@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import {
   Box,
   Button,
@@ -24,7 +24,7 @@ import LoginIcon from '@mui/icons-material/Login';
 import FindAccountPopup from '@/components/popup/FindAccountPopup';
 import type { LoginParams } from '@/types';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [frmDatas, setFrmDatas] = useState({
@@ -338,6 +338,27 @@ export default function LoginPage() {
       {/* 아이디/비밀번호 찾기 팝업 */}
       <FindAccountPopup open={findAccountPopupOpen} onClose={() => setFindAccountPopupOpen(false)} />
     </Box>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          p: 2.5,
+        }}
+      >
+        <Typography>로딩 중...</Typography>
+      </Box>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }
 

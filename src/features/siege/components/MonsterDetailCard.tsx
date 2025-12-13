@@ -62,7 +62,9 @@ function MonsterDetailCard({ monster, monsterIndex }: MonsterDetailCardProps) {
           </Typography>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }} role="list" aria-label={`${monster.name}의 스탯 정보`}>
             {Object.entries(STAT_LABELS).map(([key, label]) => {
-              const stat = monster.stats[key as keyof MonsterStats];
+              const statKey = key as keyof typeof monster.stats;
+              const stat = monster.stats[statKey];
+              if (!stat) return null;
               const isPercent = isPercentStat(key);
               return (
                 <Box

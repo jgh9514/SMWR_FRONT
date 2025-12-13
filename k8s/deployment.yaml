@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smwr-front
+  labels:
+    app: smwr-front
+    environment: production
+spec:
+  replicas: 1  # 프론트엔드는 1개로도 충분 (필요시 2개로 증가 가능)
+  selector:
+    matchLabels:
+      app: smwr-front
+  template:
+    metadata:
+      labels:
+        app: smwr-front
+    spec:
+      containers:
+      - name: smwr-front
+        image: gilhwanjeon/smwr_front-nextjs-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_TELEMETRY_DISABLED
+          value: "1"
+        - name: PORT
+          value: "3000"
+        - name: HOSTNAME
+          value: "0.0.0.0"
+        # 백엔드 API URL 설정 (ConfigMap 또는 Secret에서 가져올 수 있음)
+        - name: NEXT_PUBLIC_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: smwr-front-config
+              key: api-url
+              optional: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+

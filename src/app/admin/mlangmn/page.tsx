@@ -136,16 +136,17 @@ export default function MultiLanguageManagementPage() {
                     </TableRow>
                   ) : (
                     mlangList.map((row) => {
-                      const isSelected = selectedItems.includes(row.mlang_id);
+                      const mlangId = row.mlang_id || '';
+                      const isSelected = selectedItems.includes(mlangId);
                       return (
-                        <TableRow key={row.mlang_id} hover selected={isSelected}>
+                        <TableRow key={mlangId} hover selected={isSelected}>
                           <TableCell padding="checkbox">
                             <Checkbox
                               checked={isSelected}
-                              onChange={() => toggleSelectItem(row.mlang_id)}
+                              onChange={() => toggleSelectItem(mlangId)}
                             />
                           </TableCell>
-                          <TableCell align="center">{row.mlang_id}</TableCell>
+                          <TableCell align="center">{mlangId}</TableCell>
                           {!mobile && <TableCell align="center">{row.mlang_tp_cd}</TableCell>}
                           {!mobile && <TableCell align="center">{row.bsns_cd}</TableCell>}
                           <TableCell align="center">{row.lang_cd}</TableCell>

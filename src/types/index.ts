@@ -6,9 +6,22 @@
  * 각 feature의 types를 직접 import하는 것을 권장합니다.
  */
 
-export * from '@/features/siege/types/siege';
+export type {
+  GuildItem,
+  MonsterItem,
+  MonsterItem as SiegeMonsterItem,
+  SiegeSearchParams,
+  GuildInfo,
+  MonsterStats,
+  Monster,
+  DeckMonsterStats,
+} from '@/features/siege/types/siege';
 export * from '@/features/siege/types/siegeDetail';
-export * from '@/features/siege/types/recent-siege';
+export type {
+  SiegeItem,
+  SiegeListResponse,
+  SiegeListParams,
+} from '@/features/siege/types/recent-siege';
 export * from '@/features/rta/types/rta';
 export * from '@/features/battle-history/types/battle-history';
 export * from '@/features/auth/types/auth';

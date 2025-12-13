@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -47,7 +47,7 @@ import { validateFile } from '@/shared/utils/security';
 import { logger } from '@/shared/lib/logger';
 import type { SiegeUploadResponse, ArenaUploadResponse } from '@/types';
 
-export default function LogUploadPage() {
+function LogUploadContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const uploadType = searchParams.get('type') || 'all'; // 'rta', 'siege', 'all'
@@ -918,6 +918,18 @@ export default function LogUploadPage() {
         </Box>
       </Box>
     </Container>
+  );
+}
+
+export default function LogUploadPage() {
+  return (
+    <Suspense fallback={
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography>로딩 중...</Typography>
+      </Container>
+    }>
+      <LogUploadContent />
+    </Suspense>
   );
 }
 

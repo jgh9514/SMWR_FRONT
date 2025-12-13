@@ -5,8 +5,12 @@
 export interface UserItem {
   user_id: string;
   user_name?: string;
+  user_nm?: string;
   user_pw?: string;
   email?: string;
+  usg_yn?: string;
+  del_yn?: string;
+  lang_cd?: string;
   crt_date?: string;
   upd_date?: string;
   roles?: RoleItem[];
@@ -16,7 +20,10 @@ export interface UserItem {
 export interface LoginHisItem {
   user_id: string;
   user_name?: string;
+  usr_id?: string;
+  usr_nm?: string;
   login_date?: string;
+  login_dtm?: string;
   logout_date?: string;
   ip_addr?: string;
   role_list?: string;
@@ -38,6 +45,10 @@ export interface RoleItem {
   role_id: string;
   role_nm: string;
   role_desc?: string;
+  bsns_cd?: string;
+  usr_cnt?: number;
+  usg_yn?: string;
+  srt_sn?: string;
   crt_date?: string;
   upd_date?: string;
   row_status?: string;
@@ -51,7 +62,9 @@ export interface MenuItem {
   menu_url?: string;
   menu_icon?: string;
   srt_sn?: string;
+  srt_path?: string;
   use_yn?: string;
+  usg_yn?: string;
   crt_date?: string;
   upd_date?: string;
   row_status?: string;
@@ -61,16 +74,23 @@ export interface ApiItem {
   api_id: string;
   api_nm: string;
   api_exe_url: string;
+  api_txt?: string;
+  api_url?: string;
   api_desc?: string;
+  bsns_cd?: string;
+  bsns_cd_nm?: string;
+  usg_yn?: string;
   crt_date?: string;
   upd_date?: string;
   row_status?: string;
 }
 
 export interface CodeGroup {
+  id?: string;
   cd_grp_no: string;
   cd_grp_nm: string;
   bsns_cd?: string;
+  dtl_bsns_cd?: string;
   row_status?: string;
 }
 
@@ -108,16 +128,20 @@ export interface CodeRelSaveResponse {
 
 export interface ParentItem {
   cd_grp_no: string;
+  cd_grp_nm?: string;
   cd: string;
   cd_nm: string;
   children?: ChildItem[];
 }
 
 export interface ChildItem {
+  id?: string;
   cd_grp_no: string;
+  cd_grp_nm?: string;
   cd: string;
   cd_nm: string;
   up_cd: string;
+  row_status?: string;
 }
 
 export interface PopupItem {
@@ -137,11 +161,16 @@ export interface PageItem {
 }
 
 export interface ConditionItem {
+  id?: string;
   condition_id: string;
+  cond_id?: string;
   page_id: string;
   condition_nm: string;
+  cond_nm?: string;
   condition_type?: string;
+  cond_tp_cd?: string;
   condition_value?: string;
+  mdat_yn?: string;
   crt_date?: string;
   upd_date?: string;
   row_status?: string;
@@ -152,6 +181,11 @@ export interface UserRoleItem {
   role_id: string;
   user_name?: string;
   role_nm?: string;
+  usr_id?: string;
+  emp_no?: string;
+  usr_nm?: string;
+  dept_nm?: string;
+  usg_yn?: string;
   crt_date?: string;
   upd_date?: string;
   row_status?: string;
@@ -166,8 +200,14 @@ export interface SaveRequest<T> {
 export interface MlangItem {
   lang_cd: string;
   lang_nm: string;
+  mlang_id?: string;
   key: string;
   value: string;
+  mlang_tp_cd?: string;
+  bsns_cd?: string;
+  mlang_txt?: string;
+  usr_nm?: string;
+  upt_dt?: string;
   crt_date?: string;
   upd_date?: string;
   row_status?: string;

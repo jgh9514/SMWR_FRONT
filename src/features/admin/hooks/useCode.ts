@@ -36,13 +36,6 @@ export const useCodeSave = () => {
 };
 
 /**
- * 부모 코드 목록 조회
- */
-export const useParentCodeList = (params: Record<string, unknown> = {}) => {
-  return useApiPostQuery<ParentItem[]>('/sm/cd/parent/list', params, { enabled: false });
-};
-
-/**
  * 코드 관계 목록 조회
  */
 export const useCodeRelList = (params: Record<string, unknown> = {}) => {
@@ -54,12 +47,5 @@ export const useCodeRelList = (params: Record<string, unknown> = {}) => {
  */
 export const useCodeRelSave = (options?: Parameters<typeof useApiPostMutation<CodeRelSaveResponse, CodeRelSaveRequest>>[1]) => {
   return useApiPostMutation<CodeRelSaveResponse, CodeRelSaveRequest>('/sm/cdrel/save', options);
-};
-
-/**
- * 코드 팝업 목록 조회
- */
-export const useCodePopupList = (params: Record<string, unknown> = {}) => {
-  return useApiPostQuery<CodeItem[]>('/sm/cd/popup', params, { enabled: false });
 };
 

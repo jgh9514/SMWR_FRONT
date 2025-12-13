@@ -61,12 +61,12 @@ const ITEMS_PER_PAGE = 20;
 export function useApiPostInfiniteQuery<TData = unknown, TPageParam = number>(
   url: string,
   getPageParam: (lastPage: TData, allPages: TData[]) => TPageParam | undefined,
-  options?: Omit<UseInfiniteQueryOptions<TData, Error, TData, TData, readonly unknown[], TPageParam>, 'queryKey' | 'queryFn' | 'getNextPageParam' | 'initialPageParam'>,
+  options?: Omit<UseInfiniteQueryOptions<TData, Error, TData, readonly unknown[], TPageParam>, 'queryKey' | 'queryFn' | 'getNextPageParam' | 'initialPageParam'>,
 ): UseInfiniteQueryResult<TData, Error> {
   return useInfiniteQuery<TData, Error, TData, readonly unknown[], TPageParam>({
     queryKey: [url, 'infinite'],
-    queryFn: ({ pageParam }: { pageParam: TPageParam }) => {
-      return apiClient.post<TData>(url, { limit: ITEMS_PER_PAGE, offset: pageParam });
+    queryFn: ({ pageParam }) => {
+      return apiClient.post<TData>(url, { limit: ITEMS_PER_PAGE, offset: pageParam as TPageParam });
     },
     getNextPageParam: getPageParam,
     initialPageParam: 0 as TPageParam,

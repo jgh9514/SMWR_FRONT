@@ -92,7 +92,7 @@ export default function PreferenceCdrelmnPage() {
   }, [schDatas]);
 
   // 부모 코드 목록 조회
-  const { data: parentList = [], refetch: refetchParent } = useParentCodeList(parentSearchParams, { enabled: false });
+  const { data: parentList = [], refetch: refetchParent } = useParentCodeList(parentSearchParams, false);
 
   // 자식 코드 목록 조회 파라미터
   const childSearchParams = useMemo(() => {
@@ -100,7 +100,7 @@ export default function PreferenceCdrelmnPage() {
   }, [schChildrenDatas]);
 
   // 자식 코드 목록 조회
-  const { data: childResponse = [], refetch: refetchChild } = useCodeRelList(childSearchParams, { enabled: false });
+  const { data: childResponse = [], refetch: refetchChild } = useCodeRelList(childSearchParams);
 
   // 자식 코드 목록 상태 업데이트
   useEffect(() => {
@@ -146,7 +146,7 @@ export default function PreferenceCdrelmnPage() {
   }, [cdPopupSchDatas]);
 
   // 코드 팝업 조회
-  const { data: cdPopupResponse = [], refetch: refetchCdPopup } = useCodePopupList(cdPopupParams, { enabled: false });
+  const { data: cdPopupResponse = [], refetch: refetchCdPopup } = useCodePopupList(cdPopupParams, false);
 
   // 코드 팝업 목록 상태 업데이트
   const cdPopupList = useMemo(() => {
@@ -200,7 +200,7 @@ export default function PreferenceCdrelmnPage() {
     const res = await confirm('삭제하시겠습니까?');
     if (!res) return;
 
-    setChildList((prev) => prev.filter((item) => !selectedChildren.includes(item.id)));
+    setChildList((prev) => prev.filter((item) => item.id && !selectedChildren.includes(item.id)));
     setSelectedChildren([]);
   };
 
@@ -327,17 +327,18 @@ export default function PreferenceCdrelmnPage() {
                     </TableHead>
                     <TableBody>
                       {childList.map((row) => {
-                        const isSelected = selectedChildren.includes(row.id);
+                        const rowId = row.id || '';
+                        const isSelected = selectedChildren.includes(rowId);
                         return (
-                          <TableRow key={row.id} hover>
+                          <TableRow key={rowId} hover>
                             <TableCell padding="checkbox">
                               <Checkbox
                                 checked={isSelected}
-                                onChange={() => toggleSelectChild(row.id)}
+                                onChange={() => toggleSelectChild(rowId)}
                               />
                             </TableCell>
                             <TableCell align="center">{row.cd_grp_no}</TableCell>
-                            {!mobile && <TableCell align="left">{row.cd_grp_nm}</TableCell>}
+                            {!mobile && <TableCell align="left">{row.cd_grp_no}</TableCell>}
                             <TableCell align="center">{row.cd}</TableCell>
                             <TableCell align="left">{row.cd_nm}</TableCell>
                           </TableRow>

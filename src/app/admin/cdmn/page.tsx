@@ -582,11 +582,12 @@ export default function PreferenceCdmnPage() {
                     </TableHead>
                     <TableBody>
                       {cdGrpItems.map((row) => {
-                        const isSelected = selectedCdGrpIds.includes(row.id);
-                        const isActive = selectedCdGrpItem && selectedCdGrpItem.id === row.id;
+                        const rowId = row.id || '';
+                        const isSelected = selectedCdGrpIds.includes(rowId);
+                        const isActive = selectedCdGrpItem && selectedCdGrpItem.id === rowId;
                         return (
                           <TableRow
-                            key={row.id}
+                            key={rowId}
                             onClick={() => handleCdGrpRowClick(row)}
                             sx={{
                               cursor: 'pointer',
@@ -607,14 +608,14 @@ export default function PreferenceCdmnPage() {
                                 checked={isSelected}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggleSelectGrp(row.id);
+                                  toggleSelectGrp(rowId);
                                 }}
                               />
                             </TableCell>
-                            <TableCell align="center">{getBsnsCdNm(row.bsns_cd)}</TableCell>
+                            <TableCell align="center">{getBsnsCdNm(row.bsns_cd || '')}</TableCell>
                             {!mobile && (
                               <TableCell align="center">
-                                {getDtlBsnsCdNm(row.bsns_cd, row.dtl_bsns_cd || '')}
+                                {getDtlBsnsCdNm(row.bsns_cd || '', row.dtl_bsns_cd || '')}
                               </TableCell>
                             )}
                             <TableCell align="center">{row.cd_grp_no}</TableCell>

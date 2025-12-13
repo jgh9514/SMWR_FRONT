@@ -39,7 +39,7 @@ export const useCommonCode = (
  */
 export const useCommonCodes = (
   codeGroups: CodeGroups,
-  options?: Omit<Parameters<typeof useApiPostQuery<CodeResponse>>[2], 'enabled'>,
+  options?: Omit<Parameters<typeof useApiPostQuery<CodeResponse>>[2], 'enabled'> & { enabled?: boolean },
 ) => {
   const codeGroupKeys = Object.keys(codeGroups);
   
@@ -52,7 +52,7 @@ export const useCommonCodes = (
         return response;
       },
       enabled: !!cdGrpNo && (options?.enabled !== false),
-      ...options,
+      ...(options ? Object.fromEntries(Object.entries(options).filter(([key]) => key !== 'enabled')) : {}),
     })),
   });
 
@@ -106,7 +106,7 @@ export const useCommonCodeHierarchy = (
   return {
     ...query,
     data: {
-      keys: data.map((item: CodeItem) => [item.up_cd || '', item.cd]),
+      keys: data.map((item: CodeItem) => [item.up_cd || '', item.cd] as [string, string]),
       values: data.map((item: CodeItem) => item.cd_nm),
       tags: data.map((item: CodeItem) => item.cd),
     },

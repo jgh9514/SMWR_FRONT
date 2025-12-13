@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Box,
@@ -79,7 +79,7 @@ const AnimatedProgressBar = ({ percentage, isHighRate }: { percentage: number; i
   );
 };
 
-export default function SiegePage() {
+function SiegeContent() {
   const { isMobile } = useResponsive();
   const searchParams = useSearchParams();
   const matchIdFromQuery = searchParams?.get('match_id');
@@ -1046,5 +1046,17 @@ export default function SiegePage() {
         </Box>
       </Container>
     </Box>
+  );
+}
+
+export default function SiegePage() {
+  return (
+    <Suspense fallback={
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <Typography>로딩 중...</Typography>
+      </Container>
+    }>
+      <SiegeContent />
+    </Suspense>
   );
 }

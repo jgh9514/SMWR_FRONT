@@ -1,0 +1,28 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: smwr-front-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # HTTPS 사용 시 주석 해제
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  # TLS 설정 (HTTPS 사용 시 주석 해제)
+  # tls:
+  # - hosts:
+  #   - your-domain.com
+  #   secretName: smwr-front-tls
+  rules:
+  - host: your-domain.com  # 실제 도메인으로 변경 필요
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: smwr-front-service
+            port:
+              number: 80
+

@@ -283,13 +283,14 @@ export default function PageManagementPage() {
                           </TableRow>
                         ) : (
                           conditionList.map((row) => {
-                            const isSelected = selectedConditions.includes(row.id);
+                            const rowId = row.id || '';
+                            const isSelected = selectedConditions.includes(rowId);
                             return (
-                              <TableRow key={row.id} hover>
+                              <TableRow key={rowId} hover>
                                 <TableCell padding="checkbox">
                                   <Checkbox
                                     checked={isSelected}
-                                    onChange={() => toggleSelectCondition(row.id)}
+                                    onChange={() => toggleSelectCondition(rowId)}
                                   />
                                 </TableCell>
                                 {!mobile && <TableCell align="center">{row.cond_id}</TableCell>}

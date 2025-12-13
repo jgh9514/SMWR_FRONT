@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smwr-front-config
+data:
+  api-url: "http://your-backend-service:8080"  # 백엔드 API URL로 변경 필요
+

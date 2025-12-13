@@ -230,9 +230,8 @@ export default function GuildApplicationManagementPage() {
                   신청일
                 </Typography>
                 <Typography variant="body1">
-                  {selectedApplication.crt_date
-                    ? isMounted && new Date(selectedApplication.crt_date).toLocaleString('ko-KR')
-                    : '-'
+                  {selectedApplication.crt_date && isMounted
+                    ? new Date(selectedApplication.crt_date).toLocaleString('ko-KR')
                     : '-'}
                 </Typography>
               </Box>

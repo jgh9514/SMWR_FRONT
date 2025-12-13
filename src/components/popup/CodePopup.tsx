@@ -19,7 +19,7 @@ import {
   Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import { useCodePopupList } from '@/features/admin/hooks/useCode';
+import { useCodePopupList } from '@/features/admin/hooks/useCodeRelation';
 import { showToast } from '@/shared/lib/notification';
 import type { CodeItem } from '@/types';
 

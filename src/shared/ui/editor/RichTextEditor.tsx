@@ -163,6 +163,10 @@ export default function RichTextEditor({
         minHeight: `${minHeight}px`,
         padding: '12px',
         outline: 'none',
+        borderBottom: '1px solid #e0e0e0',
+        borderLeft: '1px solid #e0e0e0',
+        borderRight: '1px solid #e0e0e0',
+        borderRadius: readOnly ? '4px' : '0 0 4px 4px',
         '&.is-editor-empty:first-child::before': {
           content: `"${placeholder}"`,
           float: 'left',
@@ -205,12 +209,6 @@ export default function RichTextEditor({
           display: 'none',
         }),
       },
-      '& .ProseMirror': {
-        borderBottom: '1px solid #e0e0e0',
-        borderLeft: '1px solid #e0e0e0',
-        borderRight: '1px solid #e0e0e0',
-        borderRadius: readOnly ? '4px' : '0 0 4px 4px',
-      },
       ...sx,
     }),
     [minHeight, readOnly, sx, placeholder]
@@ -223,10 +221,10 @@ export default function RichTextEditor({
         sx={{
           ...editorSx,
           '& .ProseMirror': {
+            ...editorSx['& .ProseMirror'],
             minHeight: `${minHeight}px`,
             padding: '12px',
             border: '1px solid #e0e0e0',
-            borderRadius: readOnly ? '4px' : '0 0 4px 4px',
             color: 'rgba(0, 0, 0, 0.6)',
           },
         }}

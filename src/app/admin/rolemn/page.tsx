@@ -199,7 +199,7 @@ export default function RoleManagementPage() {
       role_id: (editingRole.role_id as string) || '',
       role_nm: roleNm || '',
       bsns_cd: bsnsCd || '',
-      usr_cnt: (editingRole.usr_cnt as string) || '0',
+      usr_cnt: typeof editingRole.usr_cnt === 'number' ? editingRole.usr_cnt : parseInt((editingRole.usr_cnt as string) || '0', 10),
       usg_yn: (editingRole.usg_yn as string) || 'Y',
       srt_sn: srtSn || '',
       row_status: editingRole.row_status || '',

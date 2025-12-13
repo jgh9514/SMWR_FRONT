@@ -49,7 +49,7 @@ export const useMonsterDetail = (monsterId: string | null) => {
 /**
  * 몬스터 정보 수정
  */
-export const useMonsterUpdate = (options?: Parameters<typeof useApiPostMutation>[2]) => {
+export const useMonsterUpdate = (options?: Parameters<typeof useApiPostMutation<{ success: boolean; message: string }, Partial<MonsterItem>>>[1]) => {
   return useApiPostMutation<{ success: boolean; message: string }, Partial<MonsterItem>>(
     '/admin/monster/update',
     options

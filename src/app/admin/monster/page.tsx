@@ -178,7 +178,7 @@ export default function MonsterManagementPage() {
           <CardHeader title="검색 조건" />
           <CardContent>
             <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={2}>
+              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="몬스터 ID"
@@ -187,7 +187,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="한글명"
@@ -196,7 +196,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="영문명"
@@ -205,7 +205,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>속성</InputLabel>
                   <Select
@@ -222,7 +222,7 @@ export default function MonsterManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>별</InputLabel>
                   <Select
@@ -238,7 +238,7 @@ export default function MonsterManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6} md={2}>
+              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>각성</InputLabel>
                   <Select
@@ -252,7 +252,7 @@ export default function MonsterManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              <Grid item xs={12} {...({} as any)} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                 <Button variant="contained" onClick={handleSearch} startIcon={<SearchIcon />}>
                   검색
                 </Button>
@@ -348,7 +348,7 @@ export default function MonsterManagementPage() {
           </DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="몬스터 ID"
@@ -357,7 +357,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="한글명"
@@ -366,7 +366,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="영문명"
@@ -375,7 +375,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>속성</InputLabel>
                   <Select
@@ -391,7 +391,7 @@ export default function MonsterManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="별"
@@ -402,7 +402,7 @@ export default function MonsterManagementPage() {
                   inputProps={{ min: 1, max: 6 }}
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>별 타입</InputLabel>
                   <Select
@@ -415,7 +415,7 @@ export default function MonsterManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>각성</InputLabel>
                   <Select
@@ -428,7 +428,7 @@ export default function MonsterManagementPage() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="이미지 URL"
@@ -437,7 +437,7 @@ export default function MonsterManagementPage() {
                   size="small"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid item xs={12} sm={6} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="리더 ID"

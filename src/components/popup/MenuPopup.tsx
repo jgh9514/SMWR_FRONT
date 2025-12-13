@@ -18,7 +18,7 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { useMenuSave } from '@/features/admin/hooks/useMenu';
 import { showToast } from '@/shared/lib/notification';
-import type { MenuItem, SaveRequest } from '@/types';
+import type { MenuItem as MenuItemType, SaveRequest } from '@/types';
 
 interface MenuPopupProps {
   open: boolean;
@@ -43,7 +43,7 @@ export default function MenuPopup({ open, onClose, menuId, upMenuId, mode: propM
       showToast.success('저장되었습니다.');
       onClose(true);
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
       console.error('메뉴 저장 실패:', error);
       showToast.error('저장 중 오류가 발생했습니다.');
     },
@@ -74,13 +74,13 @@ export default function MenuPopup({ open, onClose, menuId, upMenuId, mode: propM
       return;
     }
 
-    const payload: SaveRequest<MenuItem> = {
+    const payload: SaveRequest<MenuItemType> = {
       insertRow: [],
       updateRow: [],
       deleteRow: [],
     };
 
-    const menuItem: MenuItem = {
+    const menuItem: MenuItemType = {
       menu_id: form.menu_id,
       menu_nm: form.menu_nm,
       menu_url: form.menu_url,

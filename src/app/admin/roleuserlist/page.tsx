@@ -109,6 +109,7 @@ function RoleUserListContent() {
   const handleAdd = () => {
     setUserRoleList((prev) => [
       {
+        user_id: '',
         usr_id: '',
         role_tp_nm: '',
         role_nm: '',
@@ -132,7 +133,7 @@ function RoleUserListContent() {
     const res = await confirm('삭제하시겠습니까?');
     if (!res) return;
 
-    setUserRoleList((prev) => prev.filter((item) => !selectedUsers.includes(item.usr_id)));
+    setUserRoleList((prev) => prev.filter((item) => item.usr_id && !selectedUsers.includes(item.usr_id)));
     setSelectedUsers([]);
   };
 
@@ -242,12 +243,13 @@ function RoleUserListContent() {
                     </TableRow>
                   ) : (
                     userRoleList.map((row, index) => {
-                      const isSelected = selectedUsers.includes(row.usr_id);
+                      const usrId = row.usr_id || '';
+                      const isSelected = selectedUsers.includes(usrId);
                       const isNew = row.row_status === 'C';
                       return (
-                        <TableRow key={row.usr_id || index} hover selected={isSelected}>
+                        <TableRow key={usrId || index} hover selected={isSelected}>
                           <TableCell padding="checkbox">
-                            <Checkbox checked={isSelected} onChange={() => toggleSelectUser(row.usr_id)} />
+                            <Checkbox checked={isSelected} onChange={() => toggleSelectUser(usrId)} />
                           </TableCell>
                           {!mobile && (
                             <TableCell align="center">

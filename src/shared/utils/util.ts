@@ -49,7 +49,7 @@ export const getCommonCodeArray = async (
     const schData = {
       cd_grp_no: codeGroup,
     };
-    const response = await postFn(`/comm/comm-cd`, schData);
+    const response = await postFn(`/comm/comm-cd`, schData) as Record<string, CodeItem[]>;
  
     const dataArray = response[codeGroup] || [];
 
@@ -78,7 +78,7 @@ export const getCommonCodeArrayToHierarchy = async (
   const schData = {
     cd_grp_no: codeGroup
   };
-  const response = await postFn(`/comm/comm-cd`, schData);
+  const response = await postFn(`/comm/comm-cd`, schData) as Record<string, CodeItem[]>;
   
   const dataArray = response[codeGroup] || [];
   

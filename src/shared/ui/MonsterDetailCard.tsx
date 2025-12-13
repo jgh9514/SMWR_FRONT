@@ -60,6 +60,7 @@ export default function MonsterDetailCard({ monster, monsterIndex }: MonsterDeta
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 1.5 }}>
             {Object.entries(statLabels).map(([key, label]) => {
               const stat = monster.stats[key as keyof typeof monster.stats];
+              if (!stat) return null;
               const isPercent = ['cr', 'cd', 'res', 'acc'].includes(key);
               return (
                 <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
