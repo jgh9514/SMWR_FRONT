@@ -1,0 +1,31 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@7.1.0
+
+jobs:
+  build-and-lint:
+    docker:
+      - image: cimg/node:22.11
+    working_directory: ~/project
+    steps:
+      - checkout
+      - run:
+          name: Enable Corepack
+          command: corepack enable && corepack prepare pnpm@latest --activate
+      - run:
+          name: Install dependencies
+          command: cd web-react && pnpm install --frozen-lockfile
+      - run:
+          name: Lint
+          command: cd web-react && pnpm lint
+      - run:
+          name: Build
+          command: cd web-react && pnpm build
+
+workflows:
+  ci:
+    jobs:
+      - build-and-lint
+
+

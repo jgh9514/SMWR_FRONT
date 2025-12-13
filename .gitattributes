@@ -1,0 +1,6 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Exclude build artifacts from line ending conversion
+.next/** -text
+*.lock -text
