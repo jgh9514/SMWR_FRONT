@@ -31,6 +31,14 @@ export async function GET(
     const backendBaseURL = getBackendURL();
     const path = pathArray.join('/');
     
+    // 디버깅 로그
+    console.log('[이미지 프록시] 요청:', {
+      path,
+      backendBaseURL,
+      hasEnvVar: !!process.env.NEXT_PUBLIC_API_BASE_URL,
+      envVar: process.env.NEXT_PUBLIC_API_BASE_URL,
+    });
+    
     // 백엔드 URL 구성
     let backendURL: string;
     if (backendBaseURL.startsWith('http://') || backendBaseURL.startsWith('https://')) {

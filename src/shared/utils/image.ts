@@ -49,7 +49,20 @@ export const getMonsterImageUrl = (imageUrl: string | null | undefined): string 
   const wasBaseURL = getWASBaseURL();
   // imageUrl이 이미 /images/로 시작하면 그대로 사용
   const cleanImageUrl = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-  return `${wasBaseURL}${cleanImageUrl}`;
+  const finalUrl = `${wasBaseURL}${cleanImageUrl}`;
+  
+  // 디버깅 로그
+  if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+    console.log('[이미지 URL] 생성:', {
+      imageUrl,
+      wasBaseURL,
+      cleanImageUrl,
+      finalUrl,
+      hostname: window.location.hostname,
+    });
+  }
+  
+  return finalUrl;
 };
 
 /**
