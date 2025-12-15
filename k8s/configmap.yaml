@@ -3,5 +3,7 @@ kind: ConfigMap
 metadata:
   name: smwr-front-config
 data:
-  api-url: "http://your-backend-service:8080"  # 백엔드 API URL로 변경 필요
+  # 쿠버네티스 클러스터 내부 Service 이름 사용
+  # 백엔드 WAS 서비스: smw-app-service:8080
+  api-base-url: "http://smw-app-service:8080/api/v1"
 

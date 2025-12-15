@@ -31,12 +31,19 @@ docker push gilhwanjeon/smwr_front-nextjs-app:latest
 
 ### 2. ConfigMap 설정
 
-`configmap.yaml` 파일에서 백엔드 API URL을 설정합니다:
+`configmap.yaml` 파일에서 백엔드 API URL을 설정합니다. **쿠버네티스 환경에서는 클러스터 내부 Service 이름을 사용해야 합니다:**
 
 ```yaml
 data:
-  api-url: "http://your-backend-service:8080"
+  # 백엔드 WAS의 Service 이름과 포트로 변경 필요
+  # 예: http://smwr-backend-service:8080/api/v1
+  api-base-url: "http://your-backend-service-name:8080/api/v1"
 ```
+
+**중요**: 
+- 외부 URL이 아닌 쿠버네티스 클러스터 내부의 Service 이름을 사용합니다
+- Service 이름 형식: `http://<service-name>:<port>/api/v1`
+- 백엔드 WAS의 실제 Service 이름과 포트로 변경해야 합니다
 
 ### 3. Ingress 설정 (선택사항)
 
