@@ -9,15 +9,12 @@ import { showApiError } from './error-handler';
 
 // 환경별 API 서버 설정
 const getBaseURL = () => {
-  // 환경 변수가 있으면 우선 사용
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-
-  // 개발 환경 체크
+  // 브라우저 환경에서는 항상 Next.js API Route를 통해 프록시
+  // (쿠버네티스 클러스터 내부 Service는 브라우저에서 직접 접근 불가)
   if (typeof window !== 'undefined') {
+    // 개발 환경 체크
     const hostname = window.location.hostname;
-    // 로컬 환경
+    // 로컬 환경에서는 직접 백엔드 호출
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8080/api/v1';
     }
@@ -25,9 +22,16 @@ const getBaseURL = () => {
     if (hostname.includes('jgh9514.com')) {
       return `https://${hostname}/api/v1`;
     }
+    // 쿠버네티스 환경: Next.js API Route를 통해 프록시
+    return '/api/v1';
   }
 
-  // 기본값 (프로덕션 또는 서버 사이드)
+  // 서버 사이드: 환경 변수가 있으면 사용 (쿠버네티스 클러스터 내부 Service)
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+
+  // 서버 사이드 기본값
   return '/api/v1';
 };
 

@@ -21,16 +21,10 @@ export const getMonsterImageUrl = (imageUrl: string | null | undefined): string 
 
   // WAS 서버 URL 결정 (static 리소스는 /api/v1이 아닌 루트 경로)
   const getWASBaseURL = () => {
-    // 환경 변수가 있으면 우선 사용
-    if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-      // /api/v1을 제거하고 루트로
-      return process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
-    }
-
-    // 브라우저 환경에서 hostname 확인
+    // 브라우저 환경에서는 Next.js 프록시를 통해 접근
     if (typeof window !== 'undefined') {
       const hostname = window.location.hostname;
-      // 로컬 환경
+      // 로컬 환경에서는 직접 백엔드 호출
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return 'http://localhost:8080';
       }
@@ -38,9 +32,17 @@ export const getMonsterImageUrl = (imageUrl: string | null | undefined): string 
       if (hostname.includes('jgh9514.com')) {
         return `https://${hostname}`;
       }
+      // 쿠버네티스 환경: Next.js 프록시를 통해 접근 (상대 경로)
+      return '';
     }
 
-    // 기본값 (프로덕션 또는 서버 사이드) - Next.js 프록시 사용
+    // 서버 사이드: 환경 변수가 있으면 사용 (쿠버네티스 클러스터 내부 Service)
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+      // /api/v1을 제거하고 루트로
+      return process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
+    }
+
+    // 서버 사이드 기본값 - Next.js 프록시 사용
     return '';
   };
 
