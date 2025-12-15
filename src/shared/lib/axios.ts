@@ -14,6 +14,15 @@ const getBaseURL = () => {
   if (typeof window !== 'undefined') {
     // 개발 환경 체크
     const hostname = window.location.hostname;
+    
+    // 디버깅 로그
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Axios] 브라우저 환경:', {
+        hostname,
+        href: window.location.href,
+      });
+    }
+    
     // 로컬 환경에서는 직접 백엔드 호출
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8080/api/v1';
@@ -23,15 +32,21 @@ const getBaseURL = () => {
       return `https://${hostname}/api/v1`;
     }
     // 쿠버네티스 환경: Next.js API Route를 통해 프록시
-    return '/api/v1';
+    const baseURL = '/api/v1';
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Axios] 쿠버네티스 환경 감지, Next.js API Route 사용:', baseURL);
+    }
+    return baseURL;
   }
 
   // 서버 사이드: 환경 변수가 있으면 사용 (쿠버네티스 클러스터 내부 Service)
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    console.log('[Axios] 서버 사이드 - 환경 변수 사용:', process.env.NEXT_PUBLIC_API_BASE_URL);
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
 
   // 서버 사이드 기본값
+  console.log('[Axios] 서버 사이드 - 기본값 사용: /api/v1');
   return '/api/v1';
 };
 

@@ -91,6 +91,17 @@ async function proxyRequest(
       backendURL = `${base}/${path}${queryString}`;
     }
 
+    // 디버깅 로그
+    console.log('[프록시] 요청 정보:', {
+      method,
+      originalURL: request.url,
+      backendBaseURL,
+      path,
+      backendURL,
+      hasEnvVar: !!process.env.NEXT_PUBLIC_API_BASE_URL,
+      envVar: process.env.NEXT_PUBLIC_API_BASE_URL,
+    });
+
     // 요청 헤더 준비
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -127,6 +138,13 @@ async function proxyRequest(
       credentials: 'include',
     });
 
+    console.log('[프록시] 응답 정보:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
     // 응답 본문 가져오기
     const responseText = await response.text();
     
@@ -152,9 +170,32 @@ async function proxyRequest(
       headers: responseHeaders,
     });
   } catch (error) {
-    console.error('프록시 요청 실패:', error);
+    console.error('[프록시] 요청 실패:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      backendURL: (() => {
+        try {
+          const backendBaseURL = getBackendURL();
+          const path = pathSegments.join('/');
+          const url = new URL(request.url);
+          const queryString = url.search;
+          if (backendBaseURL.startsWith('http://') || backendBaseURL.startsWith('https://')) {
+            const base = backendBaseURL.endsWith('/') 
+              ? backendBaseURL.slice(0, -1) 
+              : backendBaseURL;
+            return `${base}/${path}${queryString}`;
+          }
+          return 'unknown';
+        } catch {
+          return 'unknown';
+        }
+      })(),
+    });
     return NextResponse.json(
-      { error: '백엔드 서버에 연결할 수 없습니다.' },
+      { 
+        error: '백엔드 서버에 연결할 수 없습니다.',
+        message: error instanceof Error ? error.message : String(error),
+      },
       { status: 502 }
     );
   }
