@@ -24,11 +24,12 @@ const getBackendURL = () => {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
+    const { path: pathArray } = await params;
     const backendBaseURL = getBackendURL();
-    const path = params.path.join('/');
+    const path = pathArray.join('/');
     
     // 백엔드 URL 구성
     let backendURL: string;
