@@ -130,6 +130,22 @@ async function proxyRequest(
       headers['X-Real-IP'] = realIP;
     }
 
+    // Origin 헤더 전달 (백엔드 CORS 검증에 중요)
+    // 백엔드 SimpleCorsFilter가 Origin을 검증하여 CORS를 허용함
+    const origin = request.headers.get('origin');
+    if (origin) {
+      headers['Origin'] = origin;
+    } else {
+      // Origin이 없으면 요청 URL에서 생성
+      const requestOrigin = new URL(request.url).origin;
+      headers['Origin'] = requestOrigin;
+    }
+
+    const referer = request.headers.get('referer');
+    if (referer) {
+      headers['Referer'] = referer;
+    }
+
     // 디버깅: 인증 정보 확인
     console.log('[프록시] 인증 정보:', {
       hasAuthHeader: !!authHeader,
@@ -165,6 +181,8 @@ async function proxyRequest(
       headers: {
         'content-type': response.headers.get('content-type'),
         'set-cookie': response.headers.get('set-cookie'),
+        'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+        'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
       },
     });
 
@@ -178,6 +196,33 @@ async function proxyRequest(
     const contentType = response.headers.get('content-type');
     if (contentType) {
       responseHeaders.set('Content-Type', contentType);
+    }
+
+    // CORS 헤더 전달 (백엔드에서 설정한 CORS 헤더를 그대로 전달)
+    // 백엔드 SimpleCorsFilter가 설정한 CORS 헤더를 브라우저로 전달해야 함
+    const accessControlAllowOrigin = response.headers.get('access-control-allow-origin');
+    if (accessControlAllowOrigin) {
+      responseHeaders.set('Access-Control-Allow-Origin', accessControlAllowOrigin);
+    }
+
+    const accessControlAllowCredentials = response.headers.get('access-control-allow-credentials');
+    if (accessControlAllowCredentials) {
+      responseHeaders.set('Access-Control-Allow-Credentials', accessControlAllowCredentials);
+    }
+
+    const accessControlAllowMethods = response.headers.get('access-control-allow-methods');
+    if (accessControlAllowMethods) {
+      responseHeaders.set('Access-Control-Allow-Methods', accessControlAllowMethods);
+    }
+
+    const accessControlAllowHeaders = response.headers.get('access-control-allow-headers');
+    if (accessControlAllowHeaders) {
+      responseHeaders.set('Access-Control-Allow-Headers', accessControlAllowHeaders);
+    }
+
+    const accessControlExposeHeaders = response.headers.get('access-control-expose-headers');
+    if (accessControlExposeHeaders) {
+      responseHeaders.set('Access-Control-Expose-Headers', accessControlExposeHeaders);
     }
 
     // Set-Cookie 헤더 전달 (인증 쿠키 등)
