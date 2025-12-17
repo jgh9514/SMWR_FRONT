@@ -119,6 +119,25 @@ async function proxyRequest(
       headers['Cookie'] = cookie;
     }
 
+    // 모든 요청 헤더 전달 (X-Forwarded-For 등)
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    if (forwardedFor) {
+      headers['X-Forwarded-For'] = forwardedFor;
+    }
+
+    const realIP = request.headers.get('x-real-ip');
+    if (realIP) {
+      headers['X-Real-IP'] = realIP;
+    }
+
+    // 디버깅: 인증 정보 확인
+    console.log('[프록시] 인증 정보:', {
+      hasAuthHeader: !!authHeader,
+      authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : null,
+      hasCookie: !!cookie,
+      cookieNames: cookie ? cookie.split(';').map(c => c.split('=')[0].trim()) : [],
+    });
+
     // 요청 본문 가져오기
     let body: string | undefined;
     if (method !== 'GET' && method !== 'DELETE') {
@@ -142,7 +161,11 @@ async function proxyRequest(
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
-      headers: Object.fromEntries(response.headers.entries()),
+      url: response.url,
+      headers: {
+        'content-type': response.headers.get('content-type'),
+        'set-cookie': response.headers.get('set-cookie'),
+      },
     });
 
     // 응답 본문 가져오기

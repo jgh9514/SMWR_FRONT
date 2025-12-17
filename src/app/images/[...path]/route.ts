@@ -31,14 +31,6 @@ export async function GET(
     const backendBaseURL = getBackendURL();
     const path = pathArray.join('/');
     
-    // 디버깅 로그
-    console.log('[이미지 프록시] 요청:', {
-      path,
-      backendBaseURL,
-      hasEnvVar: !!process.env.NEXT_PUBLIC_API_BASE_URL,
-      envVar: process.env.NEXT_PUBLIC_API_BASE_URL,
-    });
-    
     // 백엔드 URL 구성
     let backendURL: string;
     if (backendBaseURL.startsWith('http://') || backendBaseURL.startsWith('https://')) {
@@ -53,6 +45,15 @@ export async function GET(
       backendURL = `${base}/${path}`;
     }
 
+    // 디버깅 로그
+    console.log('[이미지 프록시] 요청:', {
+      path,
+      backendBaseURL,
+      backendURL,
+      hasEnvVar: !!process.env.NEXT_PUBLIC_API_BASE_URL,
+      envVar: process.env.NEXT_PUBLIC_API_BASE_URL,
+    });
+
     // 백엔드로 요청 전달
     const response = await fetch(backendURL, {
       method: 'GET',
@@ -61,7 +62,19 @@ export async function GET(
       },
     });
 
+    console.log('[이미지 프록시] 응답:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+      url: response.url,
+    });
+
     if (!response.ok) {
+      console.error('[이미지 프록시] 백엔드 응답 실패:', {
+        status: response.status,
+        statusText: response.statusText,
+        backendURL,
+      });
       return new NextResponse('Image not found', { status: response.status });
     }
 
@@ -80,9 +93,15 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('이미지 프록시 요청 실패:', error);
+    console.error('[이미지 프록시] 요청 실패:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return NextResponse.json(
-      { error: '이미지를 가져올 수 없습니다.' },
+      { 
+        error: '이미지를 가져올 수 없습니다.',
+        message: error instanceof Error ? error.message : String(error),
+      },
       { status: 502 }
     );
   }

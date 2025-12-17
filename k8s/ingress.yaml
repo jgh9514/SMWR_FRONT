@@ -4,6 +4,7 @@ metadata:
   name: smwr-front-ingress
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # API와 이미지 경로는 백엔드로 직접 프록시 (rewrite 없음)
     # HTTPS 사용 시 주석 해제
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
@@ -17,7 +18,7 @@ spec:
   - host: your-domain.com  # 실제 도메인으로 변경 필요
     http:
       paths:
-      # API 요청을 백엔드로 프록시
+      # API 요청을 백엔드로 프록시 (/api/v1/* -> smw-app-service:8080/api/v1/*)
       - path: /api
         pathType: Prefix
         backend:
@@ -25,7 +26,7 @@ spec:
             name: smw-app-service
             port:
               number: 8080
-      # 이미지 요청을 백엔드로 프록시
+      # 이미지 요청을 백엔드로 프록시 (/images/* -> smw-app-service:8080/images/*)
       - path: /images
         pathType: Prefix
         backend:
