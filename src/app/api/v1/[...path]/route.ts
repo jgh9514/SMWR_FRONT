@@ -107,16 +107,32 @@ async function proxyRequest(
       'Content-Type': 'application/json',
     };
 
-    // Authorization 헤더 전달
-    const authHeader = request.headers.get('authorization');
-    if (authHeader) {
-      headers['Authorization'] = authHeader;
-    }
-
     // 쿠키 전달
     const cookie = request.headers.get('cookie');
     if (cookie) {
       headers['Cookie'] = cookie;
+      
+      // 쿠키에서 인증 토큰 추출하여 Authorization 헤더 설정
+      // 백엔드에서 설정하는 쿠키 이름: SMW-Authorization 또는 SMW_AUTHORIZATION
+      const cookies = cookie.split(';').map(c => c.trim());
+      const authCookie = cookies.find(c => 
+        c.startsWith('SMW-Authorization=') || c.startsWith('SMW_AUTHORIZATION=')
+      );
+      
+      if (authCookie) {
+        const token = authCookie.split('=').slice(1).join('=').trim();
+        if (token) {
+          // Bearer 접두사가 이미 있는지 확인
+          const bearerToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+          headers['Authorization'] = bearerToken;
+        }
+      }
+    }
+
+    // Authorization 헤더 전달 (브라우저에서 설정한 경우)
+    const authHeader = request.headers.get('authorization');
+    if (authHeader && !headers['Authorization']) {
+      headers['Authorization'] = authHeader;
     }
 
     // 모든 요청 헤더 전달 (X-Forwarded-For 등)
