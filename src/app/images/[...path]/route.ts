@@ -7,10 +7,11 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // 백엔드 WAS URL 가져오기 (이미지는 /api/v1이 아닌 루트 경로)
 const getBackendURL = () => {
-  // 환경 변수가 있으면 우선 사용 (쿠버네티스 클러스터 내부 Service 이름)
+  // 환경 변수가 있으면 우선 사용
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
     // /api/v1을 제거하고 루트로
-    return process.env.NEXT_PUBLIC_API_BASE_URL.replace('/api/v1', '');
+    const url = process.env.NEXT_PUBLIC_API_BASE_URL;
+    return url.replace('/api/v1', '').replace(/\/$/, '');
   }
 
   // 개발 환경 기본값
@@ -18,8 +19,12 @@ const getBackendURL = () => {
     return 'http://localhost:8080';
   }
 
-  // 프로덕션 기본값 (쿠버네티스 클러스터 내부 Service)
-  return 'http://smw-app-service:8080';
+  // 프로덕션 기본값
+  // 외부 접근: NodePort를 통한 접근 (52.64.170.214:30080)
+  // 클러스터 내부: Service 이름 사용 (smw-app-service:8080)
+  const backendHost = process.env.BACKEND_HOST || '52.64.170.214';
+  const backendPort = process.env.BACKEND_PORT || '30080';
+  return `http://${backendHost}:${backendPort}`;
 };
 
 export async function GET(
