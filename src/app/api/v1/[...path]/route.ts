@@ -165,13 +165,32 @@ async function proxyRequest(
     }
 
     // 백엔드로 요청 전달
-    const response = await fetch(backendURL, {
+    console.log('[프록시] 백엔드 요청 시작:', {
+      backendURL,
       method,
-      headers,
-      body: body || undefined,
-      // 쿠키를 포함하여 전달
-      credentials: 'include',
+      headers: Object.keys(headers),
     });
+
+    let response: Response;
+    try {
+      response = await fetch(backendURL, {
+        method,
+        headers,
+        body: body || undefined,
+        // Node.js fetch에서는 credentials 옵션이 의미 없음
+        // 쿠키는 이미 headers['Cookie']로 전달됨
+      });
+    } catch (fetchError) {
+      console.error('[프록시] fetch 실패:', {
+        error: fetchError instanceof Error ? fetchError.message : String(fetchError),
+        stack: fetchError instanceof Error ? fetchError.stack : undefined,
+        backendURL,
+        code: (fetchError as any)?.code,
+        errno: (fetchError as any)?.errno,
+        syscall: (fetchError as any)?.syscall,
+      });
+      throw fetchError;
+    }
 
     console.log('[프록시] 응답 정보:', {
       status: response.status,
