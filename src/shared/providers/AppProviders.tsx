@@ -44,15 +44,9 @@ function makeQueryClient() {
         },
         staleTime: 5 * 60 * 1000, // 5분
         gcTime: 10 * 60 * 1000, // 10분
-        // 429 에러는 조용히 처리 (에러 표시하지 않음)
-        onError: (error: any) => {
-          const status = error?.response?.status;
-          if (status === 429) {
-            // 429 에러는 조용히 처리 (브라우저에 표시하지 않음)
-            return;
-          }
-          // 다른 에러는 기본 처리
-        },
+        // React Query v5에서는 onError가 제거되었습니다.
+        // 에러 처리는 각 useQuery/useMutation에서 개별적으로 처리하거나,
+        // axios interceptor에서 처리합니다.
       },
       mutations: {
         retry: (failureCount, error: any) => {
@@ -79,15 +73,9 @@ function makeQueryClient() {
           
           return failureCount < 1;
         },
-        // 429 에러는 조용히 처리 (에러 표시하지 않음)
-        onError: (error: any) => {
-          const status = error?.response?.status;
-          if (status === 429) {
-            // 429 에러는 조용히 처리 (브라우저에 표시하지 않음)
-            return;
-          }
-          // 다른 에러는 기본 처리
-        },
+        // React Query v5에서는 onError가 제거되었습니다.
+        // 에러 처리는 각 useQuery/useMutation에서 개별적으로 처리하거나,
+        // axios interceptor에서 처리합니다.
       },
     },
   });
