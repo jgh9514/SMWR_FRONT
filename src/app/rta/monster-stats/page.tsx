@@ -266,8 +266,9 @@ export default function RtaMonsterStatsPage() {
                           onError: (e) => {
                             // 이미지 로드 실패 시 기본 이미지로 대체
                             const target = e.target as HTMLImageElement;
-                            if (target.src !== '/images/default-monster.png') {
-                              target.src = '/images/default-monster.png';
+                            const defaultImageUrl = getMonsterImageUrl('/images/default-monster.png');
+                            if (target.src !== defaultImageUrl) {
+                              target.src = defaultImageUrl;
                             }
                           }
                         }}

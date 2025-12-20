@@ -168,7 +168,7 @@ export default function AddDeckPopup({
     // Avatar의 경우 img 태그를 찾아서 대체
     const img = (event.currentTarget as HTMLElement).querySelector('img');
     if (img) {
-      img.src = '/images/default-monster.png';
+      img.src = getMonsterImageUrl('/images/default-monster.png');
     }
   };
 
@@ -235,7 +235,7 @@ export default function AddDeckPopup({
                         sx={{ width: 60, height: 60 }}
                       />
                     ) : (
-                      <Avatar src="/images/unit_select_icon.png" sx={{ width: 60, height: 60 }} />
+                      <Avatar src={getMonsterImageUrl('/images/unit_select_icon.png')} sx={{ width: 60, height: 60 }} />
                     )}
                     {index === 0 && !selectedMonsterList[0] && (
                       <Typography

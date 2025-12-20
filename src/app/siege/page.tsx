@@ -334,7 +334,7 @@ function SiegeContent() {
     // Avatar의 경우 img 태그를 찾아서 대체
     const img = (event.currentTarget as HTMLElement).querySelector('img');
     if (img) {
-      img.src = '/images/default-monster.png';
+      img.src = getMonsterImageUrl('/images/default-monster.png');
     }
   }, []);
 

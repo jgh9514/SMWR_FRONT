@@ -169,7 +169,8 @@ axiosInstance.interceptors.response.use(
         // React Query나 컴포넌트에서 에러를 처리하도록 함
         return Promise.reject(error);
       } else if (status === 429) {
-        // 429 Too Many Requests - 일반 에러로 처리
+        // 429 Too Many Requests - Rate Limiting 에러는 조용히 처리 (브라우저에 표시하지 않음)
+        // 사용자에게 알리지 않고 조용히 실패 처리
         return Promise.reject(error);
       } else if (status >= 500) {
         if (typeof window !== 'undefined') {

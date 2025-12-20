@@ -20,6 +20,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/hooks/useRtaData';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl } from '@/shared/utils/image';
+import { getCdnImageUrl } from '@/shared/lib/env';
 import { getRatingColor, getRatingStars } from '@/shared/utils';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
 
@@ -67,7 +68,7 @@ export default function RtaPage() {
 
       return unitNames.map((name, i) => ({
         name: name || `Unit ${i + 1}`,
-        image: unitImages[i] || '/images/default-unit.png',
+        image: unitImages[i] || getMonsterImageUrl('/images/default-unit.png'),
         banned: bannedUnit === i + 1,
         leader: leaderUnit === i + 1,
       }));
@@ -269,7 +270,7 @@ export default function RtaPage() {
                       >
                         <Box sx={{ position: 'relative', flexShrink: 0 }}>
                           <Avatar
-                            src={`https://swex.oss-cn-hangzhou.aliyuncs.com/playerImage/${match.p1Id || 'default'}.jpg`}
+                            src={getCdnImageUrl(`/playerImage/${match.p1Id || 'default'}.jpg`)}
                             sx={{ width: { xs: 40, md: 50 }, height: { xs: 40, md: 50 } }}
                           />
                         </Box>
@@ -399,7 +400,7 @@ export default function RtaPage() {
                       >
                         <Box sx={{ position: 'relative', flexShrink: 0 }}>
                           <Avatar
-                            src={`https://swex.oss-cn-hangzhou.aliyuncs.com/playerImage/${match.p2Id || 'default'}.jpg`}
+                            src={getCdnImageUrl(`/playerImage/${match.p2Id || 'default'}.jpg`)}
                             sx={{ width: { xs: 40, md: 50 }, height: { xs: 40, md: 50 } }}
                           />
                         </Box>

@@ -21,7 +21,7 @@ import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { AttributeType } from '@/features/siege/types/monster';
 
-// 속성 아이콘 경로 매핑
+// 속성 아이콘 경로 매핑 (CloudFront CDN URL로 변환됨)
 const attributeIcons: Record<AttributeType, string> = {
   fire: '/images/Fire_Icon.png',
   water: '/images/Water_Icon.png',

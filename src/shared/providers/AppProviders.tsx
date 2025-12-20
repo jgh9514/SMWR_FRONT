@@ -44,6 +44,15 @@ function makeQueryClient() {
         },
         staleTime: 5 * 60 * 1000, // 5분
         gcTime: 10 * 60 * 1000, // 10분
+        // 429 에러는 조용히 처리 (에러 표시하지 않음)
+        onError: (error: any) => {
+          const status = error?.response?.status;
+          if (status === 429) {
+            // 429 에러는 조용히 처리 (브라우저에 표시하지 않음)
+            return;
+          }
+          // 다른 에러는 기본 처리
+        },
       },
       mutations: {
         retry: (failureCount, error: any) => {
@@ -69,6 +78,15 @@ function makeQueryClient() {
           }
           
           return failureCount < 1;
+        },
+        // 429 에러는 조용히 처리 (에러 표시하지 않음)
+        onError: (error: any) => {
+          const status = error?.response?.status;
+          if (status === 429) {
+            // 429 에러는 조용히 처리 (브라우저에 표시하지 않음)
+            return;
+          }
+          // 다른 에러는 기본 처리
         },
       },
     },

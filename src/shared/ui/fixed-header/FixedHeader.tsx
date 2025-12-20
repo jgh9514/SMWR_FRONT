@@ -423,7 +423,7 @@ export default function FixedHeader() {
   }, [isAdmin, hasGuild, isGuildLeaderOrManager]);
 
   // 서버와 클라이언트에서 동일한 초기 렌더링 보장
-  const logoUrl = mounted ? getMonsterImageUrl('/images/ci_active.png') : '/images/ci_active.png';
+  const logoUrl = getMonsterImageUrl('/images/ci_active.png');
 
   return (
     <>
