@@ -26,10 +26,10 @@ const getBackendURL = () => {
   }
 
   // 프로덕션 기본값
-  // 외부 접근: NodePort를 통한 접근 (52.64.170.214:30080)
+  // 외부 접근: NodePort를 통한 접근 (13.236.20.39:30080)
   // 클러스터 내부: Service 이름 사용 (smw-app-service:8080)
   // 환경 변수로 설정 가능하도록 함
-  const backendHost = process.env.BACKEND_HOST || '52.64.170.214';
+  const backendHost = process.env.BACKEND_HOST || '13.236.20.39';
   const backendPort = process.env.BACKEND_PORT || '30080';
   return `http://${backendHost}:${backendPort}/api/v1`;
 };

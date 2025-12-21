@@ -20,7 +20,8 @@ export default function PageBanner({
   height = { xs: 120, md: 200 },
 }: PageBannerProps) {
   const [imageError, setImageError] = useState(false);
-  const [bannerImageUrl, setBannerImageUrl] = useState<string>(getMonsterImageUrl(imagePath));
+  // 서버와 클라이언트에서 동일한 초기 렌더링 보장 (hydration mismatch 방지)
+  const [bannerImageUrl, setBannerImageUrl] = useState<string>(imagePath);
   
   // 클라이언트에서만 URL 변환 (hydration mismatch 방지)
   useEffect(() => {

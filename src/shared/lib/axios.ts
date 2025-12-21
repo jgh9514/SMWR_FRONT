@@ -27,14 +27,11 @@ const getBaseURL = () => {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       return 'http://localhost:8080/api/v1';
     }
-    // dev 환경 (jgh9514.com)
-    if (hostname.includes('jgh9514.com')) {
-      return `https://${hostname}/api/v1`;
-    }
-    // 쿠버네티스 환경: Next.js API Route를 통해 프록시
+    // 프로덕션 환경: Next.js API Route를 통해 프록시 (쿠키 전달 보장)
+    // jgh9514.com에서도 프록시를 통해 호출하여 쿠키가 제대로 전달되도록 함
     const baseURL = '/api/v1';
     if (process.env.NODE_ENV === 'development') {
-      console.log('[Axios] 쿠버네티스 환경 감지, Next.js API Route 사용:', baseURL);
+      console.log('[Axios] 프로덕션 환경 감지, Next.js API Route 사용:', baseURL);
     }
     return baseURL;
   }

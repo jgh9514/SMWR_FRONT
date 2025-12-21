@@ -422,8 +422,14 @@ export default function FixedHeader() {
     return getMenuCategories(isAdmin, hasGuild, isGuildLeaderOrManager);
   }, [isAdmin, hasGuild, isGuildLeaderOrManager]);
 
-  // 서버와 클라이언트에서 동일한 초기 렌더링 보장
-  const logoUrl = getMonsterImageUrl('/images/ci_active.png');
+  // 서버와 클라이언트에서 동일한 초기 렌더링 보장 (hydration mismatch 방지)
+  const [logoUrl, setLogoUrl] = useState<string>('/images/ci_active.png');
+  
+  useEffect(() => {
+    if (mounted) {
+      setLogoUrl(getMonsterImageUrl('/images/ci_active.png'));
+    }
+  }, [mounted]);
 
   return (
     <>
