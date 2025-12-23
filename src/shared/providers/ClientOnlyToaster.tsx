@@ -14,36 +14,36 @@ export default function ClientOnlyToaster() {
     setIsMounted(true);
   }, []);
 
-  // 서버와 클라이언트에서 동일한 구조 유지 (하이드레이션 오류 방지)
+  // 서버에서는 아무것도 렌더링하지 않음 (Hydration 오류 방지)
+  if (!isMounted) {
+    return null;
+  }
+
   return (
-    <div suppressHydrationWarning>
-      {isMounted && (
-        <Toaster 
-          position="top-center"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#0064FF',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              duration: 4000,
-              iconTheme: {
-                primary: '#dc004e',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
-      )}
-    </div>
+    <Toaster 
+      position="top-center"
+      toastOptions={{
+        duration: 3000,
+        style: {
+          background: '#363636',
+          color: '#fff',
+        },
+        success: {
+          duration: 3000,
+          iconTheme: {
+            primary: '#0064FF',
+            secondary: '#fff',
+          },
+        },
+        error: {
+          duration: 4000,
+          iconTheme: {
+            primary: '#dc004e',
+            secondary: '#fff',
+          },
+        },
+      }}
+    />
   );
 }
 

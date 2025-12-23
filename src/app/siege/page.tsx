@@ -87,9 +87,24 @@ function SiegeContent() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false); // 모바일 검색 조건 펼침/접기
   const [availableGuilds, setAvailableGuilds] = useState<GuildInfo[]>([]);
   const [selectedGuilds, setSelectedGuilds] = useState<string[]>([]);
+  const [userInfo, setUserInfo] = useState<any>(null);
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
+
+  // 사용자 정보 가져오기 (siege_view_scope 설정을 위해)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUserInfo = localStorage.getItem('userInfo');
+      if (storedUserInfo) {
+        try {
+          setUserInfo(JSON.parse(storedUserInfo));
+        } catch (error) {
+          console.error('사용자 정보 파싱 실패:', error);
+        }
+      }
+    }
+  }, []);
 
 
   // 선택된 몬스터 ID 배열
@@ -143,11 +158,18 @@ function SiegeContent() {
       .filter((id): id is string => id !== null);
   }, [selectedGuilds, availableGuilds]);
 
+  // 사용자 설정에서 siege_view_scope 가져오기 (기본값: 'C' - 최근 시즌)
+  const siegeViewScope = useMemo(() => {
+    const scope = userInfo?.siege_view_scope;
+    if (typeof scope === 'string' && scope.trim().length > 0) return scope;
+    return 'C'; // 기본값: 최근 시즌
+  }, [userInfo]);
+
   // 백엔드가 기대하는 형식으로 변환
   // XML에서 monster_id1, monster_id2, monster_id3를 기대함
   const apiSearchParams = useMemo(() => {
     const params: Record<string, string | number | boolean | string[] | undefined> = {
-      siege_view_scope: 'A', // 전체 시즌 조회
+      siege_view_scope: siegeViewScope, // 사용자 설정에 따른 시즌 조회 범위
     };
 
     // match_id가 있으면 해당 점령전만 조회
@@ -178,7 +200,7 @@ function SiegeContent() {
     }
 
     return searchDataExtraction(params);
-  }, [selectMonster, matchIdFromQuery, selectedGuildIds]);
+  }, [selectMonster, matchIdFromQuery, selectedGuildIds, siegeViewScope]);
 
   const [shouldSearch, setShouldSearch] = useState(true); // 처음 접속 시 자동 조회
   const isInitialMount = useRef(true); // 처음 마운트 여부 추적
@@ -307,7 +329,7 @@ function SiegeContent() {
   }, [pagination]);
 
   const handleMonsterClick = useCallback((item: MonsterItem) => {
-    navigateTo(`/monster-detail/${item.key}`);
+    navigateTo(`/siege/siege-detail/${item.key}`);
   }, []);
 
   const handlePageChange = useCallback(

@@ -154,43 +154,56 @@ export default function AppProviders({ children }: AppProvidersProps) {
   // 클라이언트 마운트 상태 관리
   const [isMounted, setIsMounted] = useState(false);
 
-  // 인증이 필요 없는 경로 목록
-  const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
-  const isPublicPath = publicPaths.includes(pathname);
-  const shouldShowHeader = !isPublicPath;
-
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // 서버와 클라이언트에서 동일한 구조 렌더링 (Hydration 오류 방지)
+  // 클라이언트에서만 pathname 기반 계산 (Hydration 오류 방지)
+  const { isPublicPath, shouldShowHeader } = useMemo(() => {
+    // 서버에서는 기본값 사용
+    if (!isMounted) {
+      return {
+        isPublicPath: false,
+        shouldShowHeader: true,
+      };
+    }
+
+    // 클라이언트에서만 pathname 사용
+    const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
+    const isPublic = publicPaths.includes(pathname);
+    const showHeader = !isPublic;
+    
+    return {
+      isPublicPath: isPublic,
+      shouldShowHeader: showHeader,
+    };
+  }, [isMounted, pathname]);
+
+  // mainSx는 항상 동일하게 유지 (Hydration 오류 방지)
+  // 실제 padding은 FixedHeader의 높이에 따라 클라이언트에서 동적으로 조정
   const mainSx = useMemo(() => {
-    return shouldShowHeader 
-      ? { pt: { xs: 7, md: 8 }, minHeight: '100vh' } 
-      : { pt: 0, minHeight: '100vh' };
-  }, [shouldShowHeader]);
+    return { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
+  }, []);
 
   return (
     <MuiThemeProvider theme={muiTheme}>
-      <CssBaseline enableColorScheme />
+      <CssBaseline />
       <RecoilRoot>
         <QueryClientProvider client={queryClient}>
           <AuthGuard>
             <ClientOnlyToaster />
-            {shouldShowHeader && <FixedHeader />}
+            {isMounted && shouldShowHeader && <FixedHeader />}
             <main suppressHydrationWarning>
               <Box sx={mainSx}>
                 {children}
               </Box>
             </main>
-            <div suppressHydrationWarning>
-              {isMounted && (
-                <>
-                  <ApiLoading />
-                  {!isPublicPath && <NoticePopup />}
-                </>
-              )}
-            </div>
+            {isMounted && (
+              <>
+                <ApiLoading />
+                {!isPublicPath && <NoticePopup />}
+              </>
+            )}
           </AuthGuard>
         </QueryClientProvider>
       </RecoilRoot>

@@ -9,41 +9,28 @@ import { showApiError } from './error-handler';
 
 // 환경별 API 서버 설정
 const getBaseURL = () => {
-  // 브라우저 환경에서는 항상 Next.js API Route를 통해 프록시
-  // (쿠버네티스 클러스터 내부 Service는 브라우저에서 직접 접근 불가)
-  if (typeof window !== 'undefined') {
-    // 개발 환경 체크
-    const hostname = window.location.hostname;
-    
-    // 디버깅 로그
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Axios] 브라우저 환경:', {
-        hostname,
-        href: window.location.href,
-      });
-    }
-    
-    // 로컬 환경에서는 직접 백엔드 호출
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:8080/api/v1';
-    }
-    // 프로덕션 환경: Next.js API Route를 통해 프록시 (쿠키 전달 보장)
-    // jgh9514.com에서도 프록시를 통해 호출하여 쿠키가 제대로 전달되도록 함
-    const baseURL = '/api/v1';
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Axios] 프로덕션 환경 감지, Next.js API Route 사용:', baseURL);
-    }
-    return baseURL;
-  }
-
-  // 서버 사이드: 환경 변수가 있으면 사용 (쿠버네티스 클러스터 내부 Service)
+  // 환경 변수가 있으면 우선 사용
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    console.log('[Axios] 서버 사이드 - 환경 변수 사용:', process.env.NEXT_PUBLIC_API_BASE_URL);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Axios] 환경 변수 사용:', process.env.NEXT_PUBLIC_API_BASE_URL);
+    }
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
 
+  // 개발 환경 기본값
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Axios] 환경 변수 없음, 기본값 사용: http://localhost:8080/api/v1');
+    return 'http://localhost:8080/api/v1';
+  }
+
+  // 브라우저 환경에서는 Next.js API Route를 통해 프록시
+  // (쿠버네티스 클러스터 내부 Service는 브라우저에서 직접 접근 불가)
+  if (typeof window !== 'undefined') {
+    // 프로덕션 환경: Next.js API Route를 통해 프록시 (쿠키 전달 보장)
+    return '/api/v1';
+  }
+
   // 서버 사이드 기본값
-  console.log('[Axios] 서버 사이드 - 기본값 사용: /api/v1');
   return '/api/v1';
 };
 

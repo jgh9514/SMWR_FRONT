@@ -19,12 +19,8 @@ const getBackendURL = () => {
     return 'http://localhost:8080';
   }
 
-  // 프로덕션 기본값
-  // 외부 접근: NodePort를 통한 접근 (52.64.170.214:30080)
-  // 클러스터 내부: Service 이름 사용 (smw-app-service:8080)
-  const backendHost = process.env.BACKEND_HOST || '52.64.170.214';
-  const backendPort = process.env.BACKEND_PORT || '30080';
-  return `http://${backendHost}:${backendPort}`;
+  // 프로덕션 기본값 (쿠버네티스 클러스터 내부 Service)
+  return 'http://smw-app-service:8080';
 };
 
 export async function GET(

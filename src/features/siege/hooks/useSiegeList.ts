@@ -12,6 +12,7 @@ export type MonsterOption = {
   un_name: string;
   image_url: string;
   modified_kr_name?: string;
+  monster_elemental?: string; // 몬스터 속성 (Fire, Water, Wind, Light, Dark)
 };
 
 /**

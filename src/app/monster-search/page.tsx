@@ -16,8 +16,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search';
 import { PageHeader } from '@/shared/ui';
 import { useRouter } from 'next/navigation';
-import { useMonsterList } from '@/features/siege/hooks/useSiegeList';
-import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
+import { useMonsterList, type MonsterOption } from '@/hooks/api';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { AttributeType } from '@/features/siege/types/monster';
 
@@ -42,17 +41,17 @@ const attributeLabels: Record<AttributeType, string> = {
 // 속성 목록
 const attributes: AttributeType[] = ['fire', 'water', 'wind', 'light', 'dark'];
 
-// 이미지 경로에서 속성 추출 (예: /images/Fire/Phoenix_Fire_Icon.png)
-const getMonsterAttribute = (imageUrl: string): AttributeType | null => {
-  if (!imageUrl) return null;
+// monster_elemental 값을 AttributeType으로 변환
+const getMonsterAttribute = (monsterElemental: string | undefined): AttributeType | null => {
+  if (!monsterElemental) return null;
   
-  const url = imageUrl.toLowerCase();
-  // 이미지 경로에서 속성 추출
-  if (url.includes('/fire/') || url.includes('_fire_') || url.includes('fire_icon')) return 'fire';
-  if (url.includes('/water/') || url.includes('_water_') || url.includes('water_icon')) return 'water';
-  if (url.includes('/wind/') || url.includes('_wind_') || url.includes('wind_icon')) return 'wind';
-  if (url.includes('/light/') || url.includes('_light_') || url.includes('light_icon')) return 'light';
-  if (url.includes('/dark/') || url.includes('_dark_') || url.includes('dark_icon')) return 'dark';
+  const elemental = monsterElemental.toLowerCase();
+  // DB에서 반환된 속성 값을 프론트엔드 타입으로 매핑
+  if (elemental === 'fire' || elemental === '불') return 'fire';
+  if (elemental === 'water' || elemental === '물') return 'water';
+  if (elemental === 'wind' || elemental === '바람') return 'wind';
+  if (elemental === 'light' || elemental === '빛') return 'light';
+  if (elemental === 'dark' || elemental === '어둠') return 'dark';
   
   return null; // 속성을 알 수 없는 경우
 };
@@ -88,9 +87,9 @@ export default function MonsterSearchPage() {
   const filteredMonsters = useMemo(() => {
     let filtered = monsterList;
 
-    // 속성 필터링 (이미지 경로에서 속성 추출)
+    // 속성 필터링 (monster_elemental 필드 사용)
     filtered = filtered.filter((monster) => {
-      const attribute = getMonsterAttribute(monster.image_url);
+      const attribute = getMonsterAttribute(monster.monster_elemental);
       return attribute === selectedAttribute;
     });
 
@@ -199,7 +198,7 @@ export default function MonsterSearchPage() {
                   }}
                 >
                   {filteredMonsters.map((monster) => {
-                    const monsterAttribute = getMonsterAttribute(monster.image_url);
+                    const monsterAttribute = getMonsterAttribute(monster.monster_elemental);
                     const attributeIcon = monsterAttribute ? attributeIcons[monsterAttribute] : null;
 
                     return (
