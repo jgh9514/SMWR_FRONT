@@ -8,6 +8,7 @@ import {
   CardContent,
   CardHeader,
   Checkbox,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -77,11 +78,15 @@ export default function PreferenceCdmnPage() {
 
   const codeSaveMutation = useCodeSave();
   
-  // 코드 그룹 목록 조회 Query (동적 파라미터 사용)
-  const codeGroupListQuery = useCodeGroupList(schDatas);
+  // 검색 파라미터 추출
+  const codeGroupSearchParams = useMemo(() => searchDataExtraction(schDatas), [schDatas]);
+  const codeSearchParams = useMemo(() => searchDataExtraction(cdSchDatas), [cdSchDatas]);
   
-  // 코드 목록 조회 Query (동적 파라미터 사용)
-  const codeListQuery = useCodeList(cdSchDatas);
+  // 코드 그룹 목록 조회 Query
+  const codeGroupListQuery = useCodeGroupList(codeGroupSearchParams);
+  
+  // 코드 목록 조회 Query (cd_grp_no가 있을 때만 활성화)
+  const codeListQuery = useCodeList(codeSearchParams);
 
   const bsnsCdOptions = useMemo(
     () =>
@@ -456,67 +461,65 @@ export default function PreferenceCdmnPage() {
     });
   };
 
-  const cdGrpSearch = async (type?: 'save') => {
-    const searchData = searchDataExtraction(schDatas);
-    
-    // React Query hook 사용 (파라미터 변경 시 자동으로 새로운 쿼리 생성)
-    const result = await codeGroupListQuery.refetch();
-    if (!result.data) {
-      showToast.error('코드 그룹 목록을 불러오는데 실패했습니다.');
-      return;
-    }
-    const rows: CodeGroup[] = result.data;
+  // 코드 그룹 목록 데이터 처리
+  useEffect(() => {
+    if (codeGroupListQuery.data) {
+      const rows: CodeGroup[] = codeGroupListQuery.data;
+      const mapped = rows.map((row, index) => ({
+        ...row,
+        id: row.cd_grp_no || `grp_${index}`,
+        row_status: row.row_status || '',
+      })) as CodeGroup[];
 
-    const mapped = rows.map((row, index) => ({
-      ...row,
-      id: row.cd_grp_no || `grp_${index}`,
-      row_status: row.row_status || '',
-    })) as CodeGroup[];
+      setCdGrpItems(mapped);
 
-    setCdGrpItems(mapped);
-
-    if (type !== 'save') {
-      setCdItems([]);
-      setSelectedCdGrpItem(null);
-    }
-
-    if (type === 'save' && selectedCdGrpItem) {
-      const item = mapped.find((i) => i.cd_grp_no === selectedCdGrpItem.cd_grp_no);
-      if (item) {
-        setSelectedCdGrpItem(item);
-        setCdSchDatas((prev: Record<string, unknown>) => ({
-          ...prev,
-          cd_grp_no: item.cd_grp_no,
-        }));
-        await cdSearch('cdGrp', item.cd_grp_no, item.bsns_cd);
+      // 저장 후 선택된 항목 유지
+      if (selectedCdGrpItem) {
+        const item = mapped.find((i) => i.cd_grp_no === selectedCdGrpItem.cd_grp_no);
+        if (item) {
+          setSelectedCdGrpItem(item);
+          setCdSchDatas((prev: CodeSearchData) => ({
+            ...prev,
+            cd_grp_no: item.cd_grp_no,
+          }));
+        }
       }
     }
+  }, [codeGroupListQuery.data, selectedCdGrpItem]);
+
+  // 코드 목록 데이터 처리
+  useEffect(() => {
+    if (codeListQuery.data && cdSchDatas.cd_grp_no) {
+      const cdRows: CodeItem[] = codeListQuery.data;
+      const mapped = cdRows.map((row, index) => ({
+        ...row,
+        id: row.cd ? `cd_${row.cd}_${index}` : `cd_${index}`,
+        row_status: row.row_status || '',
+      })) as CodeItem[];
+
+      setCdItems(mapped);
+    } else if (!cdSchDatas.cd_grp_no) {
+      setCdItems([]);
+    }
+  }, [codeListQuery.data, cdSchDatas.cd_grp_no]);
+
+  const cdGrpSearch = async (type?: 'save') => {
+    await codeGroupListQuery.refetch();
   };
 
   const cdSearch = async (type?: 'cdGrp' | 'save', grpNo?: string, bsnsCdValue?: string) => {
     const targetCdGrpNo = grpNo ?? cdSchDatas.cd_grp_no;
-    if (isEmpty(targetCdGrpNo)) return;
-
-    const cdSearchData = searchDataExtraction({
-      ...cdSchDatas,
-      cd_grp_no: targetCdGrpNo,
-    });
-    
-    // React Query hook 사용 (파라미터 변경 시 자동으로 새로운 쿼리 생성)
-    const result = await codeListQuery.refetch();
-    if (!result.data) {
-      showToast.error('코드 목록을 불러오는데 실패했습니다.');
+    if (isEmpty(targetCdGrpNo)) {
+      setCdItems([]);
       return;
     }
-    const cdRows: CodeItem[] = result.data;
 
-    const mapped = cdRows.map((row, index) => ({
-      ...row,
-      id: row.cd ? `cd_${row.cd}_${index}` : `cd_${index}`,
-      row_status: row.row_status || '',
-    })) as CodeItem[];
-
-    setCdItems(mapped);
+    setCdSchDatas((prev: CodeSearchData) => ({
+      ...prev,
+      cd_grp_no: targetCdGrpNo,
+    }));
+    
+    await codeListQuery.refetch();
   };
 
   const { data: hierarchyData } = useCommonCodeHierarchy('CO00000002');
@@ -531,6 +534,16 @@ export default function PreferenceCdmnPage() {
       }));
     }
   }, [hierarchyData]);
+
+  // 코드 그룹 선택 시 코드 목록 자동 조회
+  useEffect(() => {
+    if (selectedCdGrpItem?.cd_grp_no) {
+      setCdSchDatas((prev: CodeSearchData) => ({
+        ...prev,
+        cd_grp_no: selectedCdGrpItem.cd_grp_no,
+      }));
+    }
+  }, [selectedCdGrpItem]);
 
   const toggleSelectGrp = (id: string) => {
     setSelectedCdGrpIds((prev) =>
@@ -581,60 +594,76 @@ export default function PreferenceCdmnPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {cdGrpItems.map((row) => {
-                        const rowId = row.id || '';
-                        const isSelected = selectedCdGrpIds.includes(rowId);
-                        const isActive = selectedCdGrpItem && selectedCdGrpItem.id === rowId;
-                        return (
-                          <TableRow
-                            key={rowId}
-                            onClick={() => handleCdGrpRowClick(row)}
-                            sx={{
-                              cursor: 'pointer',
-                              backgroundColor: isActive
-                                ? 'rgba(25, 118, 210, 0.18)'
-                                : isSelected
-                                ? 'rgba(25, 118, 210, 0.08)'
-                                : 'transparent',
-                              '&:hover': {
+                      {codeGroupListQuery.isLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={cdGrpHeaders.length + 1} align="center" sx={{ py: 4 }}>
+                            <CircularProgress size={24} />
+                          </TableCell>
+                        </TableRow>
+                      ) : cdGrpItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={cdGrpHeaders.length + 1} align="center" sx={{ py: 4 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              데이터가 없습니다
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        cdGrpItems.map((row) => {
+                          const rowId = row.id || '';
+                          const isSelected = selectedCdGrpIds.includes(rowId);
+                          const isActive = selectedCdGrpItem && selectedCdGrpItem.id === rowId;
+                          return (
+                            <TableRow
+                              key={rowId}
+                              onClick={() => handleCdGrpRowClick(row)}
+                              sx={{
+                                cursor: 'pointer',
                                 backgroundColor: isActive
-                                  ? 'rgba(25, 118, 210, 0.25)'
-                                  : 'rgba(0, 0, 0, 0.04)',
-                              },
-                            }}
-                          >
-                            <TableCell padding="checkbox">
-                              <Checkbox
-                                checked={isSelected}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleSelectGrp(rowId);
-                                }}
-                              />
-                            </TableCell>
-                            <TableCell align="center">{getBsnsCdNm(row.bsns_cd || '')}</TableCell>
-                            {!mobile && (
-                              <TableCell align="center">
-                                {getDtlBsnsCdNm(row.bsns_cd || '', row.dtl_bsns_cd || '')}
+                                  ? 'rgba(25, 118, 210, 0.18)'
+                                  : isSelected
+                                  ? 'rgba(25, 118, 210, 0.08)'
+                                  : 'transparent',
+                                '&:hover': {
+                                  backgroundColor: isActive
+                                    ? 'rgba(25, 118, 210, 0.25)'
+                                    : 'rgba(0, 0, 0, 0.04)',
+                                },
+                              }}
+                            >
+                              <TableCell padding="checkbox">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleSelectGrp(rowId);
+                                  }}
+                                />
                               </TableCell>
-                            )}
-                            <TableCell align="center">{row.cd_grp_no}</TableCell>
-                            <TableCell>
-                              <Button
-                                variant="text"
-                                color="primary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  editGrp(row);
-                                }}
-                                sx={{ textTransform: 'none', p: 0, minWidth: 'auto' }}
-                              >
-                                {row.cd_grp_nm}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                              <TableCell align="center">{getBsnsCdNm(row.bsns_cd || '')}</TableCell>
+                              {!mobile && (
+                                <TableCell align="center">
+                                  {getDtlBsnsCdNm(row.bsns_cd || '', row.dtl_bsns_cd || '')}
+                                </TableCell>
+                              )}
+                              <TableCell align="center">{row.cd_grp_no}</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="text"
+                                  color="primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    editGrp(row);
+                                  }}
+                                  sx={{ textTransform: 'none', p: 0, minWidth: 'auto' }}
+                                >
+                                  {row.cd_grp_nm}
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -684,40 +713,56 @@ export default function PreferenceCdmnPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {cdItems.map((row) => {
-                        const isSelected = selectedCdIds.includes(row.id);
-                        return (
-                          <TableRow key={row.id} hover>
-                            <TableCell padding="checkbox">
-                              <Checkbox
-                                checked={isSelected}
-                                onChange={() => toggleSelectCd(row.id)}
-                              />
-                            </TableCell>
-                            <TableCell align="center">
-                              <Button
-                                variant="text"
-                                color="primary"
-                                onClick={() => editCd(row)}
-                                sx={{ textTransform: 'none', p: 0, minWidth: 'auto' }}
-                              >
-                                {row.cd}
-                              </Button>
-                            </TableCell>
-                            <TableCell>{row.cd_nm}</TableCell>
-                            <TableCell align="center">{row.srt_sn}</TableCell>
-                            {!mobile && (
-                              <>
-                                <TableCell align="center">{row.buf_fst_txt}</TableCell>
-                                <TableCell align="center">{row.buf_snd_txt}</TableCell>
-                                <TableCell align="center">{row.buf_trd_txt}</TableCell>
-                                <TableCell align="center">{row.buf_fth_txt}</TableCell>
-                                <TableCell align="center">{row.buf_ffh_txt}</TableCell>
-                              </>
-                            )}
-                          </TableRow>
-                        );
-                      })}
+                      {codeListQuery.isLoading ? (
+                        <TableRow>
+                          <TableCell colSpan={cdHeaders.length + 1} align="center" sx={{ py: 4 }}>
+                            <CircularProgress size={24} />
+                          </TableCell>
+                        </TableRow>
+                      ) : cdItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={cdHeaders.length + 1} align="center" sx={{ py: 4 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              {selectedCdGrpItem ? '데이터가 없습니다' : '코드 그룹을 선택해주세요'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        cdItems.map((row) => {
+                          const isSelected = selectedCdIds.includes(row.id);
+                          return (
+                            <TableRow key={row.id} hover>
+                              <TableCell padding="checkbox">
+                                <Checkbox
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectCd(row.id)}
+                                />
+                              </TableCell>
+                              <TableCell align="center">
+                                <Button
+                                  variant="text"
+                                  color="primary"
+                                  onClick={() => editCd(row)}
+                                  sx={{ textTransform: 'none', p: 0, minWidth: 'auto' }}
+                                >
+                                  {row.cd}
+                                </Button>
+                              </TableCell>
+                              <TableCell>{row.cd_nm}</TableCell>
+                              <TableCell align="center">{row.srt_sn}</TableCell>
+                              {!mobile && (
+                                <>
+                                  <TableCell align="center">{row.buf_fst_txt}</TableCell>
+                                  <TableCell align="center">{row.buf_snd_txt}</TableCell>
+                                  <TableCell align="center">{row.buf_trd_txt}</TableCell>
+                                  <TableCell align="center">{row.buf_fth_txt}</TableCell>
+                                  <TableCell align="center">{row.buf_ffh_txt}</TableCell>
+                                </>
+                              )}
+                            </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </TableContainer>

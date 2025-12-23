@@ -16,6 +16,7 @@ import {
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import HomeIcon from '@mui/icons-material/Home';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 
 export default function AdminHeader() {
@@ -58,6 +59,11 @@ export default function AdminHeader() {
   const handleDashboard = () => {
     handleMenuClose();
     router.push('/admin');
+  };
+
+  const handleGoToUserView = () => {
+    handleMenuClose();
+    router.push('/');
   };
 
   return (
@@ -123,6 +129,10 @@ export default function AdminHeader() {
             <MenuItem onClick={handleDashboard}>
               <DashboardIcon fontSize="small" sx={{ mr: 1 }} />
               대시보드
+            </MenuItem>
+            <MenuItem onClick={handleGoToUserView}>
+              <HomeIcon fontSize="small" sx={{ mr: 1 }} />
+              사용자 화면으로
             </MenuItem>
             <Divider />
             <MenuItem onClick={handleLogout}>

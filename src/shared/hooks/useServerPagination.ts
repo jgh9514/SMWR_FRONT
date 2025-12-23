@@ -12,6 +12,7 @@ interface UseServerPaginationReturn {
   currentPage: number;
   itemsPerPage: number;
   setPage: (page: number) => void;
+  setItemsPerPage: (itemsPerPage: number) => void;
   nextPage: () => void;
   prevPage: () => void;
   goToFirstPage: () => void;
@@ -32,10 +33,11 @@ export function useServerPagination(
 ): UseServerPaginationReturn {
   const {
     initialPage = 1,
-    itemsPerPage = 10,
+    itemsPerPage: initialItemsPerPage = 10,
   } = options;
 
   const [currentPage, setCurrentPage] = useState(initialPage);
+  const [itemsPerPage, setItemsPerPage] = useState(initialItemsPerPage);
 
   const setPage = useCallback((page: number) => {
     if (page >= 1) {
@@ -67,6 +69,11 @@ export function useServerPagination(
     setCurrentPage(initialPage);
   }, [initialPage]);
 
+  const handleSetItemsPerPage = useCallback((newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // 페이지당 항목 수 변경 시 첫 페이지로 이동
+  }, []);
+
   const paginationParams = {
     paging: itemsPerPage,
     offset: currentPage,
@@ -76,6 +83,7 @@ export function useServerPagination(
     currentPage,
     itemsPerPage,
     setPage,
+    setItemsPerPage: handleSetItemsPerPage,
     nextPage,
     prevPage,
     goToFirstPage,

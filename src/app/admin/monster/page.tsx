@@ -13,7 +13,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
-  Grid,
   IconButton,
   InputLabel,
   MenuItem,
@@ -39,6 +38,8 @@ import { useMonsterList, useMonsterDetail, useMonsterUpdate, type MonsterItem } 
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getMonsterImageUrl } from '@/shared/utils/image';
+import { Avatar } from '@mui/material';
 
 export default function MonsterManagementPage() {
   const theme = useTheme();
@@ -87,6 +88,7 @@ export default function MonsterManagementPage() {
 
   const headers = useMemo(() => {
     const baseHeaders = [
+      { title: '이미지', key: 'image', align: 'center' as const },
       { title: '몬스터 ID', key: 'monster_id', align: 'center' as const },
       { title: '한글명', key: 'kr_name', align: 'left' as const },
       { title: '영문명', key: 'un_name', align: 'left' as const },
@@ -162,7 +164,7 @@ export default function MonsterManagementPage() {
   }, [page]);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 4 } }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 2, md: 4 } }}>
       <Container maxWidth="xl">
         <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
           <Button variant="outlined" onClick={() => router.push('/admin')} startIcon={<ArrowBackIcon />}>
@@ -177,8 +179,8 @@ export default function MonsterManagementPage() {
         <Card sx={{ mb: 3 }}>
           <CardHeader title="검색 조건" />
           <CardContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
                 <TextField
                   fullWidth
                   label="몬스터 ID"
@@ -186,8 +188,6 @@ export default function MonsterManagementPage() {
                   onChange={(e) => setSchDatas({ ...schDatas, monster_id: e.target.value })}
                   size="small"
                 />
-              </Grid>
-              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="한글명"
@@ -195,8 +195,6 @@ export default function MonsterManagementPage() {
                   onChange={(e) => setSchDatas({ ...schDatas, kr_name: e.target.value })}
                   size="small"
                 />
-              </Grid>
-              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <TextField
                   fullWidth
                   label="영문명"
@@ -204,8 +202,6 @@ export default function MonsterManagementPage() {
                   onChange={(e) => setSchDatas({ ...schDatas, un_name: e.target.value })}
                   size="small"
                 />
-              </Grid>
-              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>속성</InputLabel>
                   <Select
@@ -221,8 +217,6 @@ export default function MonsterManagementPage() {
                     <MenuItem value="Dark">Dark</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>별</InputLabel>
                   <Select
@@ -237,8 +231,6 @@ export default function MonsterManagementPage() {
                     <MenuItem value="6">6</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={2} {...({} as any)}>
                 <FormControl fullWidth size="small">
                   <InputLabel>각성</InputLabel>
                   <Select
@@ -251,16 +243,16 @@ export default function MonsterManagementPage() {
                     <MenuItem value="Awakened">Awakened</MenuItem>
                   </Select>
                 </FormControl>
-              </Grid>
-              <Grid item xs={12} {...({} as any)} sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                 <Button variant="contained" onClick={handleSearch} startIcon={<SearchIcon />}>
                   검색
                 </Button>
                 <Button variant="outlined" onClick={handleReset}>
                   초기화
                 </Button>
-              </Grid>
-            </Grid>
+              </Box>
+            </Box>
           </CardContent>
         </Card>
 
@@ -306,6 +298,17 @@ export default function MonsterManagementPage() {
                   ) : (
                     monsterList.map((row, index) => (
                       <TableRow key={row.monster_id || index} hover>
+                        <TableCell align="center">
+                          {row.image_url ? (
+                            <Avatar
+                              src={getMonsterImageUrl(row.image_url)}
+                              alt={row.kr_name}
+                              sx={{ width: 48, height: 48, mx: 'auto' }}
+                            />
+                          ) : (
+                            '-'
+                          )}
+                        </TableCell>
                         <TableCell align="center">{row.monster_id}</TableCell>
                         <TableCell align="left">{row.kr_name}</TableCell>
                         {!mobile && <TableCell align="left">{row.un_name}</TableCell>}
@@ -347,106 +350,88 @@ export default function MonsterManagementPage() {
             </Box>
           </DialogTitle>
           <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <TextField
-                  fullWidth
-                  label="몬스터 ID"
-                  value={editData.monster_id || ''}
-                  disabled
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <TextField
-                  fullWidth
-                  label="한글명"
-                  value={editData.kr_name || ''}
-                  onChange={(e) => setEditData({ ...editData, kr_name: e.target.value })}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <TextField
-                  fullWidth
-                  label="영문명"
-                  value={editData.un_name || ''}
-                  onChange={(e) => setEditData({ ...editData, un_name: e.target.value })}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>속성</InputLabel>
-                  <Select
-                    value={editData.monster_elemental || ''}
-                    label="속성"
-                    onChange={(e) => setEditData({ ...editData, monster_elemental: e.target.value })}
-                  >
-                    <MenuItem value="Fire">Fire</MenuItem>
-                    <MenuItem value="Water">Water</MenuItem>
-                    <MenuItem value="Wind">Wind</MenuItem>
-                    <MenuItem value="Light">Light</MenuItem>
-                    <MenuItem value="Dark">Dark</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <TextField
-                  fullWidth
-                  label="별"
-                  type="number"
-                  value={editData.star || ''}
-                  onChange={(e) => setEditData({ ...editData, star: parseInt(e.target.value) || 0 })}
-                  size="small"
-                  inputProps={{ min: 1, max: 6 }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>별 타입</InputLabel>
-                  <Select
-                    value={editData.star_type || ''}
-                    label="별 타입"
-                    onChange={(e) => setEditData({ ...editData, star_type: e.target.value })}
-                  >
-                    <MenuItem value="Normal">Normal</MenuItem>
-                    <MenuItem value="Special">Special</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>각성</InputLabel>
-                  <Select
-                    value={editData.arousal_type || ''}
-                    label="각성"
-                    onChange={(e) => setEditData({ ...editData, arousal_type: e.target.value })}
-                  >
-                    <MenuItem value="Normal">Normal</MenuItem>
-                    <MenuItem value="Awakened">Awakened</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <TextField
-                  fullWidth
-                  label="이미지 URL"
-                  value={editData.image_url || ''}
-                  onChange={(e) => setEditData({ ...editData, image_url: e.target.value })}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} {...({} as any)}>
-                <TextField
-                  fullWidth
-                  label="리더 ID"
-                  value={editData.leader_id || ''}
-                  onChange={(e) => setEditData({ ...editData, leader_id: e.target.value })}
-                  size="small"
-                />
-              </Grid>
-            </Grid>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2, mt: 1 }}>
+              <TextField
+                fullWidth
+                label="몬스터 ID"
+                value={editData.monster_id || ''}
+                disabled
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="한글명"
+                value={editData.kr_name || ''}
+                onChange={(e) => setEditData({ ...editData, kr_name: e.target.value })}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="영문명"
+                value={editData.un_name || ''}
+                onChange={(e) => setEditData({ ...editData, un_name: e.target.value })}
+                size="small"
+              />
+              <FormControl fullWidth size="small">
+                <InputLabel>속성</InputLabel>
+                <Select
+                  value={editData.monster_elemental || ''}
+                  label="속성"
+                  onChange={(e) => setEditData({ ...editData, monster_elemental: e.target.value })}
+                >
+                  <MenuItem value="Fire">Fire</MenuItem>
+                  <MenuItem value="Water">Water</MenuItem>
+                  <MenuItem value="Wind">Wind</MenuItem>
+                  <MenuItem value="Light">Light</MenuItem>
+                  <MenuItem value="Dark">Dark</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="별"
+                type="number"
+                value={editData.star || ''}
+                onChange={(e) => setEditData({ ...editData, star: parseInt(e.target.value) || 0 })}
+                size="small"
+                inputProps={{ min: 1, max: 6 }}
+              />
+              <FormControl fullWidth size="small">
+                <InputLabel>별 타입</InputLabel>
+                <Select
+                  value={editData.star_type || ''}
+                  label="별 타입"
+                  onChange={(e) => setEditData({ ...editData, star_type: e.target.value })}
+                >
+                  <MenuItem value="Normal">Normal</MenuItem>
+                  <MenuItem value="Special">Special</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth size="small">
+                <InputLabel>각성</InputLabel>
+                <Select
+                  value={editData.arousal_type || ''}
+                  label="각성"
+                  onChange={(e) => setEditData({ ...editData, arousal_type: e.target.value })}
+                >
+                  <MenuItem value="Normal">Normal</MenuItem>
+                  <MenuItem value="Awakened">Awakened</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField
+                fullWidth
+                label="이미지 URL"
+                value={editData.image_url || ''}
+                onChange={(e) => setEditData({ ...editData, image_url: e.target.value })}
+                size="small"
+              />
+              <TextField
+                fullWidth
+                label="리더 ID"
+                value={editData.leader_id || ''}
+                onChange={(e) => setEditData({ ...editData, leader_id: e.target.value })}
+                size="small"
+              />
+            </Box>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>취소</Button>

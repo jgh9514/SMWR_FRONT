@@ -20,6 +20,10 @@ import {
   Fab,
   Checkbox,
   Divider,
+  Select,
+  FormControl,
+  InputLabel,
+  MenuItem,
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -27,7 +31,7 @@ import StarIcon from '@mui/icons-material/Star';
 import { useEnemyTeamList, useTotalPageCount, useMonsterList, type MonsterOption } from '@/hooks/api';
 import { searchDataExtraction, getRatingColor, getRatingStars } from '@/shared/utils';
 import { showToast } from '@/shared/lib/notification';
-import { DEFAULT_ITEMS_PER_PAGE, AVATAR_SIZE_XS, AVATAR_SIZE_MD } from '@/shared/constants';
+import { DEFAULT_ITEMS_PER_PAGE, AVATAR_SIZE_XS, AVATAR_SIZE_MD, PAGINATION_OPTIONS } from '@/shared/constants';
 import { LoadingState, EmptyState } from '@/shared/ui';
 import { useResponsive, useServerPagination } from '@/shared/hooks';
 import { navigateTo } from '@/shared/utils/navigation';
@@ -596,9 +600,9 @@ function SiegeContent() {
               width: { md: 400 },
               flexShrink: 0,
               position: { md: 'sticky' },
-              top: { md: 24 },
+              top: { md: 80 }, // 헤더 높이(64px) + 여유 공간(16px)
               alignSelf: { md: 'flex-start' },
-              maxHeight: { md: 'calc(100vh - 48px)' },
+              maxHeight: { md: 'calc(100vh - 80px)' }, // 헤더 높이 + 여유 공간
               overflowY: { md: 'auto' },
               '&::-webkit-scrollbar': {
                 width: '8px',
@@ -920,149 +924,190 @@ function SiegeContent() {
                 </CardContent>
               </Card>
             ) : (
-              <>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: {
-                      xs: 'repeat(2, 1fr)', // 모바일: 2열
-                      sm: 'repeat(3, 1fr)', // 태블릿: 3열
-                      md: 'repeat(4, 1fr)', // PC: 4열
-                      lg: 'repeat(5, 1fr)', // 큰 화면: 5열
-                    },
-                    gap: { xs: 1.5, md: 2 },
-                    mb: { xs: 3, md: 4 },
-                  }}
-                >
-              {paginatedMonsterList.map((item) => {
-                const winCount = item.win_count || 0;
-                const loseCount = item.lose_count || 0;
-                const total = winCount + loseCount;
-                const winRate = total > 0 ? Math.round((winCount / total) * 100) : 0;
-                const winPercentage = total > 0 ? (winCount / total) * 100 : 0;
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: 'repeat(2, 1fr)', // 모바일: 2열
+                    sm: 'repeat(3, 1fr)', // 태블릿: 3열
+                    md: 'repeat(4, 1fr)', // PC: 4열
+                    lg: 'repeat(5, 1fr)', // 큰 화면: 5열
+                  },
+                  gap: { xs: 1.5, md: 2 },
+                  mb: { xs: 3, md: 4 },
+                }}
+              >
+                {paginatedMonsterList.map((item) => {
+                  const winCount = item.win_count || 0;
+                  const loseCount = item.lose_count || 0;
+                  const total = winCount + loseCount;
+                  const winRate = total > 0 ? Math.round((winCount / total) * 100) : 0;
+                  const winPercentage = total > 0 ? (winCount / total) * 100 : 0;
 
-                return (
-                  <Card
-                    key={item.key}
-                    sx={{
-                      cursor: 'pointer',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      boxShadow: 1,
-                      borderRadius: 2,
-                      overflow: 'hidden',
-                      '&:hover': {
-                        boxShadow: 6,
-                        transform: 'translateY(-4px)',
-                      },
+                  return (
+                    <Card
+                      key={item.key}
+                      sx={{
+                        cursor: 'pointer',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        boxShadow: 1,
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        '&:hover': {
+                          boxShadow: 6,
+                          transform: 'translateY(-4px)',
+                        },
+                      }}
+                      onClick={() => handleMonsterClick(item)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleMonsterClick(item);
+                        }
+                      }}
+                      aria-label={`${item.key} 방어덱 상세 보기`}
+                    >
+                      <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
+                        {/* 몬스터 이미지 */}
+                        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, gap: -1 }}>
+                          {[item.image_url1, item.image_url2, item.image_url3]
+                            .filter(Boolean)
+                            .map((url, idx) => (
+                              <Avatar
+                                key={idx}
+                                src={getMonsterImageUrl(url)}
+                                sx={{
+                                  width: { xs: 48, md: 56 },
+                                  height: { xs: 48, md: 56 },
+                                  ml: idx > 0 ? -1 : 0,
+                                  border: '2px solid',
+                                  borderColor: 'primary.main',
+                                  boxShadow: 1,
+                                }}
+                                alt={`몬스터 ${idx + 1}`}
+                                onError={(e) => handleImageError(e, url || '')}
+                              />
+                            ))}
+                        </Box>
+
+                        {/* 승률과 승/패를 한 줄에 배치 (좌우 정렬) */}
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            mb: 0.5,
+                            gap: 1,
+                          }}
+                        >
+                          {/* 승률 - 왼쪽 */}
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              fontWeight: 600,
+                              color: winRate >= 50 ? 'success.main' : 'text.secondary',
+                              fontSize: { xs: '0.7rem', md: '0.75rem' },
+                            }}
+                          >
+                            {total > 0 ? `${winRate}%` : '100%'}
+                          </Typography>
+
+                          {/* 승/패 숫자 - 오른쪽 */}
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: 'text.secondary',
+                              fontSize: { xs: '0.65rem', md: '0.75rem' },
+                              display: total > 0 ? 'block' : 'none',
+                            }}
+                            aria-label={`${winCount}승 ${loseCount}패`}
+                          >
+                            {winCount}승 {loseCount}패
+                          </Typography>
+                        </Box>
+
+                        {/* 승/패 프로그레스바 */}
+                        {total > 0 && (
+                          <AnimatedProgressBar percentage={winPercentage} isHighRate={winRate >= 50} />
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </Box>
+            )}
+
+            {/* 페이지당 항목 수 선택 및 페이지네이션 - 항상 표시 */}
+            {!isLoadingMonsters && (
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  flexDirection: { xs: 'column', md: 'row' },
+                  justifyContent: 'space-between',
+                  alignItems: { xs: 'stretch', md: 'center' },
+                  gap: { xs: 2, md: 3 },
+                  mt: { xs: 4, md: 5 },
+                  mb: { xs: isSearchExpanded ? 16 : 8, md: 0 },
+                  py: { xs: 2, md: 3 },
+                }}
+              >
+                {/* 페이지당 항목 수 선택 */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', md: 'auto' } }}>
+                  <FormControl 
+                    size={isMobile ? 'small' : 'medium'} 
+                    sx={{ 
+                      minWidth: { xs: 120, md: 140 },
+                      width: { xs: '100%', md: 'auto' },
                     }}
-                    onClick={() => handleMonsterClick(item)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        handleMonsterClick(item);
-                      }
-                    }}
-                    aria-label={`${item.key} 방어덱 상세 보기`}
+                    fullWidth={isMobile}
                   >
-                    <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
-                      {/* 몬스터 이미지 */}
-                      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, gap: -1 }}>
-                        {[item.image_url1, item.image_url2, item.image_url3]
-                          .filter(Boolean)
-                          .map((url, idx) => (
-                            <Avatar
-                              key={idx}
-                              src={getMonsterImageUrl(url)}
-                              sx={{
-                                width: { xs: 48, md: 56 },
-                                height: { xs: 48, md: 56 },
-                                ml: idx > 0 ? -1 : 0,
-                                border: '2px solid',
-                                borderColor: 'primary.main',
-                                boxShadow: 1,
-                              }}
-                              alt={`몬스터 ${idx + 1}`}
-                              onError={(e) => handleImageError(e, url || '')}
-                            />
-                          ))}
-                      </Box>
-
-                      {/* 승률과 승/패를 한 줄에 배치 (좌우 정렬) */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          mb: 0.5,
-                          gap: 1,
-                        }}
-                      >
-                        {/* 승률 - 왼쪽 */}
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 600,
-                            color: winRate >= 50 ? 'success.main' : 'text.secondary',
-                            fontSize: { xs: '0.7rem', md: '0.75rem' },
-                          }}
-                        >
-                          {total > 0 ? `${winRate}%` : '100%'}
-                        </Typography>
-
-                        {/* 승/패 숫자 - 오른쪽 */}
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: 'text.secondary',
-                            fontSize: { xs: '0.65rem', md: '0.75rem' },
-                            display: total > 0 ? 'block' : 'none',
-                          }}
-                          aria-label={`${winCount}승 ${loseCount}패`}
-                        >
-                          {winCount}승 {loseCount}패
-                        </Typography>
-                      </Box>
-
-                      {/* 승/패 프로그레스바 */}
-                      {total > 0 && (
-                        <AnimatedProgressBar percentage={winPercentage} isHighRate={winRate >= 50} />
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </Box>
-
-                {/* 페이지네이션 - 항상 표시 */}
-                <Box 
-                  sx={{ 
-                    display: 'flex', 
-                    justifyContent: 'center', 
-                    alignItems: 'center',
-                    mt: { xs: 4, md: 5 },
-                    mb: { xs: isSearchExpanded ? 16 : 8, md: 0 },
-                    py: { xs: 2, md: 3 },
-                  }}
-                >
-                  <Pagination
-                    count={totalPages || 1}
-                    page={pagination.currentPage}
-                    onChange={handlePageChange}
-                    color="primary"
-                    size={isMobile ? 'small' : 'medium'}
-                    aria-label="페이지 네비게이션"
-                    showFirstButton
-                    showLastButton
-                    sx={{
-                      '& .MuiPaginationItem-root': {
-                        fontSize: { xs: '0.875rem', md: '1rem' },
-                      },
-                    }}
-                  />
+                    <InputLabel id="items-per-page-label">보기</InputLabel>
+                    <Select
+                      labelId="items-per-page-label"
+                      id="items-per-page-select"
+                      value={pagination.itemsPerPage}
+                      label="보기"
+                      onChange={(e) => {
+                        const newItemsPerPage = Number(e.target.value);
+                        pagination.setItemsPerPage(newItemsPerPage);
+                        setShouldSearch(false);
+                        setTimeout(() => {
+                          setShouldSearch(true);
+                        }, 0);
+                      }}
+                    >
+                      {PAGINATION_OPTIONS.map((option) => (
+                        <MenuItem key={option.cd} value={option.cd}>
+                          {option.cd_nm}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Box>
-              </>
+
+                {/* 페이지네이션 */}
+                {paginatedMonsterList.length > 0 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', flex: 1, width: { xs: '100%', md: 'auto' } }}>
+                    <Pagination
+                      count={totalPages || 1}
+                      page={pagination.currentPage}
+                      onChange={handlePageChange}
+                      color="primary"
+                      size={isMobile ? 'small' : 'medium'}
+                      aria-label="페이지 네비게이션"
+                      showFirstButton
+                      showLastButton
+                      sx={{
+                        '& .MuiPaginationItem-root': {
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        },
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
             )}
           </Box>
         </Box>

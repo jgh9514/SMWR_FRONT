@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Box, CircularProgress, Alert } from '@mui/material';
-import { isAuthenticated } from '@/shared/utils/auth';
+import { getAuthTokenFromCookie } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
 import AdminHeader from '@/shared/ui/admin-header/AdminHeader';
 import AdminSidebar from '@/shared/ui/admin-sidebar/AdminSidebar';
@@ -32,20 +32,35 @@ export default function AdminLayout({
       }
 
       try {
-        // 1. 로그인 여부 체크
-        if (!isAuthenticated()) {
-          // 로그인 페이지로 리다이렉트 (현재 경로를 returnUrl로 전달)
-          const returnUrl = encodeURIComponent(pathname);
-          router.push(`/login?returnUrl=${returnUrl}`);
-          return;
+        // 1. 쿠키에 토큰이 있는지 확인 (백엔드 JWT 인증 사용)
+        // 백엔드 쿠키 이름: SMW-Authorization (Constant.LOGIN_TOKEN_NAME)
+        // 주의: HttpOnly 쿠키는 document.cookie에서 읽을 수 없으므로,
+        // 실제로는 API 호출 시 쿠키가 자동으로 전달되어 백엔드에서 검증됨
+        const token = getAuthTokenFromCookie();
+        
+        // 쿠키가 없어도 일단 접근 허용 (백엔드에서 최종 검증)
+        // HttpOnly 쿠키는 document.cookie에서 읽을 수 없지만, API 호출 시 자동으로 전달됨
+        // 실제 인증은 백엔드 AuthInterceptor에서 처리되므로, 여기서는 일단 접근 허용
+        if (!token) {
+          // localStorage에 userInfo가 있으면 쿠키가 HttpOnly일 가능성이 높으므로 접근 허용
+          const storedUserInfo = localStorage.getItem('userInfo');
+          if (!storedUserInfo) {
+            // 쿠키도 없고 userInfo도 없으면 로그인 페이지로 리다이렉트
+            const returnUrl = encodeURIComponent(pathname);
+            router.push(`/login?returnUrl=${returnUrl}`);
+            return;
+          }
         }
 
-        // 2. 사용자 정보 가져오기
+        // 2. 사용자 정보 가져오기 (localStorage에서)
+        // 쿠키가 있으면 백엔드 인증은 통과하므로, localStorage가 없어도 접근 허용
+        // 권한 체크는 userInfo가 있을 때만 수행
         const storedUserInfo = localStorage.getItem('userInfo');
+        
         if (!storedUserInfo) {
-          showToast.error('로그인이 필요합니다.');
-          const returnUrl = encodeURIComponent(pathname);
-          router.push(`/login?returnUrl=${returnUrl}`);
+          // localStorage에 userInfo가 없으면 일단 접근 허용
+          // 실제 권한 체크는 백엔드에서 처리되므로, API 호출 시 403이 발생하면 처리됨
+          setIsAuthorized(true);
           return;
         }
 
@@ -53,9 +68,9 @@ export default function AdminLayout({
         try {
           userInfo = JSON.parse(storedUserInfo);
         } catch (error) {
-          console.error('사용자 정보 파싱 실패', error);
-          showToast.error('사용자 정보를 불러올 수 없습니다.');
-          router.push('/login');
+          console.error('[AdminLayout] 사용자 정보 파싱 실패', error);
+          // 파싱 실패해도 쿠키가 있으면 접근 허용
+          setIsAuthorized(true);
           return;
         }
 
@@ -73,9 +88,15 @@ export default function AdminLayout({
         // 모든 검증 통과
         setIsAuthorized(true);
       } catch (error) {
-        console.error('권한 검증 실패', error);
-        showToast.error('권한을 확인할 수 없습니다.');
-        router.push('/login');
+        console.error('[AdminLayout] 권한 검증 실패', error);
+        // 에러 발생 시 쿠키가 있으면 일단 접근 허용 (백엔드에서 최종 검증)
+        const token = getAuthTokenFromCookie();
+        if (token) {
+          setIsAuthorized(true);
+        } else {
+          showToast.error('권한을 확인할 수 없습니다.');
+          router.push('/login');
+        }
       } finally {
         setIsChecking(false);
       }
@@ -121,15 +142,16 @@ export default function AdminLayout({
         sx={{
           flexGrow: 1,
           width: `calc(100% - ${DRAWER_WIDTH}px)`,
-          pt: 8,
-          ml: `${DRAWER_WIDTH}px`,
+          pt: { xs: 9, md: 10 },
           bgcolor: 'background.default',
           minHeight: 'calc(100vh - 64px)',
           px: 3,
-          py: 3,
+          pb: 3,
         }}
       >
-        {children}
+        <Box sx={{ width: '100%', maxWidth: '1400px', mx: 'auto' }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

@@ -13,19 +13,30 @@ export function getAuthTokenFromCookie(): string | null {
     return null;
   }
 
-  // 쿠키 이름을 대소문자 구분 없이 폭넓게 탐색
+  // 백엔드에서 사용하는 쿠키 이름: SMW-Authorization (Constant.LOGIN_TOKEN_NAME)
+  // document.cookie는 HttpOnly가 아닌 쿠키만 읽을 수 있음
   const cookies = document.cookie.split(';');
-  const tokenCookie = cookies.find((c) => {
+  
+  // 정확한 쿠키 이름으로 먼저 찾기 (대소문자 구분)
+  let tokenCookie = cookies.find((c) => {
     const trimmed = c.trim();
-    const lower = trimmed.toLowerCase();
-    return (
-      lower.startsWith('smw-authorization=') ||
-      lower.startsWith('smw_authorization=') ||
-      lower.startsWith('authorization=')
-    );
+    return trimmed.startsWith('SMW-Authorization=');
   });
+  
+  // 없으면 대소문자 구분 없이 찾기
+  if (!tokenCookie) {
+    tokenCookie = cookies.find((c) => {
+      const trimmed = c.trim();
+      const lower = trimmed.toLowerCase();
+      return (
+        lower.startsWith('smw-authorization=') ||
+        lower.startsWith('smw_authorization=')
+      );
+    });
+  }
 
   if (tokenCookie) {
+    // = 이후 모든 값을 가져오기 (값에 =가 포함될 수 있음)
     const token = tokenCookie.split('=').slice(1).join('=').trim();
     return token || null;
   }

@@ -159,31 +159,46 @@ export default function AppProviders({ children }: AppProvidersProps) {
   }, []);
 
   // 클라이언트에서만 pathname 기반 계산 (Hydration 오류 방지)
-  const { isPublicPath, shouldShowHeader } = useMemo(() => {
+  const { isPublicPath, shouldShowHeader, isAdminPath } = useMemo(() => {
     // 서버에서는 기본값 사용
     if (!isMounted) {
       return {
         isPublicPath: false,
         shouldShowHeader: true,
+        isAdminPath: false,
       };
     }
 
     // 클라이언트에서만 pathname 사용
     const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
     const isPublic = publicPaths.includes(pathname);
-    const showHeader = !isPublic;
+    const isAdmin = pathname?.startsWith('/admin') || false;
+    // admin 경로는 별도 헤더/사이드바를 사용하므로 일반 헤더 숨김
+    const showHeader = !isPublic && !isAdmin;
     
     return {
       isPublicPath: isPublic,
       shouldShowHeader: showHeader,
+      isAdminPath: isAdmin,
     };
   }, [isMounted, pathname]);
 
-  // mainSx는 항상 동일하게 유지 (Hydration 오류 방지)
-  // 실제 padding은 FixedHeader의 높이에 따라 클라이언트에서 동적으로 조정
+  // mainSx는 public path와 admin path에 따라 다르게 설정 (Hydration 오류 방지)
+  // 서버와 클라이언트에서 동일한 구조를 유지하기 위해 isMounted 체크
   const mainSx = useMemo(() => {
-    return { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
-  }, []);
+    // 서버에서는 기본값 (헤더 있음)
+    if (!isMounted) {
+      return { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
+    }
+    // 클라이언트에서 public path와 admin path는 padding 없음
+    // admin path는 별도 레이아웃(AdminHeader/AdminSidebar)을 사용하므로 padding 없음
+    const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
+    const isPublic = publicPaths.includes(pathname);
+    const isAdmin = pathname?.startsWith('/admin') || false;
+    return isPublic || isAdmin
+      ? { pt: 0, minHeight: '100vh' }
+      : { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
+  }, [isMounted, pathname]);
 
   return (
     <MuiThemeProvider theme={muiTheme}>
@@ -201,7 +216,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
             {isMounted && (
               <>
                 <ApiLoading />
-                {!isPublicPath && <NoticePopup />}
+                {!isPublicPath && !isAdminPath && <NoticePopup />}
               </>
             )}
           </AuthGuard>

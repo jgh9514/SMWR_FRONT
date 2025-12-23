@@ -167,8 +167,8 @@ export default function AdminPage() {
   }, [dashboardData]);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 } }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', justifyContent: 'center' }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 }, width: '100%' }}>
         <PageHeader title="대시보드" />
 
         {/* 통계 카드 섹션 */}

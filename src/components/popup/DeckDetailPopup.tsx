@@ -40,8 +40,18 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
 
   // 공덱 상세 조회 (React Query 사용)
   const deckParams = useMemo(() => {
-    if (!lastSelectedItem || !lastSelectedItem.team_id) return null;
-    return { deck_id: String(lastSelectedItem.team_id) };
+    if (!lastSelectedItem) return null;
+    
+    // deck_id를 우선 사용하고, 없으면 team_id 사용
+    const deckId = lastSelectedItem.deck_id || lastSelectedItem.team_id;
+    if (!deckId) {
+      console.warn('DeckDetailPopup: deck_id와 team_id가 모두 없습니다.', lastSelectedItem);
+      return null;
+    }
+    
+    const params = { deck_id: String(deckId) };
+    console.log('DeckDetailPopup: API 파라미터:', params);
+    return params;
   }, [lastSelectedItem]);
 
   const {
@@ -50,6 +60,16 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     error: queryError,
     refetch,
   } = useDeckDetail(deckParams);
+
+  // 디버깅: API 응답 확인
+  useEffect(() => {
+    if (detailData) {
+      console.log('DeckDetailPopup: API 응답 데이터:', detailData);
+    }
+    if (queryError) {
+      console.error('DeckDetailPopup: API 에러:', queryError);
+    }
+  }, [detailData, queryError]);
 
   const error = queryError ? (queryError instanceof Error ? queryError.message : '데이터를 불러오는데 실패했습니다.') : null;
 
@@ -85,10 +105,12 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
 
   const validateParams = (target: RecommendedItem | Record<string, any>): { deck_id: string } => {
     const item = target as RecommendedItem;
-    if (!item.team_id) {
-      throw new Error('team_id가 없습니다.');
+    // deck_id를 우선 사용하고, 없으면 team_id 사용
+    const deckId = item.deck_id || item.team_id;
+    if (!deckId) {
+      throw new Error('deck_id 또는 team_id가 필요합니다.');
     }
-    return { deck_id: String(item.team_id) };
+    return { deck_id: String(deckId) };
   };
 
   const monsterImageUrls = (() => {
@@ -113,18 +135,34 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       const name = detailDataRecord[`m${i}_kr_name`];
       if (!name || String(name).trim() === '') continue;
 
+      // 룬 정보는 백엔드에서 반환하지 않을 수 있으므로 기본값 사용
       const runeSet = detailDataRecord[`m${i}_rune_set`] || detailDataRecord.rune_set || '정보 없음';
       const rune2 = detailDataRecord[`m${i}_rune_2`] || detailDataRecord.rune_2 || '정보 없음';
 
+      // 백엔드가 반환하는 필드명에 맞게 수정
+      // 백엔드: m1_hp, m1_atk, m1_crit_rate, m1_crit_dmg, m1_resistance, m1_accuracy
       const getStat = (statName: string) => {
-        const base = normalizeStatValue(
-          detailDataRecord[`m${i}_${statName}_base`] || detailDataRecord[`${statName}_base`],
+        // 백엔드 필드명 매핑
+        const backendFieldMap: Record<string, string> = {
+          hp: 'hp',
+          atk: 'atk',
+          def: 'def',
+          spd: 'spd',
+          cr: 'crit_rate',
+          cd: 'crit_dmg',
+          res: 'resistance',
+          acc: 'accuracy',
+        };
+        
+        const backendFieldName = backendFieldMap[statName] || statName;
+        const statValue = normalizeStatValue(
+          detailDataRecord[`m${i}_${backendFieldName}`],
+          0,
         );
-        const plus = normalizeStatValue(
-          detailDataRecord[`m${i}_${statName}_plus`] || detailDataRecord[`${statName}_plus`],
-          null as any,
-        );
-        return { base, plus: plus !== null ? plus : undefined };
+        
+        // 백엔드가 base와 plus를 구분하지 않고 전체 값을 반환하므로
+        // 전체 값을 base로 설정하고 plus는 undefined로 설정
+        return { base: statValue, plus: undefined };
       };
 
       monsters.push({
@@ -239,10 +277,15 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       onClose={handleClose} 
       maxWidth="md" 
       fullWidth
+      sx={{
+        zIndex: (theme) => theme.zIndex.modal + 1, // 헤더보다 높은 z-index
+      }}
       PaperProps={{
         sx: {
           borderRadius: 3,
           boxShadow: 24,
+          margin: { xs: 2, sm: 4 }, // 상단 여백 추가
+          maxHeight: { xs: 'calc(100vh - 32px)', sm: 'calc(100vh - 64px)' }, // 헤더 높이 고려
         },
       }}
     >
@@ -253,9 +296,12 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          position: 'relative',
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
           px: 3,
           py: 2,
+          flexShrink: 0,
         }}
       >
         <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
@@ -278,7 +324,33 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: { xs: 2, sm: 3 }, pt: { xs: 3, sm: 4 }, maxHeight: '75vh', overflowY: 'auto' }}>
+      <DialogContent 
+        sx={{ 
+          p: { xs: 2, sm: 3 }, 
+          pt: { xs: 3, sm: 4 },
+          pb: { xs: 2, sm: 3 },
+          maxHeight: { xs: 'calc(100vh - 200px)', sm: 'calc(100vh - 240px)' }, // DialogTitle과 DialogActions 높이 고려
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          position: 'relative',
+          '& > *:first-of-type': {
+            mt: 0, // 첫 번째 요소의 margin-top 제거
+          },
+          '&::-webkit-scrollbar': {
+            width: '8px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: 'rgba(0,0,0,0.2)',
+            borderRadius: '4px',
+            '&:hover': {
+              background: 'rgba(0,0,0,0.3)',
+            },
+          },
+        }}
+      >
         {loading && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
             <CircularProgress size={64} thickness={4} />

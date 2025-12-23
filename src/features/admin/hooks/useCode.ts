@@ -18,14 +18,15 @@ import {
  * 코드 그룹 목록 조회
  */
 export const useCodeGroupList = (params?: Record<string, unknown>) => {
-  return useApiPostQuery<CodeGroup[]>('/sm/cd/group', params || {}, { enabled: false });
+  return useApiPostQuery<CodeGroup[]>('/sm/cd/group', params || {}, { enabled: true });
 };
 
 /**
  * 코드 목록 조회
  */
 export const useCodeList = (params?: Record<string, unknown>) => {
-  return useApiPostQuery<CodeItem[]>('/sm/cd/list', params || {}, { enabled: false });
+  const hasCdGrpNo = params && params.cd_grp_no && String(params.cd_grp_no).trim() !== '';
+  return useApiPostQuery<CodeItem[]>('/sm/cd/list', params || {}, { enabled: !!hasCdGrpNo });
 };
 
 /**
