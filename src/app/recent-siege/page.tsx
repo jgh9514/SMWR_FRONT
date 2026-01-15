@@ -52,14 +52,6 @@ export default function RecentSiegePage() {
     }
   }, []);
 
-
-  // 검색 파라미터 준비 (원본 Vue 코드와 동일한 형식)
-  const siegeViewScope = useMemo(() => {
-    const scope = userInfo?.siege_view_scope;
-    if (typeof scope === 'string' && scope.trim().length > 0) return scope;
-    return 'C'; // 기본값: 최근 시즌
-  }, [userInfo]);
-
   const searchParams = useMemo(() => {
     const page = schData.offset;
     const limit = schData.paging;
@@ -70,13 +62,12 @@ export default function RecentSiegePage() {
       limit,
       offset,
       page,
-      siege_view_scope: siegeViewScope,
     };
-  }, [schData, siegeViewScope]);
+  }, [schData]);
 
   // 전체 개수 조회
   const { data: totalCount = 0, isLoading: isLoadingCount } = useGuildSiegeHistoryCount(
-    { siege_view_scope: siegeViewScope },
+    {},
     true,
   );
 
