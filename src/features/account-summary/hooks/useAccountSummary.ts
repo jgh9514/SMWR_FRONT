@@ -15,7 +15,7 @@ import type {
 } from '@/features/account-summary/types/account-summary';
 
 export const useAccountSummaryUpload = (
-  options?: Parameters<typeof useApiMutation<AccountSummaryUploadResult, File>>[0],
+  options?: Omit<Parameters<typeof useApiMutation<AccountSummaryUploadResult, File>>[0], 'mutationFn'>,
 ) => {
   return useApiMutation<AccountSummaryUploadResult, File>({
     mutationFn: async (file: File) => {

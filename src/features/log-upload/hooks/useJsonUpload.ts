@@ -55,7 +55,7 @@ const extractLogList = (jsonData: any): any[] => {
  * 점령전 validation (중복 체크) Mutation
  */
 export const useSiegeValidation = (
-  options?: Parameters<typeof useApiMutation<SiegeValidationResponse, File>>[0],
+  options?: Omit<Parameters<typeof useApiMutation<SiegeValidationResponse, File>>[0], 'mutationFn'>,
 ) => {
   return useApiMutation<SiegeValidationResponse, File>({
     mutationFn: async (file: File) => {
@@ -126,7 +126,7 @@ export const useSiegeValidation = (
  * 점령전 저장 Mutation (선택한 옵션과 함께)
  */
 export const useSiegeSave = (
-  options?: Parameters<typeof useApiMutation<SiegeUploadResponse, SiegeSaveRequest>>[0],
+  options?: Omit<Parameters<typeof useApiMutation<SiegeUploadResponse, SiegeSaveRequest>>[0], 'mutationFn'>,
 ) => {
   return useApiMutation<SiegeUploadResponse, SiegeSaveRequest>({
     mutationFn: async (request: SiegeSaveRequest) => {
@@ -146,7 +146,7 @@ export const useSiegeSave = (
  * @deprecated useSiegeValidation과 useSiegeSave를 사용하세요
  */
 export const useSiegeUpload = (
-  options?: Parameters<typeof useApiMutation<SiegeUploadResponse, File>>[0],
+  options?: Omit<Parameters<typeof useApiMutation<SiegeUploadResponse, File>>[0], 'mutationFn'>,
 ) => {
   return useApiMutation<SiegeUploadResponse, File>({
     mutationFn: async (file: File) => {
@@ -222,7 +222,7 @@ export const useSiegeUpload = (
  * 3. rid 기준으로 중복 제거
  */
 export const useArenaUpload = (
-  options?: Parameters<typeof useApiMutation<ArenaUploadResponse, File>>[0],
+  options?: Omit<Parameters<typeof useApiMutation<ArenaUploadResponse, File>>[0], 'mutationFn'>,
 ) => {
   return useApiMutation<ArenaUploadResponse, File>({
     mutationFn: async (file: File) => {
