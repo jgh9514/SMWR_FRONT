@@ -6,6 +6,7 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import { setApiLoading } from '@/shared/ui/loading/ApiLoading';
 import { API_TIMEOUT_MS } from '@/shared/constants';
 import { showApiError } from './error-handler';
+import { isForceLoggedOut } from '@/shared/utils/auth';
 
 // 환경별 API 서버 설정
 const getBaseURL = () => {
@@ -124,6 +125,10 @@ axiosInstance.interceptors.response.use(
       if (status === 401) {
         // 401 에러 시 로그인 페이지로 리다이렉트
         if (typeof window !== 'undefined') {
+          // 사용자가 명시적으로 로그아웃한 경우에는 로그인 페이지로 강제 이동하지 않음
+          if (isForceLoggedOut()) {
+            return Promise.reject(error);
+          }
           const currentPath = window.location.pathname;
           // 로그인 페이지가 아닌 경우에만 리다이렉트
           // (로그인 페이지에서도 인증 실패 시 리다이렉트하지 않음)

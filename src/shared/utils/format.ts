@@ -69,8 +69,8 @@ export function formatFileSize(bytes: number): string {
  * 점령전 ID 형식: YYYYMMWWDDXXXXXX
  * - YYYY: 년도 (4자리)
  * - MM: 월 (2자리)
- * - WW: 주차 (2자리, 해당 월의 몇 번째 주)
- * - DD: 요일 코드 (01=월요일, 02=목요일)
+ * - WW: 주차 (2자리, 해당 월의 n번째 목요일이 속한 주를 n주차로 취급)
+ * - DD: 요일 코드 (01=해당 주의 월요일, 02=해당 주의 목요일)
  * - XXXXXX: 점령전 ID (나머지)
  * 
  * @param siegeId - 점령전 ID 문자열 (예: "2025120102000016")
@@ -85,48 +85,37 @@ export function parseSiegeDate(siegeId: string): string {
     const week = parseInt(siegeId.substring(6, 8), 10);
     const dayCode = siegeId.substring(8, 10);
     
-    if (isNaN(year) || isNaN(month) || isNaN(week) || month < 1 || month > 12 || week < 1 || week > 5) {
+    if (isNaN(year) || isNaN(month) || isNaN(week) || month < 1 || month > 12 || week < 1 || week > 6) {
       return '';
     }
-    
-    // 해당 월의 첫 번째 날짜
-    const firstDay = new Date(year, month - 1, 1);
-    const firstDayOfWeek = firstDay.getDay(); // 0=일요일, 1=월요일, ..., 6=토요일
-    
-    // 첫 번째 월요일 찾기
-    let firstMonday = 1;
-    if (firstDayOfWeek === 0) {
-      // 일요일이면 다음 날이 월요일
-      firstMonday = 2;
-    } else if (firstDayOfWeek > 1) {
-      // 화요일~토요일이면 다음 주 월요일
-      firstMonday = 1 + (8 - firstDayOfWeek);
-    }
-    
-    // 주차에 따른 월요일 날짜 계산
-    const mondayDate = firstMonday + (week - 1) * 7;
-    
-    // 요일 코드에 따라 날짜 계산
-    let targetDate: number;
-    if (dayCode === '01') {
-      // 월요일
-      targetDate = mondayDate;
-    } else if (dayCode === '02') {
-      // 목요일 (월요일 + 3일)
-      targetDate = mondayDate + 3;
-    } else {
-      // 알 수 없는 요일 코드
-      return '';
-    }
-    
-    // 날짜 유효성 검사 (해당 월의 범위를 벗어나지 않는지)
+
+    // week(WW)는 "그 달의 n번째 목요일(02)"을 기준으로 잡는다.
+    // dayCode가 01이면 그 목요일이 속한 주의 월요일(목-3일), 02이면 목요일 그대로.
+    const targetIsThursday = dayCode === '02';
+    const targetIsMonday = dayCode === '01';
+    if (!targetIsThursday && !targetIsMonday) return '';
+
     const lastDayOfMonth = new Date(year, month, 0).getDate();
-    if (targetDate < 1 || targetDate > lastDayOfMonth) {
-      return '';
+
+    let nthThursdayDate: number | null = null;
+    let thursdayCount = 0;
+    for (let d = 1; d <= lastDayOfMonth; d += 1) {
+      const dow = new Date(year, month - 1, d).getDay(); // 0=일 ... 4=목
+      if (dow === 4) {
+        thursdayCount += 1;
+        if (thursdayCount === week) {
+          nthThursdayDate = d;
+          break;
+        }
+      }
     }
-    
-    // 날짜 포맷팅
-    const date = new Date(year, month - 1, targetDate);
+
+    if (nthThursdayDate == null) return '';
+
+    const dayOffsetFromThursday = targetIsThursday ? 0 : -3; // 월요일은 목요일 기준 -3일
+
+    const date = new Date(year, month - 1, nthThursdayDate + dayOffsetFromThursday);
+
     return formatDate(date, 'YYYY-MM-DD');
   } catch (error) {
     console.error('점령전 ID 날짜 파싱 오류:', error);

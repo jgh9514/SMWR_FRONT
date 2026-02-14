@@ -70,6 +70,7 @@ export default function SignupPage() {
   // 비밀번호 검증 상태
   const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
   const [passwordConfirmMatch, setPasswordConfirmMatch] = useState<boolean | null>(null);
+  const [showValidationMessages, setShowValidationMessages] = useState(false);
 
   // 아이디 변경 시 중복체크 상태 초기화
   useEffect(() => {
@@ -324,6 +325,8 @@ export default function SignupPage() {
 
   // 회원가입 처리
   const handleSignup = () => {
+    // 유효성에 막힐 때만 메시지 박스가 보이도록: 시도 시점부터 노출
+    setShowValidationMessages(true);
     if (!validateSignup()) return;
 
     const params: SignupParams = {
@@ -392,12 +395,22 @@ export default function SignupPage() {
           </Box>
 
           {/* 회원가입 폼 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 2.5 } }}>
+          <Box
+            component="form"
+            autoComplete="off"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSignup();
+            }}
+            sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 2.5 } }}
+          >
             <Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                 <TextField
                   label="아이디"
                   placeholder="아이디를 입력하세요 (최소 3자)"
+                  name="signup_user_id"
+                  autoComplete="new-username"
                   value={signupFormData.user_id}
                   onChange={(e) => {
                     setSignupFormData({ ...signupFormData, user_id: e.target.value });
@@ -444,6 +457,8 @@ export default function SignupPage() {
                 label="비밀번호"
                 placeholder="비밀번호를 입력하세요 (8자 이상, 대소문자, 숫자, 특수문자 포함)"
                 type="password"
+                name="signup_password"
+                autoComplete="new-password"
                 value={signupFormData.password}
                 onChange={(e) =>
                   setSignupFormData({ ...signupFormData, password: e.target.value })
@@ -463,6 +478,8 @@ export default function SignupPage() {
                 label="비밀번호 확인"
                 placeholder="비밀번호를 다시 입력하세요"
                 type="password"
+                name="signup_password_confirm"
+                autoComplete="new-password"
                 value={signupFormData.password_confirm}
                 onChange={(e) =>
                   setSignupFormData({ ...signupFormData, password_confirm: e.target.value })
@@ -670,18 +687,19 @@ export default function SignupPage() {
               </Box>
 
             {/* 유효성 검사 메시지 */}
-            {getValidationMessages().length > 0 && (
+            {showValidationMessages && getValidationMessages().length > 0 && (
               <Box
                 sx={{
                   mt: 1,
                   p: 2,
-                  bgcolor: 'error.light',
+                  bgcolor: 'background.paper',
                   borderRadius: 1,
                   border: '1px solid',
                   borderColor: 'error.main',
+                  boxShadow: 2,
                 }}
               >
-                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: 'error.main' }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, mb: 1, color: 'error.main' }}>
                   다음 항목을 확인해주세요:
                 </Typography>
                 <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
@@ -690,7 +708,7 @@ export default function SignupPage() {
                       key={index}
                       component="li"
                       variant="body2"
-                      sx={{ color: 'error.dark', mb: 0.5 }}
+                      sx={{ color: 'text.primary', mb: 0.5, lineHeight: 1.4 }}
                     >
                       {message}
                     </Typography>
@@ -704,7 +722,7 @@ export default function SignupPage() {
               size="large"
               fullWidth
               onClick={handleSignup}
-              disabled={signupMutation.isPending || getValidationMessages().length > 0}
+              disabled={signupMutation.isPending}
               sx={{
                 mt: 1,
                 height: 48,

@@ -44,6 +44,7 @@ import {
 import { useLogout, useUpdateSiegeViewScope } from '@/features/auth/hooks/useAuth';
 import { isEmpty } from '@/shared/utils/util';
 import { logger } from '@/shared/lib/logger';
+import { clearClientAuth } from '@/shared/utils/auth';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -260,27 +261,19 @@ export default function SettingsPage() {
 
   const logoutMutation = useLogout({
     onSuccess: () => {
-      // 로그아웃 성공 시 localStorage 정리 및 로그인 페이지로 이동
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('isLoggedIn');
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('remember_login');
-        localStorage.removeItem('saved_user_id');
-        localStorage.removeItem('saved_user_pw');
+        clearClientAuth();
       }
-      router.push('/login');
+      // 로그아웃해도 로그인 페이지로 강제 이동하지 않음
+      router.push('/');
     },
     onError: (error) => {
-      // 에러가 발생해도 로컬 상태는 정리하고 로그인 페이지로 이동
       console.error('로그아웃 실패:', error);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('isLoggedIn');
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('remember_login');
-        localStorage.removeItem('saved_user_id');
-        localStorage.removeItem('saved_user_pw');
+        clearClientAuth();
       }
-      router.push('/login');
+      // 실패하더라도 로그인 페이지로 강제 이동하지 않음
+      router.push('/');
     },
   });
 

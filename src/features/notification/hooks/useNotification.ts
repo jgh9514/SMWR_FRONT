@@ -22,7 +22,6 @@ export const useNotificationList = (
     {},
     {
       enabled: true,
-      refetchInterval: 30000, // 30초마다 자동 갱신
       refetchOnWindowFocus: true,
       ...options,
     },

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -23,6 +23,7 @@ import { formatSiegeDateLabel } from '@/shared/utils/format';
 import { PAGINATION_OPTIONS, DEFAULT_PAGE_OFFSET } from '@/shared/constants';
 import { PageBanner, PageHeader } from '@/shared/ui';
 import { useResponsive } from '@/shared/hooks';
+import { isAuthenticated } from '@/shared/utils/auth';
 import type { SiegeItem } from '@/features/siege/types/recent-siege';
 import { useGuildSiegeHistory, useGuildSiegeHistoryCount } from '@/features/siege/hooks/useRecentSiege';
 
@@ -33,23 +34,10 @@ export default function RecentSiegePage() {
   const isMobile = isMounted ? responsive.isMobile : false;
   const [schData, setSchData] = useState({ paging: 5, offset: DEFAULT_PAGE_OFFSET });
   const [userInfo, setUserInfo] = useState<any>(null);
+  const prevAuthRef = useRef<boolean | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
-
-  // 사용자 정보 가져오기
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          setUserInfo(JSON.parse(storedUserInfo));
-        } catch (error) {
-          console.error('사용자 정보 파싱 실패', error);
-        }
-      }
-    }
   }, []);
 
   const searchParams = useMemo(() => {
@@ -66,7 +54,11 @@ export default function RecentSiegePage() {
   }, [schData]);
 
   // 전체 개수 조회
-  const { data: totalCount = 0, isLoading: isLoadingCount } = useGuildSiegeHistoryCount(
+  const {
+    data: totalCount = 0,
+    isLoading: isLoadingCount,
+    refetch: refetchCount,
+  } = useGuildSiegeHistoryCount(
     {},
     true,
   );
@@ -79,6 +71,76 @@ export default function RecentSiegePage() {
     error: siegeError,
     refetch: refetchSiege,
   } = useGuildSiegeHistory(searchParams, true);
+
+  // 로그인/로그아웃에 따라 화면 내용이 달라지므로 userInfo를 주기적으로 동기화
+  const syncAuthState = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!isMounted) return;
+
+    const authed = isAuthenticated();
+    const stored = localStorage.getItem('userInfo');
+
+    // 최초 1회 초기화
+    if (prevAuthRef.current === null) {
+      prevAuthRef.current = authed;
+    }
+
+    // 로그아웃 감지: 로그인 상태였다가 로그아웃되면 메인으로 이동 후 갱신
+    if (prevAuthRef.current === true && authed === false) {
+      prevAuthRef.current = authed;
+      setUserInfo(null);
+      router.replace('/');
+      // 메인 화면에서 로그인 여부에 따라 데이터가 달라지므로 강제 갱신
+      setTimeout(() => router.refresh(), 0);
+      return;
+    }
+
+    // 로그인 감지: 비로그인 상태였다가 로그인되면 데이터 재조회
+    if (prevAuthRef.current === false && authed === true) {
+      prevAuthRef.current = authed;
+      if (stored) {
+        try {
+          setUserInfo(JSON.parse(stored));
+        } catch (error) {
+          console.error('사용자 정보 파싱 실패', error);
+          setUserInfo(null);
+        }
+      } else {
+        setUserInfo(null);
+      }
+      // 로그인 직후 통계/표시가 달라질 수 있으므로 재조회
+      refetchCount();
+      refetchSiege();
+      return;
+    }
+
+    // 같은 인증 상태 내에서도 userInfo가 변경될 수 있으니 동기화
+    if (stored) {
+      try {
+        setUserInfo(JSON.parse(stored));
+      } catch (error) {
+        console.error('사용자 정보 파싱 실패', error);
+        setUserInfo(null);
+      }
+    } else {
+      setUserInfo(null);
+    }
+  }, [isMounted, refetchCount, refetchSiege, router]);
+
+  useEffect(() => {
+    if (!isMounted || typeof window === 'undefined') return;
+
+    syncAuthState();
+    const interval = setInterval(syncAuthState, 1000);
+
+    const handleAuthChanged = () => syncAuthState();
+    window.addEventListener('smwr:auth-changed', handleAuthChanged);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('smwr:auth-changed', handleAuthChanged);
+    };
+  }, [isMounted, syncAuthState]);
   
   // 401 인증 에러 확인
   const isAuthError = useMemo(() => {

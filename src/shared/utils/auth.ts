@@ -4,6 +4,54 @@
  * 구현: 내부적으로 쿠키 파싱 로직을 숨김
  */
 
+const FORCE_LOGOUT_KEY = 'forceLoggedOut';
+const AUTH_CHANGED_EVENT = 'smwr:auth-changed';
+
+function deleteCookie(name: string) {
+  if (typeof window === 'undefined') return;
+  // 가능한 한 넓게 제거 시도 (path=/)
+  document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
+}
+
+export function isForceLoggedOut(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(FORCE_LOGOUT_KEY) === 'true';
+}
+
+export function clearForceLoggedOut() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(FORCE_LOGOUT_KEY);
+}
+
+/**
+ * 클라이언트 측 인증 상태를 정리합니다.
+ * - localStorage 로그인 관련 키 제거
+ * - 토큰 쿠키 제거 시도 (HttpOnly가 아니어야 가능)
+ * - 쿠키 제거가 실패해도 UI가 로그인으로 보이지 않도록 forceLoggedOut 플래그 설정
+ */
+export function clearClientAuth() {
+  if (typeof window === 'undefined') return;
+
+  // 로그인 상태 관련 localStorage 정리
+  localStorage.removeItem('isLoggedIn');
+  localStorage.removeItem('userInfo');
+  localStorage.removeItem('remember_login');
+  localStorage.removeItem('saved_user_id');
+  localStorage.removeItem('saved_user_pw');
+
+  // 토큰 쿠키 제거 (백엔드/환경에 따라 이름이 다를 수 있어 모두 시도)
+  deleteCookie('SMW-Authorization');
+  deleteCookie('SMW_AUTHORIZATION');
+  deleteCookie('smw-authorization');
+  deleteCookie('smw_authorization');
+
+  // 쿠키가 즉시 반영되지 않거나 제거가 실패하는 경우를 대비
+  localStorage.setItem(FORCE_LOGOUT_KEY, 'true');
+
+  // 다른 컴포넌트(헤더 등)에 즉시 반영되도록 이벤트 발사
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+}
+
 /**
  * 쿠키에서 인증 토큰을 가져옵니다.
  * @returns 인증 토큰 문자열 또는 null (토큰이 없는 경우)
@@ -50,6 +98,10 @@ export function getAuthTokenFromCookie(): string | null {
  */
 export function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false;
+
+  // 사용자가 명시적으로 로그아웃한 경우: 쿠키가 남아 있어도 로그인으로 취급하지 않음
+  if (isForceLoggedOut()) return false;
+
   const token = getAuthTokenFromCookie();
   if (token) return true;
   // 로컬 저장소 fallback (일부 환경에서 쿠키가 바로 반영되지 않을 수 있음)

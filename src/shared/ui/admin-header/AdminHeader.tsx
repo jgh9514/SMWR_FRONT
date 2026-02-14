@@ -18,6 +18,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import HomeIcon from '@mui/icons-material/Home';
 import { useLogout } from '@/features/auth/hooks/useAuth';
+import { clearClientAuth } from '@/shared/utils/auth';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -50,9 +51,13 @@ export default function AdminHeader() {
     handleMenuClose();
     try {
       await logoutMutation.mutateAsync({});
-      router.push('/login');
+      clearClientAuth();
+      // 로그아웃해도 로그인 페이지로 강제 이동하지 않음
+      router.push('/');
     } catch (error) {
       console.error('로그아웃 실패', error);
+      clearClientAuth();
+      router.push('/');
     }
   };
 

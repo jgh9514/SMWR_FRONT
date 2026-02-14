@@ -18,7 +18,7 @@ import { isEmpty } from '@/shared/utils/util';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { containsSqlInjection } from '@/shared/utils/validation';
-import { getAuthTokenFromCookie } from '@/shared/utils/auth';
+import { clearForceLoggedOut, getAuthTokenFromCookie } from '@/shared/utils/auth';
 import { COOKIE_CHECK_RETRY_DELAY_MS, COOKIE_CHECK_MAX_RETRIES } from '@/shared/constants/validation';
 import LoginIcon from '@mui/icons-material/Login';
 import FindAccountPopup from '@/components/popup/FindAccountPopup';
@@ -118,6 +118,8 @@ function LoginContent() {
     onSuccess: async (res) => {
       if (res && res.result === 'SUCCESS' && res.userInfo) {
         if (typeof window !== 'undefined') {
+          // 이전에 로그아웃 강제 플래그가 남아있으면 제거
+          clearForceLoggedOut();
           localStorage.setItem('isLoggedIn', 'true');
           localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
           // 로그인 성공 플래그 설정 (쿠키 확인 우회용)

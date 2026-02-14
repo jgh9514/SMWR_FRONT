@@ -39,12 +39,12 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import CircleIcon from '@mui/icons-material/Circle';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useResponsive } from '@/shared/hooks';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
-import { isAuthenticated } from '@/shared/utils/auth';
+import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
 import { MS_PER_MINUTE, MS_PER_HOUR, MS_PER_DAY } from '@/shared/constants/validation';
 import {
   useNotificationList,
@@ -69,7 +69,12 @@ interface MenuCategory {
   divider?: boolean;
 }
 
-const getMenuCategories = (isAdmin: boolean, hasGuild: boolean, isGuildLeaderOrManager: boolean): MenuCategory[] => {
+const getMenuCategories = (
+  isAdmin: boolean,
+  hasGuild: boolean,
+  isGuildLeaderOrManager: boolean,
+  isLoggedIn: boolean,
+): MenuCategory[] => {
   const categories: MenuCategory[] = [];
 
   const mainItems: MenuItem[] = [
@@ -134,6 +139,15 @@ const getMenuCategories = (isAdmin: boolean, hasGuild: boolean, isGuildLeaderOrM
       category: 'tool',
     },
   ];
+
+  if (isLoggedIn) {
+    toolItems.push({
+      title: '계정 요약',
+      path: '/account-summary',
+      icon: <AccountCircleIcon />,
+      category: 'tool',
+    });
+  }
 
   if (isAdmin || isGuildLeaderOrManager) {
     toolItems.push({
@@ -222,28 +236,41 @@ export default function FixedHeader() {
   }, []);
 
   // 사용자 정보 로드
+  const loadUserInfo = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!mounted) return;
+
+    if (isAuthenticated()) {
+      const stored = localStorage.getItem('userInfo');
+      if (stored) {
+        try {
+          setUserInfo(JSON.parse(stored));
+          return;
+        } catch (error) {
+          console.error('사용자 정보 파싱 실패:', error);
+        }
+      }
+      // 토큰은 있는데 userInfo가 없는 경우
+      setUserInfo(null);
+    } else {
+      setUserInfo(null);
+    }
+  }, [mounted]);
+
   useEffect(() => {
     if (!mounted || typeof window === 'undefined') return;
-    
-    const loadUserInfo = () => {
-      if (isAuthenticated()) {
-        const stored = localStorage.getItem('userInfo');
-        if (stored) {
-          try {
-            setUserInfo(JSON.parse(stored));
-          } catch (error) {
-            console.error('사용자 정보 파싱 실패:', error);
-          }
-        }
-      } else {
-        setUserInfo(null);
-      }
-    };
 
     loadUserInfo();
     const interval = setInterval(loadUserInfo, 1000);
-    return () => clearInterval(interval);
-  }, [mounted]);
+
+    const handleAuthChanged = () => loadUserInfo();
+    window.addEventListener('smwr:auth-changed', handleAuthChanged);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('smwr:auth-changed', handleAuthChanged);
+    };
+  }, [mounted, loadUserInfo]);
 
   // 길드 정보 조회
   const userGuildQuery = useUserGuild({
@@ -307,11 +334,12 @@ export default function FixedHeader() {
   const logoutMutation = useLogout({
     onSuccess: () => {
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('userInfo');
+        clearClientAuth();
       }
       setUserInfo(null);
       handleUserMenuClose();
-      router.push('/login');
+      // 로그아웃 시 로그인 페이지로 강제 이동하지 않음
+      router.push('/');
     },
   });
 
@@ -340,6 +368,8 @@ export default function FixedHeader() {
   };
 
   const handleUserMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    // 다른 화면에서 로그아웃한 직후에도 즉시 반영되도록 한 번 더 동기화
+    loadUserInfo();
     setUserMenuAnchor(event.currentTarget);
   };
 
@@ -418,9 +448,11 @@ export default function FixedHeader() {
     }
   };
 
+  const isLoggedIn = mounted && isAuthenticated();
+
   const menuCategories = useMemo(() => {
-    return getMenuCategories(isAdmin, hasGuild, isGuildLeaderOrManager);
-  }, [isAdmin, hasGuild, isGuildLeaderOrManager]);
+    return getMenuCategories(isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn);
+  }, [isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn]);
 
   // 서버와 클라이언트에서 동일한 초기 렌더링 보장 (hydration mismatch 방지)
   const [logoUrl, setLogoUrl] = useState<string>('/images/ci_active.png');
@@ -528,7 +560,13 @@ export default function FixedHeader() {
                 sx={{
                   width: 32,
                   height: 32,
-                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  bgcolor: mounted && isAuthenticated() && userInfo
+                    ? 'primary.main'
+                    : 'rgba(255, 255, 255, 0.2)',
+                  color: mounted && isAuthenticated() && userInfo
+                    ? 'white'
+                    : 'rgba(255, 255, 255, 0.6)',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 <AccountCircleIcon />
@@ -676,7 +714,7 @@ export default function FixedHeader() {
               horizontal: 'right',
             }}
           >
-            {mounted && isAuthenticated() ? (
+            {mounted && isAuthenticated() && !!userInfo ? (
               [
                 <Box key="user-info" sx={{ px: 2, py: 1, minWidth: 200 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -697,6 +735,12 @@ export default function FixedHeader() {
                     <ListItemText>관리자 모드</ListItemText>
                   </MenuItem>
                 ),
+                <MenuItem key="account-summary" onClick={() => { handleNavigate('/account-summary'); handleUserMenuClose(); }}>
+                  <ListItemIcon>
+                    <AccountCircleIcon fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText>계정 요약</ListItemText>
+                </MenuItem>,
                 <MenuItem key="settings" onClick={() => { handleNavigate('/settings'); handleUserMenuClose(); }}>
                   <ListItemIcon>
                     <AccountCircleIcon fontSize="small" />

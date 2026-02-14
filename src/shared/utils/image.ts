@@ -25,15 +25,6 @@ export const getMonsterImageUrl = (imageUrl: string | null | undefined): string 
   // CloudFront CDN URL 사용
   const cdnUrl = getCdnImageUrl(imageUrl);
   
-  // 디버깅 로그
-  if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-    console.log('[이미지 URL] 생성:', {
-      imageUrl,
-      cdnUrl,
-      hostname: window.location.hostname,
-    });
-  }
-  
   return cdnUrl;
 };
 
