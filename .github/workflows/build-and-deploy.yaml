@@ -60,4 +60,17 @@ jobs:
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache,mode=max
 
+      - name: Deploy to Kubernetes via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            # 1. 새 이미지를 확실히 가져오도록 deployment 재시작
+            kubectl rollout restart deployment smwr-front
+            
+            # 2. 배포 상태 모니터링 (성공할 때까지 대기)
+            kubectl rollout status deployment smwr-front
 
