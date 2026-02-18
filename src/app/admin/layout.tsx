@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Box, CircularProgress, Alert } from '@mui/material';
 import { getAuthTokenFromCookie } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import AdminHeader from '@/shared/ui/admin-header/AdminHeader';
 import AdminSidebar from '@/shared/ui/admin-sidebar/AdminSidebar';
 
@@ -68,7 +69,7 @@ export default function AdminLayout({
         try {
           userInfo = JSON.parse(storedUserInfo);
         } catch (error) {
-          console.error('[AdminLayout] 사용자 정보 파싱 실패', error);
+          logger.error('[AdminLayout] 사용자 정보 파싱 실패', error);
           // 파싱 실패해도 쿠키가 있으면 접근 허용
           setIsAuthorized(true);
           return;
@@ -88,7 +89,7 @@ export default function AdminLayout({
         // 모든 검증 통과
         setIsAuthorized(true);
       } catch (error) {
-        console.error('[AdminLayout] 권한 검증 실패', error);
+        logger.error('[AdminLayout] 권한 검증 실패', error);
         // 에러 발생 시 쿠키가 있으면 일단 접근 허용 (백엔드에서 최종 검증)
         const token = getAuthTokenFromCookie();
         if (token) {

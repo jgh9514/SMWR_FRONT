@@ -52,6 +52,7 @@ import {
   useMarkAllNotificationsRead,
 } from '@/features/notification/hooks/useNotification';
 import type { NotificationItem } from '@/features/notification/types/notification';
+import { logger } from '@/shared/lib/logger';
 
 interface MenuItem {
   title: string;
@@ -247,7 +248,7 @@ export default function FixedHeader() {
           setUserInfo(JSON.parse(stored));
           return;
         } catch (error) {
-          console.error('사용자 정보 파싱 실패:', error);
+          logger.error('사용자 정보 파싱 실패', error);
         }
       }
       // 토큰은 있는데 userInfo가 없는 경우
@@ -261,13 +262,11 @@ export default function FixedHeader() {
     if (!mounted || typeof window === 'undefined') return;
 
     loadUserInfo();
-    const interval = setInterval(loadUserInfo, 1000);
 
     const handleAuthChanged = () => loadUserInfo();
     window.addEventListener('smwr:auth-changed', handleAuthChanged);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('smwr:auth-changed', handleAuthChanged);
     };
   }, [mounted, loadUserInfo]);
@@ -291,7 +290,7 @@ export default function FixedHeader() {
         try {
           currentUserInfo = JSON.parse(stored);
         } catch (error) {
-          console.error('사용자 정보 파싱 실패:', error);
+          logger.error('사용자 정보 파싱 실패', error);
           return;
         }
       }
@@ -316,7 +315,8 @@ export default function FixedHeader() {
 
   // 알림 목록 조회
   const notificationListQuery = useNotificationList({
-    enabled: mounted && !!userInfo,
+    // 초기 화면 진입 때 매번 가져오지 않음 (메뉴 열 때만 조회)
+    enabled: false,
   });
 
   const markReadMutation = useMarkNotificationRead({
@@ -379,6 +379,8 @@ export default function FixedHeader() {
 
   const handleNotificationClick = (event: React.MouseEvent<HTMLElement>) => {
     setNotificationAnchor(event.currentTarget);
+    // 메뉴를 열 때만 최신 알림 조회
+    notificationListQuery.refetch();
   };
 
   const handleNotificationClose = () => {

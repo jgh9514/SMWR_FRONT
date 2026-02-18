@@ -26,11 +26,13 @@ interface NoticePopupProps {
 }
 
 function NoticePopupItem({ 
+  open,
   notice, 
   onView, 
   onClose,
   onHideForDay,
 }: { 
+  open: boolean;
   notice: Notice; 
   onView: (noticeId: string) => void; 
   onClose: () => void;
@@ -81,7 +83,7 @@ function NoticePopupItem({
 
   return (
     <Dialog 
-      open={true} 
+      open={open} 
       onClose={handleClose} 
       maxWidth="sm" 
       fullWidth
@@ -231,6 +233,25 @@ export default function NoticePopup() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [viewedNoticeIds, setViewedNoticeIds] = useState<Set<string>>(new Set());
   const [hiddenNotices, setHiddenNotices] = useState<Record<string, number>>({});
+  const [hiddenNoticesReady, setHiddenNoticesReady] = useState(false);
+  const [hasFreshCache, setHasFreshCache] = useState(false);
+
+  const POPUP_NOTICE_CACHE_KEY = 'popupNoticeCache:v1';
+  const POPUP_NOTICE_CACHE_TTL_MS = 60 * 60 * 1000; // 1시간
+
+  const readPopupCache = () => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(POPUP_NOTICE_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { ts?: number; list?: Notice[] };
+      if (!parsed || typeof parsed.ts !== 'number' || !Array.isArray(parsed.list)) return null;
+      if (Date.now() - parsed.ts > POPUP_NOTICE_CACHE_TTL_MS) return null;
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  };
 
   // 클라이언트 마운트 확인 (서버와 클라이언트 렌더링 일치를 위해 초기값 false 유지)
   useEffect(() => {
@@ -239,8 +260,25 @@ export default function NoticePopup() {
     }
   }, []);
 
+  // 숨긴 공지사항 로드 (먼저 준비되어야 캐시 표시 시 깜빡임이 없음)
+  useEffect(() => {
+    if (!isMounted) return;
+    if (typeof window === 'undefined') return;
+    setHiddenNotices(getHiddenNotices());
+    setHiddenNoticesReady(true);
+  }, [isMounted]);
+
+  // 캐시가 있으면 라우팅 이동 시 재조회하지 않도록 사용
+  useEffect(() => {
+    if (!isMounted) return;
+    const cached = readPopupCache();
+    if (cached && cached.list.length > 0) {
+      setHasFreshCache(true);
+    }
+  }, [isMounted]);
+
   const popupNoticeListQuery = usePopupNoticeList({
-    enabled: isMounted, // 클라이언트 마운트 후에만 활성화
+    enabled: isMounted && !hasFreshCache, // 캐시가 있으면 API 호출하지 않음
     refetchOnWindowFocus: false,
   });
 
@@ -248,75 +286,77 @@ export default function NoticePopup() {
   useEffect(() => {
     if (popupNoticeListQuery.isError && popupNoticeListQuery.error) {
       logger.error('팝업 공지사항 조회 실패', popupNoticeListQuery.error);
-      console.error('팝업 공지사항 조회 실패:', popupNoticeListQuery.error);
     }
   }, [popupNoticeListQuery.isError, popupNoticeListQuery.error]);
 
   // 클라이언트 마운트 후 숨긴 공지사항 로드
-  useEffect(() => {
-    if (isMounted && typeof window !== 'undefined') {
-      setHiddenNotices(getHiddenNotices());
+  // (위 effect에서 hiddenNoticesReady까지 함께 처리)
+
+  const applyNotices = (notices: Notice[]) => {
+    const filteredNotices = notices.filter((notice) => {
+      if (!notice.notice_id) return false;
+      const noticeIdStr = String(notice.notice_id);
+      const hiddenTimestamp = hiddenNotices[noticeIdStr];
+      if (hiddenTimestamp) {
+        const now = Date.now();
+        if (now - hiddenTimestamp < 86400000) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (filteredNotices.length > 0) {
+      setPopupNotices(filteredNotices);
+      setCurrentIndex(0);
+      setViewedNoticeIds(new Set());
+    } else {
+      setPopupNotices([]);
+      setCurrentIndex(0);
     }
-  }, [isMounted]);
+  };
+
+  // 캐시에서 먼저 표시 (숨긴 공지사항 제외)
+  useEffect(() => {
+    if (!isMounted || !hiddenNoticesReady) return;
+    const cached = readPopupCache();
+    if (!cached || !Array.isArray(cached.list)) return;
+    applyNotices(cached.list);
+  }, [isMounted, hiddenNoticesReady, hiddenNotices]);
 
   // 데이터가 로드되면 popupNotices 업데이트 (숨긴 공지사항 제외) - 클라이언트에서만
   useEffect(() => {
-    if (!isMounted) return;
-    
-    console.log('팝업 공지사항 쿼리 상태:', {
-      isLoading: popupNoticeListQuery.isLoading,
-      isError: popupNoticeListQuery.isError,
-      data: popupNoticeListQuery.data,
-      hiddenNotices: hiddenNotices,
-    });
+    if (!isMounted || !hiddenNoticesReady) return;
     
     if (popupNoticeListQuery.data && !popupNoticeListQuery.isLoading && !popupNoticeListQuery.isError) {
       const data = popupNoticeListQuery.data;
-      console.log('팝업 공지사항 데이터:', data);
       
       let notices: Notice[] = [];
       
       // data.list가 있는 경우
       if (data && data.list && Array.isArray(data.list)) {
         notices = data.list;
-        console.log('data.list에서 공지사항 추출:', notices);
       } 
       // data가 직접 배열인 경우
       else if (Array.isArray(data)) {
         notices = data;
-        console.log('data가 배열:', notices);
       } else {
-        console.warn('예상치 못한 데이터 구조:', data);
+        // no-op
       }
 
-      // 숨긴 공지사항 필터링 (클라이언트에서만)
-      const filteredNotices = notices.filter((notice) => {
-        if (!notice.notice_id) return false;
-        // notice_id를 문자열로 변환하여 비교
-        const noticeIdStr = String(notice.notice_id);
-        const hiddenTimestamp = hiddenNotices[noticeIdStr];
-        if (hiddenTimestamp) {
-          const now = Date.now();
-          // 24시간이 지나지 않았으면 숨김
-          if (now - hiddenTimestamp < 86400000) {
-            console.log(`공지사항 ${noticeIdStr}는 하루동안 숨김 처리됨`);
-            return false;
-          }
+      // 로컬 캐시 저장 (라우팅 이동 시 재조회 방지)
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(POPUP_NOTICE_CACHE_KEY, JSON.stringify({ ts: Date.now(), list: notices }));
+          setHasFreshCache(true);
+        } catch (e) {
+          // no-op
         }
-        return true;
-      });
-
-      if (filteredNotices.length > 0) {
-        console.log('팝업 공지사항 목록:', filteredNotices);
-        setPopupNotices(filteredNotices);
-        setCurrentIndex(0);
-        setViewedNoticeIds(new Set());
-      } else {
-        console.log('팝업 공지사항이 없습니다.');
-        setPopupNotices([]);
       }
+
+      applyNotices(notices);
     }
-  }, [isMounted, popupNoticeListQuery.data, popupNoticeListQuery.isLoading, popupNoticeListQuery.isError, hiddenNotices]);
+  }, [isMounted, hiddenNoticesReady, popupNoticeListQuery.data, popupNoticeListQuery.isLoading, popupNoticeListQuery.isError, hiddenNotices]);
 
   const handleView = (noticeId: string) => {
     setViewedNoticeIds((prev) => {
@@ -367,6 +407,7 @@ export default function NoticePopup() {
 
   return (
     <NoticePopupItem 
+      open={true}
       notice={currentNotice} 
       onView={handleView} 
       onClose={handleClose}

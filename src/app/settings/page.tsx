@@ -16,11 +16,17 @@ import {
   Switch,
   TextField,
   Typography,
-  Autocomplete,
   CircularProgress,
   Chip,
   Tabs,
   Tab,
+  List,
+  ListItemButton,
+  ListItemText,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import SecurityIcon from '@mui/icons-material/Security';
@@ -35,8 +41,9 @@ import { showToast } from '@/shared/lib/notification';
 import {
   useUserGuild,
   useGuildSearch,
-  useJoinGuild,
-  useGuildJoinApplication,
+  useApplyGuildJoinApplication,
+  useMyGuildJoinApplicationStatus,
+  useCancelMyGuildJoinApplication,
   useGuildApplicationList,
   useJoinGuildByInviteCode,
   useCheckGuildByInviteCode,
@@ -93,32 +100,32 @@ export default function SettingsPage() {
   const guildSearchQuery = useGuildSearch(
     { guild_name: guildSearchKeyword },
     {
-      enabled: guildSearchKeyword.length >= 2,
+      enabled: false, // 검색 버튼으로만 실행
     },
   );
 
-  // 길드 가입 신청 Mutation (일반 사용자가 길드에 가입 신청)
-  const guildJoinApplicationMutation = useGuildJoinApplication({
+  const handleSearchGuild = () => {
+    const keyword = guildSearchKeyword.trim();
+    if (keyword.length < 2) {
+      showToast.error('길드명을 2자 이상 입력하세요.');
+      return;
+    }
+    // 새로운 검색 시 이전 선택 초기화
+    setSelectedGuild(null);
+    guildSearchQuery.refetch();
+  };
+
+  // 길드 가입 신청 Mutation (승인 대기)
+  const applyJoinGuildMutation = useApplyGuildJoinApplication({
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
-        showToast.success('길드 가입 신청이 완료되었습니다.');
+        showToast.success('길드 가입 신청이 완료되었습니다. 승인 대기 중입니다.');
         setGuildJoinDialog(false);
         setGuildSearchKeyword('');
         setSelectedGuild(null);
-        // 사용자 정보 갱신
-        if (typeof window !== 'undefined') {
-          const storedUserInfo = localStorage.getItem('userInfo');
-          if (storedUserInfo) {
-            try {
-              const parsed = JSON.parse(storedUserInfo);
-              userGuildQuery.refetch();
-            } catch (error) {
-              logger.error('사용자 정보 업데이트 실패', error);
-            }
-          }
-        }
+        myJoinStatusQuery.refetch();
       } else {
-        throw new Error(res.message || '길드 가입 신청에 실패했습니다.');
+        throw new Error(res?.message || '길드 가입 신청에 실패했습니다.');
       }
     },
     onError: (error: Error) => {
@@ -157,15 +164,40 @@ export default function SettingsPage() {
   });
 
 
-  // 길드 신청 목록 조회 (사용자용 - 자신의 신청 상태 확인)
+  const shouldCheckGuildStatus = isMounted && isAuthenticated() && !userInfo?.guild_id;
+
+  // 길드 신청 목록 조회 (길드가 없을 때만: 생성 신청 상태 표시용)
   const guildApplicationListQuery = useGuildApplicationList({
-    enabled: true, // 항상 조회하여 자신의 신청 상태도 확인
+    enabled: shouldCheckGuildStatus,
   });
 
   // 현재 사용자의 길드 생성 신청 찾기 (길드가 없는 경우)
   const myGuildApplication = guildApplicationListQuery.data?.find(
     (app: any) => app.user_id === userInfo?.user_id && !app.guild_id && app.status === 'PENDING'
   );
+
+  // 내 길드 가입 신청(승인대기) 상태 (길드가 없을 때만)
+  const myJoinStatusQuery = useMyGuildJoinApplicationStatus({
+    enabled: shouldCheckGuildStatus,
+  });
+  const myJoinApplication = myJoinStatusQuery.data?.hasPendingJoinApplication
+    ? (myJoinStatusQuery.data.application as any)
+    : null;
+
+  const cancelMyJoinApplicationMutation = useCancelMyGuildJoinApplication({
+    onSuccess: (res) => {
+      if (res && res.result === 'SUCCESS') {
+        showToast.success('가입 신청을 취소했습니다.');
+        myJoinStatusQuery.refetch();
+      } else {
+        throw new Error(res?.message || '가입 신청 취소에 실패했습니다.');
+      }
+    },
+    onError: (error: Error) => {
+      logger.error('가입 신청 취소 실패', error);
+      showToast.error(error.message || '가입 신청 취소에 실패했습니다.');
+    },
+  });
 
   const appVersion = '1.0.0';
   const buildDate = '2024-12-26';
@@ -234,7 +266,7 @@ export default function SettingsPage() {
         setAutoLoginEnabled(enabled);
       }
     } catch (error) {
-      console.error('자동 로그인 설정 변경 실패:', error);
+      logger.error('자동 로그인 설정 변경 실패', error);
       showToast.error('설정 변경에 실패했습니다.');
     }
   };
@@ -254,7 +286,7 @@ export default function SettingsPage() {
       showToast.success('사용자 정보가 수정되었습니다.');
       setEditDialog(false);
     } catch (error) {
-      console.error('사용자 정보 수정 실패:', error);
+      logger.error('사용자 정보 수정 실패', error);
       showToast.error('사용자 정보 수정에 실패했습니다.');
     }
   };
@@ -268,7 +300,7 @@ export default function SettingsPage() {
       router.push('/');
     },
     onError: (error) => {
-      console.error('로그아웃 실패:', error);
+      logger.error('로그아웃 실패', error);
       if (typeof window !== 'undefined') {
         clearClientAuth();
       }
@@ -287,7 +319,7 @@ export default function SettingsPage() {
         showToast.error('길드를 선택해주세요.');
         return;
       }
-      guildJoinApplicationMutation.mutate({ guild_id: selectedGuild.guild_id });
+      applyJoinGuildMutation.mutate({ guild_id: selectedGuild.guild_id });
     } else {
       // 초대 코드로 가입
       if (!inviteCode || inviteCode.trim() === '') {
@@ -393,7 +425,7 @@ export default function SettingsPage() {
                 avatar={<GroupIcon color="primary" />}
                 title="길드 정보"
                 action={
-                  !userInfo?.guild_id && (
+                  !userInfo?.guild_id && !myJoinApplication && (
                     <Button
                       variant="text"
                       color="primary"
@@ -428,6 +460,44 @@ export default function SettingsPage() {
                       />
                     </Box>
                   </>
+                ) : myJoinApplication ? (
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <Box sx={{ p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
+                      <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
+                        길드 가입 신청 중
+                      </Typography>
+                      <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                          길드명
+                        </Typography>
+                        <Typography variant="body1" fontWeight={600}>
+                          {myJoinApplication.guild_name || myJoinApplication.guild_id || '정보 없음'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ mb: 2 }}>
+                        <Chip label="대기" color="warning" size="medium" />
+                      </Box>
+                      {myJoinApplication.crt_date && (
+                        <Typography variant="caption" color="text.secondary">
+                          신청일: {isMounted ? new Date(myJoinApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
+                        </Typography>
+                      )}
+                      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          onClick={() => {
+                            const ok = window.confirm('길드 가입 신청을 취소할까요?');
+                            if (!ok) return;
+                            cancelMyJoinApplicationMutation.mutate({});
+                          }}
+                          disabled={cancelMyJoinApplicationMutation.isPending}
+                        >
+                          {cancelMyJoinApplicationMutation.isPending ? '취소 중...' : '신청 취소'}
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Box>
                 ) : myGuildApplication ? (
                   <Box sx={{ textAlign: 'center', py: 4 }}>
                     <Box sx={{ p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
@@ -513,30 +583,23 @@ export default function SettingsPage() {
                   <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
                     점령전 조회 범위
                   </Typography>
-                  <Autocomplete
-                    value={siegeViewScope}
-                    onChange={(event, newValue) => {
-                      if (newValue && typeof newValue === 'string') {
+                  <FormControl fullWidth size="small" disabled={updateSiegeViewScopeMutation.isPending}>
+                    <InputLabel>조회 범위 선택</InputLabel>
+                    <Select
+                      label="조회 범위 선택"
+                      value={siegeViewScope}
+                      onChange={(e) => {
+                        const newValue = String(e.target.value);
                         setSiegeViewScope(newValue);
-                        updateSiegeViewScopeMutation.mutate({ 
-                          siege_view_scope: newValue
+                        updateSiegeViewScopeMutation.mutate({
+                          siege_view_scope: newValue,
                         });
-                      }
-                    }}
-                    options={['A', 'C']}
-                    getOptionLabel={(option) => {
-                      return option === 'A' ? '전체 시즌' : '최근 시즌';
-                    }}
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="조회 범위 선택"
-                        variant="outlined"
-                        size="small"
-                      />
-                    )}
-                    disabled={updateSiegeViewScopeMutation.isPending}
-                  />
+                      }}
+                    >
+                      <MenuItem value="C">최근 시즌</MenuItem>
+                      <MenuItem value="A">전체 시즌</MenuItem>
+                    </Select>
+                  </FormControl>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                     점령전 이력 페이지에서 조회할 시즌 범위를 설정합니다.
                   </Typography>
@@ -674,44 +737,106 @@ export default function SettingsPage() {
             </Tabs>
             {guildJoinDialogTab === 'search' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <Autocomplete
-                  options={guildSearchQuery.data || []}
-                  getOptionLabel={(option) => option.guild_name || ''}
-                  loading={guildSearchQuery.isFetching}
-                  inputValue={guildSearchKeyword}
-                  onInputChange={(event, newInputValue) => {
-                    setGuildSearchKeyword(newInputValue);
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <TextField
+                    label="길드명"
+                    value={guildSearchKeyword}
+                    onChange={(e) => setGuildSearchKeyword(e.target.value)}
+                    placeholder="길드명을 입력하세요 (2자 이상)"
+                    fullWidth
+                      disabled={applyJoinGuildMutation.isPending}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSearchGuild();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={handleSearchGuild}
+                    disabled={
+                        applyJoinGuildMutation.isPending ||
+                      guildSearchQuery.isFetching ||
+                      guildSearchKeyword.trim().length < 2
+                    }
+                    sx={{ minWidth: 96 }}
+                  >
+                    {guildSearchQuery.isFetching ? '검색 중...' : '검색'}
+                  </Button>
+                </Box>
+
+                <Box
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1.5,
+                    overflow: 'hidden',
+                    bgcolor: 'background.paper',
                   }}
-                  value={selectedGuild}
-                  onChange={(event, newValue) => {
-                    setSelectedGuild(newValue);
-                  }}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      label="길드 검색"
-                      placeholder="길드명을 입력하여 검색하세요 (2자 이상)"
-                      required
-                      InputProps={{
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {guildSearchQuery.isFetching ? (
-                              <CircularProgress color="inherit" size={20} />
-                            ) : null}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      }}
-                    />
+                >
+                  {guildSearchQuery.isFetching ? (
+                    <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+                      <CircularProgress size={22} />
+                    </Box>
+                  ) : (guildSearchQuery.data || []).length > 0 ? (
+                    <>
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 120px',
+                          gap: 1,
+                          px: 2,
+                          py: 1,
+                          bgcolor: 'action.hover',
+                          borderBottom: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                          길드명
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ fontWeight: 700, textAlign: 'right' }}
+                        >
+                          길드장
+                        </Typography>
+                      </Box>
+                      <List dense disablePadding>
+                      {(guildSearchQuery.data || []).map((g: any) => (
+                        <ListItemButton
+                          key={g.guild_id}
+                          selected={selectedGuild?.guild_id === g.guild_id}
+                          onClick={() => setSelectedGuild({ guild_id: g.guild_id, guild_name: g.guild_name })}
+                          sx={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 120px',
+                            gap: 1,
+                            px: 2,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                            {g.guild_name}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right' }} noWrap>
+                            {g.leader_name || '-'}
+                          </Typography>
+                        </ListItemButton>
+                      ))}
+                      </List>
+                    </>
+                  ) : (
+                    <Box sx={{ py: 3, px: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        {guildSearchKeyword.trim().length < 2
+                          ? '길드명을 2자 이상 입력 후 검색하세요.'
+                          : '검색 결과가 없습니다.'}
+                      </Typography>
+                    </Box>
                   )}
-                  noOptionsText={
-                    guildSearchKeyword.length < 2
-                      ? '길드명을 2자 이상 입력하세요'
-                      : '검색 결과가 없습니다'
-                  }
-                  disabled={guildJoinApplicationMutation.isPending}
-                />
+                </Box>
                 {selectedGuild && (
                   <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
@@ -776,12 +901,12 @@ export default function SettingsPage() {
                 (guildJoinDialogTab === 'search' && !selectedGuild) ||
                 (guildJoinDialogTab === 'invite' && (!inviteCode || inviteCode.trim() === '')) ||
                 (guildJoinDialogTab === 'invite' && (!checkGuildByInviteCodeQuery.data || checkGuildByInviteCodeQuery.data.result !== 'SUCCESS')) ||
-                guildJoinApplicationMutation.isPending ||
+                applyJoinGuildMutation.isPending ||
                 joinGuildByInviteCodeMutation.isPending
               }
             >
               {guildJoinDialogTab === 'search'
-                ? guildJoinApplicationMutation.isPending
+                ? applyJoinGuildMutation.isPending
                   ? '신청 중...'
                   : '가입 신청'
                 : joinGuildByInviteCodeMutation.isPending

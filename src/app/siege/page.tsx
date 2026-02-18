@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Box,
   Button,
@@ -11,10 +11,8 @@ import {
   Typography,
   Avatar,
   Chip,
-  Pagination,
   Autocomplete,
   TextField,
-  LinearProgress,
   IconButton,
   Collapse,
   Fab,
@@ -24,23 +22,25 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
+  Skeleton,
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import StarIcon from '@mui/icons-material/Star';
-import { useEnemyTeamList, useTotalPageCount, useMonsterList, type MonsterOption } from '@/hooks/api';
+import { useEnemyTeamListSuspense, useMonsterList, type MonsterOption } from '@/hooks/api';
 import { searchDataExtraction, getRatingColor, getRatingStars } from '@/shared/utils';
 import { showToast } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import { DEFAULT_ITEMS_PER_PAGE, AVATAR_SIZE_XS, AVATAR_SIZE_MD, PAGINATION_OPTIONS } from '@/shared/constants';
-import { LoadingState, EmptyState } from '@/shared/ui';
+import { EmptyState, ErrorBoundary } from '@/shared/ui';
 import { useResponsive, useServerPagination } from '@/shared/hooks';
-import { navigateTo } from '@/shared/utils/navigation';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterItem, SiegeSearchParams } from '@/types';
 import type { GuildInfo } from '@/features/siege/types/siege';
 
 const LEADER_INDEX = 0;
 const MAX_MONSTERS = 3;
+const SIEGE_SEARCH_STATE_KEY = 'smwr:siege-search-state:v1';
 
 // 프로그레스바 컴포넌트 (부드러운 애니메이션)
 const AnimatedProgressBar = ({ percentage, isHighRate }: { percentage: number; isHighRate: boolean }) => {
@@ -83,7 +83,224 @@ const AnimatedProgressBar = ({ percentage, isHighRate }: { percentage: number; i
   );
 };
 
+function SiegeResultsSkeleton({ mobile }: { mobile: boolean }) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: 'repeat(2, 1fr)',
+          sm: 'repeat(3, 1fr)',
+          md: 'repeat(4, 1fr)',
+          lg: 'repeat(5, 1fr)',
+        },
+        gap: { xs: 1.5, md: 2 },
+        mb: { xs: 3, md: 4 },
+      }}
+    >
+      {Array.from({ length: mobile ? 6 : 10 }).map((_, idx) => (
+        <Card key={idx} sx={{ boxShadow: 1, borderRadius: 2, overflow: 'hidden' }}>
+          <CardContent sx={{ p: { xs: 1.5, md: 2 } }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
+              <Skeleton variant="circular" width={mobile ? 38 : 56} height={mobile ? 38 : 56} />
+              <Skeleton variant="circular" width={mobile ? 38 : 56} height={mobile ? 38 : 56} sx={{ ml: -1.25 }} />
+              <Skeleton variant="circular" width={mobile ? 38 : 56} height={mobile ? 38 : 56} sx={{ ml: -1.25 }} />
+            </Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+              <Skeleton variant="text" width={36} />
+              <Skeleton variant="text" width={64} />
+            </Box>
+            <Skeleton variant="rounded" height={8} />
+          </CardContent>
+        </Card>
+      ))}
+    </Box>
+  );
+}
+
+function SiegeResultsSection({
+  params,
+  itemsPerPage,
+  currentPage,
+  isMobile,
+  onItemClick,
+  onPrev,
+  onNext,
+  onHasNextPageChange,
+}: {
+  params: SiegeSearchParams & { paging: number; offset: number };
+  itemsPerPage: number;
+  currentPage: number;
+  isMobile: boolean;
+  onItemClick: (item: MonsterItem) => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onHasNextPageChange: (hasNext: boolean) => void;
+}) {
+  const { data: enemyTeamList = [] } = useEnemyTeamListSuspense(params);
+  const list = Array.isArray(enemyTeamList) ? enemyTeamList : [];
+  const hasNextPage = list.length >= itemsPerPage;
+
+  // 부모 쪽 버튼 disabled 계산을 위해 상태만 전달 (페이지 이동은 버튼 클릭에서만)
+  useEffect(() => {
+    onHasNextPageChange(hasNextPage);
+  }, [hasNextPage, onHasNextPageChange]);
+
+  if (list.length === 0) {
+    return (
+      <Card sx={{ boxShadow: 2 }}>
+        <CardContent sx={{ p: 4 }}>
+          <EmptyState message="검색 결과가 없습니다" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'repeat(2, 1fr)',
+            sm: 'repeat(3, 1fr)',
+            md: 'repeat(4, 1fr)',
+            lg: 'repeat(5, 1fr)',
+          },
+          gap: { xs: 1.5, md: 2 },
+          mb: { xs: 3, md: 4 },
+        }}
+      >
+        {list.map((item) => {
+          const winCount = item.win_count || 0;
+          const loseCount = item.lose_count || 0;
+          const total = winCount + loseCount;
+          const winRate = total > 0 ? Math.round((winCount / total) * 100) : 0;
+          const winPercentage = total > 0 ? (winCount / total) * 100 : 0;
+
+          return (
+            <Card
+              key={item.key}
+              sx={{
+                cursor: 'pointer',
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: 1,
+                borderRadius: 2,
+                overflow: 'hidden',
+                '&:hover': {
+                  boxShadow: 6,
+                  transform: 'translateY(-4px)',
+                },
+              }}
+              onClick={() => onItemClick(item)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onItemClick(item);
+                }
+              }}
+              aria-label={`${item.key} 방어덱 상세 보기`}
+            >
+              <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
+                {/* 몬스터 이미지 */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    mb: 1,
+                    flexWrap: 'nowrap',
+                  }}
+                >
+                  {[item.image_url1, item.image_url2, item.image_url3]
+                    .filter(Boolean)
+                    .map((url, idx) => (
+                      <Avatar
+                        key={idx}
+                        src={getMonsterImageUrl(url)}
+                        sx={{
+                          width: { xs: 38, sm: 44, md: 56 },
+                          height: { xs: 38, sm: 44, md: 56 },
+                          ml: idx > 0 ? { xs: -1.25, md: -1 } : 0,
+                          border: '2px solid',
+                          borderColor: 'primary.main',
+                          borderWidth: { xs: 1.5, md: 2 },
+                          boxShadow: 1,
+                          flexShrink: 0,
+                          bgcolor: 'background.paper',
+                          '& img': {
+                            objectFit: 'contain',
+                          },
+                        }}
+                        alt={`몬스터 ${idx + 1}`}
+                      />
+                    ))}
+                </Box>
+
+                {/* 승률과 승/패 */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: 600,
+                      color: winRate >= 50 ? 'success.main' : 'text.secondary',
+                      fontSize: { xs: '0.7rem', md: '0.75rem' },
+                    }}
+                  >
+                    {total > 0 ? `${winRate}%` : '100%'}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: 'text.secondary',
+                      fontSize: { xs: '0.65rem', md: '0.75rem' },
+                      display: total > 0 ? 'block' : 'none',
+                    }}
+                  >
+                    {winCount}승 {loseCount}패
+                  </Typography>
+                </Box>
+
+                {/* 승/패 프로그레스바 */}
+                {total > 0 && <AnimatedProgressBar percentage={winPercentage} isHighRate={winRate >= 50} />}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Box>
+
+      {/* 페이지네이션: total-count 없이 prev/next */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: { xs: 1, md: 1.5 },
+          flexWrap: 'wrap',
+          mb: { xs: 8, md: 0 },
+        }}
+      >
+        <Button variant="outlined" size={isMobile ? 'small' : 'medium'} onClick={onPrev} disabled={currentPage <= 1}>
+          이전
+        </Button>
+        <Typography sx={{ fontWeight: 600 }}>{currentPage} 페이지</Typography>
+        <Button
+          variant="outlined"
+          size={isMobile ? 'small' : 'medium'}
+          onClick={onNext}
+          disabled={!hasNextPage}
+        >
+          다음
+        </Button>
+      </Box>
+    </>
+  );
+}
+
 function SiegeContent() {
+  const router = useRouter();
   const { isMobile } = useResponsive();
   const searchParams = useSearchParams();
   const matchIdFromQuery = searchParams?.get('match_id');
@@ -116,14 +333,12 @@ function SiegeContent() {
       const guildsData = sessionStorage.getItem(`siege_guilds_${matchIdFromQuery}`);
       if (guildsData) {
         const guilds: GuildInfo[] = JSON.parse(guildsData);
-        console.log('sessionStorage에서 받은 길드 목록:', guilds);
 
         if (guilds && Array.isArray(guilds)) {
           const filtered = guilds.filter(
             (guild) => guild.guild_name && guild.guild_name.toUpperCase() !== 'EVE.RE',
           );
           setAvailableGuilds(filtered);
-          console.log('선택 가능한 길드 목록:', filtered);
         }
       } else {
         // sessionStorage에 데이터가 없으면 초기화
@@ -131,7 +346,7 @@ function SiegeContent() {
         setSelectedGuilds([]);
       }
     } catch (error) {
-      console.error('길드 목록 조회 실패:', error);
+      logger.error('길드 목록 조회 실패', error);
       setAvailableGuilds([]);
       setSelectedGuilds([]);
     }
@@ -185,6 +400,9 @@ function SiegeContent() {
   const [shouldSearch, setShouldSearch] = useState(true); // 처음 접속 시 자동 조회
   const isInitialMount = useRef(true); // 처음 마운트 여부 추적
   const scrollPositionRef = useRef<number>(0); // 스크롤 위치 저장
+  const [restoredMonsterIds, setRestoredMonsterIds] = useState<string[] | null>(null);
+  const didRestoreRef = useRef(false);
+  const restoringRef = useRef(false);
 
   // 서버 사이드 페이지네이션 자동 관리 (기본 10개)
   const pagination = useServerPagination({
@@ -192,21 +410,35 @@ function SiegeContent() {
     itemsPerPage: 10,
   });
 
+  const persistSearchState = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const payload = {
+        match_id: matchIdFromQuery || null,
+        monster_ids: selectedMonsterList.map((m) => m.monster_id),
+        selected_guilds: selectedGuilds,
+        page: pagination.currentPage,
+        itemsPerPage: pagination.itemsPerPage,
+      };
+      sessionStorage.setItem(SIEGE_SEARCH_STATE_KEY, JSON.stringify(payload));
+    } catch {
+      // no-op
+    }
+  }, [
+    matchIdFromQuery,
+    pagination.currentPage,
+    pagination.itemsPerPage,
+    selectedGuilds,
+    selectedMonsterList,
+  ]);
+
   // 서버 사이드 페이지네이션 파라미터 추가
   const searchParamsWithPagination = useMemo(() => {
     const params = {
       ...apiSearchParams,
       ...pagination.paginationParams,
     } as SiegeSearchParams & { paging: number; offset: number };
-    
-    // 디버깅: 전송되는 파라미터 확인
-    console.log('=== enemyTeam-list API 파라미터 ===');
-    console.log('전체 파라미터:', params);
-    console.log('match_id:', matchIdFromQuery);
-    console.log('monster_ids:', params.monster_ids);
-    console.log('paging:', params.paging);
-    console.log('offset:', params.offset);
-    
+
     return params;
   }, [apiSearchParams, pagination.paginationParams, matchIdFromQuery]);
 
@@ -219,26 +451,80 @@ function SiegeContent() {
     }
   }, []);
 
+  // 상세 화면 갔다가 뒤로왔을 때 검색 조건을 유지하기 위해 sessionStorage에 저장/복구
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem(SIEGE_SEARCH_STATE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as {
+        match_id?: string | null;
+        monster_ids?: string[];
+        selected_guilds?: string[];
+        page?: number;
+        itemsPerPage?: number;
+      };
+
+      // match_id가 다르면 길드 선택은 무의미할 수 있어 몬스터만 복구
+      const sameMatch = (parsed.match_id || null) === (matchIdFromQuery || null);
+      const monsterIds = Array.isArray(parsed.monster_ids) ? parsed.monster_ids : [];
+      const selectedGuilds = sameMatch && Array.isArray(parsed.selected_guilds) ? parsed.selected_guilds : [];
+      const page = typeof parsed.page === 'number' && parsed.page >= 1 ? parsed.page : 1;
+      const itemsPerPage = typeof parsed.itemsPerPage === 'number' && parsed.itemsPerPage >= 1 ? parsed.itemsPerPage : 10;
+
+      restoringRef.current = true;
+      didRestoreRef.current = true;
+      setRestoredMonsterIds(monsterIds);
+      setSelectedGuilds(selectedGuilds);
+      pagination.setItemsPerPage(itemsPerPage);
+      pagination.setPage(page);
+      // 복구 후 바로 검색 실행되도록
+      setShouldSearch(true);
+    } catch {
+      // no-op
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchIdFromQuery]);
+
+  // monsterList가 로드된 뒤 restoredMonsterIds를 MonsterOption[]으로 복원
+  useEffect(() => {
+    if (!restoredMonsterIds || restoredMonsterIds.length === 0) return;
+    if (!monsterList || monsterList.length === 0) return;
+
+    const byId = new Map(monsterList.map((m) => [m.monster_id, m]));
+    const restored = restoredMonsterIds.map((id) => byId.get(id)).filter(Boolean) as MonsterOption[];
+    if (restored.length > 0) {
+      setSelectedMonsterList(restored);
+    }
+    // 1회 복구 후 해제
+    setRestoredMonsterIds(null);
+    restoringRef.current = false;
+  }, [restoredMonsterIds, monsterList]);
+
+  // 검색 조건 저장 (선택 몬스터/길드/페이지)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // 복구 과정 중에는 저장하지 않음(초기 값으로 덮어쓰는 것 방지)
+    if (restoringRef.current) return;
+    try {
+      const payload = {
+        match_id: matchIdFromQuery || null,
+        monster_ids: selectedMonsterList.map((m) => m.monster_id),
+        selected_guilds: selectedGuilds,
+        page: pagination.currentPage,
+        itemsPerPage: pagination.itemsPerPage,
+      };
+      sessionStorage.setItem(SIEGE_SEARCH_STATE_KEY, JSON.stringify(payload));
+    } catch {
+      // no-op
+    }
+  }, [matchIdFromQuery, selectedMonsterList, selectedGuilds, pagination.currentPage, pagination.itemsPerPage]);
+
   // 몬스터가 선택되어 있고 shouldSearch가 true일 때만 검색 실행
   // 또는 처음 접근 시에는 몬스터 없이도 조회 가능하도록 조건 완화
   const isSearchEnabled = shouldSearch;
 
-  const {
-    data: enemyTeamList = [],
-    isLoading: isLoadingMonsters,
-  } = useEnemyTeamList(searchParamsWithPagination, isSearchEnabled);
-
-  // 전체 페이지 수 조회 (페이지네이션 파라미터 제외)
-  const {
-    data: totalCount = 0,
-    isLoading: isLoadingTotalCount,
-  } = useTotalPageCount(apiSearchParams, isSearchEnabled);
-
-  // 서버 사이드 페이지네이션: API에서 totalCount를 받아서 계산
-  const itemsPerPage = pagination.itemsPerPage;
-  const totalPages = totalCount > 0 ? Math.ceil(totalCount / itemsPerPage) : 1;
-  
-  const paginatedMonsterList = Array.isArray(enemyTeamList) ? enemyTeamList : [];
+  const [hasNextPage, setHasNextPage] = useState(false);
 
   const handleMonsterChange = useCallback(
     (newValue: MonsterOption[]) => {
@@ -309,8 +595,10 @@ function SiegeContent() {
   }, [pagination]);
 
   const handleMonsterClick = useCallback((item: MonsterItem) => {
-    navigateTo(`/siege/siege-detail/${item.key}`);
-  }, []);
+    // 상세 이동 직전에 동기 저장(뒤로가기로 복귀 시 상태 유지)
+    persistSearchState();
+    router.push(`/siege/siege-detail/${item.key}`);
+  }, [persistSearchState, router]);
 
   const handlePageChange = useCallback(
     (_: unknown, page: number) => {
@@ -321,16 +609,16 @@ function SiegeContent() {
     [pagination],
   );
 
-  // 페이지 변경 후 데이터가 업데이트되면 스크롤 위치 복원
+  // Suspense 패턴에서는 데이터 로딩 완료 타이밍을 직접 잡기 어렵기 때문에,
+  // 페이지 변경 시 스크롤 복원은 "다음 프레임"에 수행합니다.
   useEffect(() => {
-    if (scrollPositionRef.current > 0 && !isLoadingMonsters) {
-      // 데이터 로딩이 완료된 후 스크롤 위치 복원
+    if (scrollPositionRef.current > 0) {
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollPositionRef.current);
-        scrollPositionRef.current = 0; // 복원 후 초기화
+        scrollPositionRef.current = 0;
       });
     }
-  }, [enemyTeamList, isLoadingMonsters]);
+  }, [pagination.currentPage]);
 
   const handleImageError = useCallback((event: React.SyntheticEvent<HTMLElement, Event>, imageUrl: string) => {
     // Avatar의 경우 img 태그를 찾아서 대체
@@ -889,9 +1177,7 @@ function SiegeContent() {
           </Collapse>
         </Box>
 
-            {isLoadingMonsters ? (
-              <LoadingState message="데이터를 불러오는 중..." />
-            ) : paginatedMonsterList.length === 0 ? (
+            {!shouldSearch ? (
               <Card sx={{ boxShadow: 2 }}>
                 <CardContent sx={{ p: 4 }}>
                   <EmptyState
@@ -900,191 +1186,68 @@ function SiegeContent() {
                 </CardContent>
               </Card>
             ) : (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: {
-                    xs: 'repeat(2, 1fr)', // 모바일: 2열
-                    sm: 'repeat(3, 1fr)', // 태블릿: 3열
-                    md: 'repeat(4, 1fr)', // PC: 4열
-                    lg: 'repeat(5, 1fr)', // 큰 화면: 5열
-                  },
-                  gap: { xs: 1.5, md: 2 },
-                  mb: { xs: 3, md: 4 },
-                }}
-              >
-                {paginatedMonsterList.map((item) => {
-                  const winCount = item.win_count || 0;
-                  const loseCount = item.lose_count || 0;
-                  const total = winCount + loseCount;
-                  const winRate = total > 0 ? Math.round((winCount / total) * 100) : 0;
-                  const winPercentage = total > 0 ? (winCount / total) * 100 : 0;
-
-                  return (
-                    <Card
-                      key={item.key}
-                      sx={{
-                        cursor: 'pointer',
-                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                        boxShadow: 1,
-                        borderRadius: 2,
-                        overflow: 'hidden',
-                        '&:hover': {
-                          boxShadow: 6,
-                          transform: 'translateY(-4px)',
-                        },
-                      }}
-                      onClick={() => handleMonsterClick(item)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          handleMonsterClick(item);
-                        }
-                      }}
-                      aria-label={`${item.key} 방어덱 상세 보기`}
-                    >
-                      <CardContent sx={{ p: { xs: 1.5, md: 2 }, '&:last-child': { pb: { xs: 1.5, md: 2 } } }}>
-                        {/* 몬스터 이미지 */}
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, gap: -1 }}>
-                          {[item.image_url1, item.image_url2, item.image_url3]
-                            .filter(Boolean)
-                            .map((url, idx) => (
-                              <Avatar
-                                key={idx}
-                                src={getMonsterImageUrl(url)}
-                                sx={{
-                                  width: { xs: 48, md: 56 },
-                                  height: { xs: 48, md: 56 },
-                                  ml: idx > 0 ? -1 : 0,
-                                  border: '2px solid',
-                                  borderColor: 'primary.main',
-                                  boxShadow: 1,
-                                }}
-                                alt={`몬스터 ${idx + 1}`}
-                                onError={(e) => handleImageError(e, url || '')}
-                              />
-                            ))}
-                        </Box>
-
-                        {/* 승률과 승/패를 한 줄에 배치 (좌우 정렬) */}
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            mb: 0.5,
-                            gap: 1,
-                          }}
-                        >
-                          {/* 승률 - 왼쪽 */}
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontWeight: 600,
-                              color: winRate >= 50 ? 'success.main' : 'text.secondary',
-                              fontSize: { xs: '0.7rem', md: '0.75rem' },
-                            }}
-                          >
-                            {total > 0 ? `${winRate}%` : '100%'}
-                          </Typography>
-
-                          {/* 승/패 숫자 - 오른쪽 */}
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: 'text.secondary',
-                              fontSize: { xs: '0.65rem', md: '0.75rem' },
-                              display: total > 0 ? 'block' : 'none',
-                            }}
-                            aria-label={`${winCount}승 ${loseCount}패`}
-                          >
-                            {winCount}승 {loseCount}패
-                          </Typography>
-                        </Box>
-
-                        {/* 승/패 프로그레스바 */}
-                        {total > 0 && (
-                          <AnimatedProgressBar percentage={winPercentage} isHighRate={winRate >= 50} />
-                        )}
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </Box>
+              <ErrorBoundary>
+                <Suspense fallback={<SiegeResultsSkeleton mobile={isMobile} />}>
+                  <SiegeResultsSection
+                    params={searchParamsWithPagination}
+                    itemsPerPage={pagination.itemsPerPage}
+                    currentPage={pagination.currentPage}
+                    isMobile={isMobile}
+                    onItemClick={handleMonsterClick}
+                    onPrev={() => handlePageChange(null, pagination.currentPage - 1)}
+                    onNext={() => handlePageChange(null, pagination.currentPage + 1)}
+                    onHasNextPageChange={setHasNextPage}
+                  />
+                </Suspense>
+              </ErrorBoundary>
             )}
 
-            {/* 페이지당 항목 수 선택 및 페이지네이션 - 항상 표시 */}
-            {!isLoadingMonsters && (
-              <Box 
-                sx={{ 
-                  display: 'flex', 
-                  flexDirection: { xs: 'column', md: 'row' },
-                  justifyContent: 'space-between',
-                  alignItems: { xs: 'stretch', md: 'center' },
-                  gap: { xs: 2, md: 3 },
-                  mt: { xs: 4, md: 5 },
-                  mb: { xs: isSearchExpanded ? 16 : 8, md: 0 },
-                  py: { xs: 2, md: 3 },
-                }}
-              >
-                {/* 페이지당 항목 수 선택 */}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', md: 'auto' } }}>
-                  <FormControl 
-                    size={isMobile ? 'small' : 'medium'} 
-                    sx={{ 
-                      minWidth: { xs: 120, md: 140 },
-                      width: { xs: '100%', md: 'auto' },
+            {/* 페이지당 항목 수 선택만 항상 표시 (결과 영역에서 prev/next 렌더) */}
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                justifyContent: 'space-between',
+                alignItems: { xs: 'stretch', md: 'center' },
+                gap: { xs: 2, md: 3 },
+                mt: { xs: 4, md: 5 },
+                mb: { xs: isSearchExpanded ? 16 : 8, md: 0 },
+                py: { xs: 2, md: 3 },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: { xs: '100%', md: 'auto' } }}>
+                <FormControl
+                  size={isMobile ? 'small' : 'medium'}
+                  sx={{
+                    minWidth: { xs: 120, md: 140 },
+                    width: { xs: '100%', md: 'auto' },
+                  }}
+                  fullWidth={isMobile}
+                >
+                  <InputLabel id="items-per-page-label">보기</InputLabel>
+                  <Select
+                    labelId="items-per-page-label"
+                    id="items-per-page-select"
+                    value={pagination.itemsPerPage}
+                    label="보기"
+                    onChange={(e) => {
+                      const newItemsPerPage = Number(e.target.value);
+                      pagination.setItemsPerPage(newItemsPerPage);
+                      setShouldSearch(false);
+                      setTimeout(() => {
+                        setShouldSearch(true);
+                      }, 0);
                     }}
-                    fullWidth={isMobile}
                   >
-                    <InputLabel id="items-per-page-label">보기</InputLabel>
-                    <Select
-                      labelId="items-per-page-label"
-                      id="items-per-page-select"
-                      value={pagination.itemsPerPage}
-                      label="보기"
-                      onChange={(e) => {
-                        const newItemsPerPage = Number(e.target.value);
-                        pagination.setItemsPerPage(newItemsPerPage);
-                        setShouldSearch(false);
-                        setTimeout(() => {
-                          setShouldSearch(true);
-                        }, 0);
-                      }}
-                    >
-                      {PAGINATION_OPTIONS.map((option) => (
-                        <MenuItem key={option.cd} value={option.cd}>
-                          {option.cd_nm}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-
-                {/* 페이지네이션 */}
-                {paginatedMonsterList.length > 0 && (
-                  <Box sx={{ display: 'flex', justifyContent: 'center', flex: 1, width: { xs: '100%', md: 'auto' } }}>
-                    <Pagination
-                      count={totalPages || 1}
-                      page={pagination.currentPage}
-                      onChange={handlePageChange}
-                      color="primary"
-                      size={isMobile ? 'small' : 'medium'}
-                      aria-label="페이지 네비게이션"
-                      showFirstButton
-                      showLastButton
-                      sx={{
-                        '& .MuiPaginationItem-root': {
-                          fontSize: { xs: '0.875rem', md: '1rem' },
-                        },
-                      }}
-                    />
-                  </Box>
-                )}
+                    {PAGINATION_OPTIONS.map((option) => (
+                      <MenuItem key={option.cd} value={option.cd}>
+                        {option.cd_nm}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
-            )}
+            </Box>
           </Box>
         </Box>
       </Container>

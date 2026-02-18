@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { useRoleList, useRoleMenuList, useRoleMenuSave } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import type { RoleItem, MenuItem } from '@/types';
 
 export default function RoleMenuManagementPage() {
@@ -74,7 +75,7 @@ export default function RoleMenuManagementPage() {
       refetchRoleMenu();
     },
     onError: (error: Error) => {
-      console.error('권한 메뉴 저장 실패:', error);
+      logger.error('권한 메뉴 저장 실패', error);
       showToast.error('저장에 실패했습니다.');
     },
   });

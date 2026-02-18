@@ -76,27 +76,6 @@ export default function MonsterDetailPage() {
     refetch: refetchDetail,
   } = useMonsterDetail(searchParams);
 
-  // 디버깅: API 응답 결과 출력
-  useEffect(() => {
-    if (detailData) {
-      console.log('=== 몬스터 상세 조회 결과 ===');
-      console.log('전체 응답:', detailData);
-      console.log('enemyData:', detailData.enemyData);
-      console.log('historyList:', detailData.historyList);
-      console.log('historyTotalCount:', detailData.historyTotalCount);
-      console.log('recommendedList:', detailData.recommendedList);
-      console.log('recommendedTotalCount:', detailData.recommendedTotalCount);
-    }
-  }, [detailData]);
-
-  // 디버깅: 요청 파라미터 출력
-  useEffect(() => {
-    if (searchParams) {
-      console.log('=== 몬스터 상세 조회 요청 파라미터 ===');
-      console.log('searchParams:', searchParams);
-    }
-  }, [searchParams]);
-
   // enemyData는 배열이므로 첫 번째 요소 사용
   const enemyData = (detailData?.enemyData && Array.isArray(detailData.enemyData) && detailData.enemyData.length > 0)
     ? detailData.enemyData[0]
@@ -122,6 +101,16 @@ export default function MonsterDetailPage() {
   };
 
   const goBack = () => {
+    // 목록 → 상세로 이동한 경우, history back을 사용하면 목록 화면 상태(검색/페이지 등)가 그대로 유지됩니다.
+    // 단독 진입(히스토리 없음)일 수 있으므로 fallback 처리합니다.
+    try {
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        router.back();
+        return;
+      }
+    } catch {
+      // no-op
+    }
     router.push('/siege');
   };
 
@@ -535,10 +524,16 @@ export default function MonsterDetailPage() {
                                         key={i}
                                         src={getMonsterImageUrl(imageUrl)}
                                         sx={{
-                                          width: { xs: 40, md: 50 },
-                                          height: { xs: 40, md: 50 },
+                                          width: { xs: 34, sm: 38, md: 50 },
+                                          height: { xs: 34, sm: 38, md: 50 },
                                           border: '2px solid #34495e',
+                                          borderWidth: { xs: 1.5, md: 2 },
                                           boxShadow: 1,
+                                          flexShrink: 0,
+                                          bgcolor: 'background.paper',
+                                          '& img': {
+                                            objectFit: 'contain',
+                                          },
                                         }}
                                       />
                                     )
@@ -687,6 +682,11 @@ export default function MonsterDetailPage() {
                                         border: '2px solid #34495e',
                                         boxShadow: 1,
                                         ml: i > 1 ? -0.5 : 0,
+                                        flexShrink: 0,
+                                        bgcolor: 'background.paper',
+                                        '& img': {
+                                          objectFit: 'contain',
+                                        },
                                       }}
                                     />
                                   );

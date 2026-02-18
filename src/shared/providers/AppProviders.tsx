@@ -1,15 +1,16 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RecoilRoot } from 'recoil';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ThemeProvider as MuiThemeProvider, CssBaseline, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import ApiLoading from '@/shared/ui/loading/ApiLoading';
 import FixedHeader from '@/shared/ui/fixed-header/FixedHeader';
 import NoticePopup from '@/components/notice/NoticePopup';
 import ClientOnlyToaster from './ClientOnlyToaster';
+import { isAuthenticated, isForceLoggedOut } from '@/shared/utils/auth';
 
 // QueryClient를 컴포넌트 내부에서 생성하여 각 요청마다 새로운 인스턴스 생성
 function makeQueryClient() {
@@ -150,29 +151,56 @@ export default function AppProviders({ children }: AppProvidersProps) {
   // QueryClient를 컴포넌트 내부에서 가져옴
   const [queryClient] = useState(() => getQueryClient());
   const pathname = usePathname();
+  const router = useRouter();
+  const authBootstrappedRef = useRef(false);
+  const [authBootstrapped, setAuthBootstrapped] = useState(false);
 
-  // 클라이언트 마운트 상태 관리
-  const [isMounted, setIsMounted] = useState(false);
-
+  // 로그아웃/로그인 등 인증 상태 변경 시, 화면(서버 컴포넌트/캐시/쿼리)을 강제로 갱신
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (typeof window === 'undefined') return;
 
-  // 클라이언트에서만 pathname 기반 계산 (Hydration 오류 방지)
+    const handleAuthChanged = () => {
+      // 로그인 상태에 의존하는 React Query 캐시 제거 (즉시 재조회 유도)
+      try {
+        queryClient.clear();
+      } catch {
+        // no-op
+      }
+
+      // 로그아웃 강제 플래그가 켜진 경우(클라이언트 auth 정리 직후)는
+      // Next router 리다이렉트 경합을 피하기 위해 브라우저 레벨로 메인으로 강제 이동
+      if (isForceLoggedOut()) {
+        if (window.location.pathname !== '/') {
+          window.location.assign('/');
+          return;
+        }
+        // 이미 메인이라면 새로고침만
+        window.location.reload();
+        return;
+      }
+
+      // 일반적인 인증 변경(로그인 등)에서는 soft refresh
+      const authed = isAuthenticated();
+      if (!authed && pathname !== '/') {
+        router.replace('/');
+        // replace 직후 refresh가 이전 라우트에 걸리는 케이스 방지
+        setTimeout(() => router.refresh(), 0);
+        return;
+      }
+
+      router.refresh();
+    };
+
+    window.addEventListener('smwr:auth-changed', handleAuthChanged);
+    return () => window.removeEventListener('smwr:auth-changed', handleAuthChanged);
+  }, [pathname, queryClient, router]);
+
+  // pathname 기반 계산
   const { isPublicPath, shouldShowHeader, isAdminPath } = useMemo(() => {
-    // 서버에서는 기본값 사용
-    if (!isMounted) {
-      return {
-        isPublicPath: false,
-        shouldShowHeader: true,
-        isAdminPath: false,
-      };
-    }
-
-    // 클라이언트에서만 pathname 사용
     const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
-    const isPublic = publicPaths.includes(pathname);
-    const isAdmin = pathname?.startsWith('/admin') || false;
+    const currentPath = pathname || '';
+    const isPublic = publicPaths.includes(currentPath);
+    const isAdmin = currentPath.startsWith('/admin');
     // admin 경로는 별도 헤더/사이드바를 사용하므로 일반 헤더 숨김
     const showHeader = !isPublic && !isAdmin;
     
@@ -181,24 +209,132 @@ export default function AppProviders({ children }: AppProvidersProps) {
       shouldShowHeader: showHeader,
       isAdminPath: isAdmin,
     };
-  }, [isMounted, pathname]);
+  }, [pathname]);
 
-  // mainSx는 public path와 admin path에 따라 다르게 설정 (Hydration 오류 방지)
-  // 서버와 클라이언트에서 동일한 구조를 유지하기 위해 isMounted 체크
+  const isHomePath = useMemo(() => {
+    return (pathname || '') === '/';
+  }, [pathname]);
+
+  const isProtectedPath = useMemo(() => {
+    const currentPath = pathname || '';
+    // 로그인 필수 경로들 (필요 시 확장)
+    const protectedPrefixes = ['/siege', '/recent-siege', '/battle-history', '/guild-management', '/settings', '/log-upload', '/rta'];
+    return protectedPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
+  }, [pathname]);
+
+  const isGuildRequiredPath = useMemo(() => {
+    const currentPath = pathname || '';
+    const guildRequiredPrefixes = ['/siege', '/recent-siege', '/battle-history', '/guild-management', '/rta'];
+    return guildRequiredPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
+  }, [pathname]);
+
+  // mainSx는 public path와 admin path에 따라 다르게 설정
   const mainSx = useMemo(() => {
-    // 서버에서는 기본값 (헤더 있음)
-    if (!isMounted) {
-      return { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
-    }
-    // 클라이언트에서 public path와 admin path는 padding 없음
-    // admin path는 별도 레이아웃(AdminHeader/AdminSidebar)을 사용하므로 padding 없음
     const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
-    const isPublic = publicPaths.includes(pathname);
-    const isAdmin = pathname?.startsWith('/admin') || false;
+    const currentPath = pathname || '';
+    const isPublic = publicPaths.includes(currentPath);
+    const isAdmin = currentPath.startsWith('/admin');
     return isPublic || isAdmin
       ? { pt: 0, minHeight: '100vh' }
       : { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
-  }, [isMounted, pathname]);
+  }, [pathname]);
+
+  // 로그인 검증(bootstrap)이 끝날 때까지는 화면을 아예 렌더하지 않음
+  // - public/admin 페이지는 즉시 렌더
+  // - 그 외 페이지는 토큰이 있으면 /auth/login-check로 "서버 검증"이 끝난 뒤에만 렌더
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (authBootstrappedRef.current) return;
+
+    // public/admin은 인증 확인을 기다릴 필요가 없음
+    if (isPublicPath || isAdminPath) {
+      authBootstrappedRef.current = true;
+      setAuthBootstrapped(true);
+      return;
+    }
+
+    const bootstrap = async () => {
+      const BOOTSTRAP_TIMEOUT_MS = 3000;
+      try {
+        const authed = isAuthenticated();
+        if (!authed) {
+          authBootstrappedRef.current = true;
+          setAuthBootstrapped(true);
+          return;
+        }
+
+        // 토큰이 있으면 무조건 서버에서 검증/유저정보 확보 후 렌더
+        const { apiClient } = await import('@/shared/lib/api/client');
+        const res: any = await Promise.race([
+          apiClient.post('/auth/login-check', {}),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('bootstrap timeout')), BOOTSTRAP_TIMEOUT_MS)),
+        ]);
+        if (res && res.result === 'SUCCESS' && res.userInfo) {
+          localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
+          localStorage.setItem('isLoggedIn', 'true');
+        } else {
+          // 서버 검증이 실패하면, 최소한 클라이언트 표시 정보는 비움 (쿠키 삭제는 로그아웃 플로우에서 처리)
+          localStorage.removeItem('userInfo');
+          localStorage.removeItem('isLoggedIn');
+        }
+      } catch {
+        // 검증 실패/타임아웃이어도 화면은 렌더(미로그인으로 동작하도록 클라이언트 표시 정보는 비움)
+        try {
+          localStorage.removeItem('userInfo');
+          localStorage.removeItem('isLoggedIn');
+        } catch {
+          // no-op
+        }
+      } finally {
+        authBootstrappedRef.current = true;
+        setAuthBootstrapped(true);
+      }
+    };
+
+    bootstrap();
+  }, [isPublicPath, isAdminPath]);
+
+  // 보호 경로는 로그인 검증 이후에만 접근 허용
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!authBootstrapped) return;
+    if (isPublicPath || isAdminPath) return;
+
+    if (isProtectedPath && !isAuthenticated()) {
+      router.replace('/login');
+      // replace 직후 refresh 경합 방지
+      setTimeout(() => router.refresh(), 0);
+      return;
+    }
+
+    // 길드 필수 경로: 로그인은 되었지만 길드가 없으면 settings로 유도
+    if (isGuildRequiredPath && isAuthenticated()) {
+      try {
+        const raw = localStorage.getItem('userInfo');
+        const parsed = raw ? JSON.parse(raw) : null;
+        const hasGuild = !!(parsed && parsed.guild_id);
+        if (!hasGuild) {
+          router.replace('/settings');
+          setTimeout(() => router.refresh(), 0);
+        }
+      } catch {
+        // userInfo 파싱 실패 시에도 settings로 유도
+        router.replace('/settings');
+        setTimeout(() => router.refresh(), 0);
+      }
+    }
+  }, [authBootstrapped, isAdminPath, isGuildRequiredPath, isProtectedPath, isPublicPath, router]);
+
+  // 인증 bootstrap 전에는 "아예" 화면을 그리지 않음(헤더/페이지/list 호출 방지)
+  if (!authBootstrapped && !isPublicPath && !isAdminPath) {
+    return (
+      <MuiThemeProvider theme={muiTheme}>
+        <CssBaseline />
+        {/* 로그인 검증 완료 전에는 화면을 아예 렌더하지 않는다 (깜빡임/동시 호출 방지) */}
+        <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }} />
+      </MuiThemeProvider>
+    );
+  }
 
   return (
     <MuiThemeProvider theme={muiTheme}>
@@ -207,18 +343,17 @@ export default function AppProviders({ children }: AppProvidersProps) {
         <QueryClientProvider client={queryClient}>
           <AuthGuard>
             <ClientOnlyToaster />
-            {isMounted && shouldShowHeader && <FixedHeader />}
+            {shouldShowHeader && <FixedHeader />}
             <main suppressHydrationWarning>
               <Box sx={mainSx}>
                 {children}
               </Box>
             </main>
-            {isMounted && (
-              <>
-                <ApiLoading />
-                {!isPublicPath && !isAdminPath && <NoticePopup />}
-              </>
-            )}
+            <>
+              <ApiLoading />
+              {/* 공지 팝업은 메인 화면에서만 동작 */}
+              {!isPublicPath && !isAdminPath && isHomePath && <NoticePopup />}
+            </>
           </AuthGuard>
         </QueryClientProvider>
       </RecoilRoot>

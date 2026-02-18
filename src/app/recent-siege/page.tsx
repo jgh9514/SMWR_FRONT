@@ -24,6 +24,7 @@ import { PAGINATION_OPTIONS, DEFAULT_PAGE_OFFSET } from '@/shared/constants';
 import { PageBanner, PageHeader } from '@/shared/ui';
 import { useResponsive } from '@/shared/hooks';
 import { isAuthenticated } from '@/shared/utils/auth';
+import { logger } from '@/shared/lib/logger';
 import type { SiegeItem } from '@/features/siege/types/recent-siege';
 import { useGuildSiegeHistory, useGuildSiegeHistoryCount } from '@/features/siege/hooks/useRecentSiege';
 
@@ -102,7 +103,7 @@ export default function RecentSiegePage() {
         try {
           setUserInfo(JSON.parse(stored));
         } catch (error) {
-          console.error('사용자 정보 파싱 실패', error);
+          logger.error('사용자 정보 파싱 실패', error);
           setUserInfo(null);
         }
       } else {
@@ -119,7 +120,7 @@ export default function RecentSiegePage() {
       try {
         setUserInfo(JSON.parse(stored));
       } catch (error) {
-        console.error('사용자 정보 파싱 실패', error);
+        logger.error('사용자 정보 파싱 실패', error);
         setUserInfo(null);
       }
     } else {
@@ -131,13 +132,11 @@ export default function RecentSiegePage() {
     if (!isMounted || typeof window === 'undefined') return;
 
     syncAuthState();
-    const interval = setInterval(syncAuthState, 1000);
 
     const handleAuthChanged = () => syncAuthState();
     window.addEventListener('smwr:auth-changed', handleAuthChanged);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('smwr:auth-changed', handleAuthChanged);
     };
   }, [isMounted, syncAuthState]);
@@ -151,24 +150,9 @@ export default function RecentSiegePage() {
     return false;
   }, [siegeError]);
   
-  // 디버깅: 원본 데이터 확인
-  useEffect(() => {
-    if (siegeListRaw && siegeListRaw.length > 0) {
-      console.log('원본 데이터:', siegeListRaw);
-      console.log('첫 번째 아이템 통계:', {
-        attack_win_count_1st: siegeListRaw[0]?.attack_win_count_1st,
-        total_attack_count_1st: siegeListRaw[0]?.total_attack_count_1st,
-        attack_rate_1st: siegeListRaw[0]?.attack_rate_1st,
-        attack_win_count_2nd: siegeListRaw[0]?.attack_win_count_2nd,
-        attack_win_count_3rd: siegeListRaw[0]?.attack_win_count_3rd,
-      });
-    }
-  }, [siegeListRaw]);
-
   // 자기 길드 ID 확인 (통계 표시용)
   const myGuildId = useMemo(() => {
     const guildId = userInfo?.guild_id ? String(userInfo.guild_id) : null;
-    console.log('myGuildId:', guildId, 'userInfo:', userInfo);
     return guildId;
   }, [userInfo?.guild_id]);
 
@@ -267,7 +251,7 @@ export default function RecentSiegePage() {
         router.push('/siege');
       }
     } catch (error) {
-      console.error('showMatchDetail error:', error);
+      logger.error('showMatchDetail error', error);
       router.push('/siege');
     }
   };
@@ -398,21 +382,6 @@ export default function RecentSiegePage() {
                         myGuildIdStr && id2nd === myGuildIdStr ? '2nd' :
                         myGuildIdStr && id3rd === myGuildIdStr ? '3rd' : null;
                       
-                      console.log(`[${item.match_id}] 길드 매칭:`, {
-                        myGuildId,
-                        myGuildIdStr,
-                        id1st,
-                        id2nd,
-                        id3rd,
-                        '1st 매칭': id1st === myGuildIdStr,
-                        '2nd 매칭': id2nd === myGuildIdStr,
-                        '3rd 매칭': id3rd === myGuildIdStr,
-                        myGuildRank,
-                        '1st 통계 있음': !!(item.attack_win_count_1st || item.attack_win_count_1st === 0),
-                        '2nd 통계 있음': !!(item.attack_win_count_2nd || item.attack_win_count_2nd === 0),
-                        '3rd 통계 있음': !!(item.attack_win_count_3rd || item.attack_win_count_3rd === 0),
-                      });
-                      
                       // 1등 길드 */}
                       const renderGuildBox = (rank: '1st' | '2nd' | '3rd', isMyGuild: boolean) => {
                         const is1st = rank === '1st';
@@ -436,20 +405,6 @@ export default function RecentSiegePage() {
                                         (defenseWinCount != null && defenseWinCount !== undefined) || 
                                         (monsterCount != null && monsterCount !== undefined);
                         const showStats = isMyGuild && hasStats;
-                        
-                        // 디버깅 - 모든 길드에 대해 로그 출력
-                        console.log(`[${item.match_id}] ${rank} 길드 렌더링:`, {
-                          isMyGuild,
-                          showStats,
-                          guildName,
-                          attackWinCount,
-                          totalAttackCount,
-                          attackRate,
-                          defenseWinCount,
-                          totalDefenseCount,
-                          defenseRate,
-                          monsterCount,
-                        });
                         
                         return (
                           <Box

@@ -14,8 +14,8 @@ import Image from '@tiptap/extension-image';
 import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
 import { useMemo, useEffect, useState } from 'react';
-import DOMPurify from 'dompurify';
 import { Box, SxProps, Theme } from '@mui/material';
+import { sanitizeHtml } from './RichTextDisplay';
 
 interface RichTextEditorProps {
   value: string;
@@ -25,54 +25,6 @@ interface RichTextEditorProps {
   sx?: SxProps<Theme>;
   minHeight?: number;
 }
-
-/**
- * HTML 콘텐츠를 sanitize하여 XSS 공격 방지
- */
-export const sanitizeHtml = (html: string): string => {
-  if (typeof window === 'undefined') {
-    // 서버 사이드에서는 기본적인 HTML만 반환 (DOMPurify는 브라우저에서만 작동)
-    return html;
-  }
-
-  // DOMPurify로 안전한 HTML만 허용
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: [
-      'p',
-      'br',
-      'strong',
-      'em',
-      'u',
-      's',
-      'h1',
-      'h2',
-      'h3',
-      'ul',
-      'ol',
-      'li',
-      'a',
-      'img',
-      'span',
-      'div',
-      'blockquote',
-    ],
-    ALLOWED_ATTR: [
-      'href',
-      'target',
-      'rel',
-      'src',
-      'alt',
-      'style',
-      'class',
-      'color',
-      'background-color',
-      'text-align',
-    ],
-    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
-    ADD_ATTR: ['target', 'rel'],
-    ADD_TAGS: ['rel'],
-  });
-};
 
 /**
  * 에디터에서 나온 HTML을 sanitize하여 반환
@@ -483,41 +435,5 @@ export default function RichTextEditor({
       )}
       <EditorContent editor={editor} />
     </Box>
-  );
-}
-
-/**
- * 에디터로 작성된 HTML 콘텐츠를 안전하게 렌더링하는 컴포넌트
- */
-export function RichTextDisplay({ content, sx }: { content: string; sx?: SxProps<Theme> }) {
-  const sanitizedContent = useMemo(() => {
-    if (!content) return '';
-    return sanitizeHtml(content);
-  }, [content]);
-
-  return (
-    <Box
-      sx={{
-        '& p': {
-          marginBottom: '0.5em',
-          '&:last-child': {
-            marginBottom: 0,
-          },
-        },
-        '& img': {
-          maxWidth: '100%',
-          height: 'auto',
-        },
-        '& a': {
-          color: '#1976d2',
-          textDecoration: 'underline',
-          '&:hover': {
-            textDecoration: 'none',
-          },
-        },
-        ...sx,
-      }}
-      dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-    />
   );
 }

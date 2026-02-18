@@ -86,10 +86,8 @@ function LoginContent() {
     
     const token = getAuthTokenFromCookie();
     if (token) {
-      // 쿠키가 있으면 이미 로그인된 상태이므로 returnUrl이 있으면 해당 경로로, 없으면 홈으로 이동
-      const returnUrl = searchParams.get('returnUrl');
-      const redirectPath = returnUrl ? decodeURIComponent(returnUrl) : '/';
-      router.push(redirectPath);
+      // 쿠키가 있으면 이미 로그인된 상태이므로 메인으로 이동
+      router.push('/');
     }
   };
 
@@ -140,10 +138,8 @@ function LoginContent() {
           
           if (tokenCookie || retryCount >= COOKIE_CHECK_MAX_RETRIES) {
             setTimeout(() => {
-              // returnUrl이 있으면 해당 경로로, 없으면 홈으로 이동
-              const returnUrl = searchParams.get('returnUrl');
-              const redirectPath = returnUrl ? decodeURIComponent(returnUrl) : '/';
-              router.push(redirectPath);
+              // 로그인 성공 후에는 이전 페이지(returnUrl) 무시하고 메인으로 이동
+              router.push('/');
             }, COOKIE_CHECK_RETRY_DELAY_MS);
           } else {
             retryCount++;

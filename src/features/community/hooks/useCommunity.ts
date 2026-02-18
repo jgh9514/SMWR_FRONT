@@ -75,11 +75,19 @@ export const useIncreaseNoticeView = (
  * 팝업 공지사항 목록 조회 Query
  * 백엔드: /api/v1/community/notice/popup/list
  */
+const POPUP_NOTICE_LIST_BODY: Record<string, never> = {};
 export const usePopupNoticeList = (
   options?: Parameters<typeof useApiPostQuery<{ list: Notice[] }>>[2],
 ) => {
-  return useApiPostQuery<{ list: Notice[] }>('/community/notice/popup/list', {}, {
+  // 주의: WAS 컨트롤러가 @RequestBody를 필수로 받으므로 {} body를 반드시 보낸다.
+  // 또한 queryKey 안정화를 위해 {}를 매 렌더마다 새로 만들지 않고 모듈 상수를 사용한다.
+  return useApiPostQuery<{ list: Notice[] }>('/community/notice/popup/list', POPUP_NOTICE_LIST_BODY, {
     enabled: true,
+    // 라우팅 이동 시에도 매번 다시 가져오지 않도록 캐시를 길게 유지
+    staleTime: 60 * 60 * 1000, // 1시간
+    gcTime: 2 * 60 * 60 * 1000, // 2시간
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     ...options,
   });
 };

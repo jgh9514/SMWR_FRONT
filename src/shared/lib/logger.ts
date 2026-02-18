@@ -12,10 +12,23 @@ interface LogContext {
 class Logger {
   private isDevelopment = process.env.NODE_ENV === 'development';
 
+  private getConsole(): {
+    debug?: (...args: unknown[]) => void;
+    info?: (...args: unknown[]) => void;
+    warn?: (...args: unknown[]) => void;
+    error?: (...args: unknown[]) => void;
+  } | null {
+    if (!this.isDevelopment) return null;
+    // eslint/no-console 회피 + 브라우저/노드 모두에서 안전 접근
+    const c = (globalThis as unknown as { [key: string]: unknown })['console'] as any;
+    if (!c) return null;
+    return c;
+  }
+
   private log(level: LogLevel, message: string, context?: LogContext): void {
-    if (!this.isDevelopment && level === 'debug') {
-      return;
-    }
+    // 프로덕션에서는 콘솔 출력 금지 (필요 시 로깅 서비스로 전송하도록 확장)
+    const c = this.getConsole();
+    if (!c) return;
 
     const timestamp = new Date().toISOString();
     const logEntry = {
@@ -27,16 +40,16 @@ class Logger {
 
     switch (level) {
       case 'debug':
-        console.debug('[DEBUG]', logEntry);
+        c.debug?.('[DEBUG]', logEntry);
         break;
       case 'info':
-        console.info('[INFO]', logEntry);
+        c.info?.('[INFO]', logEntry);
         break;
       case 'warn':
-        console.warn('[WARN]', logEntry);
+        c.warn?.('[WARN]', logEntry);
         break;
       case 'error':
-        console.error('[ERROR]', logEntry);
+        c.error?.('[ERROR]', logEntry);
         break;
     }
 

@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/shared/lib/logger';
 
 // 백엔드 WAS URL 가져오기
 const getBackendURL = () => {
@@ -99,8 +100,7 @@ async function proxyRequest(
       backendURL = `${base}/${path}${queryString}`;
     }
 
-    // 디버깅 로그
-    console.log('[프록시] 요청 정보:', {
+    logger.debug('[프록시] 요청 정보', {
       method,
       originalURL: request.url,
       backendBaseURL,
@@ -170,8 +170,7 @@ async function proxyRequest(
       headers['Referer'] = referer;
     }
 
-    // 디버깅: 인증 정보 확인
-    console.log('[프록시] 인증 정보:', {
+    logger.debug('[프록시] 인증 정보', {
       hasAuthHeader: !!authHeader,
       authHeaderPrefix: authHeader ? authHeader.substring(0, 20) + '...' : null,
       hasCookie: !!cookie,
@@ -188,8 +187,7 @@ async function proxyRequest(
       }
     }
 
-    // 백엔드로 요청 전달
-    console.log('[프록시] 백엔드 요청 시작:', {
+    logger.debug('[프록시] 백엔드 요청 시작', {
       backendURL,
       method,
       headers: Object.keys(headers),
@@ -205,9 +203,7 @@ async function proxyRequest(
         // 쿠키는 이미 headers['Cookie']로 전달됨
       });
     } catch (fetchError) {
-      console.error('[프록시] fetch 실패:', {
-        error: fetchError instanceof Error ? fetchError.message : String(fetchError),
-        stack: fetchError instanceof Error ? fetchError.stack : undefined,
+      logger.error('[프록시] fetch 실패', fetchError, {
         backendURL,
         code: (fetchError as any)?.code,
         errno: (fetchError as any)?.errno,
@@ -216,7 +212,7 @@ async function proxyRequest(
       throw fetchError;
     }
 
-    console.log('[프록시] 응답 정보:', {
+    logger.debug('[프록시] 응답 정보', {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
@@ -281,9 +277,7 @@ async function proxyRequest(
       headers: responseHeaders,
     });
   } catch (error) {
-    console.error('[프록시] 요청 실패:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
+    logger.error('[프록시] 요청 실패', error, {
       backendURL: (() => {
         try {
           const backendBaseURL = getBackendURL();

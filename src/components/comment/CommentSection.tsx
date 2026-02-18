@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Box,
   Typography,
@@ -25,10 +26,15 @@ import { useCommentList, useSaveComment, useUpdateComment, useDeleteComment } fr
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import type { Comment, BoardType, CommentSaveParams } from '@/features/community/types/comment';
-import RichTextEditor, { RichTextDisplay } from '@/shared/ui/editor/RichTextEditor';
+import { RichTextDisplay } from '@/shared/ui/editor/RichTextDisplay';
 import { validateAndSanitizeInput } from '@/shared/utils/validation';
 import { MAX_COMMENT_LENGTH } from '@/shared/constants/validation';
 import type { UserInfo } from '@/features/auth/types/auth';
+
+const RichTextEditor = dynamic(() => import('@/shared/ui/editor/RichTextEditor'), {
+  ssr: false,
+  loading: () => <Box sx={{ minHeight: 180 }} />,
+});
 
 interface CommentSectionProps {
   boardType: BoardType;

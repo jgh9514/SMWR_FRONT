@@ -15,14 +15,15 @@ import {
   GuildSearchItem,
   SignupParams,
   SignupResponse,
-  GuildJoinApplicationParams,
   GuildApplicationItem,
   ProcessGuildApplicationParams,
   GuildSettings,
   GuildMember,
   GuildJoinApplication,
+  MyGuildJoinApplicationStatusResponse,
   UpdateGuildMemberRoleParams,
   TransferGuildLeadershipParams,
+  KickGuildMemberParams,
   SendEmailVerificationParams,
   VerifyEmailCodeParams,
   EmailVerificationResponse,
@@ -138,13 +139,27 @@ export const useJoinGuild = (options?: Parameters<typeof useApiPostMutation<any,
 };
 
 /**
- * 길드 가입 신청 Mutation (일반 사용자가 길드에 가입 신청)
- * 백엔드: /api/v1/smw/guild/application/save
+ * 길드 가입 신청 Mutation (승인 대기)
+ * 백엔드: /api/v1/smw/guild/join-application/save
  */
-export const useGuildJoinApplication = (
-  options?: Parameters<typeof useApiPostMutation<any, GuildJoinApplicationParams>>[1],
+export const useApplyGuildJoinApplication = (
+  options?: Parameters<typeof useApiPostMutation<any, { guild_id: string; message?: string }>>[1],
 ) => {
-  return useApiPostMutation<any, GuildJoinApplicationParams>('/smw/guild/application/save', options);
+  return useApiPostMutation<any, { guild_id: string; message?: string }>('/smw/guild/join-application/save', options);
+};
+
+/**
+ * 내 길드 가입 신청 상태 조회 Query (승인 대기)
+ * 백엔드: /api/v1/smw/guild/join-application/my-status
+ */
+export const useMyGuildJoinApplicationStatus = (
+  options?: Parameters<typeof useApiPostQuery<MyGuildJoinApplicationStatusResponse>>[2],
+) => {
+  const hasToken = typeof window !== 'undefined' ? isAuthenticated() : false;
+  return useApiPostQuery<MyGuildJoinApplicationStatusResponse>('/smw/guild/join-application/my-status', {}, {
+    ...options,
+    enabled: hasToken && (options?.enabled !== false),
+  });
 };
 
 /**
@@ -224,7 +239,7 @@ export const useGuildJoinApplicationList = (
   guildId: string,
   options?: Omit<Parameters<typeof useApiPostQuery<GuildJoinApplication[]>>[2], 'enabled'>,
 ) => {
-  return useApiPostQuery<GuildJoinApplication[]>('/smw/guild/application/list', { guild_id: guildId }, options);
+  return useApiPostQuery<GuildJoinApplication[]>('/smw/guild/join-application/list', { guild_id: guildId }, options);
 };
 
 /**
@@ -234,7 +249,15 @@ export const useGuildJoinApplicationList = (
 export const useProcessGuildJoinApplication = (
   options?: Parameters<typeof useApiPostMutation<any, ProcessGuildApplicationParams>>[1],
 ) => {
-  return useApiPostMutation<any, ProcessGuildApplicationParams>('/smw/guild/application/process', options);
+  return useApiPostMutation<any, ProcessGuildApplicationParams>('/smw/guild/join-application/process', options);
+};
+
+/**
+ * 내 길드 가입 신청 취소 Mutation
+ * 백엔드: /api/v1/smw/guild/join-application/cancel
+ */
+export const useCancelMyGuildJoinApplication = (options?: Parameters<typeof useApiPostMutation<any, {}>>[1]) => {
+  return useApiPostMutation<any, {}>('/smw/guild/join-application/cancel', options);
 };
 
 /**
@@ -255,6 +278,14 @@ export const useTransferGuildLeadership = (
   options?: Parameters<typeof useApiPostMutation<any, TransferGuildLeadershipParams>>[1],
 ) => {
   return useApiPostMutation<any, TransferGuildLeadershipParams>('/smw/guild/transfer-leadership', options);
+};
+
+/**
+ * 길드 멤버 추방 Mutation (길드장/매니저)
+ * 백엔드: /api/v1/smw/guild/member/kick
+ */
+export const useKickGuildMember = (options?: Parameters<typeof useApiPostMutation<any, KickGuildMemberParams>>[1]) => {
+  return useApiPostMutation<any, KickGuildMemberParams>('/smw/guild/member/kick', options);
 };
 
 /**

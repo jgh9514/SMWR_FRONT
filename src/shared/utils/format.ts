@@ -118,7 +118,6 @@ export function parseSiegeDate(siegeId: string): string {
 
     return formatDate(date, 'YYYY-MM-DD');
   } catch (error) {
-    console.error('점령전 ID 날짜 파싱 오류:', error);
     return '';
   }
 }

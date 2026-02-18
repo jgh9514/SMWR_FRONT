@@ -27,6 +27,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useParentCodeList, useCodeRelList, useCodeRelSave, useCodePopupList } from '@/hooks/api';
 import { isEmpty, searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import ListWrapper from '@/shared/ui/list-wrapper/ListWrapper';
 import type { ParentItem, ChildItem, PopupItem } from '@/types';
 
@@ -238,7 +239,7 @@ export default function PreferenceCdrelmnPage() {
       }
     },
     onError: (error: Error) => {
-      console.error('코드 관계 저장 실패:', error);
+      logger.error('코드 관계 저장 실패', error);
       showToast.error('저장에 실패했습니다.');
     },
   });

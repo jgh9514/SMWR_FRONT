@@ -48,6 +48,7 @@ import {
   useProcessGuildJoinApplication,
   useUpdateGuildMemberRole,
   useTransferGuildLeadership,
+  useKickGuildMember,
   useSaveGuildSettings,
   useGenerateInviteCode,
 } from '@/hooks/api';
@@ -68,6 +69,9 @@ export default function GuildManagementPage() {
   const [roleChangeDialogOpen, setRoleChangeDialogOpen] = useState(false);
   const [selectedMemberForRoleChange, setSelectedMemberForRoleChange] = useState<{ user_id: string; current_role: string } | null>(null);
   const [newRole, setNewRole] = useState<string>('');
+  const [kickDialogOpen, setKickDialogOpen] = useState(false);
+  const [selectedMemberForKick, setSelectedMemberForKick] = useState<any>(null);
+  const [kickReason, setKickReason] = useState<string>('');
   const [guildInfo, setGuildInfo] = useState<{ guild_name?: string; join_type?: string; description?: string; invite_key?: string }>({});
 
   useEffect(() => {
@@ -98,7 +102,6 @@ export default function GuildManagementPage() {
     enabled: !!userInfo?.guild_id && (isLeader || isManager),
     onSuccess: (data: any) => {
       logger.info('길드 정보 조회 성공', { data, guild_id: userInfo?.guild_id });
-      console.log('길드 정보 응답:', data);
       // 길드 정보를 state에 저장
       setGuildInfo({
         guild_name: data.guild_name || '',
@@ -170,7 +173,6 @@ export default function GuildManagementPage() {
         setTimeout(() => {
           guildSettingsQuery.refetch().then((result) => {
             logger.info('길드 정보 refetch 완료', { data: result.data });
-            console.log('초대 코드:', result.data?.invite_key);
           });
         }, 500);
       } else {
@@ -197,6 +199,25 @@ export default function GuildManagementPage() {
     onError: (error: Error) => {
       logger.error('가입 신청 처리 실패', error);
       showToast.error(error.message || '처리에 실패했습니다.');
+    },
+  });
+
+  // 길드 멤버 추방 Mutation
+  const kickMemberMutation = useKickGuildMember({
+    onSuccess: (res) => {
+      if (res && res.result === 'SUCCESS') {
+        showToast.success('추방 처리되었습니다.');
+        setKickDialogOpen(false);
+        setSelectedMemberForKick(null);
+        setKickReason('');
+        guildMembersQuery.refetch();
+      } else {
+        throw new Error(res.message || '추방에 실패했습니다.');
+      }
+    },
+    onError: (error: Error) => {
+      logger.error('멤버 추방 실패', error);
+      showToast.error(error.message || '추방에 실패했습니다.');
     },
   });
 
@@ -286,6 +307,23 @@ export default function GuildManagementPage() {
     setSelectedMemberForRoleChange({ user_id: userId, current_role: currentRole });
     setNewRole(currentRole);
     setRoleChangeDialogOpen(true);
+  };
+
+  const handleKickMember = (member: any) => {
+    setSelectedMemberForKick(member);
+    setKickReason('');
+    setKickDialogOpen(true);
+  };
+
+  const confirmKickMember = () => {
+    if (!selectedMemberForKick?.user_id) {
+      showToast.error('대상 유저 정보가 없습니다.');
+      return;
+    }
+    kickMemberMutation.mutate({
+      user_id: selectedMemberForKick.user_id,
+      leave_reason: kickReason.trim() || undefined,
+    });
   };
 
   const handleUpdateRole = () => {
@@ -599,6 +637,18 @@ export default function GuildManagementPage() {
                                       <EditIcon fontSize="small" />
                                     </IconButton>
                                   )}
+                                  {/* 멤버 추방 */}
+                                  {((isLeader && guildRole !== 'LEADER') || (isManager && guildRole === 'MEMBER')) &&
+                                    member.user_id !== userInfo?.user_id && (
+                                      <IconButton
+                                        color="error"
+                                        size="small"
+                                        onClick={() => handleKickMember(member)}
+                                        title="인원 삭제(추방)"
+                                      >
+                                        <CancelIcon fontSize="small" />
+                                      </IconButton>
+                                    )}
                                 </Box>
                               </TableCell>
                             )}
@@ -743,6 +793,38 @@ export default function GuildManagementPage() {
             disabled={transferLeadershipMutation.isPending}
           >
             {transferLeadershipMutation.isPending ? '위임 중...' : '위임'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* 멤버 추방 확인 다이얼로그 */}
+      <Dialog open={kickDialogOpen} onClose={() => setKickDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>멤버 추방</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            추방하면 해당 사용자는 길드에서 즉시 제외됩니다. (되돌릴 수 없습니다)
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            대상: <b>{selectedMemberForKick?.user_id}</b>
+          </Typography>
+          <TextField
+            label="사유 (선택)"
+            value={kickReason}
+            onChange={(e) => setKickReason(e.target.value)}
+            fullWidth
+            multiline
+            minRows={2}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setKickDialogOpen(false)}>취소</Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={confirmKickMember}
+            disabled={kickMemberMutation.isPending}
+          >
+            {kickMemberMutation.isPending ? '처리 중...' : '추방'}
           </Button>
         </DialogActions>
       </Dialog>

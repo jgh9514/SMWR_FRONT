@@ -34,6 +34,7 @@ import { useCodeSave, useCodeGroupList, useCodeList } from '@/features/admin/hoo
 import { isEmpty, searchDataExtraction } from '@/shared/utils/util';
 import { useCommonCodes, useCommonCodeHierarchy } from '@/features/admin/hooks/useCommonCode';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import ListWrapper from '@/shared/ui/list-wrapper/ListWrapper';
 import type { CodeGroup, CodeItem, CodeSaveRequest, CommonCodeList, BsnsDtlCd } from '@/types';
 import type { CodeGroupSearchData, CodeSearchData } from '@/features/admin/types/search';
@@ -250,7 +251,7 @@ export default function PreferenceCdmnPage() {
         cdGrpSearch('save');
       },
       onError: (error) => {
-        console.error('코드 그룹 저장 실패:', error);
+        logger.error('코드 그룹 저장 실패', error);
         showToast.error('저장 중 오류가 발생했습니다.');
       },
     });
@@ -287,7 +288,7 @@ export default function PreferenceCdmnPage() {
         cdGrpSearch('save');
       },
       onError: (error) => {
-        console.error('코드 그룹 삭제 실패:', error);
+        logger.error('코드 그룹 삭제 실패', error);
         showToast.error('삭제 중 오류가 발생했습니다.');
       },
     });
@@ -414,7 +415,7 @@ export default function PreferenceCdmnPage() {
         cdSearch('save');
       },
       onError: (error) => {
-        console.error('코드 저장 실패:', error);
+        logger.error('코드 저장 실패', error);
         showToast.error('저장 중 오류가 발생했습니다.');
       },
     });
@@ -455,7 +456,7 @@ export default function PreferenceCdmnPage() {
         cdSearch('save');
       },
       onError: (error) => {
-        console.error('코드 삭제 실패:', error);
+        logger.error('코드 삭제 실패', error);
         showToast.error('삭제 중 오류가 발생했습니다.');
       },
     });

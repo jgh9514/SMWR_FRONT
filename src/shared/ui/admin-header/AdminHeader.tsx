@@ -19,6 +19,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import HomeIcon from '@mui/icons-material/Home';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { clearClientAuth } from '@/shared/utils/auth';
+import { logger } from '@/shared/lib/logger';
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function AdminHeader() {
         try {
           setUserInfo(JSON.parse(storedUserInfo));
         } catch (error) {
-          console.error('사용자 정보 파싱 실패', error);
+          logger.error('사용자 정보 파싱 실패', error);
         }
       }
     }
@@ -55,7 +56,7 @@ export default function AdminHeader() {
       // 로그아웃해도 로그인 페이지로 강제 이동하지 않음
       router.push('/');
     } catch (error) {
-      console.error('로그아웃 실패', error);
+      logger.error('로그아웃 실패', error);
       clearClientAuth();
       router.push('/');
     }

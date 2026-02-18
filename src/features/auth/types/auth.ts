@@ -62,6 +62,7 @@ export interface GuildSearchParams {
 export interface GuildSearchItem {
   guild_id: string;
   guild_name: string;
+  leader_name?: string;
   rating?: number;
 }
 
@@ -71,7 +72,8 @@ export interface GuildSearchItem {
 export interface SignupParams {
   user_id: string;
   password: string;
-  user_name: string;
+  // 닉네임 입력을 제거했으므로 선택값으로 처리 (백엔드에서 비어있으면 user_id로 기본값 설정)
+  user_name?: string;
   email: string;
 }
 
@@ -142,13 +144,6 @@ export interface UserGuildInfo {
 }
 
 /**
- * 길드 가입 신청 파라미터
- */
-export interface GuildJoinApplicationParams {
-  guild_id: string;
-}
-
-/**
  * 길드 신청 목록 항목
  */
 export interface GuildApplicationItem {
@@ -209,8 +204,16 @@ export interface GuildJoinApplication {
   user_name?: string;
   user_nm?: string;
   guild_id?: string;
+  guild_name?: string;
   status?: string; // 'PENDING' | 'APPROVED' | 'REJECTED'
   crt_date?: string;
+}
+
+export interface MyGuildJoinApplicationStatusResponse {
+  result: string;
+  hasPendingJoinApplication: boolean;
+  application?: GuildJoinApplication;
+  message?: string;
 }
 
 /**
@@ -226,6 +229,11 @@ export interface UpdateGuildMemberRoleParams {
  */
 export interface TransferGuildLeadershipParams {
   new_leader_user_id: string;
+}
+
+export interface KickGuildMemberParams {
+  user_id: string;
+  leave_reason?: string;
 }
 
 /**

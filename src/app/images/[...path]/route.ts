@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { logger } from '@/shared/lib/logger';
 
 // 백엔드 WAS URL 가져오기 (이미지는 /api/v1이 아닌 루트 경로)
 const getBackendURL = () => {
@@ -46,8 +47,7 @@ export async function GET(
       backendURL = `${base}/${path}`;
     }
 
-    // 디버깅 로그
-    console.log('[이미지 프록시] 요청:', {
+    logger.debug('[이미지 프록시] 요청', {
       path,
       backendBaseURL,
       backendURL,
@@ -63,7 +63,7 @@ export async function GET(
       },
     });
 
-    console.log('[이미지 프록시] 응답:', {
+    logger.debug('[이미지 프록시] 응답', {
       status: response.status,
       statusText: response.statusText,
       ok: response.ok,
@@ -71,7 +71,7 @@ export async function GET(
     });
 
     if (!response.ok) {
-      console.error('[이미지 프록시] 백엔드 응답 실패:', {
+      logger.error('[이미지 프록시] 백엔드 응답 실패', null, {
         status: response.status,
         statusText: response.statusText,
         backendURL,
@@ -94,10 +94,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('[이미지 프록시] 요청 실패:', {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
+    logger.error('[이미지 프록시] 요청 실패', error);
     return NextResponse.json(
       { 
         error: '이미지를 가져올 수 없습니다.',

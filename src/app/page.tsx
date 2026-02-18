@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useCallback, useState, useEffect } from 'react';
+import React, { useMemo, useCallback, useState, useEffect, useRef } from 'react';
 import { Box, Button, Card, CardContent, Container, Typography, Divider, Alert } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import CastleIcon from '@mui/icons-material/Castle';
@@ -16,7 +16,12 @@ import AnnouncementIcon from '@mui/icons-material/Announcement';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import { useResponsive } from '@/shared/hooks/useResponsive';
 import { logger } from '@/shared/lib/logger';
-import { useGuildApplicationList } from '@/hooks/api';
+import {
+  useAutoLogin,
+  useCancelMyGuildJoinApplication,
+  useGuildApplicationList,
+  useMyGuildJoinApplicationStatus,
+} from '@/hooks/api';
 import { Chip } from '@mui/material';
 import { isAuthenticated } from '@/shared/utils/auth';
 
@@ -120,33 +125,91 @@ export default function Home() {
   const responsive = useResponsive();
   const isMobile = isMounted ? responsive.isMobile : false;
   const [userInfo, setUserInfo] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const autoLoginRequestedRef = useRef(false);
+
+  const autoLoginMutation = useAutoLogin({
+    retry: false,
+    onSuccess: (res) => {
+      if (res && res.result === 'SUCCESS' && res.userInfo) {
+        setLoggedIn(true);
+        setUserInfo(res.userInfo);
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
+            localStorage.setItem('isLoggedIn', 'true');
+          }
+        } catch {
+          // no-op
+        }
+      } else {
+        setLoggedIn(false);
+        setUserInfo(null);
+      }
+      setAuthReady(true);
+    },
+    onError: (error: Error) => {
+      logger.error('자동 로그인 체크 실패', error);
+      setLoggedIn(false);
+      setUserInfo(null);
+      setAuthReady(true);
+    },
+  });
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // 로그인 상태일 때만 userInfo 가져오기
-      if (isAuthenticated()) {
-        const storedUserInfo = localStorage.getItem('userInfo');
-        if (storedUserInfo) {
-          try {
-            setUserInfo(JSON.parse(storedUserInfo));
-          } catch (error) {
-            logger.error('사용자 정보 파싱 실패', error);
-          }
-        }
-      } else {
-        // 로그인하지 않은 경우 userInfo 초기화
-        setUserInfo(null);
-      }
-    }
-  }, []);
+    if (!isMounted || typeof window === 'undefined') return;
 
-  // 길드 신청 목록 조회
+    const syncAuth = () => {
+      const authed = isAuthenticated();
+      setLoggedIn(authed);
+
+      if (!authed) {
+        setUserInfo(null);
+        setAuthReady(true);
+        autoLoginRequestedRef.current = false;
+        return;
+      }
+
+      const storedUserInfo = localStorage.getItem('userInfo');
+      if (storedUserInfo) {
+        try {
+          setUserInfo(JSON.parse(storedUserInfo));
+        } catch (error) {
+          logger.error('사용자 정보 파싱 실패', error);
+          setUserInfo(null);
+        }
+        setAuthReady(true);
+        return;
+      }
+
+      // 토큰은 있는데 userInfo가 없는 경우:
+      // login-check가 끝나기 전까지는 list 쿼리들이 같이 돌지 않도록 authReady를 false로 유지
+      setUserInfo(null);
+      setAuthReady(false);
+      if (!autoLoginRequestedRef.current && !autoLoginMutation.isPending) {
+        autoLoginRequestedRef.current = true;
+        autoLoginMutation.mutate({});
+      }
+    };
+
+    // 최초 1회 동기화
+    syncAuth();
+
+    // 로그인/로그아웃 이벤트에도 즉시 동기화
+    window.addEventListener('smwr:auth-changed', syncAuth);
+    return () => window.removeEventListener('smwr:auth-changed', syncAuth);
+  }, [isMounted]);
+
+  const shouldCheckGuildStatus = authReady && loggedIn && !!userInfo?.user_id && !userInfo?.guild_id;
+
+  // 길드 신청 목록 조회 (길드가 없을 때만: 생성 신청 상태 표시용)
   const guildApplicationListQuery = useGuildApplicationList({
-    enabled: true,
+    enabled: shouldCheckGuildStatus,
   });
 
   // 현재 사용자의 길드 생성 신청 찾기 (길드가 없는 경우)
@@ -154,9 +217,25 @@ export default function Home() {
     (app: any) => app.user_id === userInfo?.user_id && !app.guild_id && app.status === 'PENDING'
   );
 
-  const hasGuild = isAuthenticated() && !!userInfo?.guild_id; // 로그인 상태일 때만 길드 정보 사용
-  const isAdmin = isAuthenticated() && (userInfo?.roles?.some((role: any) => role.role_id === 'RL0001') || false);
-  const isGuildLeaderOrManager = isAuthenticated() && (userInfo?.guild_role === 'LEADER' || userInfo?.guild_role === 'MANAGER');
+  // 내 길드 가입 신청(승인대기) 상태 (길드가 없을 때만)
+  const myJoinStatusQuery = useMyGuildJoinApplicationStatus({
+    enabled: shouldCheckGuildStatus,
+  });
+  const myJoinApplication = myJoinStatusQuery.data?.hasPendingJoinApplication
+    ? (myJoinStatusQuery.data.application as any)
+    : null;
+
+  const cancelMyJoinApplicationMutation = useCancelMyGuildJoinApplication({
+    onSuccess: (res) => {
+      if (res && res.result === 'SUCCESS') {
+        myJoinStatusQuery.refetch();
+      }
+    },
+  });
+
+  const hasGuild = loggedIn && !!userInfo?.guild_id; // 로그인 상태일 때만 길드 정보 사용
+  const isAdmin = loggedIn && (userInfo?.roles?.some((role: any) => role.role_id === 'RL0001') || false);
+  const isGuildLeaderOrManager = loggedIn && (userInfo?.guild_role === 'LEADER' || userInfo?.guild_role === 'MANAGER');
 
   const getStatusLabel = (status?: string) => {
     if (status === 'APPROVED') return '승인';
@@ -478,6 +557,83 @@ export default function Home() {
                       신청일: {isMounted ? new Date(myGuildApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
                     </Typography>
                   )}
+                </Box>
+              ) : myJoinApplication ? (
+                <Box
+                  sx={{
+                    textAlign: 'center',
+                    py: 4,
+                    px: 2,
+                    bgcolor: 'action.hover',
+                    borderRadius: 2,
+                  }}
+                >
+                  <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
+                    길드 가입 신청 대기중
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      신청 길드
+                    </Typography>
+                    <Typography variant="body1" fontWeight={600}>
+                      {myJoinApplication.guild_name || myJoinApplication.guild_id || '정보 없음'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ mb: 2 }}>
+                    <Chip label="대기" color="warning" size="small" />
+                  </Box>
+                  {myJoinApplication.crt_date && (
+                    <Typography variant="caption" color="text.secondary">
+                      신청일: {isMounted ? new Date(myJoinApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
+                    </Typography>
+                  )}
+                  <Box sx={{ mt: 2 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Button variant="outlined" color="primary" onClick={() => router.push('/settings')}>
+                        신청 상태 보기
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => {
+                          const ok = window.confirm('길드 가입 신청을 취소할까요?');
+                          if (!ok) return;
+                          cancelMyJoinApplicationMutation.mutate({});
+                        }}
+                        disabled={cancelMyJoinApplicationMutation.isPending}
+                      >
+                        {cancelMyJoinApplicationMutation.isPending ? '취소 중...' : '신청 취소'}
+                      </Button>
+                    </Box>
+                  </Box>
+                </Box>
+              ) : !authReady ? (
+                // 메인에서는 로그인 검증 완료 전 프로그레스바를 표시하지 않음
+                <Box sx={{ py: 4, px: 2 }} />
+              ) : !loggedIn ? (
+                <Box
+                  sx={{
+                    textAlign: 'center',
+                    py: 4,
+                    px: 2,
+                    bgcolor: 'action.hover',
+                    borderRadius: 2,
+                  }}
+                >
+                  <GroupIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="body1" fontWeight={600} sx={{ mb: 1 }}>
+                    로그인이 필요합니다
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    점령전 기능을 사용하려면 먼저 로그인해주세요.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={() => router.push('/login')}
+                  >
+                    로그인하기
+                  </Button>
                 </Box>
               ) : (
                 <Box

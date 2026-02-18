@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Box,
   Button,
@@ -45,11 +46,16 @@ import {
 } from '@/hooks/api';
 import type { Notice } from '@/features/community/types/community';
 import { useResponsive } from '@/shared/hooks/useResponsive';
-import RichTextEditor, { RichTextDisplay } from '@/shared/ui/editor/RichTextEditor';
+import { RichTextDisplay } from '@/shared/ui/editor/RichTextDisplay';
 import { validateAndSanitizeInput } from '@/shared/utils/validation';
 import { MAX_TITLE_LENGTH, DEFAULT_PAGE_SIZE } from '@/shared/constants/validation';
 import type { UserInfo } from '@/features/auth/types/auth';
 import CommentSection from '@/components/comment/CommentSection';
+
+const RichTextEditor = dynamic(() => import('@/shared/ui/editor/RichTextEditor'), {
+  ssr: false,
+  loading: () => <Box sx={{ minHeight: 300 }} />,
+});
 
 export default function NoticePage() {
   const router = useRouter();

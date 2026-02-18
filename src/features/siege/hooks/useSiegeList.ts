@@ -2,7 +2,8 @@
  * 점령전 목록 조회 Hook
  */
 
-import { useApiPostQuery } from '@/hooks/api/useApiQuery';
+import { useState } from 'react';
+import { useApiPostQuery, useApiPostSuspenseQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { GuildItem, MonsterItem, SiegeSearchParams } from '@/types';
 
@@ -15,14 +16,61 @@ export type MonsterOption = {
   monster_elemental?: string; // 몬스터 속성 (Fire, Water, Wind, Light, Dark)
 };
 
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v1';
+const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+
+type MonsterListCachePayload = {
+  v: 1;
+  ts: number; // epoch ms
+  data: MonsterOption[];
+};
+
+function readMonsterListCache(): { isFresh: boolean; data: MonsterOption[] } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(MONSTER_LIST_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as MonsterListCachePayload;
+    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.data) || typeof parsed.ts !== 'number') return null;
+    const isFresh = Date.now() - parsed.ts < MONSTER_LIST_CACHE_TTL_MS;
+    return { isFresh, data: parsed.data };
+  } catch {
+    return null;
+  }
+}
+
+function writeMonsterListCache(data: MonsterOption[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: MonsterListCachePayload = { v: 1, ts: Date.now(), data };
+    window.localStorage.setItem(MONSTER_LIST_CACHE_KEY, JSON.stringify(payload));
+  } catch {
+    // localStorage quota/disabled 등은 무시
+  }
+}
+
 /**
  * 몬스터 목록 조회
  */
 export const useMonsterList = (params: Record<string, unknown> = {}) => {
+  // monster-list는 사실상 고정 데이터라 (params가 비어있을 때) localStorage TTL 캐시를 사용
+  const isCacheable = params && Object.keys(params).length === 0;
+  const [cacheSnapshot] = useState(() => (isCacheable ? readMonsterListCache() : null));
+
   return useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, { 
-    enabled: true,
+    enabled: !(isCacheable && cacheSnapshot?.isFresh),
+    initialData: isCacheable ? cacheSnapshot?.data : undefined,
+    placeholderData: isCacheable ? cacheSnapshot?.data : undefined,
     staleTime: 30 * 60 * 1000, // 30분 (몬스터 목록은 자주 변경되지 않음)
     gcTime: 60 * 60 * 1000, // 1시간
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    onSuccess: (data) => {
+      if (isCacheable && Array.isArray(data) && data.length > 0) {
+        writeMonsterListCache(data);
+      }
+    },
   });
 };
 
@@ -51,6 +99,19 @@ export const useEnemyTeamList = (params: SiegeSearchParams & { paging?: number; 
     staleTime: 2 * 60 * 1000, // 2분
     gcTime: 5 * 60 * 1000, // 5분
     placeholderData: (previousData) => previousData, // 이전 데이터 유지 (페이지네이션 시 깜빡임 방지)
+  });
+};
+
+/**
+ * 적 팀 목록 조회 (Suspense)
+ * - Suspense fallback(스켈레톤 등)로 선언적으로 로딩 UI를 구성할 때 사용
+ */
+export const useEnemyTeamListSuspense = (params: SiegeSearchParams & { paging?: number; offset?: number }) => {
+  return useApiPostSuspenseQuery<MonsterItem[]>('/summonerswar/enemyTeam-list', params, {
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    // 페이지네이션/조건 변경 시 이전 데이터 유지 -> Suspense로 매번 화면이 날아가는 걸 방지
+    placeholderData: (previousData) => previousData,
   });
 };
 

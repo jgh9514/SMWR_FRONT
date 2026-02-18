@@ -7,20 +7,19 @@ import { setApiLoading } from '@/shared/ui/loading/ApiLoading';
 import { API_TIMEOUT_MS } from '@/shared/constants';
 import { showApiError } from './error-handler';
 import { isForceLoggedOut } from '@/shared/utils/auth';
+import { logger } from '@/shared/lib/logger';
 
 // 환경별 API 서버 설정
 const getBaseURL = () => {
   // 환경 변수가 있으면 우선 사용
   if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Axios] 환경 변수 사용:', process.env.NEXT_PUBLIC_API_BASE_URL);
-    }
+    logger.debug('[Axios] 환경 변수 사용', { baseURL: process.env.NEXT_PUBLIC_API_BASE_URL });
     return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
 
   // 개발 환경 기본값
   if (process.env.NODE_ENV === 'development') {
-    console.log('[Axios] 환경 변수 없음, 기본값 사용: http://localhost:8080/api/v1');
+    logger.debug('[Axios] 환경 변수 없음, 기본값 사용', { baseURL: 'http://localhost:8080/api/v1' });
     return 'http://localhost:8080/api/v1';
   }
 
@@ -61,14 +60,12 @@ axiosInstance.interceptors.request.use(
     }
 
     // 프로덕션 환경에서는 민감한 로그 제거
-    if (process.env.NODE_ENV === 'development') {
-      // 개발 환경에서만 제한적인 로그 (민감 정보 제외)
-      console.log('🚀 API 호출:', {
-        method: config.method?.toUpperCase(),
-        url: config.url,
-        // baseURL과 data는 민감 정보일 수 있으므로 제외
-      });
-    }
+    // 개발 환경에서만 제한적인 로그 (민감 정보 제외)
+    logger.debug('🚀 API 호출', {
+      method: config.method?.toUpperCase(),
+      url: config.url,
+      // baseURL과 data는 민감 정보일 수 있으므로 제외
+    });
 
     // 토큰 가져오기
     if (typeof window !== 'undefined') {
@@ -180,7 +177,7 @@ axiosInstance.interceptors.response.use(
       if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error') || error.code === 'ERR_CONNECTION_REFUSED') {
         // 개발 환경에서만 첫 번째 네트워크 에러만 경고 출력 (중복 방지)
         if (process.env.NODE_ENV === 'development' && !(window as any).__networkErrorLogged) {
-          console.warn('백엔드 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.');
+          logger.warn('백엔드 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.');
           (window as any).__networkErrorLogged = true;
         }
         return Promise.reject(error);

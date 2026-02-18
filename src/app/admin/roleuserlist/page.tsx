@@ -28,6 +28,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useRoleList, useUserRoleList, useUserRoleSave } from '@/hooks/api';
 import { isEmpty, searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import type { UserRoleItem, SaveRequest } from '@/types';
 
 function RoleUserListContent() {
@@ -101,7 +102,7 @@ function RoleUserListContent() {
       refetchUserRole();
     },
     onError: (error: Error) => {
-      console.error('저장 실패:', error);
+      logger.error('저장 실패', error);
       showToast.error('저장에 실패했습니다.');
     },
   });

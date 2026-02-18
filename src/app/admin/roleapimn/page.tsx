@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { useRoleList, useRoleApiList, useRoleApiSave } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import type { RoleItem, ApiItem } from '@/types';
 
 export default function RoleApiManagementPage() {
@@ -75,7 +76,7 @@ export default function RoleApiManagementPage() {
       refetchRoleApi();
     },
     onError: (error: Error) => {
-      console.error('권한 API 저장 실패:', error);
+      logger.error('권한 API 저장 실패', error);
       showToast.error('저장에 실패했습니다.');
     },
   });

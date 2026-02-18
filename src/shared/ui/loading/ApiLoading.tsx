@@ -3,16 +3,56 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, Box, CircularProgress, Typography } from '@mui/material';
 
-let loadingCount = 0;
 let setLoadingState: ((loading: boolean) => void) | null = null;
+let showTimer: number | null = null;
+let hideTimer: number | null = null;
+let lastShownAt = 0;
+let currentLoading = false;
+
+// 짧은 요청(200ms 이하)에는 로딩바를 띄우지 않아 깜빡임/체감 저하를 줄임
+const SHOW_DELAY_MS = 250;
+// 한 번 뜨면 최소 유지시간을 둬서 깜빡임 방지
+const MIN_VISIBLE_MS = 300;
 
 export const setApiLoading = (loading: boolean) => {
   if (typeof window === 'undefined') {
     return;
   }
-  if (setLoadingState) {
-    setLoadingState(loading);
+
+  currentLoading = loading;
+
+  // 예약된 타이머 정리
+  if (showTimer != null) {
+    window.clearTimeout(showTimer);
+    showTimer = null;
   }
+  if (hideTimer != null) {
+    window.clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+
+  if (!setLoadingState) return;
+
+  if (loading) {
+    // 지연 후에도 여전히 로딩 중이면 표시
+    showTimer = window.setTimeout(() => {
+      showTimer = null;
+      if (!setLoadingState) return;
+      if (!currentLoading) return;
+      lastShownAt = Date.now();
+      setLoadingState(true);
+    }, SHOW_DELAY_MS);
+    return;
+  }
+
+  // 숨길 때는 최소 표시 시간 보장
+  const elapsed = Date.now() - lastShownAt;
+  const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+  hideTimer = window.setTimeout(() => {
+    hideTimer = null;
+    if (!setLoadingState) return;
+    setLoadingState(false);
+  }, remaining);
 };
 
 export default function ApiLoading() {
@@ -31,6 +71,15 @@ export default function ApiLoading() {
     setLoadingState = setLoading;
     return () => {
       setLoadingState = null;
+      // 언마운트 시 타이머 정리
+      if (showTimer != null) {
+        window.clearTimeout(showTimer);
+        showTimer = null;
+      }
+      if (hideTimer != null) {
+        window.clearTimeout(hideTimer);
+        hideTimer = null;
+      }
     };
   }, [isMounted]);
 
@@ -53,7 +102,7 @@ export default function ApiLoading() {
       sx={{
         '& .MuiBackdrop-root': {
           backgroundColor: 'rgba(0, 0, 0, 0.3)',
-          backdropFilter: 'blur(4px)',
+          // blur는 일부 환경에서 GPU 부하/지연 체감을 유발할 수 있어 제거
         },
       }}
     >

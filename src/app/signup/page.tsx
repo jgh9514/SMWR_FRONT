@@ -6,10 +6,10 @@ import {
   Button,
   Card,
   CardContent,
+  Divider,
   TextField,
   Typography,
   InputAdornment,
-  IconButton,
   Chip,
   Select,
   MenuItem,
@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelIcon from '@mui/icons-material/Cancel';
-import { useSignup, useSendEmailVerification, useVerifyEmailCode, useCheckUserIdDuplicate } from '@/hooks/api';
+import { useSignup, useLogin, useSendEmailVerification, useVerifyEmailCode, useCheckUserIdDuplicate } from '@/hooks/api';
 import { isEmpty } from '@/shared/utils/util';
 import { isValidEmail, isValidPassword } from '@/shared/utils/validation';
 import { showToast } from '@/shared/lib/notification';
@@ -35,7 +35,6 @@ export default function SignupPage() {
     user_id: '',
     password: '',
     password_confirm: '',
-    user_name: '',
     email: '',
     verification_code: '',
   });
@@ -61,6 +60,7 @@ export default function SignupPage() {
   const [emailVerified, setEmailVerified] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0); // 재발송 쿨다운(초)
 
   // 아이디 중복체크 상태
   const [userIdChecked, setUserIdChecked] = useState(false);
@@ -126,6 +126,7 @@ export default function SignupPage() {
         showToast.success(message);
         setCodeSent(true);
         setCountdown(300); // 5분 (300초)
+        setResendCooldown(10); // 과도한 재발송 방지(10초)
       } else {
         throw new Error(res.message || '인증 코드 발송에 실패했습니다.');
       }
@@ -183,10 +184,13 @@ export default function SignupPage() {
   const signupMutation = useSignup({
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
-        showToast.success('회원가입이 완료되었습니다. 승인 대기 중입니다.');
-        setTimeout(() => {
-          router.push('/login');
-        }, 1500);
+        showToast.success('회원가입이 완료되었습니다.');
+        // 회원가입 직후 바로 로그인 시도
+        loginMutation.mutate({
+          user_id: signupFormData.user_id,
+          password: signupFormData.password,
+          auto_login: 'false',
+        });
       } else {
         throw new Error(res.message || '회원가입에 실패했습니다.');
       }
@@ -194,6 +198,27 @@ export default function SignupPage() {
     onError: (error: Error) => {
       logger.error('회원가입 실패', error, { context: 'SignupPage' });
       showToast.error(error.message || '회원가입에 실패했습니다.');
+    },
+  });
+
+  // 회원가입 후 즉시 로그인
+  const loginMutation = useLogin({
+    onSuccess: (res) => {
+      if (res && res.result === 'SUCCESS' && res.userInfo) {
+        if (typeof window !== 'undefined') {
+          // 로그인 상태 저장
+          localStorage.setItem('isLoggedIn', 'true');
+          localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
+          sessionStorage.setItem('loginJustCompleted', 'true');
+        }
+        router.push('/');
+      } else {
+        // 자동 로그인 실패 시 로그인 화면으로
+        router.push('/login');
+      }
+    },
+    onError: () => {
+      router.push('/login');
     },
   });
 
@@ -207,6 +232,16 @@ export default function SignupPage() {
     }
   }, [countdown]);
 
+  // 재발송 쿨다운 타이머
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => {
+        setResendCooldown(resendCooldown - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
+
   // 이메일 인증 코드 발송
   const handleSendCode = () => {
     if (isEmpty(signupFormData.email)) {
@@ -218,6 +253,14 @@ export default function SignupPage() {
       return;
     }
     sendCodeMutation.mutate({ email: signupFormData.email });
+  };
+
+  // 이메일 인증 코드 재발송
+  const handleResendCode = () => {
+    if (emailVerified) return;
+    if (sendCodeMutation.isPending) return;
+    if (resendCooldown > 0) return;
+    handleSendCode();
   };
 
   // 아이디 중복체크
@@ -270,10 +313,6 @@ export default function SignupPage() {
       errors.push('비밀번호 확인을 입력해주세요.');
     } else if (signupFormData.password !== signupFormData.password_confirm) {
       errors.push('비밀번호가 일치하지 않습니다.');
-    }
-
-    if (isEmpty(signupFormData.user_name)) {
-      errors.push('닉네임을 입력해주세요.');
     }
 
     if (isEmpty(signupFormData.email)) {
@@ -332,7 +371,6 @@ export default function SignupPage() {
     const params: SignupParams = {
       user_id: signupFormData.user_id,
       password: signupFormData.password,
-      user_name: signupFormData.user_name,
       email: signupFormData.email,
     };
 
@@ -343,54 +381,39 @@ export default function SignupPage() {
     <Box
       sx={{
         minHeight: '100vh',
+        bgcolor: '#f6f7fb',
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        p: { xs: 1, sm: 2, md: 2.5 },
+        alignItems: 'flex-start',
+        py: { xs: 4, md: 8 },
+        px: { xs: 2, sm: 3 },
       }}
     >
       <Card
         sx={{
           width: '100%',
-          maxWidth: 500,
-          borderRadius: { xs: 1.5, md: 2.5 },
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          maxWidth: 440,
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: '0 8px 30px rgba(16, 24, 40, 0.08)',
         }}
       >
-        <CardContent sx={{ p: { xs: 2.5, sm: 3.5, md: 5 } }}>
+        <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           {/* 타이틀 영역 */}
-          <Box sx={{ textAlign: 'center', mb: { xs: 3, md: 4 } }}>
-            <Box
+          <Box sx={{ mb: 3 }}>
+            <Typography
+              variant="h5"
               sx={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: { xs: 60, md: 80 },
-                height: { xs: 60, md: 80 },
-                mb: { xs: 2, md: 2.5 },
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                borderRadius: '50%',
-                animation: 'pulse 2s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(102, 126, 234, 0.7)',
-                  },
-                  '50%': {
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 0 0 20px rgba(102, 126, 234, 0)',
-                  },
-                },
+                fontWeight: 800,
+                color: 'text.primary',
+                letterSpacing: '-0.02em',
               }}
             >
-              <Typography sx={{ color: 'white', fontSize: { xs: 30, md: 40 } }}>+</Typography>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: '#2d3748', mb: 1, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
               회원가입
             </Typography>
-            <Typography sx={{ color: '#718096', fontSize: { xs: 14, md: 16 } }}>
-              새 계정을 만들어 시작하세요
+            <Typography sx={{ color: 'text.secondary', mt: 0.75, fontSize: 14, lineHeight: 1.5 }}>
+              이메일 인증 후 계정을 만들 수 있어요.
             </Typography>
           </Box>
 
@@ -404,6 +427,9 @@ export default function SignupPage() {
             }}
             sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 2.5 } }}
           >
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', mt: 0.5 }}>
+              계정 정보
+            </Typography>
             <Box>
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
                 <TextField
@@ -419,6 +445,7 @@ export default function SignupPage() {
                   }}
                   disabled={signupMutation.isPending}
                   sx={{ flex: 1 }}
+                  size="medium"
                   required
                   error={userIdChecked && userIdAvailable === false}
                   InputProps={{
@@ -446,6 +473,7 @@ export default function SignupPage() {
                     minWidth: 100,
                     height: 56,
                     flexShrink: 0,
+                    borderRadius: 2,
                   }}
                 >
                   {checkUserIdDuplicateMutation.isPending ? '확인 중...' : '중복체크'}
@@ -466,6 +494,7 @@ export default function SignupPage() {
                 disabled={signupMutation.isPending}
                 fullWidth
                 required
+                size="medium"
                 error={passwordErrors.length > 0}
                 helperText={
                   signupFormData.password && passwordErrors.length > 0
@@ -473,6 +502,64 @@ export default function SignupPage() {
                     : '8자 이상, 대문자, 소문자, 숫자, 특수문자 포함'
                 }
               />
+              {/* 비밀번호 규칙 체크리스트 (실시간) */}
+              <Box
+                sx={{
+                  mt: 1,
+                  px: 1,
+                  py: 1,
+                  borderRadius: 2,
+                  bgcolor: 'action.hover',
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                  gap: 0.75,
+                }}
+              >
+                {(() => {
+                  const pw = signupFormData.password || '';
+                  const rules = [
+                    { key: 'upper', label: '영어 대문자', ok: /[A-Z]/.test(pw) },
+                    { key: 'lower', label: '영어 소문자', ok: /[a-z]/.test(pw) },
+                    { key: 'number', label: '숫자', ok: /[0-9]/.test(pw) },
+                    {
+                      key: 'special',
+                      label: '특수문자',
+                      ok: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pw),
+                    },
+                    { key: 'len', label: '8자 이상', ok: pw.length >= 8 },
+                  ];
+
+                  return rules.map((r) => (
+                    <Box
+                      key={r.key}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {r.ok ? (
+                        <CheckCircleOutlineIcon sx={{ fontSize: 18, color: 'success.main' }} />
+                      ) : (
+                        <CancelIcon sx={{ fontSize: 18, color: 'text.disabled' }} />
+                      )}
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontWeight: 700,
+                          color: r.ok ? 'success.main' : 'text.secondary',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {r.label}
+                      </Typography>
+                    </Box>
+                  ));
+                })()}
+              </Box>
 
               <TextField
                 label="비밀번호 확인"
@@ -492,6 +579,7 @@ export default function SignupPage() {
                 disabled={signupMutation.isPending}
                 fullWidth
                 required
+                size="medium"
                 error={passwordConfirmMatch === false}
                 helperText={
                   passwordConfirmMatch === false
@@ -502,101 +590,93 @@ export default function SignupPage() {
                 }
               />
 
-              <TextField
-                label="닉네임"
-                placeholder="닉네임을 입력하세요"
-                value={signupFormData.user_name}
-                onChange={(e) =>
-                  setSignupFormData({ ...signupFormData, user_name: e.target.value })
-                }
-                disabled={signupMutation.isPending}
-                fullWidth
-                required
-              />
-
               {/* 이메일 입력 및 인증 */}
               <Box>
-                <Box sx={{ 
-                  display: 'flex', 
-                  flexDirection: { xs: 'column', sm: 'row' },
-                  gap: { xs: 1.5, sm: 1 }, 
-                  alignItems: { xs: 'stretch', sm: 'flex-start' }
-                }}>
-                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', flex: 1, width: { xs: '100%', sm: 'auto' }, minWidth: 0 }}>
+                <Divider sx={{ my: 1.5 }} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'text.primary', mb: 1 }}>
+                  이메일 인증
+                </Typography>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 24px minmax(0, 1fr) auto' },
+                    columnGap: { xs: 0, sm: 1 },
+                    rowGap: { xs: 1.25, sm: 0 },
+                    alignItems: { xs: 'stretch', sm: 'center' },
+                  }}
+                >
+                  <TextField
+                    label="이메일"
+                    placeholder="이메일"
+                    type="text"
+                    value={emailId}
+                    onChange={(e) => {
+                      setEmailId(e.target.value);
+                    }}
+                    disabled={signupMutation.isPending || emailVerified}
+                    sx={{ minWidth: 0 }}
+                    size="medium"
+                    required
+                  />
+
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'text.secondary',
+                      fontSize: 18,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                    }}
+                  >
+                    @
+                  </Box>
+
+                  {isCustomDomain ? (
                     <TextField
-                      label="이메일"
-                      placeholder="이메일"
+                      label="도메인"
+                      placeholder="도메인 입력"
                       type="text"
-                      value={emailId}
+                      value={customDomain}
                       onChange={(e) => {
-                        setEmailId(e.target.value);
+                        setCustomDomain(e.target.value);
                       }}
                       disabled={signupMutation.isPending || emailVerified}
-                      sx={{ flex: 1, minWidth: 0 }}
+                      sx={{ minWidth: 0 }}
+                      size="medium"
                       required
                     />
-                    <Typography
-                      sx={{
-                        alignSelf: 'center',
-                        color: 'text.secondary',
-                        fontSize: { xs: 16, sm: 18 },
-                        fontWeight: 500,
-                        px: 0.5,
-                        pt: { xs: emailVerified ? 2.5 : 2.5, sm: 0 },
-                        flexShrink: 0,
-                        minWidth: 'fit-content',
-                      }}
+                  ) : (
+                    <FormControl
+                      size="medium"
+                      sx={{ minWidth: 0 }}
+                      disabled={signupMutation.isPending || emailVerified}
                     >
-                      @
-                    </Typography>
-                    {isCustomDomain ? (
-                      <TextField
-                        placeholder="도메인 입력"
-                        type="text"
-                        value={customDomain}
+                      <InputLabel>도메인</InputLabel>
+                      <Select
+                        value={emailDomain}
                         onChange={(e) => {
-                          setCustomDomain(e.target.value);
-                        }}
-                        disabled={signupMutation.isPending || emailVerified}
-                        sx={{ flex: 1, minWidth: 0 }}
-                        required
-                      />
-                    ) : (
-                      <FormControl 
-                        sx={{ 
-                          flex: 1, 
-                          minWidth: { xs: 0, sm: 120 },
-                          '& .MuiInputBase-root': {
-                            minWidth: { xs: 'unset', sm: 120 }
+                          const domain = e.target.value;
+                          setEmailDomain(domain);
+                          setIsCustomDomain(domain === '직접 입력');
+                          if (domain !== '직접 입력') {
+                            setCustomDomain('');
                           }
-                        }} 
-                        disabled={signupMutation.isPending || emailVerified}
+                        }}
+                        label="도메인"
                       >
-                        <InputLabel>도메인</InputLabel>
-                        <Select
-                          value={emailDomain}
-                          onChange={(e) => {
-                            const domain = e.target.value;
-                            setEmailDomain(domain);
-                            setIsCustomDomain(domain === '직접 입력');
-                            if (domain !== '직접 입력') {
-                              setCustomDomain('');
-                            }
-                          }}
-                          label="도메인"
-                        >
-                          {emailDomains.map((domain) => (
-                            <MenuItem key={domain} value={domain}>
-                              {domain}
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    )}
-                  </Box>
+                        {emailDomains.map((domain) => (
+                          <MenuItem key={domain} value={domain}>
+                            {domain}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  )}
+
                   {!emailVerified ? (
                     <Button
-                      size="small"
                       variant="outlined"
                       onClick={handleSendCode}
                       disabled={
@@ -607,28 +687,21 @@ export default function SignupPage() {
                         isEmpty(signupFormData.email) ||
                         !isValidEmail(signupFormData.email) ||
                         sendCodeMutation.isPending ||
-                        countdown > 0
+                        (codeSent && countdown > 0) // 최초 발송 후에는 아래 '재발송' 버튼 사용
                       }
-                      sx={{ 
-                        minWidth: { xs: '100%', sm: 100 }, 
-                        height: { xs: 40, sm: 56 },
+                      sx={{
+                        minWidth: { xs: '100%', sm: 110 },
                         width: { xs: '100%', sm: 'auto' },
+                        height: 56,
                         flexShrink: 0,
+                        borderRadius: 2,
+                        mt: { xs: 0.5, sm: 0 },
                       }}
                     >
-                      {countdown > 0
-                        ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}`
-                        : '인증코드 발송'}
+                      {countdown > 0 ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '인증코드 발송'}
                     </Button>
                   ) : (
-                    <Box 
-                      sx={{ 
-                        minWidth: { xs: '100%', sm: 100 }, 
-                        height: { xs: 40, sm: 56 },
-                        width: { xs: '100%', sm: 'auto' },
-                        flexShrink: 0,
-                      }} 
-                    />
+                    <Box sx={{ height: 56, mt: { xs: 0.5, sm: 0 } }} />
                   )}
                 </Box>
                 {emailVerified && (
@@ -650,7 +723,15 @@ export default function SignupPage() {
                   </Box>
                 )}
                 {codeSent && !emailVerified && (
-                  <Box sx={{ mt: 1.5, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
+                  <Box
+                    sx={{
+                      mt: 1.5,
+                      display: 'grid',
+                      gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) auto auto' },
+                      gap: 1,
+                      alignItems: { xs: 'stretch', sm: 'center' },
+                    }}
+                  >
                     <TextField
                       label="인증 코드"
                       placeholder="인증 코드를 입력하세요"
@@ -659,8 +740,8 @@ export default function SignupPage() {
                         setSignupFormData({ ...signupFormData, verification_code: e.target.value })
                       }
                       disabled={signupMutation.isPending || verifyCodeMutation.isPending}
-                      size="small"
-                      sx={{ flex: 1 }}
+                      size="medium"
+                      sx={{ minWidth: 0 }}
                       onKeyUp={(e) => {
                         if (e.key === 'Enter') {
                           handleVerifyCode();
@@ -676,11 +757,37 @@ export default function SignupPage() {
                         verifyCodeMutation.isPending
                       }
                       sx={{ 
-                        minWidth: { xs: '100%', sm: 80 },
-                        width: { xs: '100%', sm: 'auto' }
+                        minWidth: { xs: '100%', sm: 88 },
+                        width: { xs: '100%', sm: 'auto' },
+                        height: 56,
+                        borderRadius: 2,
                       }}
                     >
                       {verifyCodeMutation.isPending ? '확인 중...' : '확인'}
+                    </Button>
+                    <Button
+                      variant="text"
+                      onClick={handleResendCode}
+                      disabled={
+                        signupMutation.isPending ||
+                        isEmpty(signupFormData.email) ||
+                        !isValidEmail(signupFormData.email) ||
+                        sendCodeMutation.isPending ||
+                        resendCooldown > 0
+                      }
+                      sx={{ 
+                        minWidth: { xs: '100%', sm: 110 },
+                        width: { xs: '100%', sm: 'auto' },
+                        whiteSpace: 'nowrap',
+                        height: 56,
+                        borderRadius: 2,
+                      }}
+                    >
+                      {sendCodeMutation.isPending
+                        ? '재발송...'
+                        : resendCooldown > 0
+                        ? `재발송 (${resendCooldown}s)`
+                        : '재발송'}
                     </Button>
                   </Box>
                 )}
@@ -725,9 +832,10 @@ export default function SignupPage() {
               disabled={signupMutation.isPending}
               sx={{
                 mt: 1,
-                height: 48,
-                fontWeight: 600,
+                height: 52,
+                fontWeight: 800,
                 textTransform: 'none',
+                borderRadius: 2,
               }}
             >
               {signupMutation.isPending ? '가입 중...' : '회원가입'}
@@ -736,15 +844,15 @@ export default function SignupPage() {
 
           {/* 로그인 링크 */}
           <Box sx={{ textAlign: 'center', mt: 3 }}>
-            <Typography sx={{ color: '#718096', fontSize: 14 }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: 14 }}>
               이미 계정이 있으신가요?{' '}
               <Button
                 variant="text"
                 onClick={() => router.push('/login')}
                 sx={{
                   textTransform: 'none',
-                  color: '#667eea',
-                  fontWeight: 600,
+                  color: 'primary.main',
+                  fontWeight: 800,
                   p: 0,
                   minWidth: 'auto',
                 }}

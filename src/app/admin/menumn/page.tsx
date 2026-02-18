@@ -23,6 +23,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useRouter } from 'next/navigation';
 import { useMenuList, useMenuSave, useMenuRoleList, useMenuRoleSave, useRoleList } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { logger } from '@/shared/lib/logger';
 import MenuPopup from '@/components/popup/MenuPopup';
 import type { MenuItem, RoleItem } from '@/types';
 
@@ -93,7 +94,7 @@ export default function MenuManagementPage() {
       refetchMenu();
     },
     onError: (error: Error) => {
-      console.error('메뉴 삭제 실패:', error);
+      logger.error('메뉴 삭제 실패', error);
       showToast.error('삭제에 실패했습니다.');
     },
   });
@@ -104,7 +105,7 @@ export default function MenuManagementPage() {
       refetchMenuRole();
     },
     onError: (error: Error) => {
-      console.error('메뉴 권한 저장 실패:', error);
+      logger.error('메뉴 권한 저장 실패', error);
       showToast.error('저장에 실패했습니다.');
     },
   });
