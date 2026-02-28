@@ -308,6 +308,7 @@ function SiegeContent() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false); // 모바일 검색 조건 펼침/접기
   const [availableGuilds, setAvailableGuilds] = useState<GuildInfo[]>([]);
   const [selectedGuilds, setSelectedGuilds] = useState<string[]>([]);
+  const [deckStarFilter, setDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
@@ -394,8 +395,13 @@ function SiegeContent() {
       params.monster_id3 = id3;
     }
 
+    // 방덱 성급 필터: 백엔드 쿼리에서 처리(페이징 정확)
+    if (deckStarFilter && deckStarFilter !== 'ALL') {
+      params.deck_star_filter = deckStarFilter;
+    }
+
     return searchDataExtraction(params);
-  }, [selectMonster, matchIdFromQuery, selectedGuildIds]);
+  }, [selectMonster, matchIdFromQuery, selectedGuildIds, deckStarFilter]);
 
   const [shouldSearch, setShouldSearch] = useState(true); // 처음 접속 시 자동 조회
   const isInitialMount = useRef(true); // 처음 마운트 여부 추적
@@ -417,6 +423,7 @@ function SiegeContent() {
         match_id: matchIdFromQuery || null,
         monster_ids: selectedMonsterList.map((m) => m.monster_id),
         selected_guilds: selectedGuilds,
+        deck_star_filter: deckStarFilter,
         page: pagination.currentPage,
         itemsPerPage: pagination.itemsPerPage,
       };
@@ -428,6 +435,7 @@ function SiegeContent() {
     matchIdFromQuery,
     pagination.currentPage,
     pagination.itemsPerPage,
+    deckStarFilter,
     selectedGuilds,
     selectedMonsterList,
   ]);
@@ -461,6 +469,7 @@ function SiegeContent() {
         match_id?: string | null;
         monster_ids?: string[];
         selected_guilds?: string[];
+        deck_star_filter?: 'ALL' | 'FOUR_STAR' | 'FIVE_STAR';
         page?: number;
         itemsPerPage?: number;
       };
@@ -469,6 +478,10 @@ function SiegeContent() {
       const sameMatch = (parsed.match_id || null) === (matchIdFromQuery || null);
       const monsterIds = Array.isArray(parsed.monster_ids) ? parsed.monster_ids : [];
       const selectedGuilds = sameMatch && Array.isArray(parsed.selected_guilds) ? parsed.selected_guilds : [];
+      const deckStarFilter =
+        parsed.deck_star_filter === 'FOUR_STAR' || parsed.deck_star_filter === 'FIVE_STAR' || parsed.deck_star_filter === 'ALL'
+          ? parsed.deck_star_filter
+          : 'ALL';
       const page = typeof parsed.page === 'number' && parsed.page >= 1 ? parsed.page : 1;
       const itemsPerPage = typeof parsed.itemsPerPage === 'number' && parsed.itemsPerPage >= 1 ? parsed.itemsPerPage : 10;
 
@@ -476,6 +489,7 @@ function SiegeContent() {
       didRestoreRef.current = true;
       setRestoredMonsterIds(monsterIds);
       setSelectedGuilds(selectedGuilds);
+      setDeckStarFilter(deckStarFilter);
       pagination.setItemsPerPage(itemsPerPage);
       pagination.setPage(page);
       // 복구 후 바로 검색 실행되도록
@@ -511,6 +525,7 @@ function SiegeContent() {
         match_id: matchIdFromQuery || null,
         monster_ids: selectedMonsterList.map((m) => m.monster_id),
         selected_guilds: selectedGuilds,
+        deck_star_filter: deckStarFilter,
         page: pagination.currentPage,
         itemsPerPage: pagination.itemsPerPage,
       };
@@ -518,7 +533,7 @@ function SiegeContent() {
     } catch {
       // no-op
     }
-  }, [matchIdFromQuery, selectedMonsterList, selectedGuilds, pagination.currentPage, pagination.itemsPerPage]);
+  }, [matchIdFromQuery, selectedMonsterList, selectedGuilds, deckStarFilter, pagination.currentPage, pagination.itemsPerPage]);
 
   // 몬스터가 선택되어 있고 shouldSearch가 true일 때만 검색 실행
   // 또는 처음 접근 시에는 몬스터 없이도 조회 가능하도록 조건 완화
@@ -550,6 +565,7 @@ function SiegeContent() {
 
   const handleReset = useCallback(() => {
     setSelectedMonsterList([]);
+    setDeckStarFilter('ALL');
     setShouldSearch(false);
     pagination.reset();
   }, []);
@@ -825,6 +841,29 @@ function SiegeContent() {
             ))
           }
         />
+      </Box>
+
+      {/* 방덱 구분 (4성/5성) */}
+      <Box sx={{ mb: { xs: 1.5, md: 2 } }}>
+        <FormControl fullWidth size={isMobile ? 'small' : 'medium'}>
+          <InputLabel id="deck-star-filter-label">방덱 구분</InputLabel>
+          <Select
+            labelId="deck-star-filter-label"
+            value={deckStarFilter}
+            label="방덱 구분"
+            onChange={(e) => {
+              const next = e.target.value as 'ALL' | 'FOUR_STAR' | 'FIVE_STAR';
+              setDeckStarFilter(next);
+              pagination.reset();
+              setShouldSearch(false);
+              setTimeout(() => setShouldSearch(true), 0);
+            }}
+          >
+            <MenuItem value="ALL">전체</MenuItem>
+            <MenuItem value="FOUR_STAR">4성 방덱 (3마리 모두 4★ 이하)</MenuItem>
+            <MenuItem value="FIVE_STAR">5성 방덱 (그 외)</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
       {/* 버튼 */}
