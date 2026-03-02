@@ -21,6 +21,9 @@ export interface SiegeSearchParams {
   guild_names?: string[];
   monster_ids?: string[];
   deck_star_filter?: 'ALL' | 'FOUR_STAR' | 'FIVE_STAR';
+  min_lose_count?: number;
+  view_all_guilds?: boolean;
+  view_guild_id?: string;
 }
 
 /**

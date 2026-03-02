@@ -2,7 +2,7 @@
  * 점령전 목록 조회 Hook
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApiPostQuery, useApiPostSuspenseQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { GuildItem, MonsterItem, SiegeSearchParams } from '@/types';
@@ -57,7 +57,7 @@ export const useMonsterList = (params: Record<string, unknown> = {}) => {
   const isCacheable = params && Object.keys(params).length === 0;
   const [cacheSnapshot] = useState(() => (isCacheable ? readMonsterListCache() : null));
 
-  return useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, { 
+  const q = useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, { 
     enabled: !(isCacheable && cacheSnapshot?.isFresh),
     initialData: isCacheable ? cacheSnapshot?.data : undefined,
     placeholderData: isCacheable ? cacheSnapshot?.data : undefined,
@@ -66,12 +66,18 @@ export const useMonsterList = (params: Record<string, unknown> = {}) => {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
     refetchOnMount: false,
-    onSuccess: (data) => {
-      if (isCacheable && Array.isArray(data) && data.length > 0) {
-        writeMonsterListCache(data);
-      }
-    },
   });
+
+  // TanStack Query v5에서는 useQuery onSuccess 콜백이 제거되어 effect로 캐시 갱신
+  useEffect(() => {
+    if (!isCacheable) return;
+    const data = q.data;
+    if (Array.isArray(data) && data.length > 0) {
+      writeMonsterListCache(data);
+    }
+  }, [isCacheable, q.data]);
+
+  return q;
 };
 
 /**

@@ -32,6 +32,7 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import PetsIcon from '@mui/icons-material/Pets';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import StorageIcon from '@mui/icons-material/Storage';
+import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import type { MenuCategory, AdminMenuItem } from '@/features/admin/types/admin';
 
 const DRAWER_WIDTH = 280;
@@ -186,6 +187,13 @@ const menuCategories: MenuCategoryWithItems[] = [
         icon: <StorageIcon />,
         path: '/admin/ddl-comparison',
         color: '#1976d2',
+      },
+      {
+        title: '쿼리 성능',
+        description: '느린 쿼리/실행중 쿼리 모니터링',
+        icon: <QueryStatsIcon />,
+        path: '/admin/query-perf',
+        color: '#455a64',
       },
     ],
   },

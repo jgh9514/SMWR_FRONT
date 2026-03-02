@@ -16,4 +16,5 @@ export * from './useLog';
 export * from './useMlang';
 export * from './useCodeRelation';
 export * from './useDdlComparison';
+export * from './useQueryPerf';
 

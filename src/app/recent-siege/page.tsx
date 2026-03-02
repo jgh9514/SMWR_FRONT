@@ -9,13 +9,12 @@ import {
   CardContent,
   CardHeader,
   Container,
-  Pagination,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
   Typography,
-  CircularProgress,
+  Skeleton,
 } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import { searchDataExtraction, getRatingColor, getRatingStars } from '@/shared/utils';
@@ -26,7 +25,8 @@ import { useResponsive } from '@/shared/hooks';
 import { isAuthenticated } from '@/shared/utils/auth';
 import { logger } from '@/shared/lib/logger';
 import type { SiegeItem } from '@/features/siege/types/recent-siege';
-import { useGuildSiegeHistory, useGuildSiegeHistoryCount } from '@/features/siege/hooks/useRecentSiege';
+import { useGuildSiegeHistory } from '@/features/siege/hooks/useRecentSiege';
+import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
 
 export default function RecentSiegePage() {
   const router = useRouter();
@@ -36,6 +36,7 @@ export default function RecentSiegePage() {
   const [schData, setSchData] = useState({ paging: 5, offset: DEFAULT_PAGE_OFFSET });
   const [userInfo, setUserInfo] = useState<any>(null);
   const prevAuthRef = useRef<boolean | null>(null);
+  const siegeGuildViewParams = useSiegeGuildViewParams();
 
   useEffect(() => {
     setIsMounted(true);
@@ -43,26 +44,19 @@ export default function RecentSiegePage() {
 
   const searchParams = useMemo(() => {
     const page = schData.offset;
-    const limit = schData.paging;
-    const offset = (page - 1) * limit;
+    const pageSize = schData.paging;
+    // count 없이 다음 페이지 존재 여부를 판단하기 위해 1개 더 요청
+    const limit = pageSize + 1;
+    const offset = (page - 1) * pageSize;
 
     return {
       ...searchDataExtraction(schData),
+      ...siegeGuildViewParams,
       limit,
       offset,
       page,
     };
-  }, [schData]);
-
-  // 전체 개수 조회
-  const {
-    data: totalCount = 0,
-    isLoading: isLoadingCount,
-    refetch: refetchCount,
-  } = useGuildSiegeHistoryCount(
-    {},
-    true,
-  );
+  }, [schData, siegeGuildViewParams]);
 
   // 점령전 이력 조회 (원본 Vue 코드와 동일한 API 사용)
   const {
@@ -110,7 +104,6 @@ export default function RecentSiegePage() {
         setUserInfo(null);
       }
       // 로그인 직후 통계/표시가 달라질 수 있으므로 재조회
-      refetchCount();
       refetchSiege();
       return;
     }
@@ -126,7 +119,7 @@ export default function RecentSiegePage() {
     } else {
       setUserInfo(null);
     }
-  }, [isMounted, refetchCount, refetchSiege, router]);
+  }, [isMounted, refetchSiege, router]);
 
   useEffect(() => {
     if (!isMounted || typeof window === 'undefined') return;
@@ -149,6 +142,15 @@ export default function RecentSiegePage() {
     }
     return false;
   }, [siegeError]);
+
+  // 403 길드 미가입/권한 에러 확인
+  const isGuildForbiddenError = useMemo(() => {
+    if (siegeError && 'response' in siegeError) {
+      const axiosError = siegeError as { response?: { status?: number } };
+      return axiosError.response?.status === 403;
+    }
+    return false;
+  }, [siegeError]);
   
   // 자기 길드 ID 확인 (통계 표시용)
   const myGuildId = useMemo(() => {
@@ -156,13 +158,21 @@ export default function RecentSiegePage() {
     return guildId;
   }, [userInfo?.guild_id]);
 
+  const pageSize = schData.paging;
+  const hasNextPage = useMemo(() => {
+    return Array.isArray(siegeListRaw) && siegeListRaw.length > pageSize;
+  }, [siegeListRaw, pageSize]);
+
   // 모든 데이터 표시하되, 통계는 자기 길드 것만
   const siegeList = useMemo(() => {
     if (!siegeListRaw || siegeListRaw.length === 0) return [];
+
+    // limit+1로 받아온 데이터를 pageSize로 자름
+    const pageItems = siegeListRaw.slice(0, pageSize);
     
     if (!myGuildId) {
       // 길드 ID가 없으면 통계 없이 모든 데이터 표시
-      return siegeListRaw.map((item) => ({
+      return pageItems.map((item) => ({
         ...item,
         // 통계 정보 제거
         attack_rate_1st: undefined,
@@ -195,7 +205,7 @@ export default function RecentSiegePage() {
       }));
     }
     
-    return siegeListRaw.map((item) => {
+    return pageItems.map((item) => {
       // 자기 길드가 몇 등인지 확인
       const id1st = item.guild_id_1st != null ? String(item.guild_id_1st) : '';
       const id2nd = item.guild_id_2nd != null ? String(item.guild_id_2nd) : '';
@@ -210,13 +220,7 @@ export default function RecentSiegePage() {
       // UI에서 자기 길드 통계만 표시하도록 처리
       return item;
     });
-  }, [siegeListRaw, myGuildId]);
-
-  // 전체 페이지 수 계산
-  const totalPage = useMemo(() => {
-    if (totalCount === 0 || schData.paging === 0) return 0;
-    return Math.ceil(totalCount / schData.paging);
-  }, [totalCount, schData.paging]);
+  }, [siegeListRaw, myGuildId, pageSize]);
 
 
   // 페이지 변경
@@ -256,10 +260,14 @@ export default function RecentSiegePage() {
     }
   };
 
-  if (isLoadingSiege || isLoadingCount) {
+  if (isLoadingSiege) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <CircularProgress />
+        <Box sx={{ width: 'min(720px, 92vw)' }}>
+          <Skeleton variant="rounded" height={120} sx={{ mb: 2 }} />
+          <Skeleton variant="rounded" height={120} sx={{ mb: 2 }} />
+          <Skeleton variant="rounded" height={120} />
+        </Box>
       </Box>
     );
   }
@@ -276,14 +284,18 @@ export default function RecentSiegePage() {
           <Box sx={{ textAlign: 'center', py: { xs: 6, md: 8 } }}>
             <Typography variant="h6" color="text.secondary" sx={{ mb: 2, fontWeight: 600 }}>
               {isAuthError
-                ? '통계 데이터를 불러올 수 없습니다'
+                ? '로그인이 필요합니다'
+                : isGuildForbiddenError
+                ? '길드 가입이 필요합니다'
                 : isSiegeError
                 ? '점령전 데이터를 불러올 수 없습니다'
                 : '점령전 데이터가 없습니다'}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 4, fontSize: { xs: '0.875rem', md: '1rem' } }}>
               {isAuthError
-                ? '통계 데이터를 보려면 로그인이 필요합니다. 로그인 후 다시 시도해주세요.'
+                ? '점령전 데이터를 보려면 로그인이 필요합니다. 로그인 후 다시 시도해주세요.'
+                : isGuildForbiddenError
+                ? '점령전 데이터를 보려면 길드 가입이 필요합니다.'
                 : isSiegeError
                 ? '서버에서 데이터를 가져오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
                 : '현재 등록된 점령전 이력이 없습니다.'}
@@ -297,6 +309,10 @@ export default function RecentSiegePage() {
                   size={isMobile ? 'medium' : 'large'}
                 >
                   로그인하기
+                </Button>
+              ) : isGuildForbiddenError ? (
+                <Button variant="outlined" color="primary" onClick={() => router.push('/')} size={isMobile ? 'medium' : 'large'}>
+                  메인으로
                 </Button>
               ) : (
                 <Button variant="outlined" color="primary" onClick={() => refetchSiege()} size={isMobile ? 'medium' : 'large'}>
@@ -556,23 +572,24 @@ export default function RecentSiegePage() {
               py: { xs: 2, md: 3 },
             }}
           >
-            <Box sx={{ display: 'flex', justifyContent: 'center', flex: 1 }}>
-              <Pagination
-                count={totalPage}
-                page={schData.offset}
-                onChange={(_, page) => changePage(page)}
-                color="primary"
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, flex: 1, flexWrap: 'wrap' }}>
+              <Button
+                variant="outlined"
+                onClick={() => changePage(Math.max(1, schData.offset - 1))}
+                disabled={schData.offset <= 1}
                 size={isMobile ? 'small' : 'medium'}
-                siblingCount={isMobile ? 0 : 1}
-                boundaryCount={isMobile ? 1 : 1}
-                showFirstButton
-                showLastButton
-                sx={{
-                  '& .MuiPaginationItem-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' },
-                  },
-                }}
-              />
+              >
+                이전
+              </Button>
+              <Typography sx={{ fontWeight: 600 }}>{schData.offset} 페이지</Typography>
+              <Button
+                variant="outlined"
+                onClick={() => changePage(schData.offset + 1)}
+                disabled={!hasNextPage}
+                size={isMobile ? 'small' : 'medium'}
+              >
+                다음
+              </Button>
             </Box>
             <FormControl
               size="small"

@@ -17,6 +17,7 @@ import {
   Collapse,
   Fab,
   Checkbox,
+  FormControlLabel,
   Divider,
   Select,
   FormControl,
@@ -37,10 +38,10 @@ import { useResponsive, useServerPagination } from '@/shared/hooks';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterItem, SiegeSearchParams } from '@/types';
 import type { GuildInfo } from '@/features/siege/types/siege';
+import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
 
 const LEADER_INDEX = 0;
 const MAX_MONSTERS = 3;
-const SIEGE_SEARCH_STATE_KEY = 'smwr:siege-search-state:v1';
 
 // 프로그레스바 컴포넌트 (부드러운 애니메이션)
 const AnimatedProgressBar = ({ percentage, isHighRate }: { percentage: number; isHighRate: boolean }) => {
@@ -304,11 +305,20 @@ function SiegeContent() {
   const { isMobile } = useResponsive();
   const searchParams = useSearchParams();
   const matchIdFromQuery = searchParams?.get('match_id');
+  const siegeGuildViewParams = useSiegeGuildViewParams();
+  // 검색조건(편집용: draft)
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false); // 모바일 검색 조건 펼침/접기
   const [availableGuilds, setAvailableGuilds] = useState<GuildInfo[]>([]);
   const [selectedGuilds, setSelectedGuilds] = useState<string[]>([]);
   const [deckStarFilter, setDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
+  const [onlyLoseAtLeastOnce, setOnlyLoseAtLeastOnce] = useState(false);
+
+  // 검색 적용값(applied): "검색 버튼"을 눌렀을 때만 이 값이 바뀌고, 실제 조회는 이 값으로만 수행
+  const [appliedMonsterIds, setAppliedMonsterIds] = useState<string[]>([]);
+  const [appliedSelectedGuilds, setAppliedSelectedGuilds] = useState<string[]>([]);
+  const [appliedDeckStarFilter, setAppliedDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
+  const [appliedOnlyLoseAtLeastOnce, setAppliedOnlyLoseAtLeastOnce] = useState(false);
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
@@ -353,8 +363,8 @@ function SiegeContent() {
     }
   }, [matchIdFromQuery]);
 
-  // 선택된 길드 ID 배열
-  const selectedGuildIds = useMemo(() => {
+  // 선택된 길드 ID 배열 (draft)
+  const selectedGuildIdsDraft = useMemo(() => {
     return selectedGuilds
       .map((guildName) => {
         const guild = availableGuilds.find((g) => g.guild_name === guildName);
@@ -362,6 +372,16 @@ function SiegeContent() {
       })
       .filter((id): id is string => id !== null);
   }, [selectedGuilds, availableGuilds]);
+
+  // 선택된 길드 ID 배열 (applied)
+  const selectedGuildIdsApplied = useMemo(() => {
+    return appliedSelectedGuilds
+      .map((guildName) => {
+        const guild = availableGuilds.find((g) => g.guild_name === guildName);
+        return guild?.guild_id ? String(guild.guild_id) : null;
+      })
+      .filter((id): id is string => id !== null);
+  }, [appliedSelectedGuilds, availableGuilds]);
 
   // 백엔드가 기대하는 형식으로 변환
   // XML에서 monster_id1, monster_id2, monster_id3를 기대함
@@ -373,42 +393,54 @@ function SiegeContent() {
       params.match_id = matchIdFromQuery;
     }
 
-    // 선택된 길드 ID가 있으면 필터링 (원본 Vue 코드와 동일)
-    if (selectedGuildIds.length > 0) {
-      params.guild_ids = selectedGuildIds;
+    // 선택된 길드 ID가 있으면 필터링 (applied 기준)
+    if (selectedGuildIdsApplied.length > 0) {
+      params.guild_ids = selectedGuildIdsApplied;
     }
 
     // 리더 몬스터 (첫 번째) - monster_id1
-    if (selectMonster.length > 0) {
-      params.monster_id1 = selectMonster[0];
+    if (appliedMonsterIds.length > 0) {
+      params.monster_id1 = appliedMonsterIds[0];
     }
 
     // 두 번째, 세 번째 몬스터 처리
-    if (selectMonster.length === 2) {
+    if (appliedMonsterIds.length === 2) {
       // 몬스터 1개만 더 선택된 경우 - monster_id2만 사용
-      params.monster_id2 = selectMonster[1];
-    } else if (selectMonster.length === 3) {
+      params.monster_id2 = appliedMonsterIds[1];
+    } else if (appliedMonsterIds.length === 3) {
       // 몬스터 2개가 더 선택된 경우 - 정렬해서 monster_id2, monster_id3에 할당
       // XML 로직: LEAST와 GREATEST로 정렬하므로 순서대로 할당
-      const [id2, id3] = selectMonster.slice(1).sort();
+      const [id2, id3] = appliedMonsterIds.slice(1).sort();
       params.monster_id2 = id2;
       params.monster_id3 = id3;
     }
 
     // 방덱 성급 필터: 백엔드 쿼리에서 처리(페이징 정확)
-    if (deckStarFilter && deckStarFilter !== 'ALL') {
-      params.deck_star_filter = deckStarFilter;
+    if (appliedDeckStarFilter && appliedDeckStarFilter !== 'ALL') {
+      params.deck_star_filter = appliedDeckStarFilter;
     }
 
-    return searchDataExtraction(params);
-  }, [selectMonster, matchIdFromQuery, selectedGuildIds, deckStarFilter]);
+    // 패배 1회 이상만 보기 (서버에서 HAVING으로 필터링)
+    if (appliedOnlyLoseAtLeastOnce) {
+      params.min_lose_count = 1;
+    }
 
-  const [shouldSearch, setShouldSearch] = useState(true); // 처음 접속 시 자동 조회
+    // 관리자: 전체/특정 길드 전적 조회
+    Object.assign(params, siegeGuildViewParams);
+
+    return searchDataExtraction(params);
+  }, [
+    appliedMonsterIds,
+    matchIdFromQuery,
+    selectedGuildIdsApplied,
+    appliedDeckStarFilter,
+    appliedOnlyLoseAtLeastOnce,
+    siegeGuildViewParams,
+  ]);
+
+  const [shouldSearch, setShouldSearch] = useState(true); // 초기 1회 자동 조회
   const isInitialMount = useRef(true); // 처음 마운트 여부 추적
   const scrollPositionRef = useRef<number>(0); // 스크롤 위치 저장
-  const [restoredMonsterIds, setRestoredMonsterIds] = useState<string[] | null>(null);
-  const didRestoreRef = useRef(false);
-  const restoringRef = useRef(false);
 
   // 서버 사이드 페이지네이션 자동 관리 (기본 10개)
   const pagination = useServerPagination({
@@ -416,29 +448,7 @@ function SiegeContent() {
     itemsPerPage: 10,
   });
 
-  const persistSearchState = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const payload = {
-        match_id: matchIdFromQuery || null,
-        monster_ids: selectedMonsterList.map((m) => m.monster_id),
-        selected_guilds: selectedGuilds,
-        deck_star_filter: deckStarFilter,
-        page: pagination.currentPage,
-        itemsPerPage: pagination.itemsPerPage,
-      };
-      sessionStorage.setItem(SIEGE_SEARCH_STATE_KEY, JSON.stringify(payload));
-    } catch {
-      // no-op
-    }
-  }, [
-    matchIdFromQuery,
-    pagination.currentPage,
-    pagination.itemsPerPage,
-    deckStarFilter,
-    selectedGuilds,
-    selectedMonsterList,
-  ]);
+  // 상세를 Drawer(intercepting route)로 처리하므로 별도 검색조건 저장/복구는 하지 않음
 
   // 서버 사이드 페이지네이션 파라미터 추가
   const searchParamsWithPagination = useMemo(() => {
@@ -450,90 +460,13 @@ function SiegeContent() {
     return params;
   }, [apiSearchParams, pagination.paginationParams, matchIdFromQuery]);
 
-  // 처음 접근 시 자동 조회 (한 번만 실행)
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      // 처음 접속 시 무조건 조회 API 호출
-      setShouldSearch(true);
     }
   }, []);
 
-  // 상세 화면 갔다가 뒤로왔을 때 검색 조건을 유지하기 위해 sessionStorage에 저장/복구
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = sessionStorage.getItem(SIEGE_SEARCH_STATE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        match_id?: string | null;
-        monster_ids?: string[];
-        selected_guilds?: string[];
-        deck_star_filter?: 'ALL' | 'FOUR_STAR' | 'FIVE_STAR';
-        page?: number;
-        itemsPerPage?: number;
-      };
-
-      // match_id가 다르면 길드 선택은 무의미할 수 있어 몬스터만 복구
-      const sameMatch = (parsed.match_id || null) === (matchIdFromQuery || null);
-      const monsterIds = Array.isArray(parsed.monster_ids) ? parsed.monster_ids : [];
-      const selectedGuilds = sameMatch && Array.isArray(parsed.selected_guilds) ? parsed.selected_guilds : [];
-      const deckStarFilter =
-        parsed.deck_star_filter === 'FOUR_STAR' || parsed.deck_star_filter === 'FIVE_STAR' || parsed.deck_star_filter === 'ALL'
-          ? parsed.deck_star_filter
-          : 'ALL';
-      const page = typeof parsed.page === 'number' && parsed.page >= 1 ? parsed.page : 1;
-      const itemsPerPage = typeof parsed.itemsPerPage === 'number' && parsed.itemsPerPage >= 1 ? parsed.itemsPerPage : 10;
-
-      restoringRef.current = true;
-      didRestoreRef.current = true;
-      setRestoredMonsterIds(monsterIds);
-      setSelectedGuilds(selectedGuilds);
-      setDeckStarFilter(deckStarFilter);
-      pagination.setItemsPerPage(itemsPerPage);
-      pagination.setPage(page);
-      // 복구 후 바로 검색 실행되도록
-      setShouldSearch(true);
-    } catch {
-      // no-op
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchIdFromQuery]);
-
-  // monsterList가 로드된 뒤 restoredMonsterIds를 MonsterOption[]으로 복원
-  useEffect(() => {
-    if (!restoredMonsterIds || restoredMonsterIds.length === 0) return;
-    if (!monsterList || monsterList.length === 0) return;
-
-    const byId = new Map(monsterList.map((m) => [m.monster_id, m]));
-    const restored = restoredMonsterIds.map((id) => byId.get(id)).filter(Boolean) as MonsterOption[];
-    if (restored.length > 0) {
-      setSelectedMonsterList(restored);
-    }
-    // 1회 복구 후 해제
-    setRestoredMonsterIds(null);
-    restoringRef.current = false;
-  }, [restoredMonsterIds, monsterList]);
-
-  // 검색 조건 저장 (선택 몬스터/길드/페이지)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    // 복구 과정 중에는 저장하지 않음(초기 값으로 덮어쓰는 것 방지)
-    if (restoringRef.current) return;
-    try {
-      const payload = {
-        match_id: matchIdFromQuery || null,
-        monster_ids: selectedMonsterList.map((m) => m.monster_id),
-        selected_guilds: selectedGuilds,
-        deck_star_filter: deckStarFilter,
-        page: pagination.currentPage,
-        itemsPerPage: pagination.itemsPerPage,
-      };
-      sessionStorage.setItem(SIEGE_SEARCH_STATE_KEY, JSON.stringify(payload));
-    } catch {
-      // no-op
-    }
-  }, [matchIdFromQuery, selectedMonsterList, selectedGuilds, deckStarFilter, pagination.currentPage, pagination.itemsPerPage]);
+  // 검색조건 저장/복구 제거 (상세를 Drawer로 처리하므로 목록 상태가 유지됨)
 
   // 몬스터가 선택되어 있고 shouldSearch가 true일 때만 검색 실행
   // 또는 처음 접근 시에는 몬스터 없이도 조회 가능하도록 조건 완화
@@ -548,17 +481,15 @@ function SiegeContent() {
         return;
       }
       setSelectedMonsterList(newValue);
-      setShouldSearch(false); // 몬스터 선택 시 자동 검색 방지
-      pagination.reset();
+      // 몬스터 선택만으로는 조회하지 않음 (검색 버튼으로만 적용)
     },
-    [pagination],
+    [],
   );
 
   const handleRemoveMonster = useCallback(
     (monsterId: string) => {
       setSelectedMonsterList((prev) => prev.filter((m) => m.monster_id !== monsterId));
-      setShouldSearch(false); // 몬스터 제거 시 자동 검색 방지
-      pagination.reset();
+      // 몬스터 제거만으로는 조회하지 않음 (검색 버튼으로만 적용)
     },
     [],
   );
@@ -566,6 +497,11 @@ function SiegeContent() {
   const handleReset = useCallback(() => {
     setSelectedMonsterList([]);
     setDeckStarFilter('ALL');
+    setOnlyLoseAtLeastOnce(false);
+    setAppliedMonsterIds([]);
+    setAppliedSelectedGuilds([]);
+    setAppliedDeckStarFilter('ALL');
+    setAppliedOnlyLoseAtLeastOnce(false);
     setShouldSearch(false);
     pagination.reset();
   }, []);
@@ -585,36 +521,23 @@ function SiegeContent() {
     [],
   );
 
-  // 길드 선택 변경 시 검색 실행 (원본 Vue 코드와 동일)
-  const prevSelectedGuildIdsRef = useRef<string[]>([]);
-  useEffect(() => {
-    if (matchIdFromQuery && availableGuilds.length > 0) {
-      // 길드 선택이 실제로 변경되었을 때만 검색 실행
-      const hasChanged = JSON.stringify(prevSelectedGuildIdsRef.current) !== JSON.stringify(selectedGuildIds);
-      if (hasChanged) {
-        prevSelectedGuildIdsRef.current = selectedGuildIds;
-        setShouldSearch(false);
-        setTimeout(() => {
-          setShouldSearch(true);
-        }, 0);
-      }
-    }
-  }, [selectedGuildIds, matchIdFromQuery, availableGuilds.length]);
+  // 길드 선택 변경만으로는 자동 조회하지 않음 (검색 버튼으로만 적용)
 
   const handleSearch = useCallback(() => {
-    // 검색 버튼 클릭 시 재조회
-    setShouldSearch(false); // 먼저 false로 설정
-    setTimeout(() => {
-      setShouldSearch(true); // 그 다음 true로 설정하여 재조회 트리거
-    }, 0);
+    // 검색 버튼 클릭 시에만 조건을 적용하고 조회
+    setAppliedMonsterIds(selectedMonsterList.map((m) => m.monster_id));
+    setAppliedSelectedGuilds(selectedGuilds);
+    setAppliedDeckStarFilter(deckStarFilter);
+    setAppliedOnlyLoseAtLeastOnce(onlyLoseAtLeastOnce);
+    setShouldSearch(true);
     pagination.reset();
-  }, [pagination]);
+  }, [pagination, selectedMonsterList, selectedGuilds, deckStarFilter, onlyLoseAtLeastOnce]);
 
   const handleMonsterClick = useCallback((item: MonsterItem) => {
-    // 상세 이동 직전에 동기 저장(뒤로가기로 복귀 시 상태 유지)
-    persistSearchState();
-    router.push(`/siege/siege-detail/${item.key}`);
-  }, [persistSearchState, router]);
+    // match_id가 있으면 상세에서도 해당 점령전만 보이도록 전달
+    const detailParam = matchIdFromQuery ? `${item.key}_${matchIdFromQuery}` : item.key;
+    router.push(`/siege/siege-detail/${detailParam}`);
+  }, [matchIdFromQuery, router]);
 
   const handlePageChange = useCallback(
     (_: unknown, page: number) => {
@@ -854,9 +777,7 @@ function SiegeContent() {
             onChange={(e) => {
               const next = e.target.value as 'ALL' | 'FOUR_STAR' | 'FIVE_STAR';
               setDeckStarFilter(next);
-              pagination.reset();
-              setShouldSearch(false);
-              setTimeout(() => setShouldSearch(true), 0);
+              // 조건 변경만으로는 조회하지 않음 (검색 버튼으로만 적용)
             }}
           >
             <MenuItem value="ALL">전체</MenuItem>
@@ -864,6 +785,23 @@ function SiegeContent() {
             <MenuItem value="FIVE_STAR">5성 방덱 (그 외)</MenuItem>
           </Select>
         </FormControl>
+      </Box>
+
+      {/* 패배 1회 이상 필터 */}
+      <Box sx={{ mb: { xs: 1.5, md: 2 } }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={onlyLoseAtLeastOnce}
+              onChange={(e) => {
+                const next = e.target.checked;
+                setOnlyLoseAtLeastOnce(next);
+                // 조건 변경만으로는 조회하지 않음 (검색 버튼으로만 적용)
+              }}
+            />
+          }
+          label="패배 1회 이상만 보기"
+        />
       </Box>
 
       {/* 버튼 */}
@@ -882,7 +820,6 @@ function SiegeContent() {
           onClick={handleSearch}
           fullWidth
           size={isMobile ? 'small' : 'medium'}
-          disabled={selectedMonsterList.length === 0}
           aria-label="검색 실행"
         >
           검색

@@ -60,6 +60,8 @@ export interface MonsterDetailParams {
   dm1?: string;
   dm2?: string;
   dm3?: string;
+  view_all_guilds?: boolean;
+  view_guild_id?: string;
   historyLimit?: number;
   historyOffset?: number;
   recommendedLimit?: number;

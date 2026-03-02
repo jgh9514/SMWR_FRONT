@@ -18,7 +18,6 @@ class Logger {
     warn?: (...args: unknown[]) => void;
     error?: (...args: unknown[]) => void;
   } | null {
-    if (!this.isDevelopment) return null;
     // eslint/no-console 회피 + 브라우저/노드 모두에서 안전 접근
     const c = (globalThis as unknown as { [key: string]: unknown })['console'] as any;
     if (!c) return null;
@@ -26,7 +25,10 @@ class Logger {
   }
 
   private log(level: LogLevel, message: string, context?: LogContext): void {
-    // 프로덕션에서는 콘솔 출력 금지 (필요 시 로깅 서비스로 전송하도록 확장)
+    // 기본 정책:
+    // - 개발: debug/info/warn/error 모두 출력
+    // - 운영: warn/error만 출력 (원인 추적용 최소 로그)
+    if (!this.isDevelopment && level !== 'warn' && level !== 'error') return;
     const c = this.getConsole();
     if (!c) return;
 

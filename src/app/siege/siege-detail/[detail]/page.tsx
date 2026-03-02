@@ -26,6 +26,7 @@ import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData } from '@/types';
+import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
 
 export default function MonsterDetailPage() {
   const params = useParams();
@@ -42,6 +43,7 @@ export default function MonsterDetailPage() {
 
   const [schData, setSchData] = useState<any>({});
   const [matchId, setMatchId] = useState<string | null>(null);
+  const siegeGuildViewParams = useSiegeGuildViewParams();
   const [historyPage, setHistoryPage] = useState(1);
   const [recommendedPage, setRecommendedPage] = useState(1);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -57,6 +59,7 @@ export default function MonsterDetailPage() {
     return {
       ...schData,
       ...(matchId && { match_id: matchId }),
+      ...siegeGuildViewParams,
       historyLimit,
       // 백엔드 XML에서 (historyOffset - 1) * historyLimit으로 계산하므로 페이지 번호를 그대로 전달
       historyOffset: historyPage,
@@ -64,7 +67,7 @@ export default function MonsterDetailPage() {
       // 백엔드 XML에서 (recommendedOffset - 1) * recommendedLimit으로 계산하므로 페이지 번호를 그대로 전달
       recommendedOffset: recommendedPage,
     };
-  }, [schData, matchId, historyPage, recommendedPage, historyLimit, recommendedLimit]);
+  }, [schData, matchId, historyPage, recommendedPage, historyLimit, recommendedLimit, siegeGuildViewParams]);
 
   // 몬스터 상세 조회
   const {
@@ -111,7 +114,8 @@ export default function MonsterDetailPage() {
     } catch {
       // no-op
     }
-    router.push('/siege');
+    // 단독 진입/새로고침 케이스에서도 match_id 컨텍스트를 유지
+    router.push(matchId ? `/siege?match_id=${matchId}` : '/siege');
   };
 
   useEffect(() => {

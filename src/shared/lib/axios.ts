@@ -3,11 +3,43 @@
  */
 
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
-import { setApiLoading } from '@/shared/ui/loading/ApiLoading';
 import { API_TIMEOUT_MS } from '@/shared/constants';
 import { showApiError } from './error-handler';
 import { isForceLoggedOut } from '@/shared/utils/auth';
 import { logger } from '@/shared/lib/logger';
+import { apiClient } from '@/shared/lib/api/client';
+
+let reauthInFlight: Promise<void> | null = null;
+
+async function tryReauthOnce() {
+  if (typeof window === 'undefined') return;
+  if (reauthInFlight) return reauthInFlight;
+  reauthInFlight = (async () => {
+    try {
+      // login-check는 쿠키(HttpOnly 포함) 기반으로 서버가 최종 판단
+      const res: any = await apiClient.post('/auth/login-check', {});
+      if (res && res.result === 'SUCCESS' && res.userInfo) {
+        localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
+        localStorage.setItem('isLoggedIn', 'true');
+        return;
+      }
+      // 실패면 표시용 정보만 정리
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('userInfo');
+    } catch {
+      // login-check 자체도 실패하면 표시용 정보만 정리
+      try {
+        localStorage.removeItem('isLoggedIn');
+        localStorage.removeItem('userInfo');
+      } catch {
+        // no-op
+      }
+    } finally {
+      reauthInFlight = null;
+    }
+  })();
+  return reauthInFlight;
+}
 
 // 환경별 API 서버 설정
 const getBaseURL = () => {
@@ -35,8 +67,6 @@ const getBaseURL = () => {
 };
 
 const BASE_URL = getBaseURL();
-
-let loadingCount = 0;
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -85,17 +115,9 @@ axiosInstance.interceptors.request.use(
       }
     }
 
-    // Loading 표시
-    loadingCount++;
-    setApiLoading(true);
-
     return config;
   },
   (error: AxiosError) => {
-    loadingCount--;
-    if (loadingCount === 0) {
-      setApiLoading(false);
-    }
     return Promise.reject(error);
   },
 );
@@ -103,51 +125,35 @@ axiosInstance.interceptors.request.use(
 // Response Interceptor
 axiosInstance.interceptors.response.use(
   (response) => {
-    loadingCount--;
-    if (loadingCount === 0) {
-      setApiLoading(false);
-    }
     return response;
   },
-  (error: AxiosError) => {
-    loadingCount--;
-    if (loadingCount === 0) {
-      setApiLoading(false);
-    }
-
+  async (error: AxiosError) => {
     // 에러 처리
     if (error.response) {
       const status = error.response.status;
+      const method = (error.config?.method || 'UNKNOWN').toUpperCase();
+      const url = error.config?.url;
+      const data = error.response?.data;
+
+      // 리다이렉트로 에러가 사라져 원인 추적이 어려워지는 문제 방지:
+      // - 401/403/5xx도 페이지 이동하지 않고, 토스트 + 콘솔 로그로 남긴다.
+      logger.error('[Axios] API error response', error, { status, method, url, data });
 
       if (status === 401) {
-        // 401 에러 시 로그인 페이지로 리다이렉트
-        if (typeof window !== 'undefined') {
-          // 사용자가 명시적으로 로그아웃한 경우에는 로그인 페이지로 강제 이동하지 않음
-          if (isForceLoggedOut()) {
-            return Promise.reject(error);
-          }
-          const currentPath = window.location.pathname;
-          // 로그인 페이지가 아닌 경우에만 리다이렉트
-          // (로그인 페이지에서도 인증 실패 시 리다이렉트하지 않음)
-          if (!currentPath.startsWith('/login') && !currentPath.startsWith('/signup')) {
-            // 로컬 스토리지 정리
-            localStorage.removeItem('isLoggedIn');
-            localStorage.removeItem('userInfo');
-            // 현재 경로를 쿼리 파라미터로 저장하여 로그인 후 돌아올 수 있도록 함
-            const returnUrl = encodeURIComponent(currentPath + window.location.search);
-            // 로그인 페이지로 리다이렉트
-            window.location.href = `/login${returnUrl !== '/' ? `?returnUrl=${returnUrl}` : ''}`;
+        // 사용자가 명시적으로 로그아웃한 경우(강제 플래그)에는 토스트만 띄우고 종료
+        if (!isForceLoggedOut() && typeof window !== 'undefined') {
+          // 401이 한 번 났다고 바로 "로그인 풀림" 처리하면(특히 HttpOnly 쿠키 환경)
+          // localStorage 기반 로그인표시가 깨져서 체감상 강제 로그아웃이 됨.
+          // => 서버에 login-check로 재확인 후에만 정리.
+          const urlStr = String(url || '');
+          if (!urlStr.includes('/auth/login-check')) {
+            await tryReauthOnce();
           }
         }
+        showApiError(error);
         return Promise.reject(error);
       } else if (status === 403) {
-        if (typeof window !== 'undefined') {
-          // 에러 페이지에서는 리다이렉트하지 않음
-          const currentPath = window.location.pathname;
-          if (!currentPath.startsWith('/error/')) {
-            window.location.href = '/error/403';
-          }
-        }
+        showApiError(error);
         return Promise.reject(error);
       } else if (status === 404) {
         // API 404 에러는 리다이렉트하지 않고 에러만 반환
@@ -159,13 +165,7 @@ axiosInstance.interceptors.response.use(
         // 사용자에게 알리지 않고 조용히 실패 처리
         return Promise.reject(error);
       } else if (status >= 500) {
-        if (typeof window !== 'undefined') {
-          // 에러 페이지에서는 리다이렉트하지 않음
-          const currentPath = window.location.pathname;
-          if (!currentPath.startsWith('/error/')) {
-            window.location.href = '/error/500';
-          }
-        }
+        showApiError(error);
         return Promise.reject(error);
       } else {
         // 4xx 에러는 토스트로 표시
@@ -176,7 +176,7 @@ axiosInstance.interceptors.response.use(
       // 백엔드 서버가 실행되지 않은 경우 조용히 처리 (토스트 표시하지 않음)
       if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error') || error.code === 'ERR_CONNECTION_REFUSED') {
         // 개발 환경에서만 첫 번째 네트워크 에러만 경고 출력 (중복 방지)
-        if (process.env.NODE_ENV === 'development' && !(window as any).__networkErrorLogged) {
+        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && !(window as any).__networkErrorLogged) {
           logger.warn('백엔드 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.');
           (window as any).__networkErrorLogged = true;
         }

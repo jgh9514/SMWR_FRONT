@@ -1,6 +1,6 @@
 'use client';
 
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, Skeleton, Typography } from '@mui/material';
 
 interface LoadingStateProps {
   message?: string;
@@ -10,7 +10,7 @@ interface LoadingStateProps {
 export default function LoadingState({ message, size = 40 }: LoadingStateProps) {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 8, gap: 2 }}>
-      <CircularProgress size={size} />
+      <Skeleton variant="circular" width={size} height={size} />
       {message && (
         <Typography variant="body2" color="text.secondary">
           {message}

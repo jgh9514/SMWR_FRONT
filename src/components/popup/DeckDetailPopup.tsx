@@ -10,20 +10,25 @@ import {
   Box,
   Avatar,
   Chip,
-  CircularProgress,
+  Skeleton,
   IconButton,
   Typography,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  TextField,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import BrokenImageIcon from '@mui/icons-material/BrokenImage';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
-import { useDeckDetail, useDeleteDeck } from '@/hooks/api';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { useDeckDetail, useDeleteDeck, useApiPostMutation } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import MonsterDetailCard from '@/features/siege/components/MonsterDetailCard';
 import type { RecommendedItem } from '@/features/siege/types/siegeDetail';
-import type { Monster } from '@/features/siege/types/siege';
+import type { DeckMonsterStats, Monster } from '@/features/siege/types/siege';
 
 interface DeckDetailPopupProps {
   open: boolean;
@@ -37,6 +42,13 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
   const [selectedMonsterIndex, setSelectedMonsterIndex] = useState(0);
   const touchStartXRef = useRef<number | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
+  const [editStats, setEditStats] = useState<DeckMonsterStats[]>([
+    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+  ]);
 
   // 공덱 상세 조회 (React Query 사용)
   const deckParams = useMemo(() => {
@@ -111,6 +123,20 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       throw new Error('deck_id 또는 team_id가 필요합니다.');
     }
     return { deck_id: String(deckId) };
+  };
+
+  const extractStatsFromDetail = (detail: Record<string, any>, index: 1 | 2 | 3): DeckMonsterStats => {
+    const get = (key: string) => normalizeStatValue(detail[`m${index}_${key}`], 0);
+    return {
+      hp: get('hp'),
+      atk: get('atk'),
+      def: get('def'),
+      spd: get('spd'),
+      critRate: get('crit_rate'),
+      critDmg: get('crit_dmg'),
+      resistance: get('resistance'),
+      accuracy: get('accuracy'),
+    };
   };
 
   const monsterImageUrls = (() => {
@@ -271,6 +297,73 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     }
   };
 
+  const updateDeckMutation = useApiPostMutation<string, {
+    deck_id: string;
+    monster_1_stats: DeckMonsterStats;
+    monster_2_stats: DeckMonsterStats;
+    monster_3_stats: DeckMonsterStats;
+  }>('/summonerswar/deck-detail-update', {
+    onSuccess: (res) => {
+      if (res === 'SUCCESS') {
+        showToast.success('스탯이 수정되었습니다.');
+        setIsEditing(false);
+        refetch();
+      } else {
+        showToast.error('수정에 실패했습니다.');
+      }
+    },
+    onError: (err) => {
+      console.error('공덱 스탯 수정 실패:', err);
+      showToast.error('수정 중 오류가 발생했습니다.');
+    },
+  });
+
+  const onEditClick = () => {
+    if (!detailDataRecord) return;
+    setEditStats([
+      extractStatsFromDetail(detailDataRecord, 1),
+      extractStatsFromDetail(detailDataRecord, 2),
+      extractStatsFromDetail(detailDataRecord, 3),
+    ]);
+    setExpandedPanel([0, 1, 2]);
+    setIsEditing(true);
+  };
+
+  const onEditCancel = () => {
+    setIsEditing(false);
+  };
+
+  const onEditSave = () => {
+    const target = lastSelectedItem || detailDataRecord;
+    if (!target) {
+      showToast.error('수정할 공덱 정보가 없습니다.');
+      return;
+    }
+    try {
+      const { deck_id } = validateParams(target);
+      updateDeckMutation.mutate({
+        deck_id,
+        monster_1_stats: editStats[0],
+        monster_2_stats: editStats[1],
+        monster_3_stats: editStats[2],
+      });
+    } catch (err) {
+      console.error('공덱 스탯 수정 실패:', err);
+      showToast.error('수정 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 상세 데이터 로드 시 기본 editStats 초기화 (편집 중이 아닐 때만)
+  useEffect(() => {
+    if (!detailDataRecord) return;
+    if (isEditing) return;
+    setEditStats([
+      extractStatsFromDetail(detailDataRecord, 1),
+      extractStatsFromDetail(detailDataRecord, 2),
+      extractStatsFromDetail(detailDataRecord, 3),
+    ]);
+  }, [detailDataRecord, isEditing]);
+
   return (
     <Dialog 
       open={open} 
@@ -353,10 +446,11 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       >
         {loading && (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
-            <CircularProgress size={64} thickness={4} />
-            <Typography sx={{ mt: 3, color: 'text.secondary', fontWeight: 500 }}>
-              데이터를 불러오는 중...
-            </Typography>
+            <Skeleton variant="circular" width={64} height={64} />
+            <Box sx={{ width: 240, mt: 3 }}>
+              <Skeleton variant="text" height={24} />
+              <Skeleton variant="text" height={24} />
+            </Box>
           </Box>
         )}
 
@@ -375,7 +469,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
           </Box>
         )}
 
-        {!loading && !error && detailDataRecord && hasValidData && (
+        {!loading && !error && detailDataRecord && hasValidData && !isEditing && (
           <Box>
             {/* 공덱 구성 이미지 */}
             <Box 
@@ -532,6 +626,73 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
           </Box>
         )}
 
+        {!loading && !error && detailDataRecord && hasValidData && isEditing && (
+          <Box>
+            {[1, 2, 3].map((idx) => {
+              const index = idx - 1;
+              const name = detailDataRecord[`m${idx}_kr_name`];
+              const imageUrl = detailDataRecord[`image_url${idx}`];
+              const leader = idx === 1;
+              return (
+                <Accordion
+                  key={idx}
+                  expanded={expandedPanel.includes(index)}
+                  onChange={(_, expanded) => {
+                    setExpandedPanel((prev) => (expanded ? [...prev, index] : prev.filter((p) => p !== index)));
+                  }}
+                  sx={{ mb: 1 }}
+                >
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+                      <Avatar
+                        src={imageUrl ? getMonsterImageUrl(String(imageUrl)) : undefined}
+                        sx={{ width: 48, height: 48 }}
+                      />
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography variant="body1" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }} noWrap>
+                          {name ? String(name) : `몬스터 ${idx}`}
+                          {leader && <Chip label="리더" size="small" color="warning" />}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                      {(
+                        [
+                          { key: 'hp', label: '체력 (HP)' },
+                          { key: 'atk', label: '공격력 (ATK)' },
+                          { key: 'def', label: '방어력 (DEF)' },
+                          { key: 'spd', label: '공격속도 (SPD)' },
+                          { key: 'critRate', label: '치명타 확률 (%)' },
+                          { key: 'critDmg', label: '치명타 피해 (%)' },
+                          { key: 'resistance', label: '효과 저항 (%)' },
+                          { key: 'accuracy', label: '효과 적중 (%)' },
+                        ] as const
+                      ).map((f) => (
+                        <Box key={f.key} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
+                          <TextField
+                            label={f.label}
+                            type="number"
+                            value={(editStats[index] as any)[f.key] ?? 0}
+                            onChange={(e) => {
+                              const next = [...editStats];
+                              (next[index] as any)[f.key] = Number(e.target.value);
+                              setEditStats(next);
+                            }}
+                            fullWidth
+                            size="small"
+                          />
+                        </Box>
+                      ))}
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })}
+          </Box>
+        )}
+
         {!loading && !error && (!detailDataRecord || !hasValidData) && (
           <Box sx={{ 
             display: 'flex', 
@@ -556,24 +717,67 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         borderColor: 'divider',
         gap: 1,
       }}>
-        <Button 
-          color="error" 
-          variant="outlined" 
-          onClick={onDeleteClick}
-          disabled={deleteDeckMutation.isPending}
-          sx={{ 
-            borderRadius: 2,
-            px: 3,
-            fontWeight: 600,
-            '&:hover': {
-              bgcolor: 'error.main',
-              color: 'white',
-            },
-          }}
-        >
-          {deleteDeckMutation.isPending ? '삭제 중...' : '삭제'}
-        </Button>
+        {!isEditing && (
+          <Button 
+            color="error" 
+            variant="outlined" 
+            onClick={onDeleteClick}
+            disabled={deleteDeckMutation.isPending}
+            sx={{ 
+              borderRadius: 2,
+              px: 3,
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'error.main',
+                color: 'white',
+              },
+            }}
+          >
+            {deleteDeckMutation.isPending ? '삭제 중...' : '삭제'}
+          </Button>
+        )}
         <Box sx={{ flex: 1 }} />
+        {!isEditing && (
+          <Button
+            color="primary"
+            variant="outlined"
+            onClick={onEditClick}
+            disabled={loading || !!error || !detailDataRecord}
+            sx={{ borderRadius: 2, px: 3, fontWeight: 600 }}
+          >
+            수정
+          </Button>
+        )}
+        {isEditing && (
+          <>
+            <Button
+              color="inherit"
+              variant="outlined"
+              onClick={onEditCancel}
+              disabled={updateDeckMutation.isPending}
+              sx={{ borderRadius: 2, px: 3, fontWeight: 600 }}
+            >
+              취소
+            </Button>
+            <Button
+              color="primary"
+              variant="contained"
+              onClick={onEditSave}
+              disabled={updateDeckMutation.isPending}
+              sx={{ 
+                borderRadius: 2,
+                px: 3,
+                fontWeight: 600,
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%)',
+                },
+              }}
+            >
+              {updateDeckMutation.isPending ? '저장 중...' : '저장'}
+            </Button>
+          </>
+        )}
         <Button 
           color="primary" 
           variant="contained" 

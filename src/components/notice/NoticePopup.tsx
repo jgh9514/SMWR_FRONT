@@ -272,7 +272,7 @@ export default function NoticePopup() {
   useEffect(() => {
     if (!isMounted) return;
     const cached = readPopupCache();
-    if (cached && cached.list.length > 0) {
+    if (cached?.list?.length && cached.list.length > 0) {
       setHasFreshCache(true);
     }
   }, [isMounted]);

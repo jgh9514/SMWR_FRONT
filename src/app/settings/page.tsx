@@ -16,7 +16,7 @@ import {
   Switch,
   TextField,
   Typography,
-  CircularProgress,
+  Skeleton,
   Chip,
   Tabs,
   Tab,
@@ -51,13 +51,17 @@ import {
 import { useLogout, useUpdateSiegeViewScope } from '@/features/auth/hooks/useAuth';
 import { isEmpty } from '@/shared/utils/util';
 import { logger } from '@/shared/lib/logger';
-import { clearClientAuth } from '@/shared/utils/auth';
+import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
+import { readSiegeGuildViewSetting, writeSiegeGuildViewSetting, type SiegeGuildViewMode } from '@/shared/utils/siegeGuildView';
 
 export default function SettingsPage() {
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [autoLoginEnabled, setAutoLoginEnabled] = useState(false);
   const [siegeViewScope, setSiegeViewScope] = useState<string>('C');
+  const [siegeGuildViewMode, setSiegeGuildViewMode] = useState<SiegeGuildViewMode>('MY');
+  const [siegeGuildViewSelected, setSiegeGuildViewSelected] = useState<{ guild_id: string; guild_name: string } | null>(null);
+  const [siegeGuildSearchKeyword, setSiegeGuildSearchKeyword] = useState('');
 
   useEffect(() => {
     setIsMounted(true);
@@ -101,6 +105,14 @@ export default function SettingsPage() {
     { guild_name: guildSearchKeyword },
     {
       enabled: false, // 검색 버튼으로만 실행
+    },
+  );
+
+  // (관리자) 전적 조회용 길드 검색 Query
+  const siegeGuildSearchQuery = useGuildSearch(
+    { guild_name: siegeGuildSearchKeyword },
+    {
+      enabled: false,
     },
   );
 
@@ -248,6 +260,17 @@ export default function SettingsPage() {
           logger.error('사용자 정보 파싱 실패', error);
         }
       }
+
+      // 관리자 전용: 전적 조회 소속길드 설정 로드
+      try {
+        const s = readSiegeGuildViewSetting();
+        setSiegeGuildViewMode(s.mode);
+        if (s.mode === 'GUILD' && s.guild_id && s.guild_name) {
+          setSiegeGuildViewSelected({ guild_id: s.guild_id, guild_name: s.guild_name });
+        }
+      } catch {
+        // no-op
+      }
     }
   }, []);
 
@@ -364,6 +387,32 @@ export default function SettingsPage() {
     if (role === 'LEADER') return 'error';
     if (role === 'MEMBER') return 'default';
     return 'default';
+  };
+
+  const isAdmin =
+    Array.isArray(userInfo?.roles) &&
+    userInfo.roles.some((r: any) => {
+      const roleId = String(r?.role_id ?? '');
+      const enabled = r?.usg_yn == null ? true : String(r?.usg_yn) === 'Y';
+      // 관리자 = 시스템 운영자(RL0001)
+      return enabled && roleId === 'RL0001';
+    });
+
+  const saveSiegeGuildViewSetting = () => {
+    if (!isAdmin) return;
+    if (siegeGuildViewMode === 'GUILD' && !siegeGuildViewSelected) {
+      showToast.error('조회할 길드를 선택해주세요.');
+      return;
+    }
+    writeSiegeGuildViewSetting({
+      mode: siegeGuildViewMode,
+      guild_id: siegeGuildViewMode === 'GUILD' ? siegeGuildViewSelected?.guild_id || null : null,
+      guild_name: siegeGuildViewMode === 'GUILD' ? siegeGuildViewSelected?.guild_name || null : null,
+    });
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('smwr:siege-guild-view-changed'));
+    }
+    showToast.success('설정이 저장되었습니다.');
   };
 
   return (
@@ -603,6 +652,126 @@ export default function SettingsPage() {
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                     점령전 이력 페이지에서 조회할 시즌 범위를 설정합니다.
                   </Typography>
+
+                  {isAdmin && (
+                    <Box sx={{ mt: 3 }}>
+                      <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
+                        소속길드(관리자)
+                      </Typography>
+                      <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                        <InputLabel>조회 대상 길드</InputLabel>
+                        <Select
+                          label="조회 대상 길드"
+                          value={siegeGuildViewMode}
+                          onChange={(e) => {
+                            const next = e.target.value as SiegeGuildViewMode;
+                            setSiegeGuildViewMode(next);
+                            if (next !== 'GUILD') {
+                              setSiegeGuildViewSelected(null);
+                              setSiegeGuildSearchKeyword('');
+                            }
+                          }}
+                        >
+                          <MenuItem value="MY">내 길드</MenuItem>
+                          <MenuItem value="ALL">전체</MenuItem>
+                          <MenuItem value="GUILD">특정 길드</MenuItem>
+                        </Select>
+                      </FormControl>
+
+                      {siegeGuildViewMode === 'GUILD' && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <TextField
+                              label="길드명 검색"
+                              value={siegeGuildSearchKeyword}
+                              onChange={(e) => setSiegeGuildSearchKeyword(e.target.value)}
+                              placeholder="길드명을 2자 이상 입력"
+                              fullWidth
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  if (siegeGuildSearchKeyword.trim().length < 2) {
+                                    showToast.error('길드명을 2자 이상 입력하세요.');
+                                    return;
+                                  }
+                                  siegeGuildSearchQuery.refetch();
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="outlined"
+                              onClick={() => {
+                                if (siegeGuildSearchKeyword.trim().length < 2) {
+                                  showToast.error('길드명을 2자 이상 입력하세요.');
+                                  return;
+                                }
+                                siegeGuildSearchQuery.refetch();
+                              }}
+                              disabled={siegeGuildSearchQuery.isFetching || siegeGuildSearchKeyword.trim().length < 2}
+                              sx={{ minWidth: 96 }}
+                            >
+                              {siegeGuildSearchQuery.isFetching ? '검색 중...' : '검색'}
+                            </Button>
+                          </Box>
+
+                          <Box
+                            sx={{
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 1.5,
+                              overflow: 'hidden',
+                              bgcolor: 'background.paper',
+                              maxHeight: 240,
+                              overflowY: 'auto',
+                            }}
+                          >
+                            {(siegeGuildSearchQuery.data || []).length > 0 ? (
+                              <List dense disablePadding>
+                                {(siegeGuildSearchQuery.data || []).map((g: any) => (
+                                  <ListItemButton
+                                    key={g.guild_id}
+                                    selected={siegeGuildViewSelected?.guild_id === g.guild_id}
+                                    onClick={() => setSiegeGuildViewSelected({ guild_id: g.guild_id, guild_name: g.guild_name })}
+                                  >
+                                    <ListItemText primary={g.guild_name} secondary={g.guild_id} />
+                                  </ListItemButton>
+                                ))}
+                              </List>
+                            ) : (
+                              <Box sx={{ py: 2, px: 2 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                  {siegeGuildSearchKeyword.trim().length < 2
+                                    ? '길드명을 2자 이상 입력 후 검색하세요.'
+                                    : '검색 결과가 없습니다.'}
+                                </Typography>
+                              </Box>
+                            )}
+                          </Box>
+
+                          {siegeGuildViewSelected && (
+                            <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                                선택한 길드
+                              </Typography>
+                              <Typography variant="body1" fontWeight={600}>
+                                {siegeGuildViewSelected.guild_name}
+                              </Typography>
+                            </Box>
+                          )}
+                        </Box>
+                      )}
+
+                      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                        <Button variant="contained" onClick={saveSiegeGuildViewSetting}>
+                          저장
+                        </Button>
+                      </Box>
+
+                      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                        관리자만 “전체/특정 길드” 전적 조회가 가능합니다.
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </CardContent>
             </Card>
@@ -777,7 +946,7 @@ export default function SettingsPage() {
                 >
                   {guildSearchQuery.isFetching ? (
                     <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
-                      <CircularProgress size={22} />
+                      <Skeleton variant="circular" width={22} height={22} />
                     </Box>
                   ) : (guildSearchQuery.data || []).length > 0 ? (
                     <>

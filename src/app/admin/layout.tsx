@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Box, CircularProgress, Alert } from '@mui/material';
+import { Box, Skeleton, Alert } from '@mui/material';
 import { getAuthTokenFromCookie } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
@@ -119,7 +119,7 @@ export default function AdminLayout({
         }}
       >
         <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={48} />
+          <Skeleton variant="circular" width={48} height={48} />
           <Box sx={{ mt: 2 }}>
             <Alert severity="info">권한을 확인하는 중...</Alert>
           </Box>

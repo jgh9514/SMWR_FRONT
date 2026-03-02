@@ -6,7 +6,6 @@ import { RecoilRoot } from 'recoil';
 import { usePathname, useRouter } from 'next/navigation';
 import { ThemeProvider as MuiThemeProvider, CssBaseline, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import ApiLoading from '@/shared/ui/loading/ApiLoading';
 import FixedHeader from '@/shared/ui/fixed-header/FixedHeader';
 import NoticePopup from '@/components/notice/NoticePopup';
 import ClientOnlyToaster from './ClientOnlyToaster';
@@ -350,7 +349,6 @@ export default function AppProviders({ children }: AppProvidersProps) {
               </Box>
             </main>
             <>
-              <ApiLoading />
               {/* 공지 팝업은 메인 화면에서만 동작 */}
               {!isPublicPath && !isAdminPath && isHomePath && <NoticePopup />}
             </>

@@ -53,6 +53,8 @@ export default function MonsterManagementPage() {
     monster_elemental: '',
     star: '',
     arousal_type: '',
+    orderBy: 'monster_id',
+    orderDir: 'asc',
   });
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
@@ -117,6 +119,8 @@ export default function MonsterManagementPage() {
       monster_elemental: '',
       star: '',
       arousal_type: '',
+      orderBy: 'monster_id',
+      orderDir: 'asc',
     });
     setPage(1);
   };
@@ -161,7 +165,7 @@ export default function MonsterManagementPage() {
 
   useEffect(() => {
     refetchMonsterList();
-  }, [page]);
+  }, [page, schDatas.orderBy, schDatas.orderDir]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 2, md: 4 } }}>
@@ -241,6 +245,38 @@ export default function MonsterManagementPage() {
                     <MenuItem value="">전체</MenuItem>
                     <MenuItem value="Normal">Normal</MenuItem>
                     <MenuItem value="Awakened">Awakened</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth size="small">
+                  <InputLabel>정렬 기준</InputLabel>
+                  <Select
+                    value={schDatas.orderBy}
+                    label="정렬 기준"
+                    onChange={(e) => {
+                      setSchDatas({ ...schDatas, orderBy: e.target.value });
+                      setPage(1);
+                    }}
+                  >
+                    <MenuItem value="monster_id">몬스터 ID</MenuItem>
+                    <MenuItem value="kr_name">한글명</MenuItem>
+                    <MenuItem value="star">별</MenuItem>
+                    <MenuItem value="crt_date">등록일</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl fullWidth size="small">
+                  <InputLabel>정렬 방향</InputLabel>
+                  <Select
+                    value={schDatas.orderDir}
+                    label="정렬 방향"
+                    onChange={(e) => {
+                      setSchDatas({ ...schDatas, orderDir: e.target.value });
+                      setPage(1);
+                    }}
+                  >
+                    <MenuItem value="asc">오름차순</MenuItem>
+                    <MenuItem value="desc">내림차순</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
