@@ -7,27 +7,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/shared/lib/logger';
 
 // 백엔드 WAS URL 가져오기
-const getBackendURL = () => {
-  // 환경 변수가 있으면 우선 사용
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    // 이미 /api/v1이 포함되어 있으면 그대로 사용, 없으면 추가
-    const url = process.env.NEXT_PUBLIC_API_BASE_URL;
-    if (url.endsWith('/api/v1')) {
-      return url;
-    } else if (url.includes('/api/v1')) {
-      return url;
-    } else {
+const getBackendURL = (path: string[] = []) => {
+  const pathStr = path.join('/');
+
+  // 배치 API는 smwr-admin(8081) 사용
+  const getAdminURL = () => {
+    if (process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL) {
+      const url = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
+      return url.endsWith('/api/v1') ? url : url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
+    }
+    if (process.env.NODE_ENV === 'development') return 'http://localhost:8081/api/v1';
+    return 'http://smw-admin-service:8081/api/v1';
+  };
+
+  const getApiURL = () => {
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+      const url = process.env.NEXT_PUBLIC_API_BASE_URL;
+      if (url.endsWith('/api/v1')) return url;
+      if (url.includes('/api/v1')) return url;
       return url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
     }
-  }
+    if (process.env.NODE_ENV === 'development') return 'http://localhost:8080/api/v1';
+    return 'http://smw-app-service:8080/api/v1';
+  };
 
-  // 개발 환경 기본값
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:8080/api/v1';
-  }
-
-  // 프로덕션 기본값 (쿠버네티스 클러스터 내부 Service)
-  return 'http://smw-app-service:8080/api/v1';
+  if (pathStr.startsWith('batch')) return getAdminURL();
+  return getApiURL();
 };
 
 export async function GET(
@@ -76,7 +81,7 @@ async function proxyRequest(
   method: string
 ) {
   try {
-    const backendBaseURL = getBackendURL();
+    const backendBaseURL = getBackendURL(pathSegments);
     const path = pathSegments.join('/');
     const url = new URL(request.url);
     

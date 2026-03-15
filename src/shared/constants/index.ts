@@ -14,6 +14,8 @@ export const SCROLL_THROTTLE_MS = 150;
 
 // API 관련
 export const API_TIMEOUT_MS = 30000;
+/** 배치 실행 API (동기 대기) - 백엔드 30분 타임아웃에 맞춤 */
+export const BATCH_RUN_TIMEOUT_MS = 31 * 60 * 1000;
 export const QUERY_STALE_TIME_MS = 5 * 60 * 1000; // 5분
 export const QUERY_GC_TIME_MS = 10 * 60 * 1000; // 10분
 

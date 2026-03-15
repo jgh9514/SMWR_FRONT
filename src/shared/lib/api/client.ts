@@ -2,15 +2,18 @@
  * API 클라이언트
  */
 
-import axiosInstance from '@/shared/lib/axios';
+import type { AxiosInstance } from 'axios';
+import axiosInstance, { adminAxiosInstance } from '@/shared/lib/axios';
 import type { ApiResponse } from './types';
 
 class ApiClient {
+  constructor(protected axios: AxiosInstance = axiosInstance) {}
+
   /**
    * POST 요청
    */
   async post<T = unknown>(url: string, data?: unknown): Promise<T> {
-    const response = await axiosInstance.post<ApiResponse<T>>(url, data);
+    const response = await this.axios.post<ApiResponse<T>>(url, data);
     return this.extractData(response.data);
   }
 
@@ -18,7 +21,7 @@ class ApiClient {
    * GET 요청
    */
   async get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> {
-    const response = await axiosInstance.get<ApiResponse<T>>(url, { params });
+    const response = await this.axios.get<ApiResponse<T>>(url, { params });
     return this.extractData(response.data);
   }
 
@@ -26,7 +29,7 @@ class ApiClient {
    * PUT 요청
    */
   async put<T = unknown>(url: string, data?: unknown): Promise<T> {
-    const response = await axiosInstance.put<ApiResponse<T>>(url, data);
+    const response = await this.axios.put<ApiResponse<T>>(url, data);
     return this.extractData(response.data);
   }
 
@@ -34,8 +37,7 @@ class ApiClient {
    * DELETE 요청
    */
   async delete<T = unknown>(url: string, data?: unknown): Promise<T> {
-    // DELETE 요청에서 body를 전송하기 위해 data 옵션 사용
-    const response = await axiosInstance.delete<ApiResponse<T>>(url, { data });
+    const response = await this.axios.delete<ApiResponse<T>>(url, { data });
     return this.extractData(response.data);
   }
 
@@ -71,4 +73,7 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+
+// Admin API (배치 등) - smwr-admin 8081 사용
+export const adminApiClient = new ApiClient(adminAxiosInstance);
 

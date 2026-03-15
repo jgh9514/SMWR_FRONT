@@ -1,9 +1,13 @@
 /**
  * 배치 관리 Hook
+ * Admin API(smwr-admin 8081) 사용
  */
 
-import { useApiPostQuery } from '@/hooks/api/useApiQuery';
-import { useApiPostMutation } from '@/hooks/api/useApiMutation';
+import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { useMutation, UseMutationResult, UseMutationOptions } from '@tanstack/react-query';
+import { adminApiClient } from '@/shared/lib/api/client';
+import { adminAxiosInstance } from '@/shared/lib/axios';
+import { BATCH_RUN_TIMEOUT_MS } from '@/shared/constants';
 
 export interface BatchConfigItem {
   bat_id: string;
@@ -40,32 +44,51 @@ export interface BatchHistoryItem {
 /**
  * 배치 설정 목록 조회
  */
-export const useBatchConfig = (params: Record<string, unknown> = {}) => {
-  return useApiPostQuery<BatchConfigItem[]>('/batch/config', params, { enabled: true });
+export const useBatchConfig = (params: Record<string, unknown> = {}): UseQueryResult<BatchConfigItem[], Error> => {
+  return useQuery({
+    queryKey: ['/batch/config', params],
+    queryFn: () => adminApiClient.post<BatchConfigItem[]>('/batch/config', params),
+    enabled: true,
+  });
 };
 
 /**
  * 배치 실행 이력 조회
  */
-export const useBatchHistory = (params: Record<string, unknown> = {}) => {
-  return useApiPostQuery<BatchHistoryItem[]>('/batch/run-his', params, { enabled: true });
+export const useBatchHistory = (params: Record<string, unknown> = {}): UseQueryResult<BatchHistoryItem[], Error> => {
+  return useQuery({
+    queryKey: ['/batch/run-his', params],
+    queryFn: () => adminApiClient.post<BatchHistoryItem[]>('/batch/run-his', params),
+    enabled: true,
+  });
 };
 
 /**
  * 배치 재시작 Mutation
  */
 export const useBatchRestart = (
-  options?: Omit<Parameters<typeof useApiPostMutation<string, Record<string, unknown> | undefined>>[1], 'mutationFn'>
-) => {
-  return useApiPostMutation<string, Record<string, unknown> | undefined>('/batch/restart', options);
+  options?: Omit<UseMutationOptions<string, Error, Record<string, unknown> | undefined>, 'mutationFn'>
+): UseMutationResult<string, Error, Record<string, unknown> | undefined> => {
+  return useMutation({
+    mutationFn: (variables) => adminApiClient.post<string>('/batch/restart', variables),
+    ...options,
+  });
 };
 
 /**
- * 배치 수동 실행 Mutation
+ * 배치 수동 실행 Mutation (동기 - 배치 완료까지 대기)
  */
 export const useBatchRun = (
-  options?: Omit<Parameters<typeof useApiPostMutation<BatchRunResponse, BatchRunRequest>>[1], 'mutationFn'>
-) => {
-  return useApiPostMutation<BatchRunResponse, BatchRunRequest>('/batch/run', options);
+  options?: Omit<UseMutationOptions<BatchRunResponse, Error, BatchRunRequest>, 'mutationFn'>
+): UseMutationResult<BatchRunResponse, Error, BatchRunRequest> => {
+  return useMutation({
+    mutationFn: async (variables) => {
+      const { data } = await adminAxiosInstance.post<BatchRunResponse>('/batch/run', variables, {
+        timeout: BATCH_RUN_TIMEOUT_MS,
+      });
+      return data;
+    },
+    ...options,
+  });
 };
 

@@ -127,14 +127,21 @@ export default function BatchManagementPage() {
   const runMutation = useBatchRun({
     onSuccess: (response: BatchRunResponse) => {
       if (response.result === 'SUCCESS') {
-        showToast.success('배치가 실행되었습니다.');
+        showToast.success('배치가 완료되었습니다.');
+        refetchHistory(); // 이력 새로고침
       } else {
         showToast.error(response.message || '배치 실행에 실패했습니다.');
       }
     },
     onError: (error: unknown) => {
       logger.error('배치 실행 실패', error, { context: 'BatchManagementPage' });
-      showToast.error('배치 실행에 실패했습니다.');
+      const err = error as { response?: { data?: { message?: string; result?: string } }; message?: string };
+      const data = err.response?.data;
+      const msg =
+        (typeof data?.message === 'string' && data.message) ||
+        err.message ||
+        '배치 실행에 실패했습니다.';
+      showToast.error(msg);
     },
   });
 
@@ -148,8 +155,9 @@ export default function BatchManagementPage() {
       const res = await confirm('해당 배치를 실행하시겠습니까?', `배치ID: ${config.bat_id}\n배치명: ${config.bat_nm}`);
       if (!res) return;
 
+      // bat_id를 문자열로 명시 (API/DB 타입 일치)
       runMutation.mutate({
-        job_key: config.bat_id,
+        job_key: String(config.bat_id ?? ''),
       });
     },
     [runMutation],
