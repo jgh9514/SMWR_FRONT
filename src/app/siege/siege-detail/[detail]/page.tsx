@@ -17,7 +17,6 @@ import {
   useMediaQuery,
   useTheme,
   CircularProgress,
-  Skeleton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useMonsterDetail } from '@/hooks/api';
@@ -28,126 +27,6 @@ import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData } from '@/types';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
-
-function SiegeDetailSkeleton({ mobile }: { mobile: boolean }) {
-  return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 4 } }}>
-      <Container maxWidth="xl">
-        {/* 헤더 스켈레톤 */}
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Skeleton variant="rounded" width={100} height={36} />
-          <Skeleton variant="text" width={180} height={36} />
-        </Box>
-
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-            gap: { xs: 2, md: 3 },
-          }}
-        >
-          {/* 기본 정보 카드 스켈레톤 */}
-          <Box>
-            <Card sx={{ height: '100%', boxShadow: 2 }}>
-              <CardHeader
-                avatar={null}
-                title={<Skeleton variant="text" width={80} height={24} />}
-                sx={{ bgcolor: 'grey.200', borderBottom: '1px solid #e0e0e0' }}
-              />
-              <CardContent sx={{ pt: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, gap: 2 }}>
-                  {[1, 2, 3].map((i) => (
-                    <Box key={i} sx={{ textAlign: 'center' }}>
-                    <Skeleton variant="circular" width={mobile ? 80 : 100} height={mobile ? 80 : 100} />
-                    <Skeleton variant="text" width={60} sx={{ mt: 1, mx: 'auto' }} />
-                    </Box>
-                  ))}
-                </Box>
-                <Box sx={{ mb: 3, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}>
-                  <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                    <Skeleton variant="rounded" width={mobile ? 48 : 60} height={mobile ? 48 : 60} />
-                    <Box sx={{ flex: 1 }}>
-                      <Skeleton variant="text" width={60} height={20} sx={{ mb: 1 }} />
-                      <Skeleton variant="text" width="100%" height={40} />
-                    </Box>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                  {[1, 2, 3, 4].map((i) => (
-                    <Skeleton key={i} variant="rounded" height={70} />
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* 추천 공덱 카드 스켈레톤 */}
-          <Box>
-            <Card sx={{ height: '100%', boxShadow: 2 }}>
-              <CardHeader
-                title={<Skeleton variant="text" width={120} height={24} />}
-                action={<Skeleton variant="rounded" width={60} height={32} />}
-                sx={{ bgcolor: 'grey.200', borderBottom: '1px solid #e0e0e0' }}
-              />
-              <CardContent>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {[1, 2, 3, 4].map((i) => (
-                    <Card key={i} variant="outlined" sx={{ border: '1px solid #e0e0e0' }}>
-                      <CardContent sx={{ py: 1.5 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <Box sx={{ display: 'flex', gap: 1 }}>
-                            <Skeleton variant="circular" width={mobile ? 34 : 50} height={mobile ? 34 : 50} />
-                            <Skeleton variant="circular" width={mobile ? 34 : 50} height={mobile ? 34 : 50} />
-                            <Skeleton variant="circular" width={mobile ? 34 : 50} height={mobile ? 34 : 50} />
-                          </Box>
-                          <Skeleton variant="rounded" width={70} height={28} />
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-
-          {/* 공성률 정보 카드 스켈레톤 */}
-          <Box>
-            <Card sx={{ boxShadow: 2 }}>
-              <CardHeader
-                title={<Skeleton variant="text" width={100} height={24} />}
-                sx={{ bgcolor: 'grey.200', borderBottom: '1px solid #e0e0e0' }}
-              />
-              <CardContent>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Card key={i} variant="outlined" sx={{ border: '1px solid #e0e0e0' }}>
-                      <CardContent sx={{ py: 1.5, px: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Box sx={{ display: 'flex', gap: 0.5 }}>
-                            <Skeleton variant="circular" width={mobile ? 44 : 56} height={mobile ? 44 : 56} />
-                            <Skeleton variant="circular" width={mobile ? 44 : 56} height={mobile ? 44 : 56} sx={{ ml: -0.5 }} />
-                            <Skeleton variant="circular" width={mobile ? 44 : 56} height={mobile ? 44 : 56} sx={{ ml: -0.5 }} />
-                          </Box>
-                          <Box sx={{ flex: 1 }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                              <Skeleton variant="rounded" width={40} height={24} />
-                              <Skeleton variant="text" width={60} />
-                            </Box>
-                            <Skeleton variant="rounded" height={6} />
-                          </Box>
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
-        </Box>
-      </Container>
-    </Box>
-  );
-}
 
 export default function MonsterDetailPage() {
   const params = useParams();
@@ -269,9 +148,15 @@ export default function MonsterDetailPage() {
     setIsInitialized(true);
   }, [params]);
 
-  // 초기화 전이거나 초기 로딩 중 (데이터가 없을 때만 스켈레톤 표시)
+  // 초기화 전이거나 초기 로딩 중 (데이터가 없을 때만 전체 로딩 표시)
   if (!isInitialized || (isLoadingDetail && !detailData)) {
-    return <SiegeDetailSkeleton mobile={mobile} />;
+    return (
+      <Container maxWidth="xl" sx={{ py: 8 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
   }
 
   // 에러 발생
@@ -433,22 +318,24 @@ export default function MonsterDetailPage() {
                       alignItems: 'center',
                     }}
                   >
-                    {/* 좌측: 리더 아이콘 (없으면 기본 이미지) */}
-                    <Box
-                      component="img"
-                      src={getMonsterImageUrl(enemyData?.leader_icon)}
-                      alt="리더 스킬"
-                      sx={{
-                        width: { xs: 48, md: 60 },
-                        height: { xs: 48, md: 60 },
-                        border: '2px solid #34495e',
-                        boxShadow: 1,
-                        bgcolor: 'white',
-                        borderRadius: 0,
-                        objectFit: 'contain',
-                        flexShrink: 0,
-                      }}
-                    />
+                    {/* 좌측: 리더 아이콘 */}
+                    {enemyData?.leader_icon && (
+                      <Box
+                        component="img"
+                        src={getMonsterImageUrl(enemyData.leader_icon)}
+                        alt="리더 스킬"
+                        sx={{
+                          width: { xs: 48, md: 60 },
+                          height: { xs: 48, md: 60 },
+                          border: '2px solid #34495e',
+                          boxShadow: 1,
+                          bgcolor: 'white',
+                          borderRadius: 0,
+                          objectFit: 'contain',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
                     {/* 우측: 리더 스킬 제목 + 설명 */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography

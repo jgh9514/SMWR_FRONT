@@ -457,24 +457,13 @@ export default function FixedHeader() {
   }, [isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn]);
 
   // 서버와 클라이언트에서 동일한 초기 렌더링 보장 (hydration mismatch 방지)
-  // 로고: CDN PNG 시도 → 실패 시 public/images/ci_active.svg → 최종 fallback 텍스트
-  const [logoUrl, setLogoUrl] = useState<string>('/images/ci_active.svg');
-  const [logoError, setLogoError] = useState(false);
-
+  const [logoUrl, setLogoUrl] = useState<string>('/images/ci_active.png');
+  
   useEffect(() => {
     if (mounted) {
       setLogoUrl(getMonsterImageUrl('/images/ci_active.png'));
-      setLogoError(false);
     }
   }, [mounted]);
-
-  const handleLogoError = () => {
-    if (logoUrl.includes('ci_active.png')) {
-      setLogoUrl('/images/ci_active.svg');
-    } else {
-      setLogoError(true);
-    }
-  };
 
   return (
     <>
@@ -523,26 +512,19 @@ export default function FixedHeader() {
               cursor: mounted ? 'pointer' : 'default',
             }}
           >
-            {logoError ? (
-              <Typography variant="h6" sx={{ fontWeight: 700, color: 'inherit' }}>
-                SMWR
-              </Typography>
-            ) : (
-              <Box
-                component="img"
-                src={logoUrl}
-                alt="로고"
-                onError={handleLogoError}
-                sx={{
-                  height: { xs: 32, md: 40 },
-                  width: 'auto',
-                  maxWidth: '100%',
-                  cursor: mounted ? 'pointer' : 'default',
-                  objectFit: 'contain',
-                  display: 'block',
-                }}
-              />
-            )}
+            <Box
+              component="img"
+              src={logoUrl}
+              alt="로고"
+              sx={{
+                height: { xs: 32, md: 40 },
+                width: 'auto',
+                maxWidth: '100%',
+                cursor: mounted ? 'pointer' : 'default',
+                objectFit: 'contain',
+                display: 'block',
+              }}
+            />
           </Box>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 1 } }}>

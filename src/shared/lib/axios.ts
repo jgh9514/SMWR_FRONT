@@ -68,16 +68,6 @@ const getBaseURL = () => {
 
 const BASE_URL = getBaseURL();
 
-// Admin API (배치 등) - smwr-admin 8081
-const getAdminBaseURL = () => {
-  if (process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL) {
-    const url = process.env.NEXT_PUBLIC_ADMIN_API_BASE_URL;
-    return url.endsWith('/api/v1') ? url : url.endsWith('/') ? `${url}api/v1` : `${url}/api/v1`;
-  }
-  if (process.env.NODE_ENV === 'development') return 'http://localhost:8081/api/v1';
-  return '/api/v1';
-};
-
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: API_TIMEOUT_MS,
@@ -200,54 +190,4 @@ axiosInstance.interceptors.response.use(
 );
 
 export default axiosInstance;
-
-export const adminAxiosInstance: AxiosInstance = axios.create({
-  baseURL: getAdminBaseURL(),
-  timeout: API_TIMEOUT_MS,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
-  },
-  withCredentials: true,
-});
-
-adminAxiosInstance.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    if (config.data instanceof FormData && config.headers) {
-      delete config.headers['Content-Type'];
-    }
-    if (typeof window !== 'undefined') {
-      const cookies = document.cookie.split(';');
-      const tokenCookie = cookies.find((c) => {
-        const t = c.trim();
-        return t.startsWith('SMW-Authorization=') || t.startsWith('SMW_AUTHORIZATION=');
-      });
-      if (tokenCookie && config.headers) {
-        const token = tokenCookie.split('=').slice(1).join('=').trim();
-        if (token) {
-          config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        }
-      }
-    }
-    return config;
-  },
-  (e: AxiosError) => Promise.reject(e)
-);
-adminAxiosInstance.interceptors.response.use(
-  (r) => r,
-  async (error: AxiosError) => {
-    if (error.response) {
-      const status = error.response.status;
-      if (status === 401 && !isForceLoggedOut() && typeof window !== 'undefined') {
-        const urlStr = String(error.config?.url || '');
-        if (!urlStr.includes('/auth/login-check')) await tryReauthOnce();
-      }
-      // 4xx는 mutation onError에서 상세 메시지 표시 → 중복 토스트 방지
-      if (status >= 500 || status === 401 || status === 403) {
-        showApiError(error);
-      }
-    }
-    return Promise.reject(error);
-  }
-);
 

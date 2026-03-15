@@ -62,7 +62,6 @@ export const confirm = (title: string, content?: string): Promise<boolean> => {
                   border: '1px solid #d0d0d0',
                   borderRadius: '4px',
                   background: 'white',
-                  color: '#333',
                   cursor: 'pointer',
                   fontSize: '14px',
                   fontWeight: 500,
