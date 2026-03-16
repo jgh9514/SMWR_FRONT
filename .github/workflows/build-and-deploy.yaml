@@ -68,9 +68,63 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            # 1. 새 이미지를 확실히 가져오도록 deployment 재시작
-            kubectl rollout restart deployment smwr-front
-            
-            # 2. 배포 상태 모니터링 (성공할 때까지 대기)
-            kubectl rollout status deployment smwr-front
+            export KUBECONFIG=~/.kube/config
+            DEPLOY_NAME="smwr-front"
+
+            echo "=== kubectl 클러스터 정보 확인 ==="
+            kubectl cluster-info --request-timeout=10s || {
+              echo "ERROR: kubectl cluster-info 실패"
+              exit 1
+            }
+
+            echo "=== 현재 deployment 확인 ==="
+            kubectl get deployment "${DEPLOY_NAME}" --request-timeout=15s || true
+            kubectl get deployments --request-timeout=15s || true
+
+            if ! kubectl get deployment "${DEPLOY_NAME}" --request-timeout=15s >/dev/null 2>&1; then
+              echo "Deployment ${DEPLOY_NAME} 가 없어 k8s 매니페스트 적용을 시도합니다."
+
+              if [ -f k8s/configmap.yaml ]; then
+                kubectl apply -f k8s/configmap.yaml --request-timeout=60s || {
+                  echo "ERROR: k8s/configmap.yaml 적용 실패"
+                  exit 1
+                }
+              fi
+
+              if [ -f k8s/service.yaml ]; then
+                kubectl apply -f k8s/service.yaml --request-timeout=60s || {
+                  echo "ERROR: k8s/service.yaml 적용 실패"
+                  exit 1
+                }
+              fi
+
+              if [ -f k8s/deployment.yaml ]; then
+                kubectl apply -f k8s/deployment.yaml --request-timeout=60s || {
+                  echo "ERROR: k8s/deployment.yaml 적용 실패"
+                  exit 1
+                }
+              else
+                echo "ERROR: ${DEPLOY_NAME} deployment가 없고, 원격 서버에 k8s/deployment.yaml도 없습니다."
+                exit 1
+              fi
+
+              if [ -f k8s/ingress.yaml ]; then
+                kubectl apply -f k8s/ingress.yaml --request-timeout=60s || {
+                  echo "WARNING: k8s/ingress.yaml 적용 실패"
+                }
+              fi
+            fi
+
+            echo "=== 새 이미지를 확실히 가져오도록 deployment 재시작 ==="
+            kubectl rollout restart deployment "${DEPLOY_NAME}" --request-timeout=60s || {
+              echo "ERROR: deployment ${DEPLOY_NAME} 재시작 실패"
+              exit 1
+            }
+
+            echo "=== 배포 상태 모니터링 ==="
+            kubectl rollout status deployment "${DEPLOY_NAME}" --timeout=5m || {
+              echo "ERROR: deployment ${DEPLOY_NAME} rollout 실패"
+              kubectl get pods -l app="${DEPLOY_NAME}" --request-timeout=30s || true
+              exit 1
+            }
 
