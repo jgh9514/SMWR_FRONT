@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -24,15 +24,15 @@ import { useRouter } from 'next/navigation';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { useCommonCodes } from '@/features/admin/hooks/useCommonCode';
 import { showToast } from '@/shared/lib/notification';
-import type { MlangItem } from '@/types';
 import { useMlangList } from '@/features/admin/hooks';
+import type { SearchData } from '@/shared/types/util';
 
 export default function MultiLanguageManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [schDatas, setSchDatas] = useState<any>({});
+  const [schDatas] = useState<SearchData>({});
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   const headers = useMemo(() => {
@@ -56,7 +56,7 @@ export default function MultiLanguageManagementPage() {
     return searchDataExtraction(schDatas);
   }, [schDatas]);
 
-  const { data: mlangList = [], refetch: refetchMlang } = useMlangList(searchParams, false);
+  const { data: mlangList = [] } = useMlangList(searchParams);
 
   const handleAdd = () => {
     showToast.info('개발 중입니다.');

@@ -6,6 +6,10 @@ import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { ApiItem, RoleItem } from '@/types';
 
+export interface ApiRoleItem extends RoleItem {
+  rolechk?: 'Y' | 'N';
+}
+
 /**
  * API 목록 조회
  */
@@ -17,7 +21,7 @@ export const useApiList = (params: Record<string, unknown> = {}) => {
  * API 권한 조회
  */
 export const useApiRoleList = (apiId: string | null) => {
-  return useApiPostQuery<unknown[]>('/sm/apirole/list', { api_id: apiId }, {
+  return useApiPostQuery<ApiRoleItem[]>('/sm/apirole/list', { api_id: apiId }, {
     enabled: !!apiId,
   });
 };
@@ -26,9 +30,9 @@ export const useApiRoleList = (apiId: string | null) => {
  * API 권한 저장 Mutation
  */
 export const useApiRoleSave = (
-  options?: Omit<Parameters<typeof useApiPostMutation<unknown, { api_id: string; roleList: unknown[] }>>[1], 'mutationFn'>
+  options?: Omit<Parameters<typeof useApiPostMutation<unknown, { api_id: string; roleList: ApiRoleItem[] }>>[1], 'mutationFn'>
 ) => {
-  return useApiPostMutation<unknown, { api_id: string; roleList: unknown[] }>('/sm/apirole/save', options);
+  return useApiPostMutation<unknown, { api_id: string; roleList: ApiRoleItem[] }>('/sm/apirole/save', options);
 };
 
 /**

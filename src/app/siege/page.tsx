@@ -15,7 +15,6 @@ import {
   TextField,
   IconButton,
   Collapse,
-  Fab,
   Checkbox,
   FormControlLabel,
   Divider,
@@ -32,7 +31,7 @@ import { useEnemyTeamListSuspense, useMonsterList, type MonsterOption } from '@/
 import { searchDataExtraction, getRatingColor, getRatingStars } from '@/shared/utils';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
-import { DEFAULT_ITEMS_PER_PAGE, AVATAR_SIZE_XS, AVATAR_SIZE_MD, PAGINATION_OPTIONS } from '@/shared/constants';
+import { PAGINATION_OPTIONS } from '@/shared/constants';
 import { EmptyState, ErrorBoundary } from '@/shared/ui';
 import { useResponsive, useServerPagination } from '@/shared/hooks';
 import { getMonsterImageUrl } from '@/shared/utils/image';
@@ -127,7 +126,6 @@ function SiegeResultsSection({
   onItemClick,
   onPrev,
   onNext,
-  onHasNextPageChange,
 }: {
   params: SiegeSearchParams & { paging: number; offset: number };
   itemsPerPage: number;
@@ -136,16 +134,10 @@ function SiegeResultsSection({
   onItemClick: (item: MonsterItem) => void;
   onPrev: () => void;
   onNext: () => void;
-  onHasNextPageChange: (hasNext: boolean) => void;
 }) {
   const { data: enemyTeamList = [] } = useEnemyTeamListSuspense(params);
   const list = Array.isArray(enemyTeamList) ? enemyTeamList : [];
   const hasNextPage = list.length >= itemsPerPage;
-
-  // 부모 쪽 버튼 disabled 계산을 위해 상태만 전달 (페이지 이동은 버튼 클릭에서만)
-  useEffect(() => {
-    onHasNextPageChange(hasNextPage);
-  }, [hasNextPage, onHasNextPageChange]);
 
   if (list.length === 0) {
     return (
@@ -309,7 +301,6 @@ function SiegeContent() {
   // 검색조건(편집용: draft)
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false); // 모바일 검색 조건 펼침/접기
-  const [availableGuilds, setAvailableGuilds] = useState<GuildInfo[]>([]);
   const [selectedGuilds, setSelectedGuilds] = useState<string[]>([]);
   const [deckStarFilter, setDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
   const [onlyLoseAtLeastOnce, setOnlyLoseAtLeastOnce] = useState(false);
@@ -322,56 +313,30 @@ function SiegeContent() {
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
-
-
-  // 선택된 몬스터 ID 배열
-  const selectMonster = useMemo(() => {
-    return selectedMonsterList.map((m) => m.monster_id);
-  }, [selectedMonsterList]);
-
-  // sessionStorage에서 길드 정보 가져오기 (원본 Vue 코드와 동일)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    // match_id가 없으면 길드 선택 초기화
-    if (!matchIdFromQuery) {
-      setAvailableGuilds([]);
-      setSelectedGuilds([]);
-      return;
+  const availableGuilds = useMemo<GuildInfo[]>(() => {
+    if (typeof window === 'undefined' || !matchIdFromQuery) {
+      return [];
     }
 
     try {
       const guildsData = sessionStorage.getItem(`siege_guilds_${matchIdFromQuery}`);
-      if (guildsData) {
-        const guilds: GuildInfo[] = JSON.parse(guildsData);
-
-        if (guilds && Array.isArray(guilds)) {
-          const filtered = guilds.filter(
-            (guild) => guild.guild_name && guild.guild_name.toUpperCase() !== 'EVE.RE',
-          );
-          setAvailableGuilds(filtered);
-        }
-      } else {
-        // sessionStorage에 데이터가 없으면 초기화
-        setAvailableGuilds([]);
-        setSelectedGuilds([]);
+      if (!guildsData) {
+        return [];
       }
+
+      const guilds: GuildInfo[] = JSON.parse(guildsData);
+      if (!Array.isArray(guilds)) {
+        return [];
+      }
+
+      return guilds.filter(
+        (guild) => guild.guild_name && guild.guild_name.toUpperCase() !== 'EVE.RE',
+      );
     } catch (error) {
       logger.error('길드 목록 조회 실패', error);
-      setAvailableGuilds([]);
-      setSelectedGuilds([]);
+      return [];
     }
   }, [matchIdFromQuery]);
-
-  // 선택된 길드 ID 배열 (draft)
-  const selectedGuildIdsDraft = useMemo(() => {
-    return selectedGuilds
-      .map((guildName) => {
-        const guild = availableGuilds.find((g) => g.guild_name === guildName);
-        return guild?.guild_id ? String(guild.guild_id) : null;
-      })
-      .filter((id): id is string => id !== null);
-  }, [selectedGuilds, availableGuilds]);
 
   // 선택된 길드 ID 배열 (applied)
   const selectedGuildIdsApplied = useMemo(() => {
@@ -458,7 +423,7 @@ function SiegeContent() {
     } as SiegeSearchParams & { paging: number; offset: number };
 
     return params;
-  }, [apiSearchParams, pagination.paginationParams, matchIdFromQuery]);
+  }, [apiSearchParams, pagination.paginationParams]);
 
   useEffect(() => {
     if (isInitialMount.current) {
@@ -470,10 +435,6 @@ function SiegeContent() {
 
   // 몬스터가 선택되어 있고 shouldSearch가 true일 때만 검색 실행
   // 또는 처음 접근 시에는 몬스터 없이도 조회 가능하도록 조건 완화
-  const isSearchEnabled = shouldSearch;
-
-  const [hasNextPage, setHasNextPage] = useState(false);
-
   const handleMonsterChange = useCallback(
     (newValue: MonsterOption[]) => {
       if (newValue.length > MAX_MONSTERS) {
@@ -494,7 +455,7 @@ function SiegeContent() {
     [],
   );
 
-  const handleReset = useCallback(() => {
+  const handleReset = () => {
     setSelectedMonsterList([]);
     setDeckStarFilter('ALL');
     setOnlyLoseAtLeastOnce(false);
@@ -504,7 +465,7 @@ function SiegeContent() {
     setAppliedOnlyLoseAtLeastOnce(false);
     setShouldSearch(false);
     pagination.reset();
-  }, []);
+  };
 
   // 길드 선택 토글 (원본 Vue 코드와 동일)
   const toggleGuildSelection = useCallback(
@@ -559,7 +520,7 @@ function SiegeContent() {
     }
   }, [pagination.currentPage]);
 
-  const handleImageError = useCallback((event: React.SyntheticEvent<HTMLElement, Event>, imageUrl: string) => {
+  const handleImageError = useCallback((event: React.SyntheticEvent<HTMLElement, Event>) => {
     // Avatar의 경우 img 태그를 찾아서 대체
     const img = (event.currentTarget as HTMLElement).querySelector('img');
     if (img) {
@@ -567,8 +528,7 @@ function SiegeContent() {
     }
   }, []);
 
-  // 검색 조건 컴포넌트 (재사용)
-  const SearchConditionCard = () => (
+  const searchConditionCard = (
     <Box sx={{ mb: { xs: 2, md: 3 } }}>
       <Typography variant={isMobile ? 'subtitle2' : 'h6'} sx={{ mb: { xs: 1.5, md: 2 }, fontWeight: 600 }}>
         몬스터 선택 (리더 1마리 + 나머지 2마리)
@@ -614,7 +574,7 @@ function SiegeContent() {
                     borderRadius: 0,
                   }}
                   onClick={() => handleRemoveMonster(selectedMonsterList[index].monster_id)}
-                  onError={(e) => handleImageError(e, selectedMonsterList[index].image_url)}
+                  onError={handleImageError}
                 />
                 {index === LEADER_INDEX && (
                   <Chip
@@ -729,7 +689,7 @@ function SiegeContent() {
                   src={getMonsterImageUrl(option.image_url)}
                   alt={option.kr_name}
                   sx={{ width: 40, height: 40, flexShrink: 0 }}
-                  onError={(e) => handleImageError(e, option.image_url)}
+                  onError={handleImageError}
                 />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
@@ -863,7 +823,7 @@ function SiegeContent() {
               {/* 몬스터 선택 검색 조건 */}
               <Card sx={{ boxShadow: 2 }}>
                 <CardContent sx={{ p: 3 }}>
-                  <SearchConditionCard />
+              {searchConditionCard}
                 </CardContent>
               </Card>
 
@@ -1123,7 +1083,7 @@ function SiegeContent() {
                         borderColor: 'white',
                         ml: idx > 0 ? -0.5 : 0,
                       }}
-                      onError={(e) => handleImageError(e, monster.image_url)}
+                      onError={handleImageError}
                     />
                   ))}
                 </Box>
@@ -1147,7 +1107,7 @@ function SiegeContent() {
           <Collapse in={isSearchExpanded} timeout="auto" unmountOnExit>
             <Card sx={{ borderRadius: 0 }}>
               <CardContent>
-                <SearchConditionCard />
+                {searchConditionCard}
               </CardContent>
             </Card>
           </Collapse>
@@ -1172,7 +1132,6 @@ function SiegeContent() {
                     onItemClick={handleMonsterClick}
                     onPrev={() => handlePageChange(null, pagination.currentPage - 1)}
                     onNext={() => handlePageChange(null, pagination.currentPage + 1)}
-                    onHasNextPageChange={setHasNextPage}
                   />
                 </Suspense>
               </ErrorBoundary>

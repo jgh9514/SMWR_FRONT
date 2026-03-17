@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,16 +25,16 @@ import { useMenuList, useMenuSave, useMenuRoleList, useMenuRoleSave, useRoleList
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import MenuPopup from '@/components/popup/MenuPopup';
-import type { MenuItem, RoleItem } from '@/types';
+import type { MenuRoleItem } from '@/features/admin/hooks/useMenu';
+import type { MenuItem } from '@/types';
 
 export default function MenuManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [menuList, setMenuList] = useState<MenuItem[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedMenuId, setSelectedMenuId] = useState<string | null>(null);
+  const [selectedRolesOverride, setSelectedRolesOverride] = useState<string[] | null>(null);
   const [menuPopupOpen, setMenuPopupOpen] = useState(false);
   const [menuPopupMode, setMenuPopupMode] = useState<'new' | 'edit'>('new');
   const [menuPopupData, setMenuPopupData] = useState<{ menuId: string | null; upMenuId: string | null }>({
@@ -67,26 +67,23 @@ export default function MenuManagementPage() {
   const { data: roleList = [] } = useRoleList({});
   const { data: menuRoleResponse = [], refetch: refetchMenuRole } = useMenuRoleList(selectedMenuId);
 
-  useEffect(() => {
-    if (menuResponse.length > 0) {
-      setMenuList(
-        menuResponse.sort((a, b) => {
-          if (a.srt_path && b.srt_path) {
-            return a.srt_path.localeCompare(b.srt_path);
-          }
-          return 0;
-        }),
-      );
-    }
-  }, [menuResponse]);
+  const menuList = useMemo(
+    () =>
+      [...menuResponse].sort((a, b) => {
+        if (a.srt_path && b.srt_path) {
+          return a.srt_path.localeCompare(b.srt_path);
+        }
+        return 0;
+      }),
+    [menuResponse],
+  );
 
-  useEffect(() => {
-    if (menuRoleResponse.length > 0) {
-      setSelectedRoles(menuRoleResponse.filter((r: any) => r.rolechk === 'Y').map((r: any) => r.role_id));
-    } else {
-      setSelectedRoles([]);
-    }
-  }, [menuRoleResponse]);
+  const selectedRolesFromMenu = useMemo(
+    () => menuRoleResponse.filter((role) => role.rolechk === 'Y').map((role) => role.role_id),
+    [menuRoleResponse],
+  );
+
+  const selectedRoles = selectedRolesOverride ?? selectedRolesFromMenu;
 
   const menuSaveMutation = useMenuSave({
     onSuccess: () => {
@@ -112,6 +109,7 @@ export default function MenuManagementPage() {
 
   const handleMenuClick = (item: MenuItem) => {
     setSelectedMenuId(item.menu_id);
+    setSelectedRolesOverride(null);
   };
 
   const handleOpenNew = () => {
@@ -153,7 +151,7 @@ export default function MenuManagementPage() {
     const res = await confirm('저장하시겠습니까?');
     if (!res) return;
 
-    const saveData = roleList.map((role) => ({
+    const saveData: MenuRoleItem[] = roleList.map((role) => ({
       ...role,
       rolechk: selectedRoles.includes(role.role_id) ? 'Y' : 'N',
     }));
@@ -165,9 +163,12 @@ export default function MenuManagementPage() {
   };
 
   const toggleSelectRole = (roleId: string) => {
-    setSelectedRoles((prev) =>
-      prev.includes(roleId) ? prev.filter((v) => v !== roleId) : [...prev, roleId],
-    );
+    setSelectedRolesOverride((prev) => {
+      const current = prev ?? selectedRoles;
+      return current.includes(roleId)
+        ? current.filter((value) => value !== roleId)
+        : [...current, roleId];
+    });
   };
 
   return (

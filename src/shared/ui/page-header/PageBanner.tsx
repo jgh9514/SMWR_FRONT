@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Box } from '@mui/material';
-import { getMonsterImageUrl } from '@/shared/utils/image';
+import Image from 'next/image';
+import { getRenderableImageUrl } from '@/shared/utils/image';
 
 interface PageBannerProps {
   imagePath?: string;
@@ -20,15 +21,7 @@ export default function PageBanner({
   height = { xs: 120, md: 200 },
 }: PageBannerProps) {
   const [imageError, setImageError] = useState(false);
-  // 서버와 클라이언트에서 동일한 초기 렌더링 보장 (hydration mismatch 방지)
-  const [bannerImageUrl, setBannerImageUrl] = useState<string>(imagePath);
-  
-  // 클라이언트에서만 URL 변환 (hydration mismatch 방지)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setBannerImageUrl(getMonsterImageUrl(imagePath));
-    }
-  }, [imagePath]);
+  const bannerImageUrl = getRenderableImageUrl(imagePath);
 
   return (
     <Box
@@ -45,15 +38,12 @@ export default function PageBanner({
       }}
     >
       {!imageError ? (
-        <Box
-          component="img"
+        <Image
           src={bannerImageUrl}
           alt={alt}
-          sx={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
+          fill
+          sizes="100vw"
+          style={{ objectFit: 'cover' }}
           onError={() => {
             setImageError(true);
           }}

@@ -1,8 +1,14 @@
 import type { NextConfig } from "next";
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  turbopack: {
+    root: projectRoot,
+  },
   // Docker를 위한 standalone 출력 모드 활성화
   output: 'standalone',
   // 이미지 요청을 백엔드로 프록시

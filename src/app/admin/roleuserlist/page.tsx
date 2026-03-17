@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, Suspense } from 'react';
+import { useMemo, useState, Suspense } from 'react';
 import {
   Box,
   Button,
@@ -10,7 +10,6 @@ import {
   Checkbox,
   Container,
   FormControl,
-  InputLabel,
   MenuItem,
   Select,
   Table,
@@ -29,6 +28,7 @@ import { useRoleList, useUserRoleList, useUserRoleSave } from '@/hooks/api';
 import { isEmpty, searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import type { SearchData } from '@/shared/types/util';
 import type { UserRoleItem, SaveRequest } from '@/types';
 
 function RoleUserListContent() {
@@ -36,14 +36,24 @@ function RoleUserListContent() {
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
   const searchParams = useSearchParams();
+  const initialRoleNm = searchParams.get('role_nm') || undefined;
 
-  const [schDatas, setSchDatas] = useState<any>({});
-  const [userRoleList, setUserRoleList] = useState<UserRoleItem[]>([]);
+  const [userRoleListOverride, setUserRoleListOverride] = useState<UserRoleItem[] | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [roleList, setRoleList] = useState<{ cd: string[]; cd_nm: string[] }>({
-    cd: [],
-    cd_nm: [],
-  });
+  const schDatas = useMemo<SearchData>(
+    () => (initialRoleNm ? { role_nm: initialRoleNm } : {}),
+    [initialRoleNm],
+  );
+
+  const { data: roleResponse = [] } = useRoleList({});
+
+  const roleList = useMemo(
+    () => ({
+      cd: ['', ...roleResponse.map((item) => item.role_id)],
+      cd_nm: ['SELECT', ...roleResponse.map((item) => item.role_nm)],
+    }),
+    [roleResponse],
+  );
 
   const roleOptions = useMemo(() => {
     return roleList.cd.map((cd, index) => ({
@@ -68,37 +78,25 @@ function RoleUserListContent() {
     return cols;
   }, [mobile]);
 
-  const { data: roleResponse = [] } = useRoleList({});
-
-  useEffect(() => {
-    if (roleResponse.length > 0) {
-      setRoleList({
-        cd: ['', ...roleResponse.map((i) => i.role_id)],
-        cd_nm: ['SELECT', ...roleResponse.map((i) => i.role_nm)],
-      });
-    }
-  }, [roleResponse]);
-
   const searchParamsForApi = useMemo(() => {
     return searchDataExtraction(schDatas);
   }, [schDatas]);
 
   const { data: userRoleResponse = [], refetch: refetchUserRole } = useUserRoleList(searchParamsForApi);
-
-  useEffect(() => {
-    if (userRoleResponse.length > 0) {
-      setUserRoleList(
-        userRoleResponse.map((row: any) => ({
-          ...row,
-          row_status: row.row_status || '',
-        })),
-      );
-    }
-  }, [userRoleResponse]);
+  const userRoleListBase = useMemo(
+    () =>
+      userRoleResponse.map((row) => ({
+        ...row,
+        row_status: row.row_status || '',
+      })),
+    [userRoleResponse],
+  );
+  const userRoleList = userRoleListOverride ?? userRoleListBase;
 
   const saveMutation = useUserRoleSave({
     onSuccess: () => {
       showToast.success('저장되었습니다.');
+      setUserRoleListOverride(null);
       refetchUserRole();
     },
     onError: (error: Error) => {
@@ -108,7 +106,7 @@ function RoleUserListContent() {
   });
 
   const handleAdd = () => {
-    setUserRoleList((prev) => [
+    setUserRoleListOverride((prev) => [
       {
         user_id: '',
         usr_id: '',
@@ -121,7 +119,7 @@ function RoleUserListContent() {
         usg_yn: 'Y',
         row_status: 'C',
       },
-      ...prev,
+      ...(prev ?? userRoleList),
     ]);
   };
 
@@ -134,20 +132,32 @@ function RoleUserListContent() {
     const res = await confirm('삭제하시겠습니까?');
     if (!res) return;
 
-    setUserRoleList((prev) => prev.filter((item) => item.usr_id && !selectedUsers.includes(item.usr_id)));
+    setUserRoleListOverride((prev) =>
+      (prev ?? userRoleList).filter((entry) => entry.usr_id && !selectedUsers.includes(entry.usr_id)),
+    );
     setSelectedUsers([]);
   };
 
-  const handleRoleChange = (item: UserRoleItem, roleId: string) => {
+  const handleRoleChange = (index: number, roleId: string) => {
     const role = roleOptions.find((r) => r.value === roleId);
-    if (role) {
-      item.role_nm = role.label;
-      item.role_id = roleId;
-      item.row_status = item.row_status || 'U';
-    }
+    if (!role) return;
+
+    setUserRoleListOverride((prev) => {
+      const current = [...(prev ?? userRoleList)];
+      const item = current[index];
+      if (!item) return current;
+
+      current[index] = {
+        ...item,
+        role_nm: role.label,
+        role_id: roleId,
+        row_status: item.row_status || 'U',
+      };
+      return current;
+    });
   };
 
-  const handleSelectUser = (item: UserRoleItem) => {
+  const handleSelectUser = () => {
     showToast.info('사용자 선택 기능은 개발 중입니다.');
   };
 
@@ -186,13 +196,6 @@ function RoleUserListContent() {
       prev.includes(usrId) ? prev.filter((v) => v !== usrId) : [...prev, usrId],
     );
   };
-
-  useEffect(() => {
-    const roleNm = searchParams.get('role_nm');
-    if (roleNm) {
-      setSchDatas((prev: any) => ({ ...prev, role_nm: roleNm }));
-    }
-  }, [searchParams]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 4 } }}>
@@ -258,7 +261,7 @@ function RoleUserListContent() {
                                 <FormControl size="small" sx={{ minWidth: 120 }}>
                                   <Select
                                     value={row.role_id || ''}
-                                    onChange={(e) => handleRoleChange(row, e.target.value)}
+                                    onChange={(e) => handleRoleChange(index, e.target.value)}
                                   >
                                     {roleOptions.map((opt) => (
                                       <MenuItem key={opt.value} value={opt.value}>
@@ -277,7 +280,7 @@ function RoleUserListContent() {
                               <FormControl size="small" sx={{ minWidth: 120 }}>
                                 <Select
                                   value={row.role_id || ''}
-                                  onChange={(e) => handleRoleChange(row, e.target.value)}
+                                  onChange={(e) => handleRoleChange(index, e.target.value)}
                                 >
                                   {roleOptions.map((opt) => (
                                     <MenuItem key={opt.value} value={opt.value}>
@@ -293,7 +296,7 @@ function RoleUserListContent() {
                           {!mobile && <TableCell align="center">{row.emp_no}</TableCell>}
                           <TableCell align="center">
                             {isNew ? (
-                              <Button variant="text" size="small" onClick={() => handleSelectUser(row)}>
+                              <Button variant="text" size="small" onClick={handleSelectUser}>
                                 {row.usr_nm || '사용자 선택'}
                               </Button>
                             ) : (

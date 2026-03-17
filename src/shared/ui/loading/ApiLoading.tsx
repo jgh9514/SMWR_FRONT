@@ -5,6 +5,7 @@
 // - 각 화면은 Suspense fallback/스켈레톤 UI로만 로딩 표시
 
 export const setApiLoading = (_loading: boolean) => {
+  void _loading;
   // no-op
 };
 

@@ -12,13 +12,13 @@ export interface PaginationParams {
   offset?: number;
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   data: T;
   message?: string;
   success?: boolean;
 }
 
-export interface SaveRequest<T = any> {
+export interface SaveRequest<T = unknown> {
   insertRow: T[];
   updateRow: T[];
   deleteRow: T[];

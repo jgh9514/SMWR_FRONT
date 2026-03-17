@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -39,6 +39,11 @@ import ListWrapper from '@/shared/ui/list-wrapper/ListWrapper';
 import type { CodeGroup, CodeItem, CodeSaveRequest, CommonCodeList, BsnsDtlCd } from '@/types';
 import type { CodeGroupSearchData, CodeSearchData } from '@/features/admin/types/search';
 
+type EditableCodeGroup = Partial<CodeGroup> & { row_status?: string };
+type EditableCodeItem = Partial<CodeItem> & { row_status?: string };
+type TableAlign = 'left' | 'center' | 'right';
+type Header<T> = { title: string; key: keyof T | string; align?: TableAlign };
+
 export default function PreferenceCdmnPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -53,27 +58,17 @@ export default function PreferenceCdmnPage() {
   const { data: codeListData = initialCodeGroups } = useCommonCodes(initialCodeGroups);
   const codeList = codeListData;
 
-  const [bsnsDtlCd, setBsnsDtlCd] = useState<BsnsDtlCd>({
-    id: 'bsnsDtlCd',
-    levels: 2,
-    tags: [],
-    keys: [] as Array<[string, string]>,
-    values: [],
-  });
-
-  const [schDatas, setSchDatas] = useState<CodeGroupSearchData>({});
+  const [schDatas] = useState<CodeGroupSearchData>({});
   const [cdSchDatas, setCdSchDatas] = useState<CodeSearchData>({});
 
-  const [cdGrpItems, setCdGrpItems] = useState<CodeGroup[]>([]);
-  const [cdItems, setCdItems] = useState<CodeItem[]>([]);
   const [selectedCdGrpIds, setSelectedCdGrpIds] = useState<string[]>([]);
   const [selectedCdIds, setSelectedCdIds] = useState<string[]>([]);
-  const [selectedCdGrpItem, setSelectedCdGrpItem] = useState<CodeGroup | null>(null);
+  const [selectedCdGrpNo, setSelectedCdGrpNo] = useState<string | null>(null);
 
   const [cdGrpDialogOpen, setCdGrpDialogOpen] = useState(false);
   const [cdDialogOpen, setCdDialogOpen] = useState(false);
-  const [editingCdGrp, setEditingCdGrp] = useState<CodeGroup | any>({});
-  const [editingCd, setEditingCd] = useState<CodeItem | any>({});
+  const [editingCdGrp, setEditingCdGrp] = useState<EditableCodeGroup>({});
+  const [editingCd, setEditingCd] = useState<EditableCodeItem>({});
 
   const idCounterRef = useRef(0);
 
@@ -98,8 +93,21 @@ export default function PreferenceCdmnPage() {
     [codeList],
   );
 
+  const { data: hierarchyData } = useCommonCodeHierarchy('CO00000002');
+
+  const bsnsDtlCd = useMemo<BsnsDtlCd>(
+    () => ({
+      id: 'bsnsDtlCd',
+      levels: 2,
+      tags: hierarchyData?.tags ?? [],
+      keys: hierarchyData?.keys ?? [],
+      values: hierarchyData?.values ?? [],
+    }),
+    [hierarchyData],
+  );
+
   const cdGrpHeaders = useMemo(() => {
-    const headers: { title: string; key: keyof CodeGroup | string; align?: string }[] = [
+    const headers: Header<CodeGroup>[] = [
       { title: '업무', key: 'bsns_cd', align: 'center' },
     ];
 
@@ -120,7 +128,7 @@ export default function PreferenceCdmnPage() {
   }, [mobile]);
 
   const cdHeaders = useMemo(() => {
-    const headers: { title: string; key: keyof CodeItem | string; align?: string }[] = [
+    const headers: Header<CodeItem>[] = [
       { title: '코드값', key: 'cd', align: 'center' },
       { title: '코드명', key: 'cd_nm', align: 'left' },
       { title: '정렬순서', key: 'srt_sn', align: 'center' },
@@ -138,6 +146,33 @@ export default function PreferenceCdmnPage() {
 
     return headers;
   }, [mobile]);
+
+  const cdGrpItems = useMemo<CodeGroup[]>(
+    () =>
+      (codeGroupListQuery.data ?? []).map((row, index) => ({
+        ...row,
+        id: row.cd_grp_no || `grp_${index}`,
+        row_status: row.row_status || '',
+      })),
+    [codeGroupListQuery.data],
+  );
+
+  const selectedCdGrpItem = useMemo(
+    () => cdGrpItems.find((item) => item.cd_grp_no === selectedCdGrpNo) ?? null,
+    [cdGrpItems, selectedCdGrpNo],
+  );
+
+  const cdItems = useMemo<CodeItem[]>(
+    () =>
+      cdSchDatas.cd_grp_no
+        ? (codeListQuery.data ?? []).map((row, index) => ({
+            ...row,
+            id: row.cd ? `cd_${row.cd}_${index}` : `cd_${index}`,
+            row_status: row.row_status || '',
+          }))
+        : [],
+    [codeListQuery.data, cdSchDatas.cd_grp_no],
+  );
 
   const getBsnsCdNm = (bsnsCd: string) => {
     const option = bsnsCdOptions.find((opt) => opt.value === bsnsCd);
@@ -169,7 +204,7 @@ export default function PreferenceCdmnPage() {
   };
 
   const handleBsnsCdChangeOnEditingGrp = (value: string) => {
-    setEditingCdGrp((prev: any) => ({
+    setEditingCdGrp((prev) => ({
       ...prev,
       bsns_cd: value,
       dtl_bsns_cd: '',
@@ -178,12 +213,12 @@ export default function PreferenceCdmnPage() {
 
   const handleCdGrpRowClick = async (item: CodeGroup) => {
     if (isEmpty(item.cd_grp_no)) return;
-    setSelectedCdGrpItem(item);
-        setCdSchDatas((prev: CodeSearchData) => ({
-          ...prev,
-          cd_grp_no: item.cd_grp_no,
-        }));
-    await cdSearch('cdGrp', item.cd_grp_no, item.bsns_cd);
+    setSelectedCdGrpNo(item.cd_grp_no);
+    setCdSchDatas((prev) => ({
+      ...prev,
+      cd_grp_no: item.cd_grp_no,
+    }));
+    await cdSearch('cdGrp', item.cd_grp_no);
   };
 
   const addGrp = () => {
@@ -230,25 +265,29 @@ export default function PreferenceCdmnPage() {
     const res = await confirm('저장하시겠습니까?');
     if (!res) return;
 
-    const formData: any = {};
+    const groupPayload: CodeGroup = {
+      cd_grp_no: editingCdGrp.cd_grp_no || '',
+      cd_grp_nm: editingCdGrp.cd_grp_nm || '',
+      bsns_cd: editingCdGrp.bsns_cd,
+      dtl_bsns_cd: editingCdGrp.dtl_bsns_cd,
+      row_status: editingCdGrp.row_status,
+      id: editingCdGrp.id,
+    };
 
-    if (editingCdGrp.row_status === 'C') {
-      formData.insertGrpRow = [editingCdGrp];
-      formData.updateGrpRow = [];
-    } else {
-      formData.insertGrpRow = [];
-      formData.updateGrpRow = [editingCdGrp];
-    }
-    formData.deleteGrpRow = [];
-    formData.insertRow = [];
-    formData.updateRow = [];
-    formData.deleteRow = [];
+    const formData: CodeSaveRequest = {
+      insertGrpRow: editingCdGrp.row_status === 'C' ? [groupPayload] : [],
+      updateGrpRow: editingCdGrp.row_status === 'C' ? [] : [groupPayload],
+      deleteGrpRow: [],
+      insertRow: [],
+      updateRow: [],
+      deleteRow: [],
+    };
 
     codeSaveMutation.mutate(formData, {
       onSuccess: () => {
         showToast.success('저장되었습니다.');
         closeCdGrpDialog();
-        cdGrpSearch('save');
+        cdGrpSearch();
       },
       onError: (error) => {
         logger.error('코드 그룹 저장 실패', error);
@@ -283,9 +322,9 @@ export default function PreferenceCdmnPage() {
       onSuccess: () => {
         showToast.success('삭제되었습니다.');
         setSelectedCdGrpIds([]);
-        setCdItems([]);
-        setSelectedCdGrpItem(null);
-        cdGrpSearch('save');
+        setSelectedCdGrpNo(null);
+        setCdSchDatas((prev) => ({ ...prev, cd_grp_no: undefined }));
+        cdGrpSearch();
       },
       onError: (error) => {
         logger.error('코드 그룹 삭제 실패', error);
@@ -326,19 +365,21 @@ export default function PreferenceCdmnPage() {
   };
 
   const saveCd = async () => {
-    if (isEmpty(editingCd.cd)) {
+    const codeValue = editingCd.cd ?? '';
+
+    if (isEmpty(codeValue)) {
       showToast.error('코드값을 입력해주세요.');
       return;
     }
-    if (editingCd.cd && editingCd.cd.length > 20) {
+    if (codeValue.length > 20) {
       showToast.error('코드값은 20자 이하로 입력해주세요.');
       return;
     }
-    if (/\s/g.test(editingCd.cd)) {
+    if (/\s/g.test(codeValue)) {
       showToast.error('코드값에 공백문자는 사용할 수 없습니다.');
       return;
     }
-    if (!/^[A-Za-z0-9+]*$/.test(editingCd.cd)) {
+    if (!/^[A-Za-z0-9+]*$/.test(codeValue)) {
       showToast.error('코드값은 영문, 숫자만 입력해주세요.');
       return;
     }
@@ -391,22 +432,31 @@ export default function PreferenceCdmnPage() {
       return;
     }
 
-    const formData: any = {
+    const codePayload: CodeItem = {
+      id: editingCd.id || '',
+      cd_grp_no: selectedCdGrpItem.cd_grp_no,
+      cd_grp_nm: selectedCdGrpItem.cd_grp_nm,
+      cd: editingCd.cd || '',
+      cd_nm: editingCd.cd_nm || '',
+      srt_sn: editingCd.srt_sn,
+      buf_fst_txt: editingCd.buf_fst_txt,
+      buf_snd_txt: editingCd.buf_snd_txt,
+      buf_trd_txt: editingCd.buf_trd_txt,
+      buf_fth_txt: editingCd.buf_fth_txt,
+      buf_ffh_txt: editingCd.buf_ffh_txt,
+      row_status: editingCd.row_status,
+    };
+
+    const formData: CodeSaveRequest = {
       insertGrpRow: [],
       updateGrpRow: [],
       deleteGrpRow: [],
       bsns_cd: selectedCdGrpItem.bsns_cd,
       cd_grp_no: selectedCdGrpItem.cd_grp_no,
+      insertRow: editingCd.row_status === 'C' ? [codePayload] : [],
+      updateRow: editingCd.row_status === 'C' ? [] : [codePayload],
+      deleteRow: [],
     };
-
-    if (editingCd.row_status === 'C') {
-      formData.insertRow = [editingCd];
-      formData.updateRow = [];
-    } else {
-      formData.insertRow = [];
-      formData.updateRow = [editingCd];
-    }
-    formData.deleteRow = [];
 
     codeSaveMutation.mutate(formData, {
       onSuccess: () => {
@@ -462,89 +512,23 @@ export default function PreferenceCdmnPage() {
     });
   };
 
-  // 코드 그룹 목록 데이터 처리
-  useEffect(() => {
-    if (codeGroupListQuery.data) {
-      const rows: CodeGroup[] = codeGroupListQuery.data;
-      const mapped = rows.map((row, index) => ({
-        ...row,
-        id: row.cd_grp_no || `grp_${index}`,
-        row_status: row.row_status || '',
-      })) as CodeGroup[];
-
-      setCdGrpItems(mapped);
-
-      // 저장 후 선택된 항목 유지
-      if (selectedCdGrpItem) {
-        const item = mapped.find((i) => i.cd_grp_no === selectedCdGrpItem.cd_grp_no);
-        if (item) {
-          setSelectedCdGrpItem(item);
-          setCdSchDatas((prev: CodeSearchData) => ({
-            ...prev,
-            cd_grp_no: item.cd_grp_no,
-          }));
-        }
-      }
-    }
-  }, [codeGroupListQuery.data, selectedCdGrpItem]);
-
-  // 코드 목록 데이터 처리
-  useEffect(() => {
-    if (codeListQuery.data && cdSchDatas.cd_grp_no) {
-      const cdRows: CodeItem[] = codeListQuery.data;
-      const mapped = cdRows.map((row, index) => ({
-        ...row,
-        id: row.cd ? `cd_${row.cd}_${index}` : `cd_${index}`,
-        row_status: row.row_status || '',
-      })) as CodeItem[];
-
-      setCdItems(mapped);
-    } else if (!cdSchDatas.cd_grp_no) {
-      setCdItems([]);
-    }
-  }, [codeListQuery.data, cdSchDatas.cd_grp_no]);
-
-  const cdGrpSearch = async (type?: 'save') => {
+  const cdGrpSearch = async () => {
     await codeGroupListQuery.refetch();
   };
 
-  const cdSearch = async (type?: 'cdGrp' | 'save', grpNo?: string, bsnsCdValue?: string) => {
+  const cdSearch = async (type?: 'cdGrp' | 'save', grpNo?: string) => {
     const targetCdGrpNo = grpNo ?? cdSchDatas.cd_grp_no;
     if (isEmpty(targetCdGrpNo)) {
-      setCdItems([]);
       return;
     }
 
-    setCdSchDatas((prev: CodeSearchData) => ({
+    setCdSchDatas((prev) => ({
       ...prev,
       cd_grp_no: targetCdGrpNo,
     }));
     
     await codeListQuery.refetch();
   };
-
-  const { data: hierarchyData } = useCommonCodeHierarchy('CO00000002');
-  
-  useEffect(() => {
-    if (hierarchyData) {
-      setBsnsDtlCd((prev) => ({
-        ...prev,
-        keys: hierarchyData.keys,
-        values: hierarchyData.values,
-        tags: hierarchyData.tags,
-      }));
-    }
-  }, [hierarchyData]);
-
-  // 코드 그룹 선택 시 코드 목록 자동 조회
-  useEffect(() => {
-    if (selectedCdGrpItem?.cd_grp_no) {
-      setCdSchDatas((prev: CodeSearchData) => ({
-        ...prev,
-        cd_grp_no: selectedCdGrpItem.cd_grp_no,
-      }));
-    }
-  }, [selectedCdGrpItem]);
 
   const toggleSelectGrp = (id: string) => {
     setSelectedCdGrpIds((prev) =>
@@ -588,7 +572,7 @@ export default function PreferenceCdmnPage() {
                       <TableRow>
                         <TableCell padding="checkbox" />
                         {cdGrpHeaders.map((h) => (
-                          <TableCell key={h.key as string} align={h.align as any}>
+                          <TableCell key={h.key as string} align={h.align}>
                             {h.title}
                           </TableCell>
                         ))}
@@ -707,7 +691,7 @@ export default function PreferenceCdmnPage() {
                       <TableRow>
                         <TableCell padding="checkbox" />
                         {cdHeaders.map((h) => (
-                          <TableCell key={h.key as string} align={h.align as any}>
+                          <TableCell key={h.key as string} align={h.align}>
                             {h.title}
                           </TableCell>
                         ))}
@@ -806,7 +790,7 @@ export default function PreferenceCdmnPage() {
                   <Select
                     value={editingCdGrp.dtl_bsns_cd || ''}
                     onChange={(e) =>
-                      setEditingCdGrp((prev: any) => ({
+                      setEditingCdGrp((prev) => ({
                         ...prev,
                         dtl_bsns_cd: e.target.value,
                       }))
@@ -840,7 +824,7 @@ export default function PreferenceCdmnPage() {
                 label="코드그룹명"
                 value={editingCdGrp.cd_grp_nm || ''}
                 onChange={(e) =>
-                  setEditingCdGrp((prev: any) => ({
+                  setEditingCdGrp((prev) => ({
                     ...prev,
                     cd_grp_nm: e.target.value,
                   }))
@@ -876,7 +860,7 @@ export default function PreferenceCdmnPage() {
                     label="코드값"
                     value={editingCd.cd || ''}
                     onChange={(e) =>
-                      setEditingCd((prev: any) => ({
+                      setEditingCd((prev) => ({
                         ...prev,
                         cd: e.target.value,
                       }))
@@ -892,7 +876,7 @@ export default function PreferenceCdmnPage() {
                     type="number"
                     value={editingCd.srt_sn || ''}
                     onChange={(e) =>
-                      setEditingCd((prev: any) => ({
+                      setEditingCd((prev) => ({
                         ...prev,
                         srt_sn: e.target.value,
                       }))
@@ -906,7 +890,7 @@ export default function PreferenceCdmnPage() {
                   label="코드명"
                   value={editingCd.cd_nm || ''}
                   onChange={(e) =>
-                    setEditingCd((prev: any) => ({
+                    setEditingCd((prev) => ({
                       ...prev,
                       cd_nm: e.target.value,
                     }))
@@ -921,7 +905,7 @@ export default function PreferenceCdmnPage() {
                     label="BUFF1"
                     value={editingCd.buf_fst_txt || ''}
                     onChange={(e) =>
-                      setEditingCd((prev: any) => ({
+                      setEditingCd((prev) => ({
                         ...prev,
                         buf_fst_txt: e.target.value,
                       }))
@@ -935,7 +919,7 @@ export default function PreferenceCdmnPage() {
                     label="BUFF2"
                     value={editingCd.buf_snd_txt || ''}
                     onChange={(e) =>
-                      setEditingCd((prev: any) => ({
+                      setEditingCd((prev) => ({
                         ...prev,
                         buf_snd_txt: e.target.value,
                       }))
@@ -951,7 +935,7 @@ export default function PreferenceCdmnPage() {
                     label="BUFF3"
                     value={editingCd.buf_trd_txt || ''}
                     onChange={(e) =>
-                      setEditingCd((prev: any) => ({
+                      setEditingCd((prev) => ({
                         ...prev,
                         buf_trd_txt: e.target.value,
                       }))
@@ -965,7 +949,7 @@ export default function PreferenceCdmnPage() {
                     label="BUFF4"
                     value={editingCd.buf_fth_txt || ''}
                     onChange={(e) =>
-                      setEditingCd((prev: any) => ({
+                      setEditingCd((prev) => ({
                         ...prev,
                         buf_fth_txt: e.target.value,
                       }))
@@ -980,7 +964,7 @@ export default function PreferenceCdmnPage() {
                   label="BUFF5"
                   value={editingCd.buf_ffh_txt || ''}
                   onChange={(e) =>
-                    setEditingCd((prev: any) => ({
+                    setEditingCd((prev) => ({
                       ...prev,
                       buf_ffh_txt: e.target.value,
                     }))

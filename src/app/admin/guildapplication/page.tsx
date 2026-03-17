@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -33,16 +34,17 @@ import { useRouter } from 'next/navigation';
 import { useGuildApplicationList, useProcessGuildApplication } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import type { GuildApplicationItem } from '@/features/auth/types/auth';
 
 export default function GuildApplicationManagementPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
-  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const [selectedApplication, setSelectedApplication] = useState<GuildApplicationItem | null>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // 길드 신청 목록 조회 (관리자용 - 모든 신청 조회)
   const guildApplicationListQuery = useGuildApplicationList({
@@ -74,7 +76,7 @@ export default function GuildApplicationManagementPage() {
     });
   };
 
-  const handleViewDetail = (application: any) => {
+  const handleViewDetail = (application: GuildApplicationItem) => {
     setSelectedApplication(application);
     setDetailDialogOpen(true);
   };
@@ -86,7 +88,7 @@ export default function GuildApplicationManagementPage() {
     return '알 수 없음';
   };
 
-  const getStatusColor = (status?: string) => {
+  const getStatusColor = (status?: string): 'default' | 'success' | 'error' | 'warning' => {
     if (status === 'APPROVED') return 'success';
     if (status === 'REJECTED') return 'error';
     if (status === 'PENDING') return 'warning';
@@ -124,7 +126,7 @@ export default function GuildApplicationManagementPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {guildApplicationListQuery.data.map((app: any) => (
+                  {guildApplicationListQuery.data.map((app: GuildApplicationItem) => (
                     <TableRow key={app.application_id} hover>
                       <TableCell>
                         <Typography variant="body2" fontWeight={600}>
@@ -141,13 +143,13 @@ export default function GuildApplicationManagementPage() {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {isMounted && app.crt_date ? new Date(app.crt_date).toLocaleDateString('ko-KR') : '-'}
+                          {isClient && app.crt_date ? new Date(app.crt_date).toLocaleDateString('ko-KR') : '-'}
                         </Typography>
                       </TableCell>
                       <TableCell>
                         <Chip
                           label={getStatusLabel(app.status)}
-                          color={getStatusColor(app.status) as any}
+                          color={getStatusColor(app.status)}
                           size="small"
                         />
                       </TableCell>
@@ -166,7 +168,7 @@ export default function GuildApplicationManagementPage() {
                               <IconButton
                                 color="success"
                                 size="small"
-                                onClick={() => handleProcessApplication(app.application_id, 'APPROVED')}
+                                onClick={() => app.application_id && handleProcessApplication(app.application_id, 'APPROVED')}
                                 disabled={processApplicationMutation.isPending}
                                 title="승인"
                               >
@@ -175,7 +177,7 @@ export default function GuildApplicationManagementPage() {
                               <IconButton
                                 color="error"
                                 size="small"
-                                onClick={() => handleProcessApplication(app.application_id, 'REJECTED')}
+                                onClick={() => app.application_id && handleProcessApplication(app.application_id, 'REJECTED')}
                                 disabled={processApplicationMutation.isPending}
                                 title="반려"
                               >
@@ -230,7 +232,7 @@ export default function GuildApplicationManagementPage() {
                   신청일
                 </Typography>
                 <Typography variant="body1">
-                  {selectedApplication.crt_date && isMounted
+                  {selectedApplication.crt_date && isClient
                     ? new Date(selectedApplication.crt_date).toLocaleString('ko-KR')
                     : '-'}
                 </Typography>
@@ -242,7 +244,7 @@ export default function GuildApplicationManagementPage() {
                 <Box sx={{ mt: 0.5 }}>
                   <Chip
                     label={getStatusLabel(selectedApplication.status)}
-                    color={getStatusColor(selectedApplication.status) as any}
+                    color={getStatusColor(selectedApplication.status)}
                     size="small"
                   />
                 </Box>
@@ -271,10 +273,13 @@ export default function GuildApplicationManagementPage() {
                     이미지 파일
                   </Typography>
                   <Box sx={{ mt: 0.5 }}>
-                    <img
+                    <Image
                       src={selectedApplication.image_file_url}
                       alt="길드 이미지"
-                      style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px' }}
+                      width={600}
+                      height={300}
+                      unoptimized
+                      style={{ maxWidth: '100%', maxHeight: '300px', borderRadius: '4px', height: 'auto' }}
                     />
                   </Box>
                 </Box>
@@ -290,6 +295,7 @@ export default function GuildApplicationManagementPage() {
             <>
               <Button
                 onClick={() =>
+                  selectedApplication.application_id &&
                   handleProcessApplication(selectedApplication.application_id, 'REJECTED')
                 }
                 color="error"
@@ -299,6 +305,7 @@ export default function GuildApplicationManagementPage() {
               </Button>
               <Button
                 onClick={() =>
+                  selectedApplication.application_id &&
                   handleProcessApplication(selectedApplication.application_id, 'APPROVED')
                 }
                 variant="contained"

@@ -75,7 +75,7 @@ export interface SwexRuneItem {
   rank?: number | null;
   main_stat_type?: number | null;
   main_stat_value?: number | null;
-  substats_json?: any;
+  substats_json?: unknown;
 }
 
 export interface RuneScoreBucket {

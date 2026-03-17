@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -35,18 +35,18 @@ import { useRouter } from 'next/navigation';
 import { useBatchConfig, useBatchRun, useBatchHistory, BatchConfigItem, BatchRunResponse } from '@/features/admin/hooks/useBatch';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
-import { PageBanner, PageHeader } from '@/shared/ui';
+import { PageHeader } from '@/shared/ui';
 import { formatDate } from '@/shared/utils/format';
 
 export default function BatchManagementPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<string>('');
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
@@ -57,7 +57,7 @@ export default function BatchManagementPage() {
   // 날짜 포맷팅 함수
   const formatDateTime = (dateStr?: string) => {
     if (!dateStr) return '-';
-    if (!isMounted) return dateStr;
+    if (!isClient) return dateStr;
     try {
       return formatDate(dateStr, 'YYYY-MM-DD HH:mm:ss');
     } catch {
@@ -72,7 +72,7 @@ export default function BatchManagementPage() {
     const parts = cronExpr.trim().split(/\s+/);
     if (parts.length < 6) return cronExpr; // 유효하지 않은 형식
     
-    const [second, minute, hour, day, month, dayOfWeek] = parts;
+    const [, minute, hour, day, month, dayOfWeek] = parts;
     
     // 요일 매핑 (Spring Cron: 0=일요일, 1=월요일, ..., 6=토요일, ?=무시)
     const dayNames = ['일', '월', '화', '수', '목', '금', '토'];

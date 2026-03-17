@@ -12,6 +12,7 @@ out
 
 # Node dependencies
 node_modules
+.pnp.*
 
 # Logs
 logs
@@ -26,3 +27,11 @@ logs
 .env
 .env.*
 !.env.example
+
+# Yarn Berry
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions

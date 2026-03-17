@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -27,20 +27,56 @@ import { logger } from '@/shared/lib/logger';
 import type { SiegeItem } from '@/features/siege/types/recent-siege';
 import { useGuildSiegeHistory } from '@/features/siege/hooks/useRecentSiege';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
+import type { UserInfo } from '@/features/auth/types/auth';
 
 export default function RecentSiegePage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const authSnapshot = useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === 'undefined') {
+        return () => {};
+      }
+
+      const handleChange = () => onStoreChange();
+      window.addEventListener('smwr:auth-changed', handleChange);
+      window.addEventListener('storage', handleChange);
+      return () => {
+        window.removeEventListener('smwr:auth-changed', handleChange);
+        window.removeEventListener('storage', handleChange);
+      };
+    },
+    () => {
+      if (typeof window === 'undefined') {
+        return '0::';
+      }
+      return `${isAuthenticated() ? '1' : '0'}::${localStorage.getItem('userInfo') ?? ''}`;
+    },
+    () => '0::',
+  );
   const responsive = useResponsive();
-  const isMobile = isMounted ? responsive.isMobile : false;
+  const isMobile = isClient ? responsive.isMobile : false;
   const [schData, setSchData] = useState({ paging: 5, offset: DEFAULT_PAGE_OFFSET });
-  const [userInfo, setUserInfo] = useState<any>(null);
   const prevAuthRef = useRef<boolean | null>(null);
   const siegeGuildViewParams = useSiegeGuildViewParams();
+  const [authFlag, userInfoJson] = authSnapshot.split('::', 2);
+  const isAuthed = authFlag === '1';
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!userInfoJson) {
+      return null;
+    }
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    try {
+      return JSON.parse(userInfoJson) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
+    }
+  }, [userInfoJson]);
 
   const searchParams = useMemo(() => {
     const page = schData.offset;
@@ -67,72 +103,31 @@ export default function RecentSiegePage() {
     refetch: refetchSiege,
   } = useGuildSiegeHistory(searchParams, true);
 
-  // 로그인/로그아웃에 따라 화면 내용이 달라지므로 userInfo를 주기적으로 동기화
-  const syncAuthState = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    if (!isMounted) return;
-
-    const authed = isAuthenticated();
-    const stored = localStorage.getItem('userInfo');
-
-    // 최초 1회 초기화
-    if (prevAuthRef.current === null) {
-      prevAuthRef.current = authed;
+  useEffect(() => {
+    if (!isClient) {
+      return;
     }
 
-    // 로그아웃 감지: 로그인 상태였다가 로그아웃되면 메인으로 이동 후 갱신
-    if (prevAuthRef.current === true && authed === false) {
-      prevAuthRef.current = authed;
-      setUserInfo(null);
+    if (prevAuthRef.current === null) {
+      prevAuthRef.current = isAuthed;
+      return;
+    }
+
+    if (prevAuthRef.current === true && isAuthed === false) {
+      prevAuthRef.current = isAuthed;
       router.replace('/');
-      // 메인 화면에서 로그인 여부에 따라 데이터가 달라지므로 강제 갱신
       setTimeout(() => router.refresh(), 0);
       return;
     }
 
-    // 로그인 감지: 비로그인 상태였다가 로그인되면 데이터 재조회
-    if (prevAuthRef.current === false && authed === true) {
-      prevAuthRef.current = authed;
-      if (stored) {
-        try {
-          setUserInfo(JSON.parse(stored));
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-          setUserInfo(null);
-        }
-      } else {
-        setUserInfo(null);
-      }
-      // 로그인 직후 통계/표시가 달라질 수 있으므로 재조회
+    if (prevAuthRef.current === false && isAuthed === true) {
+      prevAuthRef.current = isAuthed;
       refetchSiege();
       return;
     }
 
-    // 같은 인증 상태 내에서도 userInfo가 변경될 수 있으니 동기화
-    if (stored) {
-      try {
-        setUserInfo(JSON.parse(stored));
-      } catch (error) {
-        logger.error('사용자 정보 파싱 실패', error);
-        setUserInfo(null);
-      }
-    } else {
-      setUserInfo(null);
-    }
-  }, [isMounted, refetchSiege, router]);
-
-  useEffect(() => {
-    if (!isMounted || typeof window === 'undefined') return;
-
-    syncAuthState();
-
-    const handleAuthChanged = () => syncAuthState();
-    window.addEventListener('smwr:auth-changed', handleAuthChanged);
-
-    return () => {
-      window.removeEventListener('smwr:auth-changed', handleAuthChanged);
-    };
-  }, [isMounted, syncAuthState]);
+    prevAuthRef.current = isAuthed;
+  }, [isAuthed, isClient, refetchSiege, router]);
   
   // 401 인증 에러 확인
   const isAuthError = useMemo(() => {
@@ -153,10 +148,7 @@ export default function RecentSiegePage() {
   }, [siegeError]);
   
   // 자기 길드 ID 확인 (통계 표시용)
-  const myGuildId = useMemo(() => {
-    const guildId = userInfo?.guild_id ? String(userInfo.guild_id) : null;
-    return guildId;
-  }, [userInfo?.guild_id]);
+  const myGuildId = userInfo?.guild_id ? String(userInfo.guild_id) : null;
 
   const pageSize = schData.paging;
   const hasNextPage = useMemo(() => {
@@ -205,21 +197,7 @@ export default function RecentSiegePage() {
       }));
     }
     
-    return pageItems.map((item) => {
-      // 자기 길드가 몇 등인지 확인
-      const id1st = item.guild_id_1st != null ? String(item.guild_id_1st) : '';
-      const id2nd = item.guild_id_2nd != null ? String(item.guild_id_2nd) : '';
-      const id3rd = item.guild_id_3rd != null ? String(item.guild_id_3rd) : '';
-      
-      const myGuildRank = 
-        id1st === myGuildId ? '1st' :
-        id2nd === myGuildId ? '2nd' :
-        id3rd === myGuildId ? '3rd' : null;
-      
-      // 원본 데이터 그대로 반환 (필터링하지 않음)
-      // UI에서 자기 길드 통계만 표시하도록 처리
-      return item;
-    });
+    return pageItems;
   }, [siegeListRaw, myGuildId, pageSize]);
 
 
@@ -402,7 +380,6 @@ export default function RecentSiegePage() {
                       const renderGuildBox = (rank: '1st' | '2nd' | '3rd', isMyGuild: boolean) => {
                         const is1st = rank === '1st';
                         const is2nd = rank === '2nd';
-                        const is3rd = rank === '3rd';
                         
                         const guildName = is1st ? item.guild_1st : is2nd ? item.guild_2nd : item.guild_3rd;
                         const rating = is1st ? item.rating_1st : is2nd ? item.rating_2nd : item.rating_3rd;

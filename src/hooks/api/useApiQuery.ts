@@ -17,18 +17,19 @@ type QueryKey = readonly unknown[];
 
 function stableStringify(value: unknown): string {
   const seen = new WeakSet<object>();
-  const helper = (v: any): any => {
+  const helper = (v: unknown): unknown => {
     if (v === null || v === undefined) return v;
     if (typeof v !== 'object') return v;
     if (seen.has(v)) return '[Circular]';
     seen.add(v);
     if (Array.isArray(v)) return v.map(helper);
     // plain object: sort keys
-    const out: Record<string, any> = {};
-    Object.keys(v)
+    const out: Record<string, unknown> = {};
+    const record = v as Record<string, unknown>;
+    Object.keys(record)
       .sort()
       .forEach((k) => {
-        out[k] = helper(v[k]);
+        out[k] = helper(record[k]);
       });
     return out;
   };

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,15 +25,17 @@ import { usePageList, usePageConditionList } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { useCommonCodes } from '@/features/admin/hooks/useCommonCode';
 import { showToast } from '@/shared/lib/notification';
+import type { SearchData } from '@/shared/types/util';
 import type { PageItem, ConditionItem } from '@/types';
+
+type ConditionTableItem = ConditionItem & { id: string };
 
 export default function PageManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [schDatas, setSchDatas] = useState<any>({});
-  const [conditionList, setConditionList] = useState<ConditionItem[]>([]);
+  const [schDatas] = useState<SearchData>({});
   const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
@@ -69,21 +71,17 @@ export default function PageManagementPage() {
     return searchDataExtraction(schDatas);
   }, [schDatas]);
 
-  const { data: pageList = [], refetch: refetchPage } = usePageList(searchParams);
-  const { data: conditionResponse = [], refetch: refetchCondition } = usePageConditionList(selectedPageId);
+  const { data: pageList = [] } = usePageList(searchParams);
+  const { data: conditionResponse = [] } = usePageConditionList(selectedPageId);
 
-  useEffect(() => {
-    if (conditionResponse.length > 0) {
-      setConditionList(
-        conditionResponse.map((row: any, idx: number) => ({
-          ...row,
-          id: `${row.page_id}_${row.cond_id}_${idx}`,
-        })),
-      );
-    } else {
-      setConditionList([]);
-    }
-  }, [conditionResponse]);
+  const conditionList = useMemo<ConditionTableItem[]>(
+    () =>
+      conditionResponse.map((row, idx) => ({
+        ...row,
+        id: `${row.page_id}_${row.cond_id}_${idx}`,
+      })),
+    [conditionResponse],
+  );
 
   const handlePageClick = (item: PageItem) => {
     setSelectedPageId(item.page_id);
@@ -114,10 +112,6 @@ export default function PageManagementPage() {
       showToast.error('삭제할 데이터가 없습니다.');
       return;
     }
-    showToast.info('개발 중입니다.');
-  };
-
-  const handleSave = async () => {
     showToast.info('개발 중입니다.');
   };
 

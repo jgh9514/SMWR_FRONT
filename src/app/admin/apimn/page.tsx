@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -24,19 +24,21 @@ import { useRouter } from 'next/navigation';
 import { useApiList, useRoleList, useApiRoleList, useApiRoleSave } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { useCommonCodes } from '@/features/admin/hooks/useCommonCode';
+import type { ApiRoleItem } from '@/features/admin/hooks/useApi';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
-import type { ApiItem, RoleItem } from '@/types';
+import type { SearchData } from '@/shared/types/util';
+import type { ApiItem } from '@/types';
 
 export default function ApiManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [schDatas, setSchDatas] = useState<any>({});
+  const [schDatas] = useState<SearchData>({});
   const [selectedApis, setSelectedApis] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedApiId, setSelectedApiId] = useState<string | null>(null);
+  const [selectedRolesOverride, setSelectedRolesOverride] = useState<string[] | null>(null);
 
   const apiHeaders = useMemo(() => {
     const cols = [
@@ -62,17 +64,16 @@ export default function ApiManagementPage() {
     return searchDataExtraction(schDatas);
   }, [schDatas]);
 
-  const { data: apiList = [], refetch: refetchApi } = useApiList(searchParams);
+  const { data: apiList = [] } = useApiList(searchParams);
   const { data: roleList = [] } = useRoleList({});
   const { data: apiRoleResponse = [], refetch: refetchApiRole } = useApiRoleList(selectedApiId);
 
-  useEffect(() => {
-    if (apiRoleResponse.length > 0) {
-      setSelectedRoles(apiRoleResponse.filter((r: any) => r.rolechk === 'Y').map((r: any) => r.role_id));
-    } else {
-      setSelectedRoles([]);
-    }
-  }, [apiRoleResponse]);
+  const selectedRolesFromApi = useMemo(
+    () => apiRoleResponse.filter((role) => role.rolechk === 'Y').map((role) => role.role_id),
+    [apiRoleResponse],
+  );
+
+  const selectedRoles = selectedRolesOverride ?? selectedRolesFromApi;
 
   const apiRoleSaveMutation = useApiRoleSave({
     onSuccess: () => {
@@ -87,6 +88,7 @@ export default function ApiManagementPage() {
 
   const handleApiClick = (item: ApiItem) => {
     setSelectedApiId(item.api_id);
+    setSelectedRolesOverride(null);
   };
 
   const handleAdd = () => {
@@ -110,7 +112,7 @@ export default function ApiManagementPage() {
     const res = await confirm('저장하시겠습니까?');
     if (!res) return;
 
-    const saveData = roleList.map((role) => ({
+    const saveData: ApiRoleItem[] = roleList.map((role) => ({
       ...role,
       rolechk: selectedRoles.includes(role.role_id) ? 'Y' : 'N',
     }));
@@ -128,9 +130,12 @@ export default function ApiManagementPage() {
   };
 
   const toggleSelectRole = (roleId: string) => {
-    setSelectedRoles((prev) =>
-      prev.includes(roleId) ? prev.filter((v) => v !== roleId) : [...prev, roleId],
-    );
+    setSelectedRolesOverride((prev) => {
+      const current = prev ?? selectedRoles;
+      return current.includes(roleId)
+        ? current.filter((value) => value !== roleId)
+        : [...current, roleId];
+    });
   };
 
   const initialCodeGroups = {

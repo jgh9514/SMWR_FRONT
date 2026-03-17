@@ -9,19 +9,20 @@ interface LogContext {
   [key: string]: unknown;
 }
 
+interface PartialConsole {
+  debug?: (...args: unknown[]) => void;
+  info?: (...args: unknown[]) => void;
+  warn?: (...args: unknown[]) => void;
+  error?: (...args: unknown[]) => void;
+}
+
 class Logger {
   private isDevelopment = process.env.NODE_ENV === 'development';
 
-  private getConsole(): {
-    debug?: (...args: unknown[]) => void;
-    info?: (...args: unknown[]) => void;
-    warn?: (...args: unknown[]) => void;
-    error?: (...args: unknown[]) => void;
-  } | null {
+  private getConsole(): PartialConsole | null {
     // eslint/no-console 회피 + 브라우저/노드 모두에서 안전 접근
-    const c = (globalThis as unknown as { [key: string]: unknown })['console'] as any;
-    if (!c) return null;
-    return c;
+    const maybeConsole = (globalThis as { console?: PartialConsole }).console;
+    return maybeConsole ?? null;
   }
 
   private log(level: LogLevel, message: string, context?: LogContext): void {

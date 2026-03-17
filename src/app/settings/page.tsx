@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -28,6 +28,7 @@ import {
   FormControl,
   InputLabel,
 } from '@mui/material';
+import type { ChipProps } from '@mui/material/Chip';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import SecurityIcon from '@mui/icons-material/Security';
 import InfoIcon from '@mui/icons-material/Info';
@@ -49,23 +50,88 @@ import {
   useCheckGuildByInviteCode,
 } from '@/hooks/api';
 import { useLogout, useUpdateSiegeViewScope } from '@/features/auth/hooks/useAuth';
-import { isEmpty } from '@/shared/utils/util';
 import { logger } from '@/shared/lib/logger';
 import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
 import { readSiegeGuildViewSetting, writeSiegeGuildViewSetting, type SiegeGuildViewMode } from '@/shared/utils/siegeGuildView';
+import type { GuildApplicationItem, GuildSearchItem, UserInfo } from '@/features/auth/types/auth';
+
+function toGuildRole(role?: string): UserInfo['guild_role'] {
+  if (role === 'LEADER' || role === 'MANAGER' || role === 'MEMBER') {
+    return role;
+  }
+  return undefined;
+}
+
+function readStoredUserInfo(): (UserInfo & { siege_view_scope?: string }) | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const savedUserInfo = localStorage.getItem('userInfo');
+  if (!savedUserInfo) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(savedUserInfo) as UserInfo & { siege_view_scope?: string };
+  } catch (error) {
+    logger.error('사용자 정보 파싱 실패', error);
+    return null;
+  }
+}
+
+function readInitialSiegeGuildSetting(): {
+  mode: SiegeGuildViewMode;
+  selected: { guild_id: string; guild_name: string } | null;
+} {
+  if (typeof window === 'undefined') {
+    return {
+      mode: 'MY',
+      selected: null,
+    };
+  }
+
+  try {
+    const setting = readSiegeGuildViewSetting();
+    return {
+      mode: setting.mode,
+      selected:
+        setting.mode === 'GUILD' && setting.guild_id && setting.guild_name
+          ? { guild_id: setting.guild_id, guild_name: setting.guild_name }
+          : null,
+    };
+  } catch {
+    return {
+      mode: 'MY',
+      selected: null,
+    };
+  }
+}
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
-  const [autoLoginEnabled, setAutoLoginEnabled] = useState(false);
-  const [siegeViewScope, setSiegeViewScope] = useState<string>('C');
-  const [siegeGuildViewMode, setSiegeGuildViewMode] = useState<SiegeGuildViewMode>('MY');
-  const [siegeGuildViewSelected, setSiegeGuildViewSelected] = useState<{ guild_id: string; guild_name: string } | null>(null);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const initialUserInfo = readStoredUserInfo();
+  const initialSiegeGuildSetting = readInitialSiegeGuildSetting();
+  const [autoLoginEnabled, setAutoLoginEnabled] = useState(
+    () => typeof window !== 'undefined' && localStorage.getItem('remember_login') === 'true',
+  );
+  const [siegeViewScope, setSiegeViewScope] = useState<string>(() => {
+    const scope = initialUserInfo?.siege_view_scope;
+    return typeof scope === 'string' && scope.trim().length > 0 ? scope : 'C';
+  });
+  const [siegeGuildViewMode, setSiegeGuildViewMode] = useState<SiegeGuildViewMode>(
+    () => initialSiegeGuildSetting.mode,
+  );
+  const [siegeGuildViewSelected, setSiegeGuildViewSelected] = useState<{ guild_id: string; guild_name: string } | null>(
+    () => initialSiegeGuildSetting.selected,
+  );
   const [siegeGuildSearchKeyword, setSiegeGuildSearchKeyword] = useState('');
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
   const [editDialog, setEditDialog] = useState(false);
   const [guildJoinDialog, setGuildJoinDialog] = useState(false);
   const [guildJoinDialogTab, setGuildJoinDialogTab] = useState<'search' | 'invite'>('search');
@@ -79,7 +145,7 @@ export default function SettingsPage() {
   });
 
   // 사용자 정보 가져오기
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const [storedUserInfo, setStoredUserInfo] = useState<UserInfo | null>(initialUserInfo);
 
   // 길드 정보 조회
   const userGuildQuery = useUserGuild({
@@ -88,17 +154,22 @@ export default function SettingsPage() {
     refetchOnWindowFocus: false, // 윈도우 포커스 시 리프레시하지 않음
   });
 
-  // 길드 정보 업데이트
-  useEffect(() => {
-    if (userGuildQuery.data && userGuildQuery.data.guild_id && userInfo) {
-      setUserInfo({
-        ...userInfo,
-        guild_id: userGuildQuery.data.guild_id,
-        guild_name: userGuildQuery.data.guild_name,
-        guild_role: userGuildQuery.data.role,
-      });
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!storedUserInfo) {
+      return null;
     }
-  }, [userGuildQuery.data]);
+
+    if (!userGuildQuery.data?.guild_id) {
+      return storedUserInfo;
+    }
+
+    return {
+      ...storedUserInfo,
+      guild_id: userGuildQuery.data.guild_id,
+      guild_name: userGuildQuery.data.guild_name,
+      guild_role: toGuildRole(userGuildQuery.data.role) ?? storedUserInfo.guild_role,
+    };
+  }, [storedUserInfo, userGuildQuery.data]);
 
   // 길드 검색 Query
   const guildSearchQuery = useGuildSearch(
@@ -176,7 +247,7 @@ export default function SettingsPage() {
   });
 
 
-  const shouldCheckGuildStatus = isMounted && isAuthenticated() && !userInfo?.guild_id;
+  const shouldCheckGuildStatus = isClient && isAuthenticated() && !userInfo?.guild_id;
 
   // 길드 신청 목록 조회 (길드가 없을 때만: 생성 신청 상태 표시용)
   const guildApplicationListQuery = useGuildApplicationList({
@@ -185,7 +256,7 @@ export default function SettingsPage() {
 
   // 현재 사용자의 길드 생성 신청 찾기 (길드가 없는 경우)
   const myGuildApplication = guildApplicationListQuery.data?.find(
-    (app: any) => app.user_id === userInfo?.user_id && !app.guild_id && app.status === 'PENDING'
+    (app: GuildApplicationItem) => app.user_id === userInfo?.user_id && !app.guild_id && app.status === 'PENDING'
   );
 
   // 내 길드 가입 신청(승인대기) 상태 (길드가 없을 때만)
@@ -193,7 +264,7 @@ export default function SettingsPage() {
     enabled: shouldCheckGuildStatus,
   });
   const myJoinApplication = myJoinStatusQuery.data?.hasPendingJoinApplication
-    ? (myJoinStatusQuery.data.application as any)
+    ? (myJoinStatusQuery.data.application ?? null)
     : null;
 
   const cancelMyJoinApplicationMutation = useCancelMyGuildJoinApplication({
@@ -226,7 +297,7 @@ export default function SettingsPage() {
             siege_view_scope: siegeViewScope,
           };
           localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
-          setUserInfo(updatedUserInfo);
+          setStoredUserInfo(updatedUserInfo);
         }
       } else {
         throw new Error(res?.message || '설정 저장에 실패했습니다.');
@@ -237,42 +308,6 @@ export default function SettingsPage() {
       showToast.error(error.message || '설정 저장에 실패했습니다.');
     },
   });
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedRemember = localStorage.getItem('remember_login');
-      setAutoLoginEnabled(savedRemember === 'true');
-
-      // 사용자 정보 가져오기
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          const parsed = JSON.parse(storedUserInfo);
-          setUserInfo(parsed);
-          // siege_view_scope 설정
-          const scope = parsed.siege_view_scope;
-          if (typeof scope === 'string' && scope.trim().length > 0) {
-            setSiegeViewScope(scope);
-          } else {
-            setSiegeViewScope('C'); // 기본값
-          }
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
-      }
-
-      // 관리자 전용: 전적 조회 소속길드 설정 로드
-      try {
-        const s = readSiegeGuildViewSetting();
-        setSiegeGuildViewMode(s.mode);
-        if (s.mode === 'GUILD' && s.guild_id && s.guild_name) {
-          setSiegeGuildViewSelected({ guild_id: s.guild_id, guild_name: s.guild_name });
-        }
-      } catch {
-        // no-op
-      }
-    }
-  }, []);
 
   const toggleAutoLogin = async (enabled: boolean) => {
     try {
@@ -370,7 +405,7 @@ export default function SettingsPage() {
     return '알 수 없음';
   };
 
-  const getStatusColor = (status?: string) => {
+  const getStatusColor = (status?: string): ChipProps['color'] => {
     if (status === 'APPROVED') return 'success';
     if (status === 'REJECTED') return 'error';
     if (status === 'PENDING') return 'warning';
@@ -383,7 +418,7 @@ export default function SettingsPage() {
     return '정보 없음';
   };
 
-  const getRoleColor = (role?: string) => {
+  const getRoleColor = (role?: string): ChipProps['color'] => {
     if (role === 'LEADER') return 'error';
     if (role === 'MEMBER') return 'default';
     return 'default';
@@ -391,11 +426,10 @@ export default function SettingsPage() {
 
   const isAdmin =
     Array.isArray(userInfo?.roles) &&
-    userInfo.roles.some((r: any) => {
-      const roleId = String(r?.role_id ?? '');
-      const enabled = r?.usg_yn == null ? true : String(r?.usg_yn) === 'Y';
+    userInfo.roles.some((role) => {
+      const roleId = String(role?.role_id ?? '');
       // 관리자 = 시스템 운영자(RL0001)
-      return enabled && roleId === 'RL0001';
+      return roleId === 'RL0001';
     });
 
   const saveSiegeGuildViewSetting = () => {
@@ -504,7 +538,7 @@ export default function SettingsPage() {
                       </Typography>
                       <Chip
                         label={getRoleLabel(userInfo.guild_role)}
-                        color={getRoleColor(userInfo.guild_role) as any}
+                        color={getRoleColor(userInfo.guild_role)}
                         size="small"
                       />
                     </Box>
@@ -528,7 +562,7 @@ export default function SettingsPage() {
                       </Box>
                       {myJoinApplication.crt_date && (
                         <Typography variant="caption" color="text.secondary">
-                          신청일: {isMounted ? new Date(myJoinApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
+                          신청일: {isClient ? new Date(myJoinApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
                         </Typography>
                       )}
                       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
@@ -564,13 +598,13 @@ export default function SettingsPage() {
                       <Box sx={{ mb: 2 }}>
                         <Chip
                           label={getStatusLabel(myGuildApplication.status)}
-                          color={getStatusColor(myGuildApplication.status) as any}
+                          color={getStatusColor(myGuildApplication.status)}
                           size="medium"
                         />
                       </Box>
                       {myGuildApplication.crt_date && (
                         <Typography variant="caption" color="text.secondary">
-                          신청일: {isMounted ? new Date(myGuildApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
+                          신청일: {isClient ? new Date(myGuildApplication.crt_date).toLocaleDateString('ko-KR') : '-'}
                         </Typography>
                       )}
                     </Box>
@@ -727,7 +761,7 @@ export default function SettingsPage() {
                           >
                             {(siegeGuildSearchQuery.data || []).length > 0 ? (
                               <List dense disablePadding>
-                                {(siegeGuildSearchQuery.data || []).map((g: any) => (
+                                {(siegeGuildSearchQuery.data || []).map((g: GuildSearchItem) => (
                                   <ListItemButton
                                     key={g.guild_id}
                                     selected={siegeGuildViewSelected?.guild_id === g.guild_id}
@@ -974,7 +1008,7 @@ export default function SettingsPage() {
                         </Typography>
                       </Box>
                       <List dense disablePadding>
-                      {(guildSearchQuery.data || []).map((g: any) => (
+                      {(guildSearchQuery.data || []).map((g: GuildSearchItem) => (
                         <ListItemButton
                           key={g.guild_id}
                           selected={selectedGuild?.guild_id === g.guild_id}

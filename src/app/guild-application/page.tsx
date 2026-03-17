@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import {
   Box,
   Button,
@@ -24,23 +25,27 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ImageIcon from '@mui/icons-material/Image';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import type { GuildApplicationParams, UserInfo } from '@/features/auth/types/auth';
 
 export default function GuildApplicationPage() {
   const router = useRouter();
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!isClient) return null;
+    const storedUserInfo = localStorage.getItem('userInfo');
+    if (!storedUserInfo) return null;
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          setUserInfo(JSON.parse(storedUserInfo));
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
-      }
+    try {
+      return JSON.parse(storedUserInfo) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
     }
-  }, []);
+  }, [isClient]);
 
   // 길드 신청 폼 데이터
   const [guildFormData, setGuildFormData] = useState({
@@ -48,6 +53,18 @@ export default function GuildApplicationPage() {
     json_file: null as File | null,
     image_file: null as File | null,
   });
+  const previewImageUrl = useMemo(
+    () => (guildFormData.image_file ? URL.createObjectURL(guildFormData.image_file) : null),
+    [guildFormData.image_file],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (previewImageUrl) {
+        URL.revokeObjectURL(previewImageUrl);
+      }
+    };
+  }, [previewImageUrl]);
 
   // 길드 생성 신청 Mutation
   const guildCreateMutation = useGuildApplication({
@@ -88,11 +105,16 @@ export default function GuildApplicationPage() {
       return;
     }
 
-    guildCreateMutation.mutate({
+    const payload: GuildApplicationParams = {
       guild_name: guildFormData.guild_name,
+      user_id: userInfo.user_id,
+      password: '',
+      user_name: userInfo.user_name || userInfo.user_nm || userInfo.user_id,
       json_file: guildFormData.json_file,
       image_file: guildFormData.image_file,
-    } as any);
+    };
+
+    guildCreateMutation.mutate(payload);
   };
 
   return (
@@ -281,8 +303,8 @@ export default function GuildApplicationPage() {
                       const input = document.createElement('input');
                       input.type = 'file';
                       input.accept = 'image/*';
-                      input.onchange = (e: any) => {
-                        const file = e.target.files?.[0] || null;
+                      input.onchange = () => {
+                        const file = input.files?.[0] || null;
                         if (file) {
                           // 파일 검증
                           const validation = validateFile(file, {
@@ -293,7 +315,7 @@ export default function GuildApplicationPage() {
 
                           if (!validation.valid) {
                             showToast.error(validation.error || '파일 검증에 실패했습니다.');
-                            e.target.value = '';
+                            input.value = '';
                             return;
                           }
 
@@ -346,16 +368,22 @@ export default function GuildApplicationPage() {
                           bgcolor: 'action.hover',
                         }}
                       >
-                        <img
-                          src={URL.createObjectURL(guildFormData.image_file)}
-                          alt="미리보기"
-                          style={{
-                            maxWidth: '100%',
-                            maxHeight: '250px',
-                            objectFit: 'contain',
-                            display: 'block',
-                          }}
-                        />
+                        {previewImageUrl && (
+                          <Image
+                            src={previewImageUrl}
+                            alt="미리보기"
+                            width={640}
+                            height={250}
+                            unoptimized
+                            style={{
+                              maxWidth: '100%',
+                              maxHeight: '250px',
+                              objectFit: 'contain',
+                              display: 'block',
+                              height: 'auto',
+                            }}
+                          />
+                        )}
                         <IconButton
                           color="error"
                           size="small"

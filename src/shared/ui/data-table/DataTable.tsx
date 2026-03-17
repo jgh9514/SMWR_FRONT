@@ -14,15 +14,18 @@ import {
 import { ReactNode } from 'react';
 import EmptyState from '../empty-state/EmptyState';
 
-export interface TableColumn<T = any> {
+type TableRowData = object;
+type TableColumnKey<T extends TableRowData> = Extract<keyof T, string>;
+
+export interface TableColumn<T extends TableRowData = TableRowData> {
   title: string;
-  key: string;
+  key: TableColumnKey<T>;
   align?: 'left' | 'center' | 'right';
-  render?: (value: any, row: T, index: number) => ReactNode;
+  render?: (value: T[TableColumnKey<T>], row: T, index: number) => ReactNode;
   hideOnMobile?: boolean;
 }
 
-interface DataTableProps<T = any> extends Omit<TableProps, 'children'> {
+interface DataTableProps<T extends TableRowData = TableRowData> extends Omit<TableProps, 'children'> {
   columns: TableColumn<T>[];
   data: T[];
   emptyMessage?: string;
@@ -32,7 +35,7 @@ interface DataTableProps<T = any> extends Omit<TableProps, 'children'> {
   mobile?: boolean;
 }
 
-export default function DataTable<T = any>({
+export default function DataTable<T extends TableRowData = TableRowData>({
   columns,
   data,
   emptyMessage,
@@ -43,7 +46,8 @@ export default function DataTable<T = any>({
   ...tableProps
 }: DataTableProps<T>) {
   const theme = useTheme();
-  const mobile = mobileProp ?? useMediaQuery(theme.breakpoints.down('md'));
+  const responsiveMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const mobile = mobileProp ?? responsiveMobile;
 
   const visibleColumns = mobile ? columns.filter((col) => !col.hideOnMobile) : columns;
 
@@ -86,7 +90,13 @@ export default function DataTable<T = any>({
         </TableHead>
         <TableBody>
           {data.map((row, index) => {
-            const rowKey = getRowKey ? getRowKey(row, index) : (row as any).id || index;
+            const rawRowKey =
+              getRowKey?.(row, index) ??
+              ('id' in row && row.id != null ? row.id : index);
+            const rowKey =
+              typeof rawRowKey === 'string' || typeof rawRowKey === 'number'
+                ? rawRowKey
+                : index;
             const isSelected = selectedRowKey !== undefined && selectedRowKey === rowKey;
 
             return (
@@ -98,10 +108,10 @@ export default function DataTable<T = any>({
                 selected={isSelected}
               >
                 {visibleColumns.map((col) => {
-                  const value = (row as any)[col.key];
+                  const value = row[col.key];
                   return (
                     <TableCell key={col.key} align={col.align || 'left'}>
-                      {col.render ? col.render(value, row, index) : value}
+                      {col.render ? col.render(value, row, index) : (value as ReactNode)}
                     </TableCell>
                   );
                 })}

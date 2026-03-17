@@ -9,10 +9,12 @@ import {
   LoginParams,
   LoginResponse,
   AuthCheckResponse,
+  ApiResult,
   GuildApplicationParams,
   GuildApplicationResponse,
   GuildSearchParams,
   GuildSearchItem,
+  UserGuildInfo,
   SignupParams,
   SignupResponse,
   GuildApplicationItem,
@@ -21,6 +23,7 @@ import {
   GuildMember,
   GuildJoinApplication,
   MyGuildJoinApplicationStatusResponse,
+  GuildInviteCheckResponse,
   UpdateGuildMemberRoleParams,
   TransferGuildLeadershipParams,
   KickGuildMemberParams,
@@ -120,11 +123,13 @@ export const useSignup = (options?: Parameters<typeof useApiPostMutation<SignupR
  * 백엔드: /api/v1/smw/guild/user-guild
  * 로그인 상태일 때만 조회
  */
-export const useUserGuild = (options?: Parameters<typeof useApiPostQuery>[2]) => {
+export const useUserGuild = (
+  options?: Parameters<typeof useApiPostQuery<UserGuildInfo>>[2],
+) => {
   // 로그인 상태 확인 (역할을 드러내고 구현은 숨김)
   const hasToken = typeof window !== 'undefined' ? isAuthenticated() : false;
   
-  return useApiPostQuery<any>('/smw/guild/user-guild', {}, {
+  return useApiPostQuery<UserGuildInfo>('/smw/guild/user-guild', {}, {
     ...options,
     enabled: hasToken && (options?.enabled !== false), // 로그인 상태일 때만 조회
   });
@@ -134,8 +139,8 @@ export const useUserGuild = (options?: Parameters<typeof useApiPostQuery>[2]) =>
  * 길드 가입 Mutation
  * 백엔드: /api/v1/smw/guild/join
  */
-export const useJoinGuild = (options?: Parameters<typeof useApiPostMutation<any, { guild_id: string }>>[1]) => {
-  return useApiPostMutation<any, { guild_id: string }>('/smw/guild/join', options);
+export const useJoinGuild = (options?: Parameters<typeof useApiPostMutation<ApiResult, { guild_id: string }>>[1]) => {
+  return useApiPostMutation<ApiResult, { guild_id: string }>('/smw/guild/join', options);
 };
 
 /**
@@ -143,9 +148,9 @@ export const useJoinGuild = (options?: Parameters<typeof useApiPostMutation<any,
  * 백엔드: /api/v1/smw/guild/join-application/save
  */
 export const useApplyGuildJoinApplication = (
-  options?: Parameters<typeof useApiPostMutation<any, { guild_id: string; message?: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { guild_id: string; message?: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { guild_id: string; message?: string }>('/smw/guild/join-application/save', options);
+  return useApiPostMutation<ApiResult, { guild_id: string; message?: string }>('/smw/guild/join-application/save', options);
 };
 
 /**
@@ -184,9 +189,9 @@ export const useGuildApplicationList = (
  * 백엔드: /api/v1/smw/guild/application/process
  */
 export const useProcessGuildApplication = (
-  options?: Parameters<typeof useApiPostMutation<any, ProcessGuildApplicationParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, ProcessGuildApplicationParams>>[1],
 ) => {
-  return useApiPostMutation<any, ProcessGuildApplicationParams>('/smw/guild/application/process', options);
+  return useApiPostMutation<ApiResult, ProcessGuildApplicationParams>('/smw/guild/application/process', options);
 };
 
 /**
@@ -205,9 +210,9 @@ export const useGuildSettings = (
  * 백엔드: /api/v1/smw/guild/save
  */
 export const useSaveGuildSettings = (
-  options?: Parameters<typeof useApiPostMutation<any, GuildSettings>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, GuildSettings>>[1],
 ) => {
-  return useApiPostMutation<any, GuildSettings>('/smw/guild/save', options);
+  return useApiPostMutation<ApiResult, GuildSettings>('/smw/guild/save', options);
 };
 
 /**
@@ -215,9 +220,9 @@ export const useSaveGuildSettings = (
  * 백엔드: /api/v1/smw/guild/invite/generate
  */
 export const useGenerateInviteCode = (
-  options?: Parameters<typeof useApiPostMutation<any, { guild_id: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult & { invite_code?: string; invite_key?: string }, { guild_id: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { guild_id: string }>('/smw/guild/invite/generate', options);
+  return useApiPostMutation<ApiResult & { invite_code?: string; invite_key?: string }, { guild_id: string }>('/smw/guild/invite/generate', options);
 };
 
 /**
@@ -247,17 +252,19 @@ export const useGuildJoinApplicationList = (
  * 백엔드: /api/v1/smw/guild/application/process
  */
 export const useProcessGuildJoinApplication = (
-  options?: Parameters<typeof useApiPostMutation<any, ProcessGuildApplicationParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, ProcessGuildApplicationParams>>[1],
 ) => {
-  return useApiPostMutation<any, ProcessGuildApplicationParams>('/smw/guild/join-application/process', options);
+  return useApiPostMutation<ApiResult, ProcessGuildApplicationParams>('/smw/guild/join-application/process', options);
 };
 
 /**
  * 내 길드 가입 신청 취소 Mutation
  * 백엔드: /api/v1/smw/guild/join-application/cancel
  */
-export const useCancelMyGuildJoinApplication = (options?: Parameters<typeof useApiPostMutation<any, {}>>[1]) => {
-  return useApiPostMutation<any, {}>('/smw/guild/join-application/cancel', options);
+export const useCancelMyGuildJoinApplication = (
+  options?: Parameters<typeof useApiPostMutation<ApiResult, Record<string, never>>>[1],
+) => {
+  return useApiPostMutation<ApiResult, Record<string, never>>('/smw/guild/join-application/cancel', options);
 };
 
 /**
@@ -265,9 +272,9 @@ export const useCancelMyGuildJoinApplication = (options?: Parameters<typeof useA
  * 백엔드: /api/v1/smw/guild/member/role/update
  */
 export const useUpdateGuildMemberRole = (
-  options?: Parameters<typeof useApiPostMutation<any, UpdateGuildMemberRoleParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, UpdateGuildMemberRoleParams>>[1],
 ) => {
-  return useApiPostMutation<any, UpdateGuildMemberRoleParams>('/smw/guild/member/role/update', options);
+  return useApiPostMutation<ApiResult, UpdateGuildMemberRoleParams>('/smw/guild/member/role/update', options);
 };
 
 /**
@@ -275,17 +282,17 @@ export const useUpdateGuildMemberRole = (
  * 백엔드: /api/v1/smw/guild/transfer-leadership
  */
 export const useTransferGuildLeadership = (
-  options?: Parameters<typeof useApiPostMutation<any, TransferGuildLeadershipParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, TransferGuildLeadershipParams>>[1],
 ) => {
-  return useApiPostMutation<any, TransferGuildLeadershipParams>('/smw/guild/transfer-leadership', options);
+  return useApiPostMutation<ApiResult, TransferGuildLeadershipParams>('/smw/guild/transfer-leadership', options);
 };
 
 /**
  * 길드 멤버 추방 Mutation (길드장/매니저)
  * 백엔드: /api/v1/smw/guild/member/kick
  */
-export const useKickGuildMember = (options?: Parameters<typeof useApiPostMutation<any, KickGuildMemberParams>>[1]) => {
-  return useApiPostMutation<any, KickGuildMemberParams>('/smw/guild/member/kick', options);
+export const useKickGuildMember = (options?: Parameters<typeof useApiPostMutation<ApiResult, KickGuildMemberParams>>[1]) => {
+  return useApiPostMutation<ApiResult, KickGuildMemberParams>('/smw/guild/member/kick', options);
 };
 
 /**
@@ -293,9 +300,9 @@ export const useKickGuildMember = (options?: Parameters<typeof useApiPostMutatio
  * 백엔드: /api/v1/smw/guild/invite/join
  */
 export const useJoinGuildByInviteCode = (
-  options?: Parameters<typeof useApiPostMutation<any, { invite_key: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { invite_key: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { invite_key: string }>('/smw/guild/invite/join', options);
+  return useApiPostMutation<ApiResult, { invite_key: string }>('/smw/guild/invite/join', options);
 };
 
 /**
@@ -304,9 +311,9 @@ export const useJoinGuildByInviteCode = (
  */
 export const useCheckGuildByInviteCode = (
   inviteKey: string,
-  options?: Omit<Parameters<typeof useApiPostQuery<any>>[2], 'enabled'>,
+  options?: Omit<Parameters<typeof useApiPostQuery<GuildInviteCheckResponse>>[2], 'enabled'>,
 ) => {
-  return useApiPostQuery<any>('/smw/guild/invite/check', { invite_key: inviteKey }, options);
+  return useApiPostQuery<GuildInviteCheckResponse>('/smw/guild/invite/check', { invite_key: inviteKey }, options);
 };
 
 /**
@@ -364,8 +371,8 @@ export const useFindPassword = (
  * 백엔드: /api/v1/sm/user/update-siege-scope
  */
 export const useUpdateSiegeViewScope = (
-  options?: Parameters<typeof useApiPostMutation<any, { siege_view_scope: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { siege_view_scope: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { siege_view_scope: string }>('/sm/user/update-siege-scope', options);
+  return useApiPostMutation<ApiResult, { siege_view_scope: string }>('/sm/user/update-siege-scope', options);
 };
 

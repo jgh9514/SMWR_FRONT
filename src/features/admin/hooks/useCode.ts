@@ -10,7 +10,6 @@ import {
   CodeSaveRequest,
   CodeRelSaveRequest,
   CodeRelSaveResponse,
-  ParentItem,
   ChildItem,
 } from '@/types';
 
@@ -40,7 +39,13 @@ export const useCodeSave = () => {
  * 코드 관계 목록 조회
  */
 export const useCodeRelList = (params: Record<string, unknown> = {}) => {
-  return useApiPostQuery<ChildItem[]>('/sm/cdrel/list', params, { enabled: false });
+  const hasParentCode =
+    params.up_cd_grp_no &&
+    String(params.up_cd_grp_no).trim() !== '' &&
+    params.up_cd &&
+    String(params.up_cd).trim() !== '';
+
+  return useApiPostQuery<ChildItem[]>('/sm/cdrel/list', params, { enabled: !!hasParentCode });
 };
 
 /**

@@ -23,6 +23,7 @@ const STAT_LABELS: Record<string, string> = {
 const PERCENT_STATS = ['cr', 'cd', 'res', 'acc'];
 
 function MonsterDetailCard({ monster, monsterIndex }: MonsterDetailCardProps) {
+  void monsterIndex;
   const isPercentStat = (key: string): boolean => PERCENT_STATS.includes(key);
 
   return (

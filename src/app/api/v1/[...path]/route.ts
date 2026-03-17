@@ -6,6 +6,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/shared/lib/logger';
 
+interface ProxyFetchError extends Error {
+  code?: string;
+  errno?: number | string;
+  syscall?: string;
+}
+
 // 백엔드 WAS URL 가져오기
 const getBackendURL = () => {
   // 환경 변수가 있으면 우선 사용
@@ -122,9 +128,9 @@ async function proxyRequest(
       
       // 쿠키에서 인증 토큰 추출하여 Authorization 헤더 설정
       // 백엔드에서 설정하는 쿠키 이름: SMW-Authorization 또는 SMW_AUTHORIZATION
-      const cookies = cookie.split(';').map(c => c.trim());
-      const authCookie = cookies.find(c => 
-        c.startsWith('SMW-Authorization=') || c.startsWith('SMW_AUTHORIZATION=')
+      const cookies = cookie.split(';').map((cookieItem) => cookieItem.trim());
+      const authCookie = cookies.find((cookieItem) => 
+        cookieItem.startsWith('SMW-Authorization=') || cookieItem.startsWith('SMW_AUTHORIZATION=')
       );
       
       if (authCookie) {
@@ -182,7 +188,7 @@ async function proxyRequest(
     if (method !== 'GET' && method !== 'DELETE') {
       try {
         body = await request.text();
-      } catch (error) {
+      } catch {
         // 본문이 없는 경우 무시
       }
     }
@@ -203,11 +209,12 @@ async function proxyRequest(
         // 쿠키는 이미 headers['Cookie']로 전달됨
       });
     } catch (fetchError) {
+      const proxyFetchError = fetchError as ProxyFetchError;
       logger.error('[프록시] fetch 실패', fetchError, {
         backendURL,
-        code: (fetchError as any)?.code,
-        errno: (fetchError as any)?.errno,
-        syscall: (fetchError as any)?.syscall,
+        code: proxyFetchError.code,
+        errno: proxyFetchError.errno,
+        syscall: proxyFetchError.syscall,
       });
       throw fetchError;
     }

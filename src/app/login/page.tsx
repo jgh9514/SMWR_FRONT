@@ -1,18 +1,17 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import {
   Box,
   Button,
   Card,
   CardContent,
   Checkbox,
-  Container,
   FormControlLabel,
   TextField,
   Typography,
 } from '@mui/material';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useLogin } from '@/hooks/api';
 import { isEmpty } from '@/shared/utils/util';
 import { showToast } from '@/shared/lib/notification';
@@ -26,7 +25,6 @@ import type { LoginParams } from '@/types';
 
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [frmDatas, setFrmDatas] = useState({
     user_id: '',
     user_pw: '',
@@ -56,7 +54,7 @@ function LoginContent() {
 
 
   // 페이지 로드 시 저장된 아이디 및 자동 로그인 설정 불러오기
-  const loadSavedLoginInfo = () => {
+  const loadSavedLoginInfo = useCallback(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -89,7 +87,7 @@ function LoginContent() {
       // 쿠키가 있으면 이미 로그인된 상태이므로 메인으로 이동
       router.push('/');
     }
-  };
+  }, [router]);
 
   // 아이디 및 자동 로그인 설정 저장 (설정 페이지와 동기화)
   // 자동 로그인은 WAS 쿠키 기반으로 처리
@@ -160,10 +158,10 @@ function LoginContent() {
         throw new Error(errorMessage);
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       logger.error('로그인 실패', error, { context: 'LoginPage' });
-      
-      showToast.error(error.message || '로그인에 실패했습니다.');
+
+      showToast.error(error instanceof Error ? error.message : '로그인에 실패했습니다.');
     },
   });
 
@@ -181,7 +179,7 @@ function LoginContent() {
 
   useEffect(() => {
     loadSavedLoginInfo();
-  }, []);
+  }, [loadSavedLoginInfo]);
 
   return (
     <Box

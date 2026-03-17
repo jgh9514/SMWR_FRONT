@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,24 +25,28 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useParentCodeList, useCodeRelList, useCodeRelSave, useCodePopupList } from '@/hooks/api';
-import { isEmpty, searchDataExtraction } from '@/shared/utils/util';
+import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import ListWrapper from '@/shared/ui/list-wrapper/ListWrapper';
 import type { ParentItem, ChildItem, PopupItem } from '@/types';
+import type { SearchData } from '@/shared/types/util';
+
+type ChildTableItem = ChildItem & { id: string };
+type PopupTableItem = PopupItem & { id: string };
 
 export default function PreferenceCdrelmnPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const [schDatas, setSchDatas] = useState<any>({});
-  const [schChildrenDatas, setSchChildrenDatas] = useState<any>({});
-  const [childList, setChildList] = useState<ChildItem[]>([]);
+  const [schDatas] = useState<SearchData>({});
+  const [schChildrenDatas, setSchChildrenDatas] = useState<SearchData>({});
+  const [childListOverride, setChildListOverride] = useState<ChildTableItem[] | null>(null);
   const [selectedChildren, setSelectedChildren] = useState<string[]>([]);
   const [selectedParent, setSelectedParent] = useState<ParentItem | null>(null);
 
   const [cdDialog, setCdDialog] = useState(false);
-  const [cdPopupSchDatas, setCdPopupSchDatas] = useState<any>({});
+  const [cdPopupSchDatas, setCdPopupSchDatas] = useState<SearchData>({});
   const [selectedPopupCodes, setSelectedPopupCodes] = useState<string[]>([]);
 
   const parentHeaders = useMemo(() => {
@@ -93,7 +97,7 @@ export default function PreferenceCdrelmnPage() {
   }, [schDatas]);
 
   // 부모 코드 목록 조회
-  const { data: parentList = [], refetch: refetchParent } = useParentCodeList(parentSearchParams, false);
+  const { data: parentList = [], refetch: refetchParent } = useParentCodeList(parentSearchParams, true);
 
   // 자식 코드 목록 조회 파라미터
   const childSearchParams = useMemo(() => {
@@ -103,35 +107,27 @@ export default function PreferenceCdrelmnPage() {
   // 자식 코드 목록 조회
   const { data: childResponse = [], refetch: refetchChild } = useCodeRelList(childSearchParams);
 
-  // 자식 코드 목록 상태 업데이트
-  useEffect(() => {
-    if (childResponse.length > 0) {
-      setChildList(
-        childResponse.map((row: any, idx: number) => ({
-          ...row,
-          id: `${row.cd_grp_no}_${row.cd}_${idx}`,
-        })),
-      );
-    } else {
-      setChildList([]);
-    }
-  }, [childResponse]);
+  const childListFromResponse = useMemo<ChildTableItem[]>(
+    () =>
+      childResponse.map((row, idx) => ({
+        ...row,
+        id: `${row.cd_grp_no}_${row.cd}_${idx}`,
+      })),
+    [childResponse],
+  );
+
+  const childList = childListOverride ?? childListFromResponse;
 
   const onParentClick = (item: ParentItem) => {
     setSelectedParent(item);
-    setSchChildrenDatas((prev: any) => ({
+    setSelectedChildren([]);
+    setChildListOverride(null);
+    setSchChildrenDatas((prev) => ({
       ...prev,
       up_cd_grp_no: item.cd_grp_no,
       up_cd: item.cd,
     }));
   };
-
-  // 부모 클릭 시 자식 목록 조회
-  useEffect(() => {
-    if (selectedParent) {
-      refetchChild();
-    }
-  }, [selectedParent, schChildrenDatas]);
 
   const add = () => {
     if (!selectedParent) {
@@ -149,9 +145,8 @@ export default function PreferenceCdrelmnPage() {
   // 코드 팝업 조회
   const { data: cdPopupResponse = [], refetch: refetchCdPopup } = useCodePopupList(cdPopupParams, false);
 
-  // 코드 팝업 목록 상태 업데이트
-  const cdPopupList = useMemo(() => {
-    return cdPopupResponse.map((row: any, idx: number) => ({
+  const cdPopupList = useMemo<PopupTableItem[]>(() => {
+    return cdPopupResponse.map((row, idx) => ({
       ...row,
       id: `${row.cd_grp_no}_${row.cd}_${idx}`,
     }));
@@ -168,25 +163,29 @@ export default function PreferenceCdrelmnPage() {
       showToast.error('선택할 항목이 없습니다.');
       return;
     }
+    if (!selectedParent) {
+      showToast.error('부모코드목록에서 코드를 선택해주세요.');
+      return;
+    }
 
     const returnData = cdPopupList.filter((item) => selectedPopupCodes.includes(item.id));
 
-    for (let i = 0; i < returnData.length; i++) {
-      const exists = childList.some(
-        (c) => c.cd_grp_no === returnData[i].cd_grp_no && c.cd === returnData[i].cd,
-      );
+    setChildListOverride((prev) => {
+      const current = prev ?? childList;
+      const additions = returnData
+        .filter(
+          (item) =>
+            !current.some((child) => child.cd_grp_no === item.cd_grp_no && child.cd === item.cd),
+        )
+        .map((item, index) => ({
+          ...item,
+          up_cd: selectedParent.cd,
+          id: `${item.cd_grp_no}_${item.cd}_${Date.now()}_${index}`,
+          row_status: 'C',
+        }));
 
-      if (!exists) {
-        setChildList((prev) => [
-          ...prev,
-          {
-            ...returnData[i],
-            id: `${returnData[i].cd_grp_no}_${returnData[i].cd}_${Date.now()}_${i}`,
-            row_status: 'C',
-          },
-        ]);
-      }
-    }
+      return [...current, ...additions];
+    });
 
     showToast.success('중복된 데이터를 제외 후 추가되었습니다.');
     closeCdDialog();
@@ -201,7 +200,10 @@ export default function PreferenceCdrelmnPage() {
     const res = await confirm('삭제하시겠습니까?');
     if (!res) return;
 
-    setChildList((prev) => prev.filter((item) => item.id && !selectedChildren.includes(item.id)));
+    setChildListOverride((prev) => {
+      const current = prev ?? childList;
+      return current.filter((item) => !selectedChildren.includes(item.id));
+    });
     setSelectedChildren([]);
   };
 
@@ -230,6 +232,7 @@ export default function PreferenceCdrelmnPage() {
     onSuccess: (response) => {
       if (response.result === 'Success') {
         showToast.success('저장되었습니다.');
+        setChildListOverride(null);
         refetchParent();
         refetchChild();
       } else if (response.result === 'OverlapFail') {
@@ -339,7 +342,7 @@ export default function PreferenceCdrelmnPage() {
                               />
                             </TableCell>
                             <TableCell align="center">{row.cd_grp_no}</TableCell>
-                            {!mobile && <TableCell align="left">{row.cd_grp_no}</TableCell>}
+                            {!mobile && <TableCell align="left">{row.cd_grp_nm}</TableCell>}
                             <TableCell align="center">{row.cd}</TableCell>
                             <TableCell align="left">{row.cd_nm}</TableCell>
                           </TableRow>

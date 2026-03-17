@@ -4,7 +4,11 @@
 
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
-import { MenuItem, SaveRequest } from '@/types';
+import { MenuItem, RoleItem, SaveRequest } from '@/types';
+
+export interface MenuRoleItem extends RoleItem {
+  rolechk?: 'Y' | 'N';
+}
 
 /**
  * 메뉴 목록 조회
@@ -26,7 +30,7 @@ export const useMenuSave = (
  * 메뉴 권한 조회
  */
 export const useMenuRoleList = (menuId: string | null) => {
-  return useApiPostQuery<unknown[]>('/sm/menurole/list', { menu_id: menuId }, {
+  return useApiPostQuery<MenuRoleItem[]>('/sm/menurole/list', { menu_id: menuId }, {
     enabled: !!menuId,
   });
 };
@@ -35,8 +39,8 @@ export const useMenuRoleList = (menuId: string | null) => {
  * 메뉴 권한 저장 Mutation
  */
 export const useMenuRoleSave = (
-  options?: Omit<Parameters<typeof useApiPostMutation<unknown, { menu_id: string; roleList: unknown[] }>>[1], 'mutationFn'>
+  options?: Omit<Parameters<typeof useApiPostMutation<unknown, { menu_id: string; roleList: MenuRoleItem[] }>>[1], 'mutationFn'>
 ) => {
-  return useApiPostMutation<unknown, { menu_id: string; roleList: unknown[] }>('/sm/menurole/save', options);
+  return useApiPostMutation<unknown, { menu_id: string; roleList: MenuRoleItem[] }>('/sm/menurole/save', options);
 };
 

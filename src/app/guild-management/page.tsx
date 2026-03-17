@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -28,12 +28,12 @@ import {
   InputLabel,
   Alert,
   CircularProgress,
-  Divider,
   TextField,
   RadioGroup,
   FormControlLabel,
   Radio,
 } from '@mui/material';
+import type { ChipProps } from '@mui/material/Chip';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
@@ -55,52 +55,76 @@ import {
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import type { GuildJoinApplication, GuildMember, GuildSettings, UserInfo } from '@/features/auth/types/auth';
+
+type GuildMemberLike = GuildMember & {
+  role?: string;
+  usr_id?: string;
+};
+
+function toGuildRole(role?: string): UserInfo['guild_role'] {
+  if (role === 'LEADER' || role === 'MANAGER' || role === 'MEMBER') {
+    return role;
+  }
+  return undefined;
+}
 
 export default function GuildManagementPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const userInfoSnapshot = useSyncExternalStore(
+    () => () => {},
+    () => (typeof window === 'undefined' ? null : localStorage.getItem('userInfo')),
+    () => null,
+  );
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!userInfoSnapshot) {
+      return null;
+    }
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    try {
+      return JSON.parse(userInfoSnapshot) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
+    }
+  }, [userInfoSnapshot]);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState<string>('');
   const [roleChangeDialogOpen, setRoleChangeDialogOpen] = useState(false);
-  const [selectedMemberForRoleChange, setSelectedMemberForRoleChange] = useState<{ user_id: string; current_role: string } | null>(null);
+  const [selectedMemberForRoleChange, setSelectedMemberForRoleChange] = useState<{
+    user_id: string;
+    current_role: UserInfo['guild_role'];
+  } | null>(null);
   const [newRole, setNewRole] = useState<string>('');
   const [kickDialogOpen, setKickDialogOpen] = useState(false);
-  const [selectedMemberForKick, setSelectedMemberForKick] = useState<any>(null);
+  const [selectedMemberForKick, setSelectedMemberForKick] = useState<GuildMemberLike | null>(null);
   const [kickReason, setKickReason] = useState<string>('');
-  const [guildInfo, setGuildInfo] = useState<{ guild_name?: string; join_type?: string; description?: string; invite_key?: string }>({});
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          const parsed = JSON.parse(storedUserInfo);
-          setUserInfo(parsed);
-          // 권한 체크
-          const isLeaderOrManager = parsed.guild_role === 'LEADER' || parsed.guild_role === 'MANAGER';
-          if (!parsed.guild_id || !isLeaderOrManager) {
-            showToast.error('길드 관리 권한이 없습니다.');
-            router.push('/');
-          }
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
-      }
-    }
-  }, [router]);
+  const [guildInfo, setGuildInfo] = useState<GuildSettings>({});
 
   const isLeader = userInfo?.guild_role === 'LEADER';
   const isManager = userInfo?.guild_role === 'MANAGER';
 
+  useEffect(() => {
+    if (!isClient || !userInfo) {
+      return;
+    }
+
+    const isLeaderOrManager = userInfo.guild_role === 'LEADER' || userInfo.guild_role === 'MANAGER';
+    if (!userInfo.guild_id || !isLeaderOrManager) {
+      showToast.error('길드 관리 권한이 없습니다.');
+      router.push('/');
+    }
+  }, [isClient, router, userInfo]);
+
   // 길드 정보 조회
   const guildSettingsQuery = useGuildSettings(userInfo?.guild_id || '', {
     enabled: !!userInfo?.guild_id && (isLeader || isManager),
-    onSuccess: (data: any) => {
+    onSuccess: (data: GuildSettings) => {
       logger.info('길드 정보 조회 성공', { data, guild_id: userInfo?.guild_id });
       // 길드 정보를 state에 저장
       setGuildInfo({
@@ -110,7 +134,7 @@ export default function GuildManagementPage() {
         invite_key: data.invite_key,
       });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       logger.error('길드 정보 조회 실패', error, { guild_id: userInfo?.guild_id });
     },
   });
@@ -118,10 +142,10 @@ export default function GuildManagementPage() {
   // 길드 멤버 목록 조회
   const guildMembersQuery = useGuildMembers(userInfo?.guild_id || '', {
     enabled: !!userInfo?.guild_id && (isLeader || isManager),
-    onSuccess: (data: any) => {
+    onSuccess: (data: GuildMember[]) => {
       logger.info('길드 멤버 목록 조회 성공', { data, guild_id: userInfo?.guild_id });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       logger.error('길드 멤버 목록 조회 실패', error, { guild_id: userInfo?.guild_id });
     },
   });
@@ -134,7 +158,7 @@ export default function GuildManagementPage() {
   // 초대 코드 채번 Mutation
   const generateInviteCodeMutation = useGenerateInviteCode({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS' && res.invite_code) {
+      if (res && res.result === 'SUCCESS' && (res.invite_code || res.invite_key)) {
         showToast.success('초대 코드가 생성되었습니다.');
         // 백엔드에서 최신 데이터를 가져오기 위해 refetch
         guildSettingsQuery.refetch();
@@ -145,22 +169,6 @@ export default function GuildManagementPage() {
     onError: (error: Error) => {
       logger.error('초대 코드 생성 실패', error);
       showToast.error(error.message || '초대 코드 생성에 실패했습니다.');
-    },
-  });
-
-  // 길드 설정 저장 Mutation (초대 코드 변경용)
-  const saveGuildSettingsMutation = useSaveGuildSettings({
-    onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('초대 코드가 변경되었습니다.');
-        guildSettingsQuery.refetch();
-      } else {
-        throw new Error(res.message || '초대 코드 변경에 실패했습니다.');
-      }
-    },
-    onError: (error: Error) => {
-      logger.error('초대 코드 변경 실패', error);
-      showToast.error(error.message || '초대 코드 변경에 실패했습니다.');
     },
   });
 
@@ -234,9 +242,9 @@ export default function GuildManagementPage() {
           const storedUserInfo = localStorage.getItem('userInfo');
           if (storedUserInfo) {
             try {
-              const parsed = JSON.parse(storedUserInfo);
+              const parsed = JSON.parse(storedUserInfo) as UserInfo;
               if (parsed.user_id === selectedMemberForRoleChange?.user_id) {
-                parsed.guild_role = newRole;
+                parsed.guild_role = toGuildRole(newRole);
                 localStorage.setItem('userInfo', JSON.stringify(parsed));
               }
             } catch (error) {
@@ -267,7 +275,7 @@ export default function GuildManagementPage() {
           const storedUserInfo = localStorage.getItem('userInfo');
           if (storedUserInfo) {
             try {
-              const parsed = JSON.parse(storedUserInfo);
+              const parsed = JSON.parse(storedUserInfo) as UserInfo;
               if (parsed.user_id === selectedMemberForTransfer) {
                 parsed.guild_role = 'LEADER';
                 localStorage.setItem('userInfo', JSON.stringify(parsed));
@@ -301,15 +309,19 @@ export default function GuildManagementPage() {
     });
   };
 
-  const handleRoleChange = (member: any) => {
+  const handleRoleChange = (member: GuildMemberLike) => {
     const userId = member.user_id || member.usr_id;
-    const currentRole = member.guild_role || member.role || 'MEMBER';
+    const currentRole = toGuildRole(member.guild_role || member.role) ?? 'MEMBER';
+    if (!userId) {
+      showToast.error('대상 유저 정보가 없습니다.');
+      return;
+    }
     setSelectedMemberForRoleChange({ user_id: userId, current_role: currentRole });
     setNewRole(currentRole);
     setRoleChangeDialogOpen(true);
   };
 
-  const handleKickMember = (member: any) => {
+  const handleKickMember = (member: GuildMemberLike) => {
     setSelectedMemberForKick(member);
     setKickReason('');
     setKickDialogOpen(true);
@@ -328,14 +340,23 @@ export default function GuildManagementPage() {
 
   const handleUpdateRole = () => {
     if (!selectedMemberForRoleChange || !newRole) return;
+    const guildRole = toGuildRole(newRole);
+    if (!guildRole) {
+      showToast.error('변경할 권한 정보가 올바르지 않습니다.');
+      return;
+    }
     updateMemberRoleMutation.mutate({
       user_id: selectedMemberForRoleChange.user_id,
-      guild_role: newRole as 'LEADER' | 'MANAGER' | 'MEMBER',
+      guild_role: guildRole,
     });
   };
 
-  const handleTransferLeadership = (member: any) => {
+  const handleTransferLeadership = (member: GuildMemberLike) => {
     const userId = member.user_id || member.usr_id;
+    if (!userId) {
+      showToast.error('대상 유저 정보가 없습니다.');
+      return;
+    }
     setSelectedMemberForTransfer(userId);
     setTransferDialogOpen(true);
   };
@@ -377,7 +398,7 @@ export default function GuildManagementPage() {
     }
     
     // 길드 정보 저장 (guild_name, join_type, description, invite_key)
-    const params: any = {
+    const params: GuildSettings = {
       guild_id: userInfo.guild_id,
       guild_name: guildName.trim(),
       join_type: guildInfo.join_type !== undefined 
@@ -402,7 +423,7 @@ export default function GuildManagementPage() {
     return '멤버';
   };
 
-  const getRoleColor = (role?: string) => {
+  const getRoleColor = (role?: string): ChipProps['color'] => {
     if (role === 'LEADER') return 'error';
     if (role === 'MANAGER') return 'warning';
     return 'default';
@@ -541,7 +562,7 @@ export default function GuildManagementPage() {
                     가입일
                   </Typography>
                   <Typography variant="body1">
-                    {isMounted && guildSettingsQuery.data.crt_date ? new Date(guildSettingsQuery.data.crt_date).toLocaleDateString('ko-KR') : '-'}
+                    {isClient && guildSettingsQuery.data.crt_date ? new Date(guildSettingsQuery.data.crt_date).toLocaleDateString('ko-KR') : '-'}
                   </Typography>
                 </Box>
                 {(isLeader || isManager) && (
@@ -596,7 +617,7 @@ export default function GuildManagementPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {guildMembersQuery.data.map((member: any, index: number) => {
+                      {guildMembersQuery.data.map((member: GuildMemberLike, index: number) => {
                         // 필드명 매핑 (role -> guild_role, user_nm -> user_name)
                         const guildRole = member.guild_role || member.role;
                         const userName = member.user_name || member.user_nm;
@@ -608,7 +629,7 @@ export default function GuildManagementPage() {
                             <TableCell align="center">
                               <Chip
                                 label={getRoleLabel(guildRole)}
-                                color={getRoleColor(guildRole) as any}
+                                color={getRoleColor(guildRole)}
                                 size="small"
                               />
                             </TableCell>
@@ -675,14 +696,14 @@ export default function GuildManagementPage() {
         <Card>
           <CardHeader
             avatar={<PersonAddIcon color="primary" />}
-            title={`가입 신청 (${guildJoinApplicationListQuery.data?.filter((app: any) => app.status === 'PENDING').length || 0}명)`}
+            title={`가입 신청 (${guildJoinApplicationListQuery.data?.filter((app: GuildJoinApplication) => app.status === 'PENDING').length || 0}명)`}
           />
           <CardContent>
             {guildJoinApplicationListQuery.isLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : guildJoinApplicationListQuery.data && guildJoinApplicationListQuery.data.filter((app: any) => app.status === 'PENDING').length > 0 ? (
+            ) : guildJoinApplicationListQuery.data && guildJoinApplicationListQuery.data.filter((app: GuildJoinApplication) => app.status === 'PENDING').length > 0 ? (
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
@@ -694,8 +715,13 @@ export default function GuildManagementPage() {
                   </TableHead>
                   <TableBody>
                     {guildJoinApplicationListQuery.data
-                      .filter((app: any) => app.status === 'PENDING')
-                      .map((app: any) => (
+                      .filter(
+                        (
+                          app: GuildJoinApplication,
+                        ): app is GuildJoinApplication & { application_id: string } =>
+                          app.status === 'PENDING' && typeof app.application_id === 'string' && app.application_id.length > 0,
+                      )
+                      .map((app) => (
                         <TableRow key={app.application_id}>
                           <TableCell align="center">{app.user_id}</TableCell>
                           <TableCell align="center">{app.user_name}</TableCell>

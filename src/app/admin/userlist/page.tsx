@@ -55,14 +55,12 @@ export default function UserListPage() {
   const { data: userList = [], isLoading, refetch: refetchUserList } = useUserList(searchParams);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
   const [editData, setEditData] = useState<Partial<UserItem>>({});
 
   const saveMutation = useUserSave({
     onSuccess: () => {
       showToast.success('수정되었습니다.');
       setEditDialogOpen(false);
-      setSelectedUser(null);
       setEditData({});
       refetchUserList();
     },
@@ -73,7 +71,6 @@ export default function UserListPage() {
   });
 
   const handleEdit = (user: UserItem) => {
-    setSelectedUser(user);
     setEditData({
       user_id: user.user_id,
       user_nm: user.user_nm || user.user_name || '',
@@ -99,7 +96,6 @@ export default function UserListPage() {
 
   const handleCloseDialog = () => {
     setEditDialogOpen(false);
-    setSelectedUser(null);
     setEditData({});
   };
 

@@ -39,8 +39,7 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import CircleIcon from '@mui/icons-material/Circle';
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useResponsive } from '@/shared/hooks';
+import { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
@@ -52,6 +51,7 @@ import {
   useMarkAllNotificationsRead,
 } from '@/features/notification/hooks/useNotification';
 import type { NotificationItem } from '@/features/notification/types/notification';
+import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
 
 interface MenuItem {
@@ -225,93 +225,85 @@ export default function FixedHeader() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
-  const [mounted, setMounted] = useState(false);
-  const [userInfo, setUserInfo] = useState<any>(null);
-  
-  const responsive = useResponsive();
-  const isMobile = mounted ? responsive.isMobile : false;
-
-  // 클라이언트 마운트 확인
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // 사용자 정보 로드
-  const loadUserInfo = useCallback(() => {
-    if (typeof window === 'undefined') return;
-    if (!mounted) return;
-
-    if (isAuthenticated()) {
-      const stored = localStorage.getItem('userInfo');
-      if (stored) {
-        try {
-          setUserInfo(JSON.parse(stored));
-          return;
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const userInfoSnapshot = useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === 'undefined') {
+        return () => {};
       }
-      // 토큰은 있는데 userInfo가 없는 경우
-      setUserInfo(null);
-    } else {
-      setUserInfo(null);
+
+      const handleChange = () => onStoreChange();
+      window.addEventListener('smwr:auth-changed', handleChange);
+      window.addEventListener('storage', handleChange);
+      return () => {
+        window.removeEventListener('smwr:auth-changed', handleChange);
+        window.removeEventListener('storage', handleChange);
+      };
+    },
+    () => {
+      if (typeof window === 'undefined' || !isAuthenticated()) {
+        return null;
+      }
+      return localStorage.getItem('userInfo');
+    },
+    () => null,
+  );
+  const storedUserInfo = useMemo<UserInfo | null>(() => {
+    if (!userInfoSnapshot) {
+      return null;
     }
-  }, [mounted]);
 
-  useEffect(() => {
-    if (!mounted || typeof window === 'undefined') return;
-
-    loadUserInfo();
-
-    const handleAuthChanged = () => loadUserInfo();
-    window.addEventListener('smwr:auth-changed', handleAuthChanged);
-
-    return () => {
-      window.removeEventListener('smwr:auth-changed', handleAuthChanged);
-    };
-  }, [mounted, loadUserInfo]);
+    try {
+      return JSON.parse(userInfoSnapshot) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
+    }
+  }, [userInfoSnapshot]);
 
   // 길드 정보 조회
   const userGuildQuery = useUserGuild({
-    enabled: mounted && isAuthenticated(),
+    enabled: isClient && isAuthenticated(),
     retry: false,
     refetchOnWindowFocus: false,
   });
 
-  // 길드 정보 동기화
-  useEffect(() => {
-    if (!mounted || !userGuildQuery.data) return;
-
-    // userInfo가 없으면 먼저 localStorage에서 가져오기
-    let currentUserInfo = userInfo;
-    if (!currentUserInfo && typeof window !== 'undefined' && isAuthenticated()) {
-      const stored = localStorage.getItem('userInfo');
-      if (stored) {
-        try {
-          currentUserInfo = JSON.parse(stored);
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-          return;
-        }
-      }
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!storedUserInfo) {
+      return null;
     }
 
-    if (!currentUserInfo) return;
+    if (!userGuildQuery.data) {
+      return storedUserInfo;
+    }
 
-    const updated = {
-      ...currentUserInfo,
+    return {
+      ...storedUserInfo,
       guild_id: userGuildQuery.data.guild_id,
       guild_name: userGuildQuery.data.guild_name,
-      guild_role: userGuildQuery.data.role,
+      guild_role:
+        userGuildQuery.data.role === 'LEADER' ||
+        userGuildQuery.data.role === 'MANAGER' ||
+        userGuildQuery.data.role === 'MEMBER'
+          ? userGuildQuery.data.role
+          : storedUserInfo.guild_role,
     };
+  }, [storedUserInfo, userGuildQuery.data]);
 
-    if (JSON.stringify(currentUserInfo) !== JSON.stringify(updated)) {
-      setUserInfo(updated);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('userInfo', JSON.stringify(updated));
-      }
+  useEffect(() => {
+    if (!isClient || !userInfo || !userGuildQuery.data) {
+      return;
     }
-  }, [userGuildQuery.data, mounted, userInfo]);
+
+    const nextValue = JSON.stringify(userInfo);
+    if (localStorage.getItem('userInfo') !== nextValue) {
+      localStorage.setItem('userInfo', nextValue);
+    }
+  }, [isClient, userGuildQuery.data, userInfo]);
 
   // 알림 목록 조회
   const notificationListQuery = useNotificationList({
@@ -336,7 +328,6 @@ export default function FixedHeader() {
       if (typeof window !== 'undefined') {
         clearClientAuth();
       }
-      setUserInfo(null);
       handleUserMenuClose();
       // 로그아웃 시 로그인 페이지로 강제 이동하지 않음
       router.push('/');
@@ -344,32 +335,30 @@ export default function FixedHeader() {
   });
 
   const isAdmin = useMemo(() => {
-    return userInfo?.roles?.some((role: any) => role.role_id === 'RL0001') || false;
+    return userInfo?.roles?.some((role) => role.role_id === 'RL0001') || false;
   }, [userInfo]);
 
   const hasGuild = useMemo(() => {
-    if (!mounted || !isAuthenticated()) return false;
+    if (!isClient || !isAuthenticated()) return false;
     // userInfo의 guild_id 또는 userGuildQuery.data의 guild_id 확인
     return !!(userInfo?.guild_id || userGuildQuery.data?.guild_id);
-  }, [mounted, userInfo, userGuildQuery.data]);
+  }, [isClient, userInfo, userGuildQuery.data]);
 
   const isGuildLeaderOrManager = useMemo(() => {
-    if (!mounted || !isAuthenticated()) return false;
+    if (!isClient || !isAuthenticated()) return false;
     const role = userInfo?.guild_role || userGuildQuery.data?.role;
     return role === 'LEADER' || role === 'MANAGER';
-  }, [mounted, userInfo, userGuildQuery.data]);
+  }, [isClient, userInfo, userGuildQuery.data]);
 
   const showNotification = useMemo(() => {
-    return mounted && isAuthenticated() && !!userInfo;
-  }, [mounted, userInfo]);
+    return isClient && isAuthenticated() && !!userInfo;
+  }, [isClient, userInfo]);
 
   const handleDrawerToggle = () => {
     setDrawerOpen(!drawerOpen);
   };
 
   const handleUserMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-    // 다른 화면에서 로그아웃한 직후에도 즉시 반영되도록 한 번 더 동기화
-    loadUserInfo();
     setUserMenuAnchor(event.currentTarget);
   };
 
@@ -431,7 +420,7 @@ export default function FixedHeader() {
   };
 
   const formatNotificationTime = (dateString: string) => {
-    if (!mounted) return '';
+    if (!isClient) return '';
     try {
       const date = new Date(dateString);
       const now = new Date();
@@ -450,20 +439,15 @@ export default function FixedHeader() {
     }
   };
 
-  const isLoggedIn = mounted && isAuthenticated();
+  const isLoggedIn = isClient && isAuthenticated();
 
   const menuCategories = useMemo(() => {
     return getMenuCategories(isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn);
   }, [isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn]);
 
-  // 서버와 클라이언트에서 동일한 초기 렌더링 보장 (hydration mismatch 방지)
-  const [logoUrl, setLogoUrl] = useState<string>('/images/ci_active.png');
-  
-  useEffect(() => {
-    if (mounted) {
-      setLogoUrl(getMonsterImageUrl('/images/ci_active.png'));
-    }
-  }, [mounted]);
+  const logoUrl = isClient
+    ? getMonsterImageUrl('/images/ci_active.png')
+    : '/images/ci_active.png';
 
   return (
     <>
@@ -490,8 +474,8 @@ export default function FixedHeader() {
             color="inherit"
             aria-label="menu"
             edge="start"
-            onClick={mounted ? handleDrawerToggle : undefined}
-            disabled={!mounted}
+            onClick={isClient ? handleDrawerToggle : undefined}
+            disabled={!isClient}
             sx={{
               flexShrink: 0,
               marginLeft: 0,
@@ -502,14 +486,14 @@ export default function FixedHeader() {
           </IconButton>
 
           <Box
-            onClick={mounted ? handleHome : undefined}
+            onClick={isClient ? handleHome : undefined}
             sx={{
               flexGrow: 1,
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
               minWidth: 0,
-              cursor: mounted ? 'pointer' : 'default',
+              cursor: isClient ? 'pointer' : 'default',
             }}
           >
             <Box
@@ -520,7 +504,7 @@ export default function FixedHeader() {
                 height: { xs: 32, md: 40 },
                 width: 'auto',
                 maxWidth: '100%',
-                cursor: mounted ? 'pointer' : 'default',
+                cursor: isClient ? 'pointer' : 'default',
                 objectFit: 'contain',
                 display: 'block',
               }}
@@ -554,18 +538,18 @@ export default function FixedHeader() {
 
             <IconButton
               color="inherit"
-              onClick={mounted ? handleUserMenuClick : undefined}
-              disabled={!mounted}
+              onClick={isClient ? handleUserMenuClick : undefined}
+              disabled={!isClient}
               sx={{ flexShrink: 0 }}
             >
               <Avatar
                 sx={{
                   width: 32,
                   height: 32,
-                  bgcolor: mounted && isAuthenticated() && userInfo
+                  bgcolor: isClient && isAuthenticated() && userInfo
                     ? 'primary.main'
                     : 'rgba(255, 255, 255, 0.2)',
-                  color: mounted && isAuthenticated() && userInfo
+                  color: isClient && isAuthenticated() && userInfo
                     ? 'white'
                     : 'rgba(255, 255, 255, 0.6)',
                   transition: 'all 0.2s ease',
@@ -578,7 +562,7 @@ export default function FixedHeader() {
 
           <Menu
             anchorEl={notificationAnchor}
-            open={mounted && Boolean(notificationAnchor)}
+            open={isClient && Boolean(notificationAnchor)}
             onClose={handleNotificationClose}
             anchorOrigin={{
               vertical: 'bottom',
@@ -705,7 +689,7 @@ export default function FixedHeader() {
 
           <Menu
             anchorEl={userMenuAnchor}
-            open={mounted && Boolean(userMenuAnchor)}
+            open={isClient && Boolean(userMenuAnchor)}
             onClose={handleUserMenuClose}
             anchorOrigin={{
               vertical: 'bottom',
@@ -716,7 +700,7 @@ export default function FixedHeader() {
               horizontal: 'right',
             }}
           >
-            {mounted && isAuthenticated() && !!userInfo ? (
+            {isClient && isAuthenticated() && !!userInfo ? (
               [
                 <Box key="user-info" sx={{ px: 2, py: 1, minWidth: 200 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -770,7 +754,7 @@ export default function FixedHeader() {
 
       <Drawer
         anchor="left"
-        open={mounted && drawerOpen}
+        open={isClient && drawerOpen}
         onClose={handleDrawerToggle}
         sx={{
           '& .MuiDrawer-paper': {

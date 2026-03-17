@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -34,19 +34,20 @@ import EditIcon from '@mui/icons-material/Edit';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import { useRouter } from 'next/navigation';
-import { useMonsterList, useMonsterDetail, useMonsterUpdate, type MonsterItem } from '@/features/admin/hooks/useMonster';
+import { useMonsterList, useMonsterUpdate, type MonsterItem } from '@/features/admin/hooks/useMonster';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import { Avatar } from '@mui/material';
+import type { SearchData } from '@/shared/types/util';
 
 export default function MonsterManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [schDatas, setSchDatas] = useState<any>({
+  const [schDatas, setSchDatas] = useState<SearchData>({
     monster_id: '',
     kr_name: '',
     un_name: '',
@@ -59,7 +60,6 @@ export default function MonsterManagementPage() {
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedMonster, setSelectedMonster] = useState<MonsterItem | null>(null);
   const [editData, setEditData] = useState<Partial<MonsterItem>>({});
 
   const searchParams = useMemo(() => {
@@ -78,7 +78,6 @@ export default function MonsterManagementPage() {
     onSuccess: () => {
       showToast.success('수정되었습니다.');
       setEditDialogOpen(false);
-      setSelectedMonster(null);
       setEditData({});
       refetchMonsterList();
     },
@@ -126,7 +125,6 @@ export default function MonsterManagementPage() {
   };
 
   const handleEdit = (monster: MonsterItem) => {
-    setSelectedMonster(monster);
     setEditData({
       monster_id: monster.monster_id,
       kr_name: monster.kr_name,
@@ -155,17 +153,12 @@ export default function MonsterManagementPage() {
 
   const handleCloseDialog = () => {
     setEditDialogOpen(false);
-    setSelectedMonster(null);
     setEditData({});
   };
 
   const handlePageChange = (_event: React.ChangeEvent<unknown>, value: number) => {
     setPage(value);
   };
-
-  useEffect(() => {
-    refetchMonsterList();
-  }, [page, schDatas.orderBy, schDatas.orderDir]);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 2, md: 4 } }}>

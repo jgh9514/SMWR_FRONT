@@ -1,42 +1,26 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import {
   Box,
   Card,
   CardContent,
   Container,
   Typography,
-  Grid,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
   CircularProgress,
   Alert,
-  Chip,
 } from '@mui/material';
-import { useRouter } from 'next/navigation';
-import PeopleIcon from '@mui/icons-material/People';
-import SecurityIcon from '@mui/icons-material/Security';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ApiIcon from '@mui/icons-material/Api';
-import CodeIcon from '@mui/icons-material/Code';
-import LanguageIcon from '@mui/icons-material/Language';
-import HistoryIcon from '@mui/icons-material/History';
-import SettingsIcon from '@mui/icons-material/Settings';
-import GroupIcon from '@mui/icons-material/Group';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import TrafficIcon from '@mui/icons-material/Traffic';
 import ArticleIcon from '@mui/icons-material/Article';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
-import PetsIcon from '@mui/icons-material/Pets';
 import {
   LineChart,
   Line,
@@ -53,7 +37,6 @@ import {
 } from 'recharts';
 import { useDashboardStats } from '@/features/admin/hooks/useDashboard';
 import { PageHeader } from '@/shared/ui';
-import { useResponsive } from '@/shared/hooks';
 
 interface StatCardPropsLocal {
   title: string;
@@ -142,14 +125,11 @@ function StatCard({ title, value, icon, color, trend, subtitle }: StatCardPropsL
 
 
 export default function AdminPage() {
-  const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
-  const responsive = useResponsive();
-  const isMobile = isMounted ? responsive.isMobile : false;
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // 대시보드 통계 조회
   const { data: dashboardData, isLoading, isError, error } = useDashboardStats();
@@ -221,7 +201,7 @@ export default function AdminPage() {
             </Box>
 
             {/* 차트 섹션 */}
-            {isMounted && chartData.length > 0 && (
+            {isClient && chartData.length > 0 && (
               <Box
                 sx={{
                   display: 'grid',
@@ -290,7 +270,7 @@ export default function AdminPage() {
             )}
 
             {/* 최근 활동 테이블 */}
-            {isMounted && chartData.length > 0 && (
+            {isClient && chartData.length > 0 && (
               <Card sx={{ mb: 4 }}>
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>

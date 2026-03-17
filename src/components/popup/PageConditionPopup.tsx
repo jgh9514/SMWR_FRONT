@@ -24,7 +24,7 @@ interface PageConditionPopupProps {
 }
 
 export default function PageConditionPopup({ open, onClose }: PageConditionPopupProps) {
-  const [mode, setMode] = useState<'page' | 'condition'>('page');
+  const [mode] = useState<'page' | 'condition'>('page');
   const [pageForm, setPageForm] = useState({
     page_id: '',
     page_nm: '',
@@ -48,18 +48,6 @@ export default function PageConditionPopup({ open, onClose }: PageConditionPopup
     { text: 'Y', value: 'Y' },
     { text: 'N', value: 'N' },
   ];
-
-  const handleOpen = (openMode: 'page' | 'condition', payload?: { page_id?: string }) => {
-    setMode(openMode);
-    setPageForm({ page_id: '', page_nm: '', page_url: '' });
-    setConditionForm({
-      page_id: payload?.page_id || '',
-      cond_id: '',
-      cond_nm: '',
-      cond_tp_cd: '',
-      mdat_yn: 'N',
-    });
-  };
 
   const handleSave = async () => {
     if (mode === 'page') {

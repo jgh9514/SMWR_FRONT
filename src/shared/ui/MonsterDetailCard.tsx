@@ -20,6 +20,7 @@ const statLabels: { [key: string]: string } = {
 };
 
 export default function MonsterDetailCard({ monster, monsterIndex }: MonsterDetailCardProps) {
+  void monsterIndex;
   return (
     <Card variant="outlined" sx={{ mb: 2, borderRadius: 2 }}>
       <CardHeader

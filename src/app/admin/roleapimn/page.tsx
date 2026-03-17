@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,16 +25,19 @@ import { useRoleList, useRoleApiList, useRoleApiSave } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import type { SearchData } from '@/shared/types/util';
 import type { RoleItem, ApiItem } from '@/types';
+
+type RoleScopedApiItem = ApiItem & { rolechk?: 'Y' | 'N' };
 
 export default function RoleApiManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [schDatas, setSchDatas] = useState<any>({});
-  const [selectedApis, setSelectedApis] = useState<string[]>([]);
+  const [schDatas, setSchDatas] = useState<SearchData>({});
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [selectedApisOverride, setSelectedApisOverride] = useState<string[] | null>(null);
 
   const roleHeaders = [{ title: '권한명', key: 'role_nm', align: 'left' as const }];
 
@@ -60,15 +63,12 @@ export default function RoleApiManagementPage() {
   }, [schDatas, selectedRoleId]);
 
   const { data: apiList = [], refetch: refetchRoleApi } = useRoleApiList(roleApiParams);
-
-  useEffect(() => {
-    if (apiList.length > 0) {
-      const selected = apiList.filter((r: any) => r.rolechk === 'Y').map((r: any) => r.api_id);
-      setSelectedApis(selected);
-    } else {
-      setSelectedApis([]);
-    }
-  }, [apiList]);
+  const typedApiList = apiList as RoleScopedApiItem[];
+  const selectedApisFromRole = useMemo(
+    () => typedApiList.filter((api) => api.rolechk === 'Y').map((api) => api.api_id),
+    [typedApiList],
+  );
+  const selectedApis = selectedApisOverride ?? selectedApisFromRole;
 
   const roleApiSaveMutation = useRoleApiSave({
     onSuccess: () => {
@@ -83,7 +83,8 @@ export default function RoleApiManagementPage() {
 
   const handleRoleClick = (item: RoleItem) => {
     setSelectedRoleId(item.role_id);
-    setSchDatas((prev: any) => ({ ...prev, role_id: item.role_id }));
+    setSelectedApisOverride(null);
+    setSchDatas((prev) => ({ ...prev, role_id: item.role_id }));
   };
 
   const handleSave = async () => {
@@ -95,7 +96,7 @@ export default function RoleApiManagementPage() {
     const res = await confirm('저장하시겠습니까?');
     if (!res) return;
 
-    const saveData = apiList.map((api) => ({
+    const saveData: RoleScopedApiItem[] = typedApiList.map((api) => ({
       ...api,
       rolechk: selectedApis.includes(api.api_id) ? 'Y' : 'N',
     }));
@@ -107,9 +108,12 @@ export default function RoleApiManagementPage() {
   };
 
   const toggleSelectApi = (apiId: string) => {
-    setSelectedApis((prev) =>
-      prev.includes(apiId) ? prev.filter((v) => v !== apiId) : [...prev, apiId],
-    );
+    setSelectedApisOverride((prev) => {
+      const current = prev ?? selectedApis;
+      return current.includes(apiId)
+        ? current.filter((value) => value !== apiId)
+        : [...current, apiId];
+    });
   };
 
   return (

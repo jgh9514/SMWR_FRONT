@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -19,6 +19,7 @@ import { isAuthenticated } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
 import { validateFile } from '@/shared/utils/security';
 import DataTable from '@/shared/ui/data-table/DataTable';
+import type { TableColumn } from '@/shared/ui/data-table/DataTable';
 import {
   useAccountSummaryUpload,
   useAccountSummaryImportList,
@@ -27,12 +28,13 @@ import type { ImportListItem } from '@/features/account-summary/types/account-su
 
 export default function AccountSummaryPage() {
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-
-  useEffect(() => setMounted(true), []);
-
-  const loggedIn = mounted && isAuthenticated();
+  const loggedIn = isClient && isAuthenticated();
 
   const importListQuery = useAccountSummaryImportList({ enabled: loggedIn });
 
@@ -73,7 +75,7 @@ export default function AccountSummaryPage() {
     uploadMutation.mutate(selectedFile);
   };
 
-  const importColumns = useMemo(
+  const importColumns = useMemo<TableColumn<ImportListItem>[]>(
     () => [
       { title: '임포트ID', key: 'import_id' },
       { title: '업로드일시', key: 'uploaded_at' },
@@ -85,7 +87,7 @@ export default function AccountSummaryPage() {
     [],
   );
 
-  if (!mounted) return null;
+  if (!isClient) return null;
 
   if (!loggedIn) {
     return (
@@ -169,7 +171,7 @@ export default function AccountSummaryPage() {
             </Alert>
           )}
           <DataTable<ImportListItem>
-            columns={importColumns as any}
+            columns={importColumns}
             data={importListQuery.data || []}
             emptyMessage="업로드 이력이 없습니다."
             size="small"

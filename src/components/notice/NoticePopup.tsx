@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -18,12 +18,8 @@ import { usePopupNoticeList, useSavePopupNoticeView } from '@/hooks/api';
 import { Notice } from '@/features/community/types/community';
 import { logger } from '@/shared/lib/logger';
 
-interface NoticePopupProps {
-  open: boolean;
-  onClose: () => void;
-  notice: Notice;
-  onView: (noticeId: string) => void;
-}
+const POPUP_NOTICE_CACHE_KEY = 'popupNoticeCache:v1';
+const POPUP_NOTICE_CACHE_TTL_MS = 60 * 60 * 1000;
 
 function NoticePopupItem({ 
   open,
@@ -38,8 +34,26 @@ function NoticePopupItem({
   onClose: () => void;
   onHideForDay: (noticeId: string) => void;
 }) {
-  const [formattedDate, setFormattedDate] = useState<string>('-');
-  const [isMounted, setIsMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const formattedDate = useMemo(() => {
+    if (!isClient || !notice.crt_date) {
+      return '-';
+    }
+
+    try {
+      return new Date(notice.crt_date).toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch {
+      return '-';
+    }
+  }, [isClient, notice.crt_date]);
 
   const saveViewMutation = useSavePopupNoticeView({
     onSuccess: () => {
@@ -49,23 +63,6 @@ function NoticePopupItem({
       logger.error('팝업 공지사항 조회 기록 저장 실패', error);
     },
   });
-
-  // 클라이언트에서만 날짜 포맷팅
-  useEffect(() => {
-    setIsMounted(true);
-    if (notice.crt_date) {
-      try {
-        const date = new Date(notice.crt_date);
-        setFormattedDate(date.toLocaleDateString('ko-KR', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }));
-      } catch (error) {
-        setFormattedDate('-');
-      }
-    }
-  }, [notice.crt_date]);
 
   const handleClose = () => {
     if (notice.notice_id) {
@@ -123,7 +120,7 @@ function NoticePopupItem({
                 작성자: {notice.user_name || '-'}
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                {isMounted ? formattedDate : '-'}
+                {formattedDate}
               </Typography>
             </Box>
           </Box>
@@ -227,58 +224,42 @@ const hideNoticeForDay = (noticeId: string) => {
   }
 };
 
+const readPopupCache = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(POPUP_NOTICE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { ts?: number; list?: Notice[] };
+    if (!parsed || typeof parsed.ts !== 'number' || !Array.isArray(parsed.list)) return null;
+    if (Date.now() - parsed.ts > POPUP_NOTICE_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+};
+
 export default function NoticePopup() {
-  const [isMounted, setIsMounted] = useState(false);
-  const [popupNotices, setPopupNotices] = useState<Notice[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [viewedNoticeIds, setViewedNoticeIds] = useState<Set<string>>(new Set());
-  const [hiddenNotices, setHiddenNotices] = useState<Record<string, number>>({});
-  const [hiddenNoticesReady, setHiddenNoticesReady] = useState(false);
-  const [hasFreshCache, setHasFreshCache] = useState(false);
-
-  const POPUP_NOTICE_CACHE_KEY = 'popupNoticeCache:v1';
-  const POPUP_NOTICE_CACHE_TTL_MS = 60 * 60 * 1000; // 1시간
-
-  const readPopupCache = () => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const raw = localStorage.getItem(POPUP_NOTICE_CACHE_KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { ts?: number; list?: Notice[] };
-      if (!parsed || typeof parsed.ts !== 'number' || !Array.isArray(parsed.list)) return null;
-      if (Date.now() - parsed.ts > POPUP_NOTICE_CACHE_TTL_MS) return null;
-      return parsed;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  // 클라이언트 마운트 확인 (서버와 클라이언트 렌더링 일치를 위해 초기값 false 유지)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsMounted(true);
-    }
-  }, []);
-
-  // 숨긴 공지사항 로드 (먼저 준비되어야 캐시 표시 시 깜빡임이 없음)
-  useEffect(() => {
-    if (!isMounted) return;
-    if (typeof window === 'undefined') return;
-    setHiddenNotices(getHiddenNotices());
-    setHiddenNoticesReady(true);
-  }, [isMounted]);
-
-  // 캐시가 있으면 라우팅 이동 시 재조회하지 않도록 사용
-  useEffect(() => {
-    if (!isMounted) return;
-    const cached = readPopupCache();
-    if (cached?.list?.length && cached.list.length > 0) {
-      setHasFreshCache(true);
-    }
-  }, [isMounted]);
+  const [hiddenVersion, setHiddenVersion] = useState(0);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const hiddenNotices = useMemo(
+    () => {
+      void hiddenVersion;
+      return isClient ? getHiddenNotices() : {};
+    },
+    [hiddenVersion, isClient],
+  );
+  const cachedPopup = useMemo(
+    () => (isClient ? readPopupCache() : null),
+    [isClient],
+  );
 
   const popupNoticeListQuery = usePopupNoticeList({
-    enabled: isMounted && !hasFreshCache, // 캐시가 있으면 API 호출하지 않음
+    enabled: isClient && !(cachedPopup?.list?.length), // 캐시가 있으면 API 호출하지 않음
     refetchOnWindowFocus: false,
   });
 
@@ -288,117 +269,72 @@ export default function NoticePopup() {
       logger.error('팝업 공지사항 조회 실패', popupNoticeListQuery.error);
     }
   }, [popupNoticeListQuery.isError, popupNoticeListQuery.error]);
+  const sourceNotices = useMemo(() => {
+    if (popupNoticeListQuery.data?.list && Array.isArray(popupNoticeListQuery.data.list)) {
+      return popupNoticeListQuery.data.list;
+    }
+    if (cachedPopup?.list && Array.isArray(cachedPopup.list)) {
+      return cachedPopup.list;
+    }
+    return [];
+  }, [cachedPopup, popupNoticeListQuery.data]);
 
-  // 클라이언트 마운트 후 숨긴 공지사항 로드
-  // (위 effect에서 hiddenNoticesReady까지 함께 처리)
-
-  const applyNotices = (notices: Notice[]) => {
-    const filteredNotices = notices.filter((notice) => {
+  const activeNotices = useMemo(() => {
+    return sourceNotices.filter((notice) => {
       if (!notice.notice_id) return false;
       const noticeIdStr = String(notice.notice_id);
       const hiddenTimestamp = hiddenNotices[noticeIdStr];
-      if (hiddenTimestamp) {
-        const now = Date.now();
-        if (now - hiddenTimestamp < 86400000) {
-          return false;
-        }
+      if (!hiddenTimestamp) {
+        return true;
       }
-      return true;
+      return false;
     });
+  }, [hiddenNotices, sourceNotices]);
 
-    if (filteredNotices.length > 0) {
-      setPopupNotices(filteredNotices);
-      setCurrentIndex(0);
-      setViewedNoticeIds(new Set());
-    } else {
-      setPopupNotices([]);
-      setCurrentIndex(0);
-    }
-  };
-
-  // 캐시에서 먼저 표시 (숨긴 공지사항 제외)
   useEffect(() => {
-    if (!isMounted || !hiddenNoticesReady) return;
-    const cached = readPopupCache();
-    if (!cached || !Array.isArray(cached.list)) return;
-    applyNotices(cached.list);
-  }, [isMounted, hiddenNoticesReady, hiddenNotices]);
-
-  // 데이터가 로드되면 popupNotices 업데이트 (숨긴 공지사항 제외) - 클라이언트에서만
-  useEffect(() => {
-    if (!isMounted || !hiddenNoticesReady) return;
-    
-    if (popupNoticeListQuery.data && !popupNoticeListQuery.isLoading && !popupNoticeListQuery.isError) {
-      const data = popupNoticeListQuery.data;
-      
-      let notices: Notice[] = [];
-      
-      // data.list가 있는 경우
-      if (data && data.list && Array.isArray(data.list)) {
-        notices = data.list;
-      } 
-      // data가 직접 배열인 경우
-      else if (Array.isArray(data)) {
-        notices = data;
-      } else {
-        // no-op
-      }
-
-      // 로컬 캐시 저장 (라우팅 이동 시 재조회 방지)
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(POPUP_NOTICE_CACHE_KEY, JSON.stringify({ ts: Date.now(), list: notices }));
-          setHasFreshCache(true);
-        } catch (e) {
-          // no-op
-        }
-      }
-
-      applyNotices(notices);
+    if (!isClient || !popupNoticeListQuery.data?.list || popupNoticeListQuery.isLoading || popupNoticeListQuery.isError) {
+      return;
     }
-  }, [isMounted, hiddenNoticesReady, popupNoticeListQuery.data, popupNoticeListQuery.isLoading, popupNoticeListQuery.isError, hiddenNotices]);
+
+    try {
+      localStorage.setItem(
+        POPUP_NOTICE_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), list: popupNoticeListQuery.data.list }),
+      );
+    } catch {
+      // no-op
+    }
+  }, [isClient, popupNoticeListQuery.data, popupNoticeListQuery.isError, popupNoticeListQuery.isLoading]);
 
   const handleView = (noticeId: string) => {
-    setViewedNoticeIds((prev) => {
-      const newSet = new Set([...prev, noticeId]);
-      // 다음 팝업으로 이동
-      const nextIndex = currentIndex + 1;
-      if (nextIndex < popupNotices.length) {
-        setCurrentIndex(nextIndex);
-      } else {
-        // 모든 팝업을 본 경우
-        setPopupNotices([]);
-        setCurrentIndex(0);
-      }
-      return newSet;
-    });
+    void noticeId;
+    const nextIndex = currentIndex + 1;
+    setCurrentIndex(nextIndex < activeNotices.length ? nextIndex : 0);
   };
 
   const handleClose = () => {
     // 현재 팝업을 본 것으로 처리
-    if (popupNotices[currentIndex]?.notice_id) {
-      handleView(popupNotices[currentIndex].notice_id);
+    if (activeNotices[safeCurrentIndex]?.notice_id) {
+      handleView(activeNotices[safeCurrentIndex].notice_id);
     }
   };
 
   const handleHideForDay = (noticeId: string) => {
     const noticeIdStr = String(noticeId);
     hideNoticeForDay(noticeIdStr);
-    setHiddenNotices((prev) => ({
-      ...prev,
-      [noticeIdStr]: Date.now(),
-    }));
+    setHiddenVersion((prev) => prev + 1);
     handleClose();
   };
 
   // 서버 사이드에서는 아무것도 렌더링하지 않음
-  if (!isMounted) {
+  if (!isClient) {
     return null;
   }
 
   // 현재 표시할 팝업 (아직 보지 않은 것 중 첫 번째)
-  const currentNotice = popupNotices.length > 0 && currentIndex < popupNotices.length
-    ? popupNotices[currentIndex]
+  const safeCurrentIndex = currentIndex < activeNotices.length ? currentIndex : 0;
+  const currentNotice = activeNotices.length > 0
+    ? activeNotices[safeCurrentIndex]
     : null;
 
   if (!currentNotice) {

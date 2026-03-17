@@ -9,7 +9,33 @@ import type {
   SiegeItem,
   SiegeValidationResponse,
   SiegeSaveRequest,
+  GuildInfo,
 } from '@/features/log-upload/types/log-upload';
+
+interface RawGuildInfo {
+  guild_id?: string | number | null;
+  guild_name?: string | null;
+  rating_id?: number;
+  match_rank?: string | number | null;
+  siege_id?: string | number | null;
+  match_id?: string | number | null;
+  log_timestamp?: string | number | null;
+}
+
+interface RawLogEntry {
+  guild_info_list?: RawGuildInfo[];
+  battle_log_list?: unknown[];
+}
+
+interface ArenaReplayItem {
+  rid?: string | number;
+  [key: string]: unknown;
+}
+
+interface ArenaReplayLine {
+  command?: string;
+  ranker_replay_list?: ArenaReplayItem[];
+}
 
 /**
  * 파일을 읽어서 텍스트로 반환하는 유틸리티 함수
@@ -33,7 +59,7 @@ const isJSON = (str: string): boolean => {
   try {
     JSON.parse(str);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };
@@ -41,15 +67,33 @@ const isJSON = (str: string): boolean => {
 /**
  * 파일에서 log_list 추출하는 유틸리티 함수
  */
-const extractLogList = (jsonData: any): any[] => {
-  if (Array.isArray(jsonData)) {
-    return jsonData;
-  } else if (jsonData.log_list && Array.isArray(jsonData.log_list)) {
-    return jsonData.log_list;
-  } else {
-    return [jsonData];
-  }
+const isRawLogEntry = (value: unknown): value is RawLogEntry => {
+  return typeof value === 'object' && value !== null;
 };
+
+const extractLogList = (jsonData: unknown): RawLogEntry[] => {
+  if (Array.isArray(jsonData)) {
+    return jsonData.filter(isRawLogEntry);
+  }
+
+  if (
+    typeof jsonData === 'object' &&
+    jsonData !== null &&
+    'log_list' in jsonData &&
+    Array.isArray(jsonData.log_list)
+  ) {
+    return jsonData.log_list.filter(isRawLogEntry);
+  }
+
+  return isRawLogEntry(jsonData) ? [jsonData] : [];
+};
+
+const toGuildInfo = (guildInfo: RawGuildInfo): GuildInfo => ({
+  guildId: guildInfo.guild_id?.toString(),
+  guildName: guildInfo.guild_name?.toString(),
+  rating: guildInfo.rating_id,
+  matchRank: guildInfo.match_rank?.toString(),
+});
 
 /**
  * 점령전 validation (중복 체크) Mutation
@@ -79,7 +123,7 @@ export const useSiegeValidation = (
         const siegeItems: SiegeItem[] = [];
         let totalBattleCount = 0;
         
-        logList.forEach((item: any, index: number) => {
+        logList.forEach((item, index) => {
           const guildInfoList = item.guild_info_list || [];
           const battleLogList = item.battle_log_list || [];
           
@@ -89,12 +133,7 @@ export const useSiegeValidation = (
             totalBattleCount += battleCount;
             
             // 3파전 길드 정보 추출 (1등, 2등, 3등)
-            const guilds = guildInfoList.map((guildInfo: any) => ({
-              guildId: guildInfo.guild_id?.toString(),
-              guildName: guildInfo.guild_name?.toString(),
-              rating: guildInfo.rating_id,
-              matchRank: guildInfo.match_rank?.toString(),
-            }));
+            const guilds = guildInfoList.map(toGuildInfo);
             
             siegeItems.push({
               siegeId: firstGuildInfo.siege_id?.toString(),
@@ -159,13 +198,13 @@ export const useSiegeUpload = (
         log_list: logList,
       };
       
-      const response = await apiClient.post<any>('/summonerswar/siege-upload', payload);
+      const response = await apiClient.post<SiegeUploadResponse>('/summonerswar/siege-upload', payload);
       
       // 파일에서 통계 계산
       const siegeItems: SiegeItem[] = [];
       let totalBattleCount = 0;
       
-      logList.forEach((item: any, index: number) => {
+      logList.forEach((item, index) => {
         const guildInfoList = item.guild_info_list || [];
         const battleLogList = item.battle_log_list || [];
         
@@ -175,12 +214,7 @@ export const useSiegeUpload = (
           totalBattleCount += battleCount;
           
           // 3파전 길드 정보 추출 (1등, 2등, 3등)
-          const guilds = guildInfoList.map((guildInfo: any) => ({
-            guildId: guildInfo.guild_id?.toString(),
-            guildName: guildInfo.guild_name?.toString(),
-            rating: guildInfo.rating_id,
-            matchRank: guildInfo.match_rank?.toString(),
-          }));
+          const guilds = guildInfoList.map(toGuildInfo);
           
           siegeItems.push({
             siegeId: firstGuildInfo.siege_id?.toString(),
@@ -231,28 +265,29 @@ export const useArenaUpload = (
       
       // 줄 단위로 분리
       const jsonArray = text.split('\r\n');
-      const jsonObjects: any[] = [];
+      const jsonObjects: ArenaReplayItem[] = [];
       const uniqueObjects: Record<string, boolean> = {};
       
       // 각 줄을 파싱하여 실레나 데이터 추출
       jsonArray.forEach((item) => {
         if (isJSON(item)) {
           try {
-            const jsonData = JSON.parse(item);
+            const jsonData = JSON.parse(item) as ArenaReplayLine;
             // getRankerRtpvpReplayList 명령어인 경우만 추출
             if (
               jsonData.command === 'getRankerRtpvpReplayList' &&
               jsonData.ranker_replay_list !== undefined
             ) {
-              jsonData.ranker_replay_list.forEach((obj: any) => {
+              jsonData.ranker_replay_list.forEach((obj) => {
                 // rid 기준으로 중복 제거
-                if (!uniqueObjects[obj.rid]) {
-                  uniqueObjects[obj.rid] = true;
+                const replayId = obj.rid?.toString();
+                if (replayId && !uniqueObjects[replayId]) {
+                  uniqueObjects[replayId] = true;
                   jsonObjects.push(obj);
                 }
               });
             }
-          } catch (e) {
+          } catch {
             // JSON 파싱 실패 시 무시
           }
         }

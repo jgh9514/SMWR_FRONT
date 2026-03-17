@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 
 /**
  * Next.js Proxy: 모든 요청을 통과시킴 (인증 체크 비활성화)
  */
-export function proxy(request: NextRequest) {
+export function proxy() {
   // 모든 요청을 통과시킴 (로그인 필수 아님)
   return NextResponse.next();
 }

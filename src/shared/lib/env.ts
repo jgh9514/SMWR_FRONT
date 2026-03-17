@@ -3,6 +3,14 @@
  * Next.js 빌드 시점 환경 변수와 런타임 환경 변수를 모두 지원
  */
 
+declare global {
+  interface Window {
+    env?: {
+      APP_CDN_URL?: string;
+    };
+  }
+}
+
 /**
  * CloudFront CDN URL 가져오기
  * 1. 빌드 시점: process.env.APP_CDN_URL (NEXT_PUBLIC_ 접두사 필요)
@@ -12,8 +20,8 @@
  */
 export const getCdnUrl = (): string => {
   // 런타임 환경 변수 (쿠버네티스에서 주입)
-  if (typeof window !== 'undefined' && (window as any).env?.APP_CDN_URL) {
-    return (window as any).env.APP_CDN_URL;
+  if (typeof window !== 'undefined' && window.env?.APP_CDN_URL) {
+    return window.env.APP_CDN_URL;
   }
 
   // 빌드 시점 환경 변수 (Next.js에서 NEXT_PUBLIC_ 접두사 필요)
@@ -28,6 +36,22 @@ export const getCdnUrl = (): string => {
 
   // 프로덕션 환경에서도 환경 변수가 없으면 빈 문자열 반환 (상대 경로 사용)
   return '';
+};
+
+/**
+ * 서비스 기본 URL
+ */
+export const getSiteUrl = (): string => {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (siteUrl) {
+    return siteUrl.replace(/\/$/, '');
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
+
+  return 'https://localhost:3000';
 };
 
 /**

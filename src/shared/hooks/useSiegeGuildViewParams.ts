@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSiegeGuildViewParamsForApi, readSiegeGuildViewSetting } from '@/shared/utils/siegeGuildView';
+import type { UserInfo } from '@/features/auth/types/auth';
+
+type AdminRole = NonNullable<UserInfo['roles']>[number] & {
+  usg_yn?: string;
+};
+
+type AdminUserInfo = Omit<UserInfo, 'roles'> & {
+  roles?: AdminRole[];
+};
 
 /**
  * 관리자 전용 "전체/특정 길드" 조회 파라미터를 React state로 동기화합니다.
@@ -15,10 +24,11 @@ export function useSiegeGuildViewParams() {
     const onStorage = (e: StorageEvent) => {
       if (e.key && e.key.includes('smwr:siege-guild-view')) setTick((v) => v + 1);
     };
-    window.addEventListener('smwr:siege-guild-view-changed', onCustom as any);
+    const onCustomEvent: EventListener = onCustom;
+    window.addEventListener('smwr:siege-guild-view-changed', onCustomEvent);
     window.addEventListener('storage', onStorage);
     return () => {
-      window.removeEventListener('smwr:siege-guild-view-changed', onCustom as any);
+      window.removeEventListener('smwr:siege-guild-view-changed', onCustomEvent);
       window.removeEventListener('storage', onStorage);
     };
   }, []);
@@ -32,12 +42,13 @@ export function useSiegeGuildViewParams() {
     try {
       const rawUser = window.localStorage.getItem('userInfo');
       if (!rawUser) return {};
-      const userInfo = JSON.parse(rawUser) as any;
+      const userInfo = JSON.parse(rawUser) as AdminUserInfo;
+      const roles = Array.isArray(userInfo?.roles) ? (userInfo.roles as AdminRole[]) : [];
       const isAdmin =
-        Array.isArray(userInfo?.roles) &&
-        userInfo.roles.some((r: any) => {
-          const roleId = String(r?.role_id ?? '');
-          const enabled = r?.usg_yn == null ? true : String(r?.usg_yn) === 'Y';
+        roles.length > 0 &&
+        roles.some((role) => {
+          const roleId = String(role?.role_id ?? '');
+          const enabled = role?.usg_yn == null ? true : String(role.usg_yn) === 'Y';
           return enabled && roleId === 'RL0001';
         });
       if (!isAdmin) return {};

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Toaster } from 'react-hot-toast';
 
 /**
@@ -8,14 +8,14 @@ import { Toaster } from 'react-hot-toast';
  * SSR hydration 오류 방지
  */
 export default function ClientOnlyToaster() {
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // 서버에서는 아무것도 렌더링하지 않음 (Hydration 오류 방지)
-  if (!isMounted) {
+  if (!isClient) {
     return null;
   }
 

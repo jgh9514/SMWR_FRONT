@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -25,16 +25,19 @@ import { useRoleList, useRoleMenuList, useRoleMenuSave } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import type { SearchData } from '@/shared/types/util';
 import type { RoleItem, MenuItem } from '@/types';
+
+type RoleScopedMenuItem = MenuItem & { rolechk?: 'Y' | 'N' };
 
 export default function RoleMenuManagementPage() {
   const theme = useTheme();
   const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
 
-  const [selectedMenus, setSelectedMenus] = useState<string[]>([]);
-  const [schDatas, setSchDatas] = useState<any>({});
+  const [schDatas, setSchDatas] = useState<SearchData>({});
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
+  const [selectedMenusOverride, setSelectedMenusOverride] = useState<string[] | null>(null);
 
   const roleHeaders = [{ title: '권한명', key: 'role_nm', align: 'left' as const }];
 
@@ -59,15 +62,12 @@ export default function RoleMenuManagementPage() {
   }, [schDatas, selectedRoleId]);
 
   const { data: menuList = [], refetch: refetchRoleMenu } = useRoleMenuList(roleMenuParams);
-
-  useEffect(() => {
-    if (menuList.length > 0) {
-      const selected = menuList.filter((r: any) => r.rolechk === 'Y').map((r: any) => r.menu_id);
-      setSelectedMenus(selected);
-    } else {
-      setSelectedMenus([]);
-    }
-  }, [menuList]);
+  const typedMenuList = menuList as RoleScopedMenuItem[];
+  const selectedMenusFromRole = useMemo(
+    () => typedMenuList.filter((menu) => menu.rolechk === 'Y').map((menu) => menu.menu_id),
+    [typedMenuList],
+  );
+  const selectedMenus = selectedMenusOverride ?? selectedMenusFromRole;
 
   const roleMenuSaveMutation = useRoleMenuSave({
     onSuccess: () => {
@@ -82,7 +82,8 @@ export default function RoleMenuManagementPage() {
 
   const handleRoleClick = (item: RoleItem) => {
     setSelectedRoleId(item.role_id);
-    setSchDatas((prev: any) => ({ ...prev, role_id: item.role_id }));
+    setSelectedMenusOverride(null);
+    setSchDatas((prev) => ({ ...prev, role_id: item.role_id }));
   };
 
   const handleSave = async () => {
@@ -94,7 +95,7 @@ export default function RoleMenuManagementPage() {
     const res = await confirm('저장하시겠습니까?');
     if (!res) return;
 
-    const saveData = menuList.map((menu) => ({
+    const saveData: RoleScopedMenuItem[] = typedMenuList.map((menu) => ({
       ...menu,
       rolechk: selectedMenus.includes(menu.menu_id) ? 'Y' : 'N',
     }));
@@ -106,9 +107,12 @@ export default function RoleMenuManagementPage() {
   };
 
   const toggleSelectMenu = (menuId: string) => {
-    setSelectedMenus((prev) =>
-      prev.includes(menuId) ? prev.filter((v) => v !== menuId) : [...prev, menuId],
-    );
+    setSelectedMenusOverride((prev) => {
+      const current = prev ?? selectedMenus;
+      return current.includes(menuId)
+        ? current.filter((value) => value !== menuId)
+        : [...current, menuId];
+    });
   };
 
   return (

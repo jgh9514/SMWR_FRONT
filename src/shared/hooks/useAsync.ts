@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { handleApiError } from '@/shared/lib/error-handler';
 
 interface UseAsyncState<T> {
@@ -9,8 +9,8 @@ interface UseAsyncState<T> {
   error: Error | null;
 }
 
-interface UseAsyncReturn<T> extends UseAsyncState<T> {
-  execute: (...args: any[]) => Promise<T | undefined>;
+interface UseAsyncReturn<T, TArgs extends unknown[]> extends UseAsyncState<T> {
+  execute: (...args: TArgs) => Promise<T | undefined>;
   reset: () => void;
 }
 
@@ -19,10 +19,10 @@ interface UseAsyncReturn<T> extends UseAsyncState<T> {
  * @param asyncFunction - 실행할 비동기 함수
  * @param immediate - 즉시 실행 여부
  */
-export function useAsync<T = any>(
-  asyncFunction: (...args: any[]) => Promise<T>,
-  immediate: boolean = false,
-): UseAsyncReturn<T> {
+export function useAsync<T = unknown, TArgs extends unknown[] = []>(
+  asyncFunction: (...args: TArgs) => Promise<T>,
+  immediate = false,
+): UseAsyncReturn<T, TArgs> {
   const [state, setState] = useState<UseAsyncState<T>>({
     data: null,
     loading: immediate,
@@ -30,7 +30,7 @@ export function useAsync<T = any>(
   });
 
   const execute = useCallback(
-    async (...args: any[]) => {
+    async (...args: TArgs) => {
       setState((prev) => ({ ...prev, loading: true, error: null }));
 
       try {
@@ -47,13 +47,19 @@ export function useAsync<T = any>(
     [asyncFunction],
   );
 
+  useEffect(() => {
+    if (!immediate) {
+      return;
+    }
+
+    Promise.resolve().then(() => {
+      void execute(...([] as unknown as TArgs));
+    });
+  }, [execute, immediate]);
+
   const reset = useCallback(() => {
     setState({ data: null, loading: false, error: null });
   }, []);
-
-  if (immediate) {
-    execute();
-  }
 
   return {
     ...state,

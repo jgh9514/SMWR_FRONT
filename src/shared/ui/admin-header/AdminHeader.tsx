@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AppBar,
@@ -19,26 +19,42 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import HomeIcon from '@mui/icons-material/Home';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { clearClientAuth } from '@/shared/utils/auth';
+import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
 
 export default function AdminHeader() {
   const router = useRouter();
   const logoutMutation = useLogout();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [userInfo, setUserInfo] = useState<any>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          setUserInfo(JSON.parse(storedUserInfo));
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
+  const userInfoSnapshot = useSyncExternalStore(
+    (onStoreChange) => {
+      if (typeof window === 'undefined') {
+        return () => {};
       }
+
+      const handleChange = () => onStoreChange();
+      window.addEventListener('smwr:auth-changed', handleChange);
+      window.addEventListener('storage', handleChange);
+      return () => {
+        window.removeEventListener('smwr:auth-changed', handleChange);
+        window.removeEventListener('storage', handleChange);
+      };
+    },
+    () => (typeof window === 'undefined' ? null : localStorage.getItem('userInfo')),
+    () => null,
+  );
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!userInfoSnapshot) {
+      return null;
     }
-  }, []);
+
+    try {
+      return JSON.parse(userInfoSnapshot) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
+    }
+  }, [userInfoSnapshot]);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);

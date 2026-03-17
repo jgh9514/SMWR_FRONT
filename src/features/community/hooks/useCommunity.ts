@@ -15,6 +15,7 @@ import {
   InquiryParams,
   InquiryAnswerParams,
 } from '@/features/community/types/community';
+import type { ApiResult } from '@/features/auth/types/auth';
 
 /**
  * 공지사항 목록 조회 Query
@@ -46,9 +47,9 @@ export const useNoticeDetail = (
  * 백엔드: /api/v1/community/notice/save
  */
 export const useSaveNotice = (
-  options?: Parameters<typeof useApiPostMutation<any, NoticeParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, NoticeParams>>[1],
 ) => {
-  return useApiPostMutation<any, NoticeParams>('/community/notice/save', options);
+  return useApiPostMutation<ApiResult, NoticeParams>('/community/notice/save', options);
 };
 
 /**
@@ -56,9 +57,9 @@ export const useSaveNotice = (
  * 백엔드: /api/v1/community/notice/delete
  */
 export const useDeleteNotice = (
-  options?: Parameters<typeof useApiPostMutation<any, { notice_id: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { notice_id: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { notice_id: string }>('/community/notice/delete', options);
+  return useApiPostMutation<ApiResult, { notice_id: string }>('/community/notice/delete', options);
 };
 
 /**
@@ -66,9 +67,9 @@ export const useDeleteNotice = (
  * 백엔드: /api/v1/community/notice/view
  */
 export const useIncreaseNoticeView = (
-  options?: Parameters<typeof useApiPostMutation<any, { notice_id: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { notice_id: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { notice_id: string }>('/community/notice/view', options);
+  return useApiPostMutation<ApiResult, { notice_id: string }>('/community/notice/view', options);
 };
 
 /**
@@ -97,9 +98,9 @@ export const usePopupNoticeList = (
  * 백엔드: /api/v1/community/notice/popup/view
  */
 export const useSavePopupNoticeView = (
-  options?: Parameters<typeof useApiPostMutation<any, { notice_id: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { notice_id: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { notice_id: string }>('/community/notice/popup/view', options);
+  return useApiPostMutation<ApiResult, { notice_id: string }>('/community/notice/popup/view', options);
 };
 
 /**
@@ -129,9 +130,9 @@ export const useInquiryDetail = (
  * 백엔드: /api/v1/community/inquiry/save
  */
 export const useSaveInquiry = (
-  options?: Parameters<typeof useApiPostMutation<any, InquiryParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, InquiryParams>>[1],
 ) => {
-  return useApiPostMutation<any, InquiryParams>('/community/inquiry/save', options);
+  return useApiPostMutation<ApiResult, InquiryParams>('/community/inquiry/save', options);
 };
 
 /**
@@ -139,9 +140,9 @@ export const useSaveInquiry = (
  * 백엔드: /api/v1/community/inquiry/answer
  */
 export const useAnswerInquiry = (
-  options?: Parameters<typeof useApiPostMutation<any, InquiryAnswerParams>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, InquiryAnswerParams>>[1],
 ) => {
-  return useApiPostMutation<any, InquiryAnswerParams>('/community/inquiry/answer', options);
+  return useApiPostMutation<ApiResult, InquiryAnswerParams>('/community/inquiry/answer', options);
 };
 
 /**
@@ -149,8 +150,8 @@ export const useAnswerInquiry = (
  * 백엔드: /api/v1/community/inquiry/delete
  */
 export const useDeleteInquiry = (
-  options?: Parameters<typeof useApiPostMutation<any, { inquiry_id: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<ApiResult, { inquiry_id: string }>>[1],
 ) => {
-  return useApiPostMutation<any, { inquiry_id: string }>('/community/inquiry/delete', options);
+  return useApiPostMutation<ApiResult, { inquiry_id: string }>('/community/inquiry/delete', options);
 };
 

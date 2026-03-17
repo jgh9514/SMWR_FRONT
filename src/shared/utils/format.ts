@@ -117,7 +117,7 @@ export function parseSiegeDate(siegeId: string): string {
     const date = new Date(year, month - 1, nthThursdayDate + dayOffsetFromThursday);
 
     return formatDate(date, 'YYYY-MM-DD');
-  } catch (error) {
+  } catch {
     return '';
   }
 }

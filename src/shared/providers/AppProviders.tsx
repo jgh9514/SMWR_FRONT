@@ -10,6 +10,24 @@ import FixedHeader from '@/shared/ui/fixed-header/FixedHeader';
 import NoticePopup from '@/components/notice/NoticePopup';
 import ClientOnlyToaster from './ClientOnlyToaster';
 import { isAuthenticated, isForceLoggedOut } from '@/shared/utils/auth';
+import type { AuthCheckResponse } from '@/features/auth/types/auth';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const getRetryErrorMeta = (error: unknown) => {
+  if (!isRecord(error)) {
+    return { code: undefined, message: undefined, status: undefined };
+  }
+
+  const code = typeof error.code === 'string' ? error.code : undefined;
+  const message = typeof error.message === 'string' ? error.message : undefined;
+  const response = isRecord(error.response) ? error.response : undefined;
+  const status = typeof response?.status === 'number' ? response.status : undefined;
+
+  return { code, message, status };
+};
 
 // QueryClient를 컴포넌트 내부에서 생성하여 각 요청마다 새로운 인스턴스 생성
 function makeQueryClient() {
@@ -17,28 +35,28 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
-        retry: (failureCount, error: any) => {
+        retry: (failureCount, error: unknown) => {
           // 재시도하지 않을 에러들
           const noRetryErrors = [
             'ERR_NETWORK',
             'ERR_CONNECTION_REFUSED',
             'Network Error',
           ];
-          
+          const { code, message, status } = getRetryErrorMeta(error);
+
           // 네트워크 에러는 재시도하지 않음
           if (
-            error?.code && noRetryErrors.includes(error.code) ||
-            error?.message && noRetryErrors.some(msg => error.message.includes(msg))
+            (code && noRetryErrors.includes(code)) ||
+            (message && noRetryErrors.some(msg => message.includes(msg)))
           ) {
             return false;
           }
-          
+
           // 429 (Too Many Requests), 401 (Unauthorized), 403 (Forbidden)은 재시도하지 않음
-          const status = error?.response?.status;
           if (status === 429 || status === 401 || status === 403) {
             return false;
           }
-          
+
           // 다른 에러는 1번만 재시도
           return failureCount < 1;
         },
@@ -49,28 +67,28 @@ function makeQueryClient() {
         // axios interceptor에서 처리합니다.
       },
       mutations: {
-        retry: (failureCount, error: any) => {
+        retry: (failureCount, error: unknown) => {
           // 재시도하지 않을 에러들
           const noRetryErrors = [
             'ERR_NETWORK',
             'ERR_CONNECTION_REFUSED',
             'Network Error',
           ];
-          
+          const { code, message, status } = getRetryErrorMeta(error);
+
           // 네트워크 에러는 재시도하지 않음
           if (
-            error?.code && noRetryErrors.includes(error.code) ||
-            error?.message && noRetryErrors.some(msg => error.message.includes(msg))
+            (code && noRetryErrors.includes(code)) ||
+            (message && noRetryErrors.some(msg => message.includes(msg)))
           ) {
             return false;
           }
-          
+
           // 429 (Too Many Requests), 401 (Unauthorized), 403 (Forbidden)은 재시도하지 않음
-          const status = error?.response?.status;
           if (status === 429 || status === 401 || status === 403) {
             return false;
           }
-          
+
           return failureCount < 1;
         },
         // React Query v5에서는 onError가 제거되었습니다.
@@ -217,13 +235,13 @@ export default function AppProviders({ children }: AppProvidersProps) {
   const isProtectedPath = useMemo(() => {
     const currentPath = pathname || '';
     // 로그인 필수 경로들 (필요 시 확장)
-    const protectedPrefixes = ['/siege', '/recent-siege', '/battle-history', '/guild-management', '/settings', '/log-upload', '/rta'];
+    const protectedPrefixes = ['/siege', '/recent-siege', '/guild-management', '/settings', '/log-upload', '/account-summary'];
     return protectedPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
   }, [pathname]);
 
   const isGuildRequiredPath = useMemo(() => {
     const currentPath = pathname || '';
-    const guildRequiredPrefixes = ['/siege', '/recent-siege', '/battle-history', '/guild-management', '/rta'];
+    const guildRequiredPrefixes = ['/siege', '/recent-siege', '/guild-management'];
     return guildRequiredPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
   }, [pathname]);
 
@@ -264,12 +282,12 @@ export default function AppProviders({ children }: AppProvidersProps) {
 
         // 토큰이 있으면 무조건 서버에서 검증/유저정보 확보 후 렌더
         const { apiClient } = await import('@/shared/lib/api/client');
-        const res: any = await Promise.race([
-          apiClient.post('/auth/login-check', {}),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('bootstrap timeout')), BOOTSTRAP_TIMEOUT_MS)),
+        const response = await Promise.race([
+          apiClient.post<AuthCheckResponse>('/auth/login-check', {}),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('bootstrap timeout')), BOOTSTRAP_TIMEOUT_MS)),
         ]);
-        if (res && res.result === 'SUCCESS' && res.userInfo) {
-          localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
+        if (response.result === 'SUCCESS' && response.userInfo) {
+          localStorage.setItem('userInfo', JSON.stringify(response.userInfo));
           localStorage.setItem('isLoggedIn', 'true');
         } else {
           // 서버 검증이 실패하면, 최소한 클라이언트 표시 정보는 비움 (쿠키 삭제는 로그아웃 플로우에서 처리)

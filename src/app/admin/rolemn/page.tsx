@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -39,14 +39,24 @@ import { logger } from '@/shared/lib/logger';
 import type { RoleItem, SaveRequest } from '@/types';
 import type { SearchData, CodeListData, EditingItem } from '@/shared/types/admin';
 
+type RoleEditingItem = EditingItem & {
+  role_id?: string;
+  role_nm?: string;
+  role_desc?: string;
+  bsns_cd?: string;
+  usr_cnt?: number | string;
+  usg_yn?: string;
+  srt_sn?: string;
+};
+
 export default function RoleManagementPage() {
   const { isMobile } = useResponsive();
   const router = useRouter();
 
-  const [schDatas, setSchDatas] = useState<SearchData>({});
+  const [schDatas] = useState<SearchData>({});
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [roleDialog, setRoleDialog] = useState(false);
-  const [editingRole, setEditingRole] = useState<EditingItem<RoleItem>>({});
+  const [editingRole, setEditingRole] = useState<RoleEditingItem>({});
 
   const initialCodeGroups: CodeListData = {
     CO00000001: { cd: [], cd_nm: [] },
@@ -134,7 +144,7 @@ export default function RoleManagementPage() {
       usg_yn: 'Y',
       srt_sn: '',
       row_status: 'C',
-    } as EditingItem<RoleItem>);
+    } as RoleEditingItem);
     setRoleDialog(true);
   }, []);
 

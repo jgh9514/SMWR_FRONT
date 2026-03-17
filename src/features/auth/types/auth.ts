@@ -36,6 +36,11 @@ export interface AuthCheckResponse {
   userInfo?: UserInfo;
 }
 
+export interface ApiResult {
+  result: string;
+  message?: string;
+}
+
 /**
  * 길드 신청 파라미터 (길드장이 신청)
  */
@@ -214,6 +219,14 @@ export interface MyGuildJoinApplicationStatusResponse {
   hasPendingJoinApplication: boolean;
   application?: GuildJoinApplication;
   message?: string;
+}
+
+export interface GuildInviteCheckResponse extends ApiResult {
+  guild?: {
+    guild_id?: string;
+    guild_name?: string;
+    guild_description?: string;
+  };
 }
 
 /**

@@ -12,16 +12,16 @@ jobs:
       - checkout
       - run:
           name: Enable Corepack
-          command: corepack enable && corepack prepare pnpm@latest --activate
+          command: corepack enable
       - run:
           name: Install dependencies
-          command: cd web-react && pnpm install --frozen-lockfile
+          command: cd web-react && yarn install --immutable
       - run:
           name: Lint
-          command: cd web-react && pnpm lint
+          command: cd web-react && yarn lint
       - run:
           name: Build
-          command: cd web-react && pnpm build
+          command: cd web-react && yarn build
 
 workflows:
   ci:

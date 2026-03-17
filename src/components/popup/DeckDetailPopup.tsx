@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,23 @@ import MonsterDetailCard from '@/features/siege/components/MonsterDetailCard';
 import type { RecommendedItem } from '@/features/siege/types/siegeDetail';
 import type { DeckMonsterStats, Monster } from '@/features/siege/types/siege';
 
+type DeckDetailRecord = Record<string, unknown>;
+type EditableStatKey = keyof DeckMonsterStats;
+
+const createInitialDeckStats = (): DeckMonsterStats[] => [
+  { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+  { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+  { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+];
+
+const normalizeStatValue = (value: unknown, defaultValue = 0): number => {
+  if (value === null || value === undefined || value === '') {
+    return defaultValue;
+  }
+  const numValue = Number(value);
+  return isNaN(numValue) ? defaultValue : numValue;
+};
+
 interface DeckDetailPopupProps {
   open: boolean;
   onClose: () => void;
@@ -44,11 +61,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const touchStartXRef = useRef<number | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
-  const [editStats, setEditStats] = useState<DeckMonsterStats[]>([
-    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-  ]);
+  const [editStats, setEditStats] = useState<DeckMonsterStats[]>(createInitialDeckStats);
 
   // 공덱 상세 조회 (React Query 사용)
   const deckParams = useMemo(() => {
@@ -86,7 +99,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const error = queryError ? (queryError instanceof Error ? queryError.message : '데이터를 불러오는데 실패했습니다.') : null;
 
   // detailData를 Record 타입으로 타입 단언
-  const detailDataRecord = detailData as Record<string, any> | null | undefined;
+  const detailDataRecord = detailData as DeckDetailRecord | null | undefined;
 
   // 삭제 Mutation
   const deleteDeckMutation = useDeleteDeck({
@@ -107,15 +120,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     },
   });
 
-  const normalizeStatValue = (value: any, defaultValue = 0): number => {
-    if (value === null || value === undefined || value === '') {
-      return defaultValue;
-    }
-    const numValue = Number(value);
-    return isNaN(numValue) ? defaultValue : numValue;
-  };
-
-  const validateParams = (target: RecommendedItem | Record<string, any>): { deck_id: string } => {
+  const validateParams = (target: RecommendedItem | DeckDetailRecord): { deck_id: string } => {
     const item = target as RecommendedItem;
     // deck_id를 우선 사용하고, 없으면 team_id 사용
     const deckId = item.deck_id || item.team_id;
@@ -125,7 +130,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     return { deck_id: String(deckId) };
   };
 
-  const extractStatsFromDetail = (detail: Record<string, any>, index: 1 | 2 | 3): DeckMonsterStats => {
+  const extractStatsFromDetail = useCallback((detail: DeckDetailRecord, index: 1 | 2 | 3): DeckMonsterStats => {
     const get = (key: string) => normalizeStatValue(detail[`m${index}_${key}`], 0);
     return {
       hp: get('hp'),
@@ -137,7 +142,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       resistance: get('resistance'),
       accuracy: get('accuracy'),
     };
-  };
+  }, []);
 
   const monsterImageUrls = (() => {
     if (!detailDataRecord) return [];
@@ -238,7 +243,21 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     setLastSelectedItem(null);
     setImageLoadErrors(new Set());
     setSelectedMonsterIndex(0);
+    setEditStats(createInitialDeckStats());
     onClose();
+  };
+
+  const handleEditStatChange = (monsterIndex: number, key: EditableStatKey, value: number) => {
+    setEditStats((prev) =>
+      prev.map((stats, index) =>
+        index === monsterIndex
+          ? {
+              ...stats,
+              [key]: value,
+            }
+          : stats,
+      ),
+    );
   };
 
   const selectMonster = (index: number) => {
@@ -362,7 +381,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       extractStatsFromDetail(detailDataRecord, 2),
       extractStatsFromDetail(detailDataRecord, 3),
     ]);
-  }, [detailDataRecord, isEditing]);
+  }, [detailDataRecord, extractStatsFromDetail, isEditing]);
 
   return (
     <Dialog 
@@ -674,11 +693,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                           <TextField
                             label={f.label}
                             type="number"
-                            value={(editStats[index] as any)[f.key] ?? 0}
+                            value={editStats[index][f.key] ?? 0}
                             onChange={(e) => {
-                              const next = [...editStats];
-                              (next[index] as any)[f.key] = Number(e.target.value);
-                              setEditStats(next);
+                              handleEditStatChange(index, f.key, Number(e.target.value));
                             }}
                             fullWidth
                             size="small"

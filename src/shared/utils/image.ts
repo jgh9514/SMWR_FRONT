@@ -29,6 +29,23 @@ export const getMonsterImageUrl = (imageUrl: string | null | undefined): string 
 };
 
 /**
+ * SSG/SSR에 안전한 이미지 URL
+ * - 상대 경로는 그대로 유지하여 hydration mismatch를 피한다.
+ * - 절대 URL만 그대로 통과시킨다.
+ */
+export const getRenderableImageUrl = (imageUrl: string | null | undefined): string => {
+  if (!imageUrl) {
+    return '/images/default-monster.png';
+  }
+
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+
+  return imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+};
+
+/**
  * 정적 이미지 URL (public 폴더)
  * @param imagePath - public 폴더 기준 경로 (예: /images/icon.png)
  */

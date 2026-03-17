@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useMemo, useState, useSyncExternalStore, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -14,9 +14,6 @@ import {
   Alert,
   Paper,
   IconButton,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Chip,
   Table,
   TableBody,
@@ -32,41 +29,42 @@ import FileUploadIcon from '@mui/icons-material/FileUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CancelIcon from '@mui/icons-material/Cancel';
 import { useSiegeValidation, useSiegeSave, useArenaUpload } from '@/hooks/api';
 import type {
-  SiegeItem,
   SiegeSaveRequest,
   SiegeValidationResponse,
 } from '@/features/log-upload/types/log-upload';
 import { showToast } from '@/shared/lib/notification';
 import { validateFile } from '@/shared/utils/security';
 import { logger } from '@/shared/lib/logger';
+import type { UserInfo } from '@/features/auth/types/auth';
 import type { SiegeUploadResponse, ArenaUploadResponse } from '@/types';
 
 function LogUploadContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const uploadType = searchParams.get('type') || 'all'; // 'rta', 'siege', 'all'
-  const [userInfo, setUserInfo] = useState<any>(null);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!isClient) return null;
+    const storedUserInfo = localStorage.getItem('userInfo');
+    if (!storedUserInfo) return null;
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          setUserInfo(JSON.parse(storedUserInfo));
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
-      }
+    try {
+      return JSON.parse(storedUserInfo) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
     }
-  }, []);
+  }, [isClient]);
 
-  const isAdmin = userInfo?.roles?.some((role: any) => role.role_id === 'RL0001') || false;
+  const isAdmin = userInfo?.roles?.some((role) => role.role_id === 'RL0001') || false;
   const isGuildLeaderOrManager = userInfo?.guild_role === 'LEADER' || userInfo?.guild_role === 'MANAGER';
   const hasGuild = !!userInfo?.guild_id;
 
@@ -80,7 +78,7 @@ function LogUploadContent() {
   const [siegeResult, setSiegeResult] = useState<SiegeUploadResponse | null>(null);
   const [arenaResult, setArenaResult] = useState<ArenaUploadResponse | null>(null);
   const [siegeOptions, setSiegeOptions] = useState<Record<string, 'skip' | 'overwrite'>>({});
-  const [logListData, setLogListData] = useState<any[]>([]);
+  const [logListData, setLogListData] = useState<unknown[]>([]);
   const [dragActive, setDragActive] = useState<{ siege: boolean; arena: boolean }>({
     siege: false,
     arena: false,
@@ -187,7 +185,7 @@ function LogUploadContent() {
       logger.error('점령전 검증 실패', error, { context: 'LogUploadPage' });
       showToast.error('점령전 검증에 실패했습니다.');
     },
-  } as any);
+  });
 
   // 점령전 저장 Mutation
   const siegeSaveMutation = useSiegeSave({
@@ -200,7 +198,7 @@ function LogUploadContent() {
       logger.error('점령전 저장 실패', error, { context: 'LogUploadPage' });
       showToast.error('점령전 저장에 실패했습니다.');
     },
-  } as any);
+  });
 
   // 실레나 업로드 Mutation
   const arenaUploadMutation = useArenaUpload({
@@ -212,7 +210,7 @@ function LogUploadContent() {
       logger.error('실레나 업로드 실패', error, { context: 'LogUploadPage' });
       showToast.error('실레나 업로드에 실패했습니다.');
     },
-  } as any);
+  });
 
   // 점령전 검증 처리
   const handleSiegeValidation = async () => {
@@ -228,7 +226,7 @@ function LogUploadContent() {
       try {
         const text = e.target?.result as string;
         const jsonData = JSON.parse(text);
-        let logList: any[];
+        let logList: unknown[];
         
         if (Array.isArray(jsonData)) {
           logList = jsonData;
@@ -742,7 +740,7 @@ function LogUploadContent() {
                                         <RadioGroup
                                           row
                                           value={item.status === 'overwrite' ? 'overwrite' : 'skip'}
-                                          onChange={(e) => {
+                                          onChange={() => {
                                             // 상태 업데이트 로직 (추후 구현)
                                           }}
                                         >

@@ -110,15 +110,22 @@ export interface CodeItem {
 }
 
 export interface CodeSaveRequest {
+  insertGrpRow: CodeGroup[];
+  updateGrpRow: CodeGroup[];
+  deleteGrpRow: CodeGroup[];
   insertRow: CodeItem[];
   updateRow: CodeItem[];
   deleteRow: CodeItem[];
+  bsns_cd?: string;
+  cd_grp_no?: string;
 }
 
 export interface CodeRelSaveRequest {
-  insertRow: ParentItem[];
-  updateRow: ParentItem[];
-  deleteRow: ParentItem[];
+  insertRow: ChildItem[];
+  updateRow: ChildItem[];
+  deleteRow: ChildItem[];
+  up_cd_grp_no?: string;
+  up_cd?: string;
 }
 
 export interface CodeRelSaveResponse {
@@ -145,7 +152,9 @@ export interface ChildItem {
 }
 
 export interface PopupItem {
+  id?: string;
   cd_grp_no: string;
+  cd_grp_nm?: string;
   cd: string;
   cd_nm: string;
 }

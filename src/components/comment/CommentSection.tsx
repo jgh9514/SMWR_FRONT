@@ -7,7 +7,6 @@ import {
   Typography,
   Button,
   Paper,
-  Divider,
   IconButton,
   Avatar,
   Stack,

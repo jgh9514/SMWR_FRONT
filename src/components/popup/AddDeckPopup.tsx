@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -42,10 +42,7 @@ export default function AddDeckPopup({
   type: propType,
   defenseMonster: propDefenseMonster,
 }: AddDeckPopupProps) {
-  const [type, setType] = useState<0 | 1 | 2>(0);
-  const [defenseMonster, setDefenseMonster] = useState<any>(null);
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
-  const [selectedMonsterIds, setSelectedMonsterIds] = useState<string[]>([]);
   const [step, setStep] = useState(1);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
   const [monsterStats, setMonsterStats] = useState<DeckMonsterStats[]>([
@@ -53,6 +50,8 @@ export default function AddDeckPopup({
     { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
     { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
   ]);
+  const type = propType === 'bang' ? 1 : propType === 'empty' ? 2 : 0;
+  const defenseMonster = propDefenseMonster ?? null;
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
@@ -85,36 +84,22 @@ export default function AddDeckPopup({
     },
   });
 
-  const handleOpen = (openType: 'bang' | 'empty', id?: any) => {
-    if (openType === 'bang') {
-      setType(1);
-    } else if (openType === 'empty') {
-      setType(2);
-      setDefenseMonster(id);
-    }
-    setStep(1);
-  };
-
-  const handleMonsterChange = (monsterIds: string[]) => {
-    if (monsterIds.length > 3) {
+  const handleMonsterChange = (monsters: MonsterOption[]) => {
+    if (monsters.length > 3) {
       showToast.error('최대 3개까지 선택할 수 있습니다.');
       return;
     }
-    setSelectedMonsterIds(monsterIds);
-    setSelectedMonsterList(
-      monsterIds.map((id) => monsterList.find((m) => m.monster_id === id)).filter(Boolean) as MonsterOption[],
-    );
+    setSelectedMonsterList(monsters);
   };
 
   const removeMonster = (monsterIdOrIndex: string | number) => {
     if (typeof monsterIdOrIndex === 'string') {
-      setSelectedMonsterIds((prev) => prev.filter((id) => id !== monsterIdOrIndex));
+      setSelectedMonsterList((prev) =>
+        prev.filter((monster) => monster.monster_id !== monsterIdOrIndex),
+      );
     } else {
       const index = monsterIdOrIndex;
-      const monsterToRemove = selectedMonsterList[index];
-      if (monsterToRemove) {
-        setSelectedMonsterIds((prev) => prev.filter((id) => id !== monsterToRemove.monster_id));
-      }
+      setSelectedMonsterList((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
     }
   };
 
@@ -154,7 +139,6 @@ export default function AddDeckPopup({
 
   const handleClose = () => {
     setSelectedMonsterList([]);
-    setSelectedMonsterIds([]);
     setStep(1);
     setMonsterStats([
       { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
@@ -164,25 +148,13 @@ export default function AddDeckPopup({
     onClose();
   };
 
-  const handleImageError = (event: React.SyntheticEvent<HTMLElement, Event>, imageUrl: string) => {
+  const handleImageError = (event: React.SyntheticEvent<HTMLElement, Event>) => {
     // Avatar의 경우 img 태그를 찾아서 대체
     const img = (event.currentTarget as HTMLElement).querySelector('img');
     if (img) {
       img.src = getMonsterImageUrl('/images/default-monster.png');
     }
   };
-
-  useEffect(() => {
-    if (open) {
-      if (propType === 'bang') {
-        setType(1);
-      } else if (propType === 'empty' && propDefenseMonster) {
-        setType(2);
-        setDefenseMonster(propDefenseMonster);
-      }
-      setStep(1);
-    }
-  }, [open, propType, propDefenseMonster]);
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth fullScreen>
@@ -282,7 +254,7 @@ export default function AddDeckPopup({
                 }}
                 value={selectedMonsterList}
                 onChange={(_, newValue) => {
-                  handleMonsterChange(newValue.map((m) => m.monster_id));
+                  handleMonsterChange(newValue);
                 }}
                 renderInput={(params) => (
                   <TextField
@@ -310,7 +282,7 @@ export default function AddDeckPopup({
                         src={getMonsterImageUrl(option.image_url)}
                         alt={option.kr_name}
                         sx={{ width: 40, height: 40, flexShrink: 0 }}
-                        onError={(e) => handleImageError(e, option.image_url)}
+                        onError={handleImageError}
                       />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
@@ -336,7 +308,7 @@ export default function AddDeckPopup({
                           src={getMonsterImageUrl(option.image_url)}
                           alt={option.kr_name}
                           sx={{ borderRadius: 0 }}
-                          onError={(e) => handleImageError(e, option.image_url)}
+                          onError={handleImageError}
                         />
                       }
                       onDelete={() => removeMonster(option.monster_id)}

@@ -11,13 +11,22 @@ import { apiClient } from '@/shared/lib/api/client';
 
 let reauthInFlight: Promise<void> | null = null;
 
+interface LoginCheckResponse {
+  result?: string;
+  userInfo?: unknown;
+}
+
+type BrowserWindowWithFlags = Window & {
+  __networkErrorLogged?: boolean;
+};
+
 async function tryReauthOnce() {
   if (typeof window === 'undefined') return;
   if (reauthInFlight) return reauthInFlight;
   reauthInFlight = (async () => {
     try {
       // login-check는 쿠키(HttpOnly 포함) 기반으로 서버가 최종 판단
-      const res: any = await apiClient.post('/auth/login-check', {});
+      const res = await apiClient.post<LoginCheckResponse>('/auth/login-check', {});
       if (res && res.result === 'SUCCESS' && res.userInfo) {
         localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
         localStorage.setItem('isLoggedIn', 'true');
@@ -176,9 +185,11 @@ axiosInstance.interceptors.response.use(
       // 백엔드 서버가 실행되지 않은 경우 조용히 처리 (토스트 표시하지 않음)
       if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error') || error.code === 'ERR_CONNECTION_REFUSED') {
         // 개발 환경에서만 첫 번째 네트워크 에러만 경고 출력 (중복 방지)
-        if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development' && !(window as any).__networkErrorLogged) {
+        const browserWindow =
+          typeof window !== 'undefined' ? (window as BrowserWindowWithFlags) : null;
+        if (browserWindow && process.env.NODE_ENV === 'development' && !browserWindow.__networkErrorLogged) {
           logger.warn('백엔드 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인하세요.');
-          (window as any).__networkErrorLogged = true;
+          browserWindow.__networkErrorLogged = true;
         }
         return Promise.reject(error);
       }

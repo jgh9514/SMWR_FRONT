@@ -32,7 +32,7 @@ export interface MonsterListResponse {
  * 몬스터 목록 조회
  */
 export const useMonsterList = (params: Record<string, unknown> = {}) => {
-  return useApiPostQuery<MonsterListResponse>('/admin/monster/list', params, { enabled: false });
+  return useApiPostQuery<MonsterListResponse>('/admin/monster/list', params, { enabled: true });
 };
 
 /**

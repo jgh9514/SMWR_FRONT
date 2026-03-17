@@ -21,7 +21,6 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useRouter } from 'next/navigation';
 import { searchDataExtraction } from '@/shared/utils/util';
-import type { ApiHisItem } from '@/types';
 import { useApiHistoryList } from '@/features/admin/hooks';
 
 export default function ApiHistoryPage() {

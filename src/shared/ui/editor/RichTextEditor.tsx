@@ -13,7 +13,7 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import TextStyle from '@tiptap/extension-text-style';
 import Color from '@tiptap/extension-color';
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useSyncExternalStore } from 'react';
 import { Box, SxProps, Theme } from '@mui/material';
 import { sanitizeHtml } from './RichTextDisplay';
 
@@ -46,12 +46,11 @@ export default function RichTextEditor({
   sx,
   minHeight = 300,
 }: RichTextEditorProps) {
-  // 클라이언트 마운트 상태 관리 (Hydration 오류 방지)
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // 초기값도 sanitize
   const sanitizedValue = useMemo(() => {
@@ -167,7 +166,7 @@ export default function RichTextEditor({
   );
 
   // 서버 사이드에서는 placeholder만 렌더링 (Hydration 오류 방지)
-  if (!isMounted || !editor) {
+  if (!isClient || !editor) {
     return (
       <Box
         sx={{

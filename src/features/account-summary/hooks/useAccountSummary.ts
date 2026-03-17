@@ -14,6 +14,10 @@ import type {
   RuneScoreSummaryResponse,
 } from '@/features/account-summary/types/account-summary';
 
+function isApiResponse<T>(value: ApiResponse<T> | T): value is ApiResponse<T> {
+  return typeof value === 'object' && value !== null && ('result' in value || 'data' in value || 'message' in value);
+}
+
 export const useAccountSummaryUpload = (
   options?: Omit<Parameters<typeof useApiMutation<AccountSummaryUploadResult, File>>[0], 'mutationFn'>,
 ) => {
@@ -30,13 +34,13 @@ export const useAccountSummaryUpload = (
       );
 
       const body = res.data as ApiResponse<AccountSummaryUploadResult> | AccountSummaryUploadResult;
-      if (body && typeof body === 'object' && 'result' in body) {
+      if (isApiResponse(body)) {
         if (body.result !== 'SUCCESS') {
-          const message = (body as any).message || '업로드에 실패했습니다.';
+          const message = body.message || '업로드에 실패했습니다.';
           throw new Error(message);
         }
-        if ((body as any).data) {
-          return (body as any).data as AccountSummaryUploadResult;
+        if (body.data) {
+          return body.data;
         }
       }
 

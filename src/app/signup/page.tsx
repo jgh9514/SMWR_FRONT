@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Button,
@@ -35,7 +35,6 @@ export default function SignupPage() {
     user_id: '',
     password: '',
     password_confirm: '',
-    email: '',
     verification_code: '',
   });
 
@@ -65,56 +64,31 @@ export default function SignupPage() {
   // 아이디 중복체크 상태
   const [userIdChecked, setUserIdChecked] = useState(false);
   const [userIdAvailable, setUserIdAvailable] = useState<boolean | null>(null);
-  const [lastCheckedUserId, setLastCheckedUserId] = useState<string>('');
-
-  // 비밀번호 검증 상태
-  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
-  const [passwordConfirmMatch, setPasswordConfirmMatch] = useState<boolean | null>(null);
   const [showValidationMessages, setShowValidationMessages] = useState(false);
-
-  // 아이디 변경 시 중복체크 상태 초기화
-  useEffect(() => {
-    if (signupFormData.user_id !== lastCheckedUserId) {
-      setUserIdChecked(false);
-      setUserIdAvailable(null);
+  const passwordErrors = useMemo(() => {
+    if (!signupFormData.password) {
+      return [];
     }
-  }, [signupFormData.user_id, lastCheckedUserId]);
-
-  // 비밀번호 검증
-  useEffect(() => {
-    if (signupFormData.password) {
-      const validation = isValidPassword(signupFormData.password);
-      setPasswordErrors(validation.errors);
-    } else {
-      setPasswordErrors([]);
-    }
+    return isValidPassword(signupFormData.password).errors;
   }, [signupFormData.password]);
-
-  // 비밀번호 확인 일치 여부
-  useEffect(() => {
-    if (signupFormData.password_confirm) {
-      setPasswordConfirmMatch(signupFormData.password === signupFormData.password_confirm);
-    } else {
-      setPasswordConfirmMatch(null);
+  const passwordConfirmMatch = useMemo(() => {
+    if (!signupFormData.password_confirm) {
+      return null;
     }
+    return signupFormData.password === signupFormData.password_confirm;
   }, [signupFormData.password, signupFormData.password_confirm]);
-
-  // 이메일 주소 조합
-  useEffect(() => {
-    let fullEmail = '';
-    if (emailId) {
-      if (isCustomDomain && customDomain) {
-        fullEmail = `${emailId}@${customDomain}`;
-      } else if (emailDomain && emailDomain !== '직접 입력') {
-        fullEmail = `${emailId}@${emailDomain}`;
-      }
+  const composedEmail = useMemo(() => {
+    if (!emailId) {
+      return '';
     }
-    setSignupFormData((prev) => ({ ...prev, email: fullEmail }));
-    if (fullEmail !== signupFormData.email) {
-      setEmailVerified(false);
-      setCodeSent(false);
+    if (isCustomDomain && customDomain) {
+      return `${emailId}@${customDomain}`;
     }
-  }, [emailId, emailDomain, customDomain, isCustomDomain]);
+    if (emailDomain && emailDomain !== '직접 입력') {
+      return `${emailId}@${emailDomain}`;
+    }
+    return '';
+  }, [customDomain, emailDomain, emailId, isCustomDomain]);
 
   // 이메일 인증 코드 발송 Mutation
   const sendCodeMutation = useSendEmailVerification({
@@ -162,7 +136,6 @@ export default function SignupPage() {
         const isDuplicate = res.isDuplicate ?? false;
         setUserIdAvailable(!isDuplicate);
         setUserIdChecked(true);
-        setLastCheckedUserId(signupFormData.user_id);
         if (isDuplicate) {
           showToast.error('이미 사용 중인 아이디입니다.');
         } else {
@@ -244,15 +217,15 @@ export default function SignupPage() {
 
   // 이메일 인증 코드 발송
   const handleSendCode = () => {
-    if (isEmpty(signupFormData.email)) {
+    if (isEmpty(composedEmail)) {
       showToast.error('이메일을 입력해주세요.');
       return;
     }
-    if (!isValidEmail(signupFormData.email)) {
+    if (!isValidEmail(composedEmail)) {
       showToast.error('올바른 이메일 형식이 아닙니다.');
       return;
     }
-    sendCodeMutation.mutate({ email: signupFormData.email });
+    sendCodeMutation.mutate({ email: composedEmail });
   };
 
   // 이메일 인증 코드 재발송
@@ -283,7 +256,7 @@ export default function SignupPage() {
       return;
     }
     verifyCodeMutation.mutate({
-      email: signupFormData.email,
+      email: composedEmail,
       code: signupFormData.verification_code,
     });
   };
@@ -315,9 +288,9 @@ export default function SignupPage() {
       errors.push('비밀번호가 일치하지 않습니다.');
     }
 
-    if (isEmpty(signupFormData.email)) {
+    if (isEmpty(composedEmail)) {
       errors.push('이메일을 입력해주세요.');
-    } else if (!isValidEmail(signupFormData.email)) {
+    } else if (!isValidEmail(composedEmail)) {
       errors.push('올바른 이메일 형식이 아닙니다.');
     }
 
@@ -351,11 +324,11 @@ export default function SignupPage() {
       messages.push('비밀번호가 일치하지 않습니다.');
     }
 
-    if (signupFormData.email && !isValidEmail(signupFormData.email)) {
+    if (composedEmail && !isValidEmail(composedEmail)) {
       messages.push('올바른 이메일 형식이 아닙니다.');
     }
 
-    if (signupFormData.email && !emailVerified) {
+    if (composedEmail && !emailVerified) {
       messages.push('이메일 인증을 완료해주세요.');
     }
 
@@ -371,7 +344,7 @@ export default function SignupPage() {
     const params: SignupParams = {
       user_id: signupFormData.user_id,
       password: signupFormData.password,
-      email: signupFormData.email,
+      email: composedEmail,
     };
 
     signupMutation.mutate(params);
@@ -612,6 +585,8 @@ export default function SignupPage() {
                     value={emailId}
                     onChange={(e) => {
                       setEmailId(e.target.value);
+                      setEmailVerified(false);
+                      setCodeSent(false);
                     }}
                     disabled={signupMutation.isPending || emailVerified}
                     sx={{ minWidth: 0 }}
@@ -641,6 +616,8 @@ export default function SignupPage() {
                       value={customDomain}
                       onChange={(e) => {
                         setCustomDomain(e.target.value);
+                          setEmailVerified(false);
+                          setCodeSent(false);
                       }}
                       disabled={signupMutation.isPending || emailVerified}
                       sx={{ minWidth: 0 }}
@@ -663,6 +640,8 @@ export default function SignupPage() {
                           if (domain !== '직접 입력') {
                             setCustomDomain('');
                           }
+                          setEmailVerified(false);
+                          setCodeSent(false);
                         }}
                         label="도메인"
                       >
@@ -684,8 +663,8 @@ export default function SignupPage() {
                         isEmpty(emailId) ||
                         isEmpty(emailDomain) ||
                         (isCustomDomain && isEmpty(customDomain)) ||
-                        isEmpty(signupFormData.email) ||
-                        !isValidEmail(signupFormData.email) ||
+                        isEmpty(composedEmail) ||
+                        !isValidEmail(composedEmail) ||
                         sendCodeMutation.isPending ||
                         (codeSent && countdown > 0) // 최초 발송 후에는 아래 '재발송' 버튼 사용
                       }
@@ -770,8 +749,8 @@ export default function SignupPage() {
                       onClick={handleResendCode}
                       disabled={
                         signupMutation.isPending ||
-                        isEmpty(signupFormData.email) ||
-                        !isValidEmail(signupFormData.email) ||
+                        isEmpty(composedEmail) ||
+                        !isValidEmail(composedEmail) ||
                         sendCodeMutation.isPending ||
                         resendCooldown > 0
                       }

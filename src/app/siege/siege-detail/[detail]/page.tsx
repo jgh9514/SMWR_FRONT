@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Box,
@@ -20,7 +20,6 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useMonsterDetail } from '@/hooks/api';
-import { showToast } from '@/shared/lib/notification';
 import AddDeckPopup from '@/components/popup/AddDeckPopup';
 import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
@@ -32,21 +31,42 @@ export default function MonsterDetailPage() {
   const params = useParams();
   const router = useRouter();
   const theme = useTheme();
-  const [isMounted, setIsMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const mobileQuery = useMediaQuery(theme.breakpoints.down('md'));
-  const mobile = isMounted ? mobileQuery : false; // 서버에서는 항상 false
+  const mobile = isClient ? mobileQuery : false; // 서버에서는 항상 false
+  const detailParam = useMemo(() => {
+    const rawDetail = params?.detail;
+    return Array.isArray(rawDetail) ? rawDetail[0] : rawDetail;
+  }, [params]);
+  const parsedDetail = useMemo(() => {
+    if (!detailParam) {
+      return {
+        schData: {} as Pick<MonsterDetailParams, 'dm1' | 'dm2' | 'dm3'>,
+        matchId: null as string | null,
+      };
+    }
 
-  // 클라이언트 마운트 확인
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    const [monsterKey, matchIdPart] = detailParam.split('_');
+    const [dm1, dm2, dm3] = monsterKey.split('-');
 
-  const [schData, setSchData] = useState<any>({});
-  const [matchId, setMatchId] = useState<string | null>(null);
+    return {
+      schData: {
+        dm1,
+        dm2,
+        dm3,
+      },
+      matchId: matchIdPart ?? null,
+    };
+  }, [detailParam]);
+  const schData = parsedDetail.schData;
+  const matchId = parsedDetail.matchId;
   const siegeGuildViewParams = useSiegeGuildViewParams();
   const [historyPage, setHistoryPage] = useState(1);
   const [recommendedPage, setRecommendedPage] = useState(1);
-  const [isInitialized, setIsInitialized] = useState(false);
   const historyLimit = DEFAULT_PAGE_SIZE;
   const recommendedLimit = 5;
 
@@ -118,38 +138,8 @@ export default function MonsterDetailPage() {
     router.push(matchId ? `/siege?match_id=${matchId}` : '/siege');
   };
 
-  useEffect(() => {
-    const detailParam = params?.detail as string;
-    if (!detailParam) {
-      setIsInitialized(true);
-      return;
-    }
-
-    if (detailParam.includes('_')) {
-      const parts = detailParam.split('_');
-      const monsterKey = parts[0];
-      const matchIdPart = parts[1];
-
-      const dm = monsterKey.split('-');
-      setSchData({
-        dm1: dm[0],
-        dm2: dm[1],
-        dm3: dm[2],
-      });
-      setMatchId(matchIdPart);
-    } else {
-      const dm = detailParam.split('-');
-      setSchData({
-        dm1: dm[0],
-        dm2: dm[1],
-        dm3: dm[2],
-      });
-    }
-    setIsInitialized(true);
-  }, [params]);
-
   // 초기화 전이거나 초기 로딩 중 (데이터가 없을 때만 전체 로딩 표시)
-  if (!isInitialized || (isLoadingDetail && !detailData)) {
+  if ((isLoadingDetail && !detailData) || !detailParam) {
     return (
       <Container maxWidth="xl" sx={{ py: 8 }}>
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
@@ -768,7 +758,15 @@ export default function MonsterDetailPage() {
           onClose={handleAddPopupClose}
           onSave={handleAddPopupClose}
           type="empty"
-          defenseMonster={schData.dm1 ? { dm1: schData.dm1, dm2: schData.dm2, dm3: schData.dm3 } : undefined}
+          defenseMonster={
+            schData.dm1
+              ? {
+                  dm1: schData.dm1,
+                  dm2: schData.dm2 ?? '',
+                  dm3: schData.dm3 ?? '',
+                }
+              : undefined
+          }
         />
         <DeckDetailPopup
           open={deckDetailPopupOpen}

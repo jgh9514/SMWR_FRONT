@@ -8,7 +8,7 @@ import type { MlangItem } from '@/types';
 /**
  * 다국어 목록 조회
  */
-export const useMlangList = (params: Record<string, unknown>, enabled = false) => {
+export const useMlangList = (params: Record<string, unknown>, enabled = true) => {
   return useApiPostQuery<MlangItem[]>('/sm/mlang/list', params, { enabled });
 };
 

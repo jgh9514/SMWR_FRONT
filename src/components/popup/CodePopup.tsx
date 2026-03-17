@@ -21,11 +21,11 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import { useCodePopupList } from '@/features/admin/hooks/useCodeRelation';
 import { showToast } from '@/shared/lib/notification';
-import type { CodeItem } from '@/types';
+import type { PopupItem } from '@/types';
 
 interface CodePopupProps {
   open: boolean;
-  onClose: (data?: CodeItem[]) => void;
+  onClose: (data?: PopupItem[]) => void;
 }
 
 export default function CodePopup({ open, onClose }: CodePopupProps) {
@@ -42,7 +42,7 @@ export default function CodePopup({ open, onClose }: CodePopupProps) {
 
   const codeList = codePopupListQuery.data || [];
 
-  const onRowClick = (item: CodeItem) => {
+  const onRowClick = (item: PopupItem) => {
     const index = selectedCodes.indexOf(item.cd);
     if (index > -1) {
       setSelectedCodes((prev) => prev.filter((c) => c !== item.cd));

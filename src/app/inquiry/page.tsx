@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Box,
@@ -61,9 +61,13 @@ const RichTextEditor = dynamic(() => import('@/shared/ui/editor/RichTextEditor')
 
 export default function InquiryPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false);
+  const isClient = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const responsive = useResponsive();
-  const isMobile = isMounted ? responsive.isMobile : false;
+  const isMobile = isClient ? responsive.isMobile : false;
   const [page, setPage] = useState(1);
   const [limit] = useState(DEFAULT_PAGE_SIZE);
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
@@ -72,13 +76,22 @@ export default function InquiryPage() {
   const [writeDialogOpen, setWriteDialogOpen] = useState(false);
   const [answerDialogOpen, setAnswerDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const userInfo = useMemo<UserInfo | null>(() => {
+    if (!isClient) return null;
+    const storedUserInfo = localStorage.getItem('userInfo');
+    if (!storedUserInfo) return null;
 
-  // 클라이언트 마운트 확인
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    try {
+      return JSON.parse(storedUserInfo) as UserInfo;
+    } catch (error) {
+      logger.error('사용자 정보 파싱 실패', error);
+      return null;
+    }
+  }, [isClient]);
+  const isAdmin = useMemo(
+    () => userInfo?.roles?.some((role) => role.role_id === 'RL0001') || false,
+    [userInfo],
+  );
 
   const [formData, setFormData] = useState({
     title: '',
@@ -88,21 +101,6 @@ export default function InquiryPage() {
   const [answerData, setAnswerData] = useState({
     answer: '',
   });
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedUserInfo = localStorage.getItem('userInfo');
-      if (storedUserInfo) {
-        try {
-          const parsed = JSON.parse(storedUserInfo);
-          setUserInfo(parsed);
-          setIsAdmin(parsed.roles?.some((role: { role_id: string }) => role.role_id === 'RL0001') || false);
-        } catch (error) {
-          logger.error('사용자 정보 파싱 실패', error);
-        }
-      }
-    }
-  }, []);
 
   // 1대1문의 목록 조회
   const inquiryListQuery = useInquiryList(
@@ -263,7 +261,7 @@ export default function InquiryPage() {
             variant="outlined" 
             onClick={() => router.push('/')} 
             startIcon={<ArrowBackIcon />}
-            size={isMounted && isMobile ? 'small' : 'medium'}
+            size={isClient && isMobile ? 'small' : 'medium'}
             sx={{ flexShrink: 0 }}
           >
             목록
@@ -313,7 +311,7 @@ export default function InquiryPage() {
             variant="contained" 
             onClick={handleOpenWrite} 
             startIcon={<AddIcon />}
-            size={isMounted && isMobile ? 'small' : 'medium'}
+            size={isClient && isMobile ? 'small' : 'medium'}
             sx={{ width: { xs: '100%', sm: 'auto' } }}
           >
             문의하기
@@ -331,7 +329,7 @@ export default function InquiryPage() {
         </Alert>
       ) : inquiryListQuery.data && inquiryListQuery.data.list && inquiryListQuery.data.list.length > 0 ? (
         <>
-          {!isMounted ? (
+          {!isClient ? (
             // 서버 사이드: 데스크톱 레이아웃 (테이블)
             <TableContainer component={Paper} variant="outlined">
               <Table>
@@ -396,7 +394,7 @@ export default function InquiryPage() {
           ) : isMobile ? (
             // 모바일: 카드 형식
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {inquiryListQuery.data.list.map((inquiry, index) => (
+              {inquiryListQuery.data.list.map((inquiry) => (
                 <Card
                   key={inquiry.inquiry_id}
                   variant="outlined"
@@ -482,7 +480,7 @@ export default function InquiryPage() {
                         작성자: {inquiry.user_name || '-'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                        {isMounted && inquiry.crt_date
+                        {isClient && inquiry.crt_date
                           ? new Date(inquiry.crt_date).toLocaleDateString('ko-KR', {
                               year: 'numeric',
                               month: '2-digit',
@@ -540,7 +538,7 @@ export default function InquiryPage() {
                         />
                       </TableCell>
                       <TableCell align="center">
-                        {isMounted && inquiry.crt_date
+                        {isClient && inquiry.crt_date
                           ? new Date(inquiry.crt_date).toLocaleDateString('ko-KR')
                           : '-'}
                       </TableCell>
@@ -589,7 +587,7 @@ export default function InquiryPage() {
                 page={page}
                 onChange={handlePageChange}
                 color="primary"
-                size={isMounted && isMobile ? 'small' : 'medium'}
+                size={isClient && isMobile ? 'small' : 'medium'}
               />
             </Box>
           )}
@@ -628,7 +626,7 @@ export default function InquiryPage() {
               <Box sx={{ mb: 2, display: 'flex', gap: 2, color: 'text.secondary' }}>
                 <Typography variant="body2">작성자: {inquiryDetailQuery.data.user_name || '-'}</Typography>
                 <Typography variant="body2">
-                  작성일: {isMounted && inquiryDetailQuery.data.crt_date
+                  작성일: {isClient && inquiryDetailQuery.data.crt_date
                     ? new Date(inquiryDetailQuery.data.crt_date).toLocaleString('ko-KR')
                     : '-'}
                 </Typography>
@@ -663,7 +661,7 @@ export default function InquiryPage() {
                     {inquiryDetailQuery.data.answer_user_name && (
                       <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                         답변자: {inquiryDetailQuery.data.answer_user_name} | 답변일:{' '}
-                        {isMounted && inquiryDetailQuery.data.answer_date
+                        {isClient && inquiryDetailQuery.data.answer_date
                           ? new Date(inquiryDetailQuery.data.answer_date).toLocaleString('ko-KR')
                           : '-'}
                       </Typography>

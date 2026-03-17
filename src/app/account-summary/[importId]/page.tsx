@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DataTable from '@/shared/ui/data-table/DataTable';
+import type { TableColumn } from '@/shared/ui/data-table/DataTable';
 import { Avatar, Badge, CardActionArea, TextField, InputAdornment } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { getMonsterImageUrl } from '@/shared/utils/image';
@@ -97,7 +98,7 @@ export default function AccountSummaryDetailPage() {
     { enabled: Number.isFinite(importId) && activeTab === 'rune' },
   );
 
-  const runeColumns = useMemo(
+  const runeColumns = useMemo<TableColumn<SwexRuneItem>[]>(
     () => [
       { title: '룬ID', key: 'rune_id' },
       { title: '유닛ID', key: 'unit_id', hideOnMobile: true },
@@ -425,7 +426,7 @@ export default function AccountSummaryDetailPage() {
             <>
               {runeQuery.isLoading && <LinearProgress sx={{ mb: 2 }} />}
               <DataTable<SwexRuneItem>
-                columns={runeColumns as any}
+                columns={runeColumns}
                 data={runeQuery.data?.items || []}
                 emptyMessage="룬 데이터가 없습니다."
                 size="small"

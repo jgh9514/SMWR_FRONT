@@ -44,11 +44,21 @@ import {
 } from '@/features/admin/hooks/useQueryPerf';
 
 type TabKey = 'slow' | 'running';
+const SLOW_ORDER_BY_OPTIONS = ['total_ms', 'mean_ms', 'max_ms', 'calls', 'rows'] as const;
+const ORDER_DIR_OPTIONS = ['desc', 'asc'] as const;
 
 function formatMs(ms: number | null | undefined): string {
   if (ms == null || Number.isNaN(ms)) return '-';
   if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
   return `${ms.toFixed(0)}ms`;
+}
+
+function isSlowOrderBy(value: string): value is (typeof SLOW_ORDER_BY_OPTIONS)[number] {
+  return SLOW_ORDER_BY_OPTIONS.includes(value as (typeof SLOW_ORDER_BY_OPTIONS)[number]);
+}
+
+function isOrderDir(value: string): value is (typeof ORDER_DIR_OPTIONS)[number] {
+  return ORDER_DIR_OPTIONS.includes(value as (typeof ORDER_DIR_OPTIONS)[number]);
 }
 
 export default function AdminQueryPerfPage() {
@@ -366,7 +376,12 @@ export default function AdminQueryPerfPage() {
                   <Select
                     label="정렬 기준"
                     value={orderBy}
-                    onChange={(e) => setOrderBy(e.target.value as any)}
+                    onChange={(e) => {
+                      const value = String(e.target.value);
+                      if (isSlowOrderBy(value)) {
+                        setOrderBy(value);
+                      }
+                    }}
                   >
                     <MenuItem value="total_ms">총합</MenuItem>
                     <MenuItem value="mean_ms">평균</MenuItem>
@@ -380,7 +395,12 @@ export default function AdminQueryPerfPage() {
                   <Select
                     label="정렬 방향"
                     value={orderDir}
-                    onChange={(e) => setOrderDir(e.target.value as any)}
+                    onChange={(e) => {
+                      const value = String(e.target.value);
+                      if (isOrderDir(value)) {
+                        setOrderDir(value);
+                      }
+                    }}
                   >
                     <MenuItem value="desc">내림차순</MenuItem>
                     <MenuItem value="asc">오름차순</MenuItem>

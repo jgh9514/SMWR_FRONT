@@ -27,7 +27,7 @@ export interface SiegeValidationResponse {
 }
 
 export interface SiegeSaveRequest {
-  log_list: any[];
+  log_list: unknown[];
   siegeOptions?: Record<string, 'skip' | 'overwrite'>; // 인덱스별 처리 옵션 (키는 문자열)
 }
 

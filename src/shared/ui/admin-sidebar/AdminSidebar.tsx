@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Drawer,
@@ -203,23 +203,23 @@ export default function AdminSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
-  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    // 현재 경로에 맞는 카테고리 자동 열기
+  const [manuallyOpenCategories, setManuallyOpenCategories] = useState<Record<string, boolean>>({});
+  const openCategories = useMemo(() => {
     const currentCategory = menuCategories.find((category) =>
-      category.items.some((item) => item.path === pathname)
+      category.items.some((item) => item.path === pathname),
     );
-    if (currentCategory) {
-      setOpenCategories((prev) => ({
-        ...prev,
-        [currentCategory.title]: true,
-      }));
+    if (!currentCategory) {
+      return manuallyOpenCategories;
     }
-  }, [pathname]);
+
+    return {
+      ...manuallyOpenCategories,
+      [currentCategory.title]: true,
+    };
+  }, [manuallyOpenCategories, pathname]);
 
   const handleCategoryToggle = (categoryTitle: string) => {
-    setOpenCategories((prev) => ({
+    setManuallyOpenCategories((prev) => ({
       ...prev,
       [categoryTitle]: !prev[categoryTitle],
     }));
