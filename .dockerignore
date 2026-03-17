@@ -1,7 +1,9 @@
 # Dependencies
 node_modules
-.pnp
-.pnp.js
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/__virtual__
 
 # Testing
 coverage
