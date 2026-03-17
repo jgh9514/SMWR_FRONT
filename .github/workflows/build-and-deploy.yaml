@@ -10,6 +10,9 @@ on:
 env:
   DOCKER_IMAGE: gilhwanjeon/smwr_front-nextjs-app
   DOCKER_TAG: latest
+  YARN_CACHE_FOLDER: .yarn/cache
+  YARN_VIRTUAL_FOLDER: .yarn/__virtual__
+  YARN_PNP_UNPLUGGED_FOLDER: .yarn/unplugged
 
 jobs:
   build-and-push:
@@ -23,10 +26,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
 
       - name: Enable Corepack
-        run: corepack enable
+        run: |
+          corepack enable
+          corepack prepare yarn@4.10.3 --activate
+
+      - name: Cache Yarn Berry artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .yarn/cache
+            .yarn/__virtual__
+            .yarn/unplugged
+            .yarn/install-state.gz
+            .pnp.cjs
+            .pnp.loader.mjs
+          key: ${{ runner.os }}-yarn-berry-${{ hashFiles('yarn.lock', '.yarnrc.yml', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-berry-
 
       - name: Install dependencies
         run: yarn install --immutable
