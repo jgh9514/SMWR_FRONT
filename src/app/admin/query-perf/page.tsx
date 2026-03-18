@@ -27,10 +27,12 @@ import {
   TableRow,
   TextField,
   Typography,
+  Chip,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import { useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/shared/ui';
 import { confirm, showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
@@ -62,21 +64,41 @@ function isOrderDir(value: string): value is (typeof ORDER_DIR_OPTIONS)[number] 
 }
 
 export default function AdminQueryPerfPage() {
-  const [tab, setTab] = useState<TabKey>('slow');
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab');
+  const initialQueryLike = searchParams.get('query_like') || '';
+  const initialMinMeanMs = searchParams.get('min_mean_ms');
+  const initialMinCalls = searchParams.get('min_calls');
+  const initialOrderBy = searchParams.get('order_by');
+  const initialOrderDir = searchParams.get('order_dir');
+  const initialMinDurationMs = searchParams.get('min_duration_ms');
+
+  const [tab, setTab] = useState<TabKey>(initialTab === 'running' ? 'running' : 'slow');
   const [queryDialogOpen, setQueryDialogOpen] = useState(false);
   const [queryDialogText, setQueryDialogText] = useState('');
 
   // slow queries filters
   const [slowLimit, setSlowLimit] = useState(50);
-  const [orderBy, setOrderBy] = useState<'total_ms' | 'mean_ms' | 'max_ms' | 'calls' | 'rows'>('total_ms');
-  const [orderDir, setOrderDir] = useState<'desc' | 'asc'>('desc');
-  const [queryLike, setQueryLike] = useState('');
-  const [minMeanMs, setMinMeanMs] = useState<number | ''>('');
-  const [minCalls, setMinCalls] = useState<number | ''>('');
+  const [orderBy, setOrderBy] = useState<'total_ms' | 'mean_ms' | 'max_ms' | 'calls' | 'rows'>(
+    isSlowOrderBy(initialOrderBy || '') ? initialOrderBy : 'total_ms',
+  );
+  const [orderDir, setOrderDir] = useState<'desc' | 'asc'>(
+    isOrderDir(initialOrderDir || '') ? initialOrderDir : 'desc',
+  );
+  const [queryLike, setQueryLike] = useState(initialQueryLike);
+  const [minMeanMs, setMinMeanMs] = useState<number | ''>(initialMinMeanMs ? Number(initialMinMeanMs) : '');
+  const [minCalls, setMinCalls] = useState<number | ''>(initialMinCalls ? Number(initialMinCalls) : '');
 
   // running queries filters
   const [runningLimit, setRunningLimit] = useState(50);
-  const [minDurationMs, setMinDurationMs] = useState<number | ''>(500);
+  const [minDurationMs, setMinDurationMs] = useState<number | ''>(initialMinDurationMs ? Number(initialMinDurationMs) : 500);
+  const incident = searchParams.get('incident');
+  const incidentMessage = useMemo(() => {
+    if (incident === 'db_diagnostics_unavailable') {
+      return '운영 상태 카드에서 DB 진단 실패 이슈로 진입했습니다. 슬로우 쿼리와 메트릭 수집 상태를 우선 확인하세요.';
+    }
+    return null;
+  }, [incident]);
 
   const slowParams = useMemo(() => {
     return {
@@ -115,6 +137,23 @@ export default function AdminQueryPerfPage() {
     slowQuery.refetch();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (incident === 'db_diagnostics_unavailable') {
+      setTab('slow');
+      if (initialMinMeanMs) {
+        setMinMeanMs(Number(initialMinMeanMs));
+      }
+      if (isSlowOrderBy(initialOrderBy || '')) {
+        setOrderBy(initialOrderBy);
+      }
+      if (isOrderDir(initialOrderDir || '')) {
+        setOrderDir(initialOrderDir);
+      }
+      void slowQuery.refetch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incident]);
 
   const openQueryDialog = (sql: string) => {
     setQueryDialogText(sql || '');
@@ -282,7 +321,16 @@ export default function AdminQueryPerfPage() {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 } }}>
-        <PageHeader title="쿼리 성능" />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 3 }}>
+          <PageHeader title="쿼리 성능" />
+          {incident && <Chip label={`incident: ${incident}`} color="warning" variant="outlined" />}
+        </Box>
+
+        {incidentMessage && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            {incidentMessage}
+          </Alert>
+        )}
 
         <Card sx={{ mb: 3 }}>
           <CardHeader

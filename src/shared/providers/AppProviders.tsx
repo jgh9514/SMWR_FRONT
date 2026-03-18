@@ -1,16 +1,25 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RecoilRoot } from 'recoil';
 import { usePathname, useRouter } from 'next/navigation';
 import { ThemeProvider as MuiThemeProvider, CssBaseline, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
-import FixedHeader from '@/shared/ui/fixed-header/FixedHeader';
-import NoticePopup from '@/components/notice/NoticePopup';
 import ClientOnlyToaster from './ClientOnlyToaster';
 import { isAuthenticated, isForceLoggedOut } from '@/shared/utils/auth';
 import type { AuthCheckResponse } from '@/features/auth/types/auth';
+
+const FixedHeader = dynamic(() => import('@/shared/ui/fixed-header/FixedHeader'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const NoticePopup = dynamic(() => import('@/components/notice/NoticePopup'), {
+  ssr: false,
+  loading: () => null,
+});
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;

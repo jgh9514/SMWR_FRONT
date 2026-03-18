@@ -38,6 +38,19 @@ export interface ApiHisItem {
   exe_dtm: string;
   ip_addr?: string;
   role_nm?: string;
+  user_id?: string;
+  trace_id?: string;
+  http_status?: number;
+  elapsed_ms?: number;
+  mthd_tp_cd?: string;
+}
+
+export interface ApiHistoryResponse {
+  items: ApiHisItem[];
+  list: ApiHisItem[];
+  totalCount: number;
+  limit: number;
+  offset: number;
 }
 
 // 권한 관련
@@ -286,6 +299,127 @@ export interface DailyStats {
 export interface DashboardStatsResponse {
   stats: DashboardStats;
   dailyStats: DailyStats[]; // 최근 7일 또는 30일 데이터
+  opsMetrics?: OpsMetricsSnapshot;
+}
+
+export interface IncidentDetail {
+  incidentType: string;
+  title: string;
+  shortLabel: string;
+  owner: string;
+  priority: string;
+  playbook: string;
+  message: string;
+  badgeColor: string;
+  slaMinutes: number;
+  autoRefreshSeconds: number;
+  target: string;
+  method: string;
+  requestBody: Record<string, unknown>;
+  deepLink: string;
+}
+
+export interface HealthRateStatus {
+  metric: string;
+  value: number;
+  totalCount: number;
+  matchedCount: number;
+  warningThreshold: number;
+  criticalThreshold: number;
+  status: string;
+  message: string;
+}
+
+export interface OpsHealthSummary {
+  runtime: string;
+  apiErrorRate: HealthRateStatus;
+  apiSlowRate: HealthRateStatus;
+  status: string;
+  incidentTypes: string[];
+  primaryIncidentType: string;
+  incidentDetails: IncidentDetail[];
+  reasons: string[];
+  summaryMessage: string;
+  recommendedActions: string[];
+}
+
+export interface RuntimeHealthStatusItem {
+  metric: string;
+  value: number;
+  warningThreshold: number;
+  criticalThreshold: number;
+  unit: string;
+  status: string;
+  message: string;
+}
+
+export interface RuntimeHealthSnapshot {
+  heap: RuntimeHealthStatusItem;
+  processCpu: RuntimeHealthStatusItem;
+  systemCpu: RuntimeHealthStatusItem;
+  threads: RuntimeHealthStatusItem;
+  gcPause: RuntimeHealthStatusItem;
+  status: string;
+  incidentTypes: string[];
+  primaryIncidentType: string;
+  reasons: string[];
+  summaryMessage: string;
+}
+
+export interface ApiLogSummary {
+  recent_count?: number;
+  error_count?: number;
+  slow_count?: number;
+  max_elapsed_ms?: number;
+}
+
+export interface ApiLogSample {
+  exe_dtm: string;
+  user_id?: string;
+  api_exe_url?: string;
+  mthd_tp_cd?: string;
+  trace_id?: string;
+  http_status?: number;
+  elapsed_ms?: number;
+}
+
+export interface ApiLogDiagnostics {
+  windowHours: number;
+  startExeDtm: string;
+  slowThresholdMs: number;
+  limit: number;
+  traceIdEnabled: boolean;
+  httpStatusEnabled: boolean;
+  elapsedMsEnabled: boolean;
+  summary?: ApiLogSummary;
+  topErrors?: Array<Record<string, unknown>>;
+  topSlow?: Array<Record<string, unknown>>;
+  recentErrorSamples?: ApiLogSample[];
+  recentSlowSamples?: ApiLogSample[];
+}
+
+export interface OpsMetricsSnapshot {
+  enabled: boolean;
+  topErrorApis?: Array<Record<string, unknown>>;
+  topSlowApis?: Array<Record<string, unknown>>;
+  runtimeHealth?: RuntimeHealthSnapshot;
+  jvm?: Record<string, unknown>;
+  system?: Record<string, unknown>;
+  rateLimitMetrics?: Record<string, unknown>;
+  rateLimit?: Record<string, unknown>;
+}
+
+export interface OpsOverviewResponse {
+  result: string;
+  batch_status?: string;
+  db_status?: string;
+  metrics_status?: string;
+  api_logs_status?: string;
+  batch?: Record<string, unknown>;
+  db?: Record<string, unknown>;
+  metrics?: OpsMetricsSnapshot;
+  api_logs?: ApiLogDiagnostics;
+  health?: OpsHealthSummary;
 }
 
 /**

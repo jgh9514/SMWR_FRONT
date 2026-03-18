@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -31,7 +31,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useBatchConfig, useBatchRun, useBatchHistory, BatchConfigItem, BatchRunResponse } from '@/features/admin/hooks/useBatch';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
@@ -40,6 +40,7 @@ import { formatDate } from '@/shared/utils/format';
 
 export default function BatchManagementPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -47,12 +48,35 @@ export default function BatchManagementPage() {
   );
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<string>('');
+  const incident = searchParams.get('incident');
+  const historyFilter = searchParams.get('filter');
+  const incidentMessage = useMemo(() => {
+    if (incident === 'batch_diagnostics_failed') {
+      return '운영 상태 카드에서 배치 진단 실패 이슈로 진입했습니다. 최근 배치 설정과 실행 이력을 우선 확인하세요.';
+    }
+    return null;
+  }, [incident]);
 
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
 
   // 배치 실행 이력 조회
   const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory({});
+  const filteredBatchHistory = useMemo(() => {
+    if (historyFilter !== 'failed') {
+      return batchHistory;
+    }
+    return batchHistory.filter((item) => item.rslt_cd === 'FAIL' || item.rslt_cd === 'RUNNING');
+  }, [batchHistory, historyFilter]);
+  const batchHistorySummary = useMemo(() => {
+    let failCount = 0;
+    let runningCount = 0;
+    for (const item of batchHistory) {
+      if (item.rslt_cd === 'FAIL') failCount += 1;
+      if (item.rslt_cd === 'RUNNING') runningCount += 1;
+    }
+    return { failCount, runningCount };
+  }, [batchHistory]);
 
   // 날짜 포맷팅 함수
   const formatDateTime = (dateStr?: string) => {
@@ -173,9 +197,13 @@ export default function BatchManagementPage() {
             목록
           </Button>
           <PageHeader title="배치 관리" />
+          {incident && <Chip label={`incident: ${incident}`} color="warning" variant="outlined" />}
+          {historyFilter === 'failed' && <Chip label="실패/실행중 우선 보기" color="error" variant="outlined" />}
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {incidentMessage && <Alert severity="warning">{incidentMessage}</Alert>}
+
           {/* 배치 설정 */}
           <Card>
             <CardHeader
@@ -263,7 +291,7 @@ export default function BatchManagementPage() {
           {/* 실행 이력 */}
           <Card>
             <CardHeader
-              title="배치 실행 이력"
+              title={`배치 실행 이력 (${filteredBatchHistory.length}건)`}
               action={
                 <Tooltip title="새로고침">
                   <IconButton onClick={() => refetchHistory()} disabled={isLoadingHistory} size="small">
@@ -273,11 +301,16 @@ export default function BatchManagementPage() {
               }
             />
             <CardContent sx={{ p: 0, '&:last-child': { pb: 2 } }}>
+              {historyFilter === 'failed' && (
+                <Alert severity="info" sx={{ m: 2 }}>
+                  최근 실패 {batchHistorySummary.failCount}건, 실행중 {batchHistorySummary.runningCount}건을 우선 표시합니다.
+                </Alert>
+              )}
               {isLoadingHistory ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                   <CircularProgress />
                 </Box>
-              ) : batchHistory.length === 0 ? (
+              ) : filteredBatchHistory.length === 0 ? (
                 <Alert severity="info" sx={{ m: 2 }}>실행 이력이 없습니다.</Alert>
               ) : (
                 <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
@@ -293,7 +326,7 @@ export default function BatchManagementPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {batchHistory.map((his, index) => (
+                      {filteredBatchHistory.map((his, index) => (
                         <TableRow key={his.bat_exe_log_sn || `history-${index}`} hover>
                           <TableCell>{his.bat_exe_log_sn}</TableCell>
                           <TableCell>

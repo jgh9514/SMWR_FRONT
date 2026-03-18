@@ -35,6 +35,7 @@ export type {
   MenuItem,
   ApiItem,
   ApiHisItem,
+  ApiHistoryResponse,
   CodeGroup,
   CodeItem,
   CodeSaveRequest,

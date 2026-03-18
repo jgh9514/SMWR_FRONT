@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useSyncExternalStore } from 'react';
+import dynamic from 'next/dynamic';
 import {
   Box,
   Card,
@@ -21,22 +22,17 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import TrafficIcon from '@mui/icons-material/Traffic';
 import ArticleIcon from '@mui/icons-material/Article';
 import AssignmentIcon from '@mui/icons-material/Assignment';
-import {
-  LineChart,
-  Line,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts';
-import { useDashboardStats } from '@/features/admin/hooks/useDashboard';
+import { useAdminOpsOverview, useDashboardStats } from '@/features/admin/hooks/useDashboard';
 import { PageHeader } from '@/shared/ui';
+import AdminOpsOverviewPanel from '@/features/admin/components/AdminOpsOverviewPanel';
+
+const AdminDashboardCharts = dynamic(
+  () => import('@/features/admin/components/AdminDashboardCharts'),
+  {
+    ssr: false,
+    loading: () => null,
+  },
+);
 
 interface StatCardPropsLocal {
   title: string;
@@ -133,6 +129,13 @@ export default function AdminPage() {
 
   // 대시보드 통계 조회
   const { data: dashboardData, isLoading, isError, error } = useDashboardStats();
+  const {
+    data: opsOverview,
+    isLoading: isOpsLoading,
+    isError: isOpsError,
+    error: opsError,
+    refetch: refetchOpsOverview,
+  } = useAdminOpsOverview();
 
   // 차트 데이터 포맷팅
   const chartData = useMemo(() => {
@@ -150,6 +153,16 @@ export default function AdminPage() {
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', justifyContent: 'center' }}>
       <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 }, width: '100%' }}>
         <PageHeader title="대시보드" />
+
+        <AdminOpsOverviewPanel
+          data={opsOverview}
+          isLoading={isOpsLoading}
+          isError={isOpsError}
+          errorMessage={opsError instanceof Error ? opsError.message : '알 수 없는 오류'}
+          onRefresh={() => {
+            void refetchOpsOverview();
+          }}
+        />
 
         {/* 통계 카드 섹션 */}
         {isLoading ? (
@@ -201,73 +214,7 @@ export default function AdminPage() {
             </Box>
 
             {/* 차트 섹션 */}
-            {isClient && chartData.length > 0 && (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-                  gap: 3,
-                  mb: 4,
-                }}
-              >
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                      일별 가입자 추이
-                    </Typography>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        <Area type="monotone" dataKey="가입자" stroke="#1976d2" fill="#1976d2" fillOpacity={0.6} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent>
-                      <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                        일별 로그인 추이
-                      </Typography>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Line type="monotone" dataKey="로그인" stroke="#2e7d32" strokeWidth={2} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-                <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                        일별 활동 통계
-                      </Typography>
-                      <ResponsiveContainer width="100%" height={350}>
-                        <BarChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="date" />
-                          <YAxis />
-                          <Tooltip />
-                          <Legend />
-                          <Bar dataKey="가입자" fill="#1976d2" />
-                          <Bar dataKey="로그인" fill="#2e7d32" />
-                          <Bar dataKey="게시글" fill="#ed6c02" />
-                          <Bar dataKey="길드 신청" fill="#9c27b0" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                </Box>
-              </Box>
-            )}
+            {isClient && chartData.length > 0 && <AdminDashboardCharts chartData={chartData} />}
 
             {/* 최근 활동 테이블 */}
             {isClient && chartData.length > 0 && (
