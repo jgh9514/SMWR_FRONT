@@ -27,17 +27,8 @@ logs
 .env.*
 !.env.example
 
-# Yarn Berry (Zero Install: cache, unplugged, PnP 로더 커밋)
-.yarn/*
-!.yarn/cache
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/unplugged
-!.yarn/versions
-
-# GitHub 100MB 제한: 대용량 바이너리는 커밋 제외 (yarn install 시 fetch)
-.yarn/cache/next-npm-*.zip
-.yarn/cache/@next-swc-*.zip
-.yarn/cache/@tailwindcss-oxide-*.zip
+# Yarn Berry (node-modules)
+.yarn/cache
+.yarn/unplugged
+.yarn/__virtual__
+.pnp.*

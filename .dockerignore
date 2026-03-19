@@ -1,9 +1,9 @@
 # Dependencies
 node_modules
-.pnp.*
 .yarn/cache
 .yarn/unplugged
 .yarn/__virtual__
+.pnp.*
 
 # Testing
 coverage
