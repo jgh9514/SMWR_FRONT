@@ -158,6 +158,7 @@ function NoticePopupItem({
       <Divider />
       <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
         <Button 
+          type="button"
           onClick={handleHideForDay} 
           variant="outlined"
           color="inherit"
@@ -170,6 +171,7 @@ function NoticePopupItem({
           하루동안 안보기
         </Button>
         <Button 
+          type="button"
           onClick={handleClose} 
           variant="contained"
           sx={{ 
@@ -241,6 +243,7 @@ const readPopupCache = () => {
 export default function NoticePopup() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hiddenVersion, setHiddenVersion] = useState(0);
+  const [dismissedThisSession, setDismissedThisSession] = useState<Set<string>>(() => new Set());
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -283,13 +286,12 @@ export default function NoticePopup() {
     return sourceNotices.filter((notice) => {
       if (!notice.notice_id) return false;
       const noticeIdStr = String(notice.notice_id);
+      if (dismissedThisSession.has(noticeIdStr)) return false;
       const hiddenTimestamp = hiddenNotices[noticeIdStr];
-      if (!hiddenTimestamp) {
-        return true;
-      }
+      if (!hiddenTimestamp) return true;
       return false;
     });
-  }, [hiddenNotices, sourceNotices]);
+  }, [dismissedThisSession, hiddenNotices, sourceNotices]);
 
   useEffect(() => {
     if (!isClient || !popupNoticeListQuery.data?.list || popupNoticeListQuery.isLoading || popupNoticeListQuery.isError) {
@@ -306,24 +308,17 @@ export default function NoticePopup() {
     }
   }, [isClient, popupNoticeListQuery.data, popupNoticeListQuery.isError, popupNoticeListQuery.isLoading]);
 
-  const handleView = (noticeId: string) => {
-    void noticeId;
-    const nextIndex = currentIndex + 1;
-    setCurrentIndex(nextIndex < activeNotices.length ? nextIndex : 0);
-  };
-
   const handleClose = () => {
-    // 현재 팝업을 본 것으로 처리
-    if (activeNotices[safeCurrentIndex]?.notice_id) {
-      handleView(activeNotices[safeCurrentIndex].notice_id);
-    }
+    const noticeId = activeNotices[safeCurrentIndex]?.notice_id;
+    if (!noticeId) return;
+    setDismissedThisSession((prev) => new Set(prev).add(String(noticeId)));
   };
 
   const handleHideForDay = (noticeId: string) => {
     const noticeIdStr = String(noticeId);
     hideNoticeForDay(noticeIdStr);
     setHiddenVersion((prev) => prev + 1);
-    handleClose();
+    setDismissedThisSession((prev) => new Set(prev).add(noticeIdStr));
   };
 
   // 서버 사이드에서는 아무것도 렌더링하지 않음
@@ -345,7 +340,7 @@ export default function NoticePopup() {
     <NoticePopupItem 
       open={true}
       notice={currentNotice} 
-      onView={handleView} 
+      onView={() => {}}
       onClose={handleClose}
       onHideForDay={handleHideForDay}
     />
