@@ -69,8 +69,8 @@ export default function AdminQueryPerfPage() {
   const initialQueryLike = searchParams.get('query_like') || '';
   const initialMinMeanMs = searchParams.get('min_mean_ms');
   const initialMinCalls = searchParams.get('min_calls');
-  const initialOrderBy = searchParams.get('order_by');
-  const initialOrderDir = searchParams.get('order_dir');
+  const initialOrderBy = searchParams.get('order_by') ?? '';
+  const initialOrderDir = searchParams.get('order_dir') ?? '';
   const initialMinDurationMs = searchParams.get('min_duration_ms');
 
   const [tab, setTab] = useState<TabKey>(initialTab === 'running' ? 'running' : 'slow');
@@ -80,10 +80,10 @@ export default function AdminQueryPerfPage() {
   // slow queries filters
   const [slowLimit, setSlowLimit] = useState(50);
   const [orderBy, setOrderBy] = useState<'total_ms' | 'mean_ms' | 'max_ms' | 'calls' | 'rows'>(
-    isSlowOrderBy(initialOrderBy || '') ? initialOrderBy : 'total_ms',
+    isSlowOrderBy(initialOrderBy) ? initialOrderBy : 'total_ms',
   );
   const [orderDir, setOrderDir] = useState<'desc' | 'asc'>(
-    isOrderDir(initialOrderDir || '') ? initialOrderDir : 'desc',
+    isOrderDir(initialOrderDir) ? initialOrderDir : 'desc',
   );
   const [queryLike, setQueryLike] = useState(initialQueryLike);
   const [minMeanMs, setMinMeanMs] = useState<number | ''>(initialMinMeanMs ? Number(initialMinMeanMs) : '');
@@ -144,10 +144,10 @@ export default function AdminQueryPerfPage() {
       if (initialMinMeanMs) {
         setMinMeanMs(Number(initialMinMeanMs));
       }
-      if (isSlowOrderBy(initialOrderBy || '')) {
+      if (isSlowOrderBy(initialOrderBy)) {
         setOrderBy(initialOrderBy);
       }
-      if (isOrderDir(initialOrderDir || '')) {
+      if (isOrderDir(initialOrderDir)) {
         setOrderDir(initialOrderDir);
       }
       void slowQuery.refetch();
