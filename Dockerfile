@@ -18,6 +18,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV BASELINE_BROWSER_MAPPING_IGNORE_OLD_DATA=true
 ENV YARN_CACHE_FOLDER=/app/.yarn/cache
 ENV YARN_VIRTUAL_FOLDER=/app/.yarn/__virtual__
 ENV YARN_PNP_UNPLUGGED_FOLDER=/app/.yarn/unplugged
