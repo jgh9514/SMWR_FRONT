@@ -1,0 +1,16 @@
+# Certificate - jgh9514.com 도메인용 TLS 인증서
+# cert-manager가 자동으로 인증서를 발급하고 jgh9514-tls Secret에 저장합니다.
+# 만료 30일 전에 자동 갱신됩니다.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jgh9514-tls
+  namespace: default
+spec:
+  secretName: jgh9514-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+  - jgh9514.com
+  - www.jgh9514.com

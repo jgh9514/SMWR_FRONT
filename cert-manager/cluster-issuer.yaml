@@ -1,0 +1,17 @@
+# Let's Encrypt ClusterIssuer - HTTP-01 챌린지
+# cert-manager가 클러스터 전체에서 사용할 수 있는 Issuer입니다.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Let's Encrypt에 등록할 이메일 (만료 알림 등에 사용, 본인 이메일로 변경 권장)
+    email: admin@jgh9514.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx
