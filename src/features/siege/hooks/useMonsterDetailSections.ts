@@ -3,6 +3,7 @@
  * 기본정보 / 추천공덱 / 공성률을 각각 API 호출 후 먼저 도착하는 것부터 표시
  */
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import type {
   MonsterDetailParams,
@@ -13,7 +14,7 @@ import type {
 
 const SHARED_OPTIONS = {
   refetchOnWindowFocus: false,
-  placeholderData: (prev: unknown) => prev,
+  placeholderData: keepPreviousData,
 } as const;
 
 /** 기본 정보 (enemyData) - 보통 가장 빠르게 응답 */
