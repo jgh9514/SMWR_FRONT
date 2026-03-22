@@ -90,9 +90,30 @@ jobs:
             REPO_BRANCH="${{ github.ref_name }}"
             WORK_DIR="/tmp/smwr-front-deploy"
 
-            echo "=== ~/SMWR_FRONT 최신 코드 동기화 (자동 pull) ==="
+            echo "=== ~/SMWR_FRONT 최신 코드 동기화 (WAS와 동일하게 자동 pull) ==="
+            if [ ! -d ~/SMWR_FRONT/.git ]; then
+              echo "~/SMWR_FRONT 없음, 초기 clone"
+              rm -rf ~/SMWR_FRONT
+              git clone --depth 1 --branch "${REPO_BRANCH}" "${REPO_URL}" ~/SMWR_FRONT || echo "WARNING: clone 실패 (무시)"
+            fi
             if [ -d ~/SMWR_FRONT/.git ]; then
-              cd ~/SMWR_FRONT && git fetch origin "${REPO_BRANCH}" && git reset --hard "origin/${REPO_BRANCH}" && cd - || echo "WARNING: ~/SMWR_FRONT 동기화 실패 (무시)"
+              cd ~/SMWR_FRONT || true
+              GIT_FETCH_OK=false
+              for i in 1 2 3 4 5; do
+                if git fetch origin "${REPO_BRANCH}" 2>&1; then
+                  GIT_FETCH_OK=true
+                  break
+                fi
+                echo "fetch 재시도 $i/5..."
+                sleep 5
+              done
+              if [ "$GIT_FETCH_OK" = "true" ] && git rev-parse --verify "origin/${REPO_BRANCH}" >/dev/null 2>&1; then
+                git reset --hard "origin/${REPO_BRANCH}" 2>&1 || git checkout -B "${REPO_BRANCH}" "origin/${REPO_BRANCH}" 2>&1
+                echo "~/SMWR_FRONT 동기화 완료: $(git log -1 --oneline 2>/dev/null || echo '?')"
+              else
+                echo "WARNING: ~/SMWR_FRONT fetch 실패, 기존 코드 유지"
+              fi
+              cd - >/dev/null 2>&1 || true
             fi
 
             echo "=== 배포 작업 디렉토리 준비 ==="

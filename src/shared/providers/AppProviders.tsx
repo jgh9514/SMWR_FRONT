@@ -21,6 +21,11 @@ const NoticePopup = dynamic(() => import('@/components/notice/NoticePopup'), {
   loading: () => null,
 });
 
+const AddToHomeScreenBanner = dynamic(() => import('@/components/pwa/AddToHomeScreenBanner'), {
+  ssr: false,
+  loading: () => null,
+});
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
@@ -378,6 +383,8 @@ export default function AppProviders({ children }: AppProvidersProps) {
             <>
               {/* 공지 팝업은 메인 화면에서만 동작 */}
               {!isPublicPath && !isAdminPath && isHomePath && <NoticePopup />}
+              {/* PWA 앱으로 보기 배너 (하단 고정) */}
+              <AddToHomeScreenBanner />
             </>
           </AuthGuard>
         </QueryClientProvider>

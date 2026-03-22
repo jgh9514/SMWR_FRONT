@@ -1,10 +1,19 @@
 /**
  * Next.js API Route: 백엔드 WAS의 정적 이미지 리소스 프록시
  * 쿠버네티스 환경에서는 클러스터 내부 Service 이름을 사용
+ * 백엔드에 없을 때 fallback 이미지 반환 (default-monster.png 등)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { logger } from '@/shared/lib/logger';
+
+// 1x1 투명 PNG (백엔드 이미지 없을 때 fallback)
+const FALLBACK_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64'
+);
+
+const FALLBACK_IMAGES = ['default-monster.png', 'default-unit.png'];
 
 // 백엔드 WAS URL 가져오기 (이미지는 /api/v1이 아닌 루트 경로)
 const getBackendURL = () => {
@@ -71,6 +80,17 @@ export async function GET(
     });
 
     if (!response.ok) {
+      // fallback 이미지인 경우 빈 placeholder 반환 (404 방지)
+      const fileName = path.split('/').pop() || '';
+      if (FALLBACK_IMAGES.includes(fileName)) {
+        return new NextResponse(FALLBACK_PNG, {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'public, max-age=3600',
+          },
+        });
+      }
       logger.error('[이미지 프록시] 백엔드 응답 실패', null, {
         status: response.status,
         statusText: response.statusText,
