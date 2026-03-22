@@ -3,10 +3,9 @@ kind: Ingress
 metadata:
   name: smwr-front-ingress
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"  # HTTP → HTTPS 리다이렉트
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik  # k3s 기본 Traefik (80번 포트 사용)
   tls:
   - hosts:
     - jgh9514.com

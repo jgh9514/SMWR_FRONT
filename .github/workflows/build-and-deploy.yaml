@@ -90,6 +90,11 @@ jobs:
             REPO_BRANCH="${{ github.ref_name }}"
             WORK_DIR="/tmp/smwr-front-deploy"
 
+            echo "=== ~/SMWR_FRONT 최신 코드 동기화 (자동 pull) ==="
+            if [ -d ~/SMWR_FRONT/.git ]; then
+              cd ~/SMWR_FRONT && git fetch origin "${REPO_BRANCH}" && git reset --hard "origin/${REPO_BRANCH}" && cd - || echo "WARNING: ~/SMWR_FRONT 동기화 실패 (무시)"
+            fi
+
             echo "=== 배포 작업 디렉토리 준비 ==="
             rm -rf "${WORK_DIR}"
             git clone --depth 1 --branch "${REPO_BRANCH}" "${REPO_URL}" "${WORK_DIR}" || {
