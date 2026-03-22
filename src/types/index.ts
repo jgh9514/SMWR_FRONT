@@ -69,4 +69,5 @@ export type {
   BattleGroup,
   RecordListParams,
   RecordDetailParams,
+  SeasonItem,
 } from '@/features/battle-history/types/battle-history';

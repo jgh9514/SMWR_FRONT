@@ -10,6 +10,7 @@ export const revalidate = 600;
 
 interface BattleHistoryDetailPageProps {
   params: Promise<{ detail: string }>;
+  searchParams: Promise<{ season_no?: string }>;
 }
 
 function buildBattleHistoryDescription(
@@ -27,17 +28,21 @@ function buildBattleHistoryDescription(
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: BattleHistoryDetailPageProps): Promise<Metadata> {
   const { detail } = await params;
+  const { season_no } = await searchParams;
+  const seasonNo = season_no != null && season_no !== '' ? season_no : undefined;
   const battles = await getBattleHistoryDetailData({
     paging: DEFAULT_PAGE_SIZE,
     offset: DEFAULT_PAGE_OFFSET,
     wizard_id: detail,
+    season_no: seasonNo,
   }).catch(() => []);
   const firstBattle = battles[0];
   const wizardName = firstBattle?.wizard_name?.trim() || detail;
   const battleCount = battles.length;
-  const winCount = battles.filter((battle) => battle.win_lose === 'WIN').length;
+  const winCount = battles.filter((battle) => battle.win_lose === '1').length;
   const description = buildBattleHistoryDescription(wizardName, battleCount, winCount);
 
   return buildPublicMetadata({
@@ -51,17 +56,21 @@ export async function generateMetadata({
 
 export default async function BattleHistoryDetailPage({
   params,
+  searchParams,
 }: BattleHistoryDetailPageProps) {
   const { detail } = await params;
+  const { season_no } = await searchParams;
+  const seasonNo = season_no != null && season_no !== '' ? season_no : undefined;
   const battles = await getBattleHistoryDetailData({
     paging: DEFAULT_PAGE_SIZE,
     offset: DEFAULT_PAGE_OFFSET,
     wizard_id: detail,
+    season_no: seasonNo,
   });
   const groupedBattles = groupBattlesBySiegeId(battles);
   const firstBattle = battles[0];
   const wizardName = firstBattle?.wizard_name?.trim() || detail;
-  const winCount = battles.filter((battle) => battle.win_lose === 'WIN').length;
+  const winCount = battles.filter((battle) => battle.win_lose === '1').length;
   const pageUrl = getAbsoluteUrl(`/battle-history/detail/${detail}`);
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -89,7 +98,10 @@ export default async function BattleHistoryDetailPage({
   return (
     <>
       <JsonLd data={[jsonLd, breadcrumbJsonLd]} />
-      <BattleHistoryDetailContent groupedBattles={groupedBattles} />
+      <BattleHistoryDetailContent
+        groupedBattles={groupedBattles}
+        backPath={seasonNo ? `/battle-history?season_no=${seasonNo}` : '/battle-history'}
+      />
     </>
   );
 }

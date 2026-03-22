@@ -51,6 +51,8 @@ export default function MonsterManagementPage() {
     monster_id: '',
     kr_name: '',
     un_name: '',
+    un_name_status: '',
+    usg_yn: 'Y',
     monster_elemental: '',
     star: '',
     arousal_type: '',
@@ -93,6 +95,7 @@ export default function MonsterManagementPage() {
       { title: '몬스터 ID', key: 'monster_id', align: 'center' as const },
       { title: '한글명', key: 'kr_name', align: 'left' as const },
       { title: '영문명', key: 'un_name', align: 'left' as const },
+      { title: '구분', key: 'un_name_status', align: 'center' as const },
       { title: '속성', key: 'monster_elemental', align: 'center' as const },
       { title: '별', key: 'star', align: 'center' as const },
       { title: '각성', key: 'arousal_type', align: 'center' as const },
@@ -100,10 +103,21 @@ export default function MonsterManagementPage() {
     ];
 
     if (mobile) {
-      return baseHeaders.filter((col) => !['un_name', 'arousal_type'].includes(col.key));
+      return baseHeaders.filter((col) => !['un_name', 'un_name_status', 'arousal_type'].includes(col.key));
     }
     return baseHeaders;
   }, [mobile]);
+
+  const getUnNameStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'VERIFIED':
+        return '검증완료';
+      case 'BATCH':
+        return '갱신필요';
+      default:
+        return status || '-';
+    }
+  };
 
   const handleSearch = () => {
     setPage(1);
@@ -115,6 +129,8 @@ export default function MonsterManagementPage() {
       monster_id: '',
       kr_name: '',
       un_name: '',
+      un_name_status: '',
+      usg_yn: 'Y',
       monster_elemental: '',
       star: '',
       arousal_type: '',
@@ -129,6 +145,8 @@ export default function MonsterManagementPage() {
       monster_id: monster.monster_id,
       kr_name: monster.kr_name,
       un_name: monster.un_name,
+      un_name_status: monster.un_name_status || 'BATCH',
+      usg_yn: monster.usg_yn || 'Y',
       monster_elemental: monster.monster_elemental,
       star: monster.star,
       star_type: monster.star_type,
@@ -240,6 +258,30 @@ export default function MonsterManagementPage() {
                     <MenuItem value="Awakened">Awakened</MenuItem>
                   </Select>
                 </FormControl>
+                <FormControl fullWidth size="small">
+                  <InputLabel>영문명 구분</InputLabel>
+                  <Select
+                    value={schDatas.un_name_status}
+                    label="영문명 구분"
+                    onChange={(e) => setSchDatas({ ...schDatas, un_name_status: e.target.value })}
+                  >
+                    <MenuItem value="">전체</MenuItem>
+                    <MenuItem value="BATCH">갱신필요</MenuItem>
+                    <MenuItem value="VERIFIED">검증완료</MenuItem>
+                  </Select>
+                </FormControl>
+                <FormControl fullWidth size="small">
+                  <InputLabel>사용여부</InputLabel>
+                  <Select
+                    value={schDatas.usg_yn ?? 'Y'}
+                    label="사용여부"
+                    onChange={(e) => setSchDatas({ ...schDatas, usg_yn: e.target.value })}
+                  >
+                    <MenuItem value="">전체</MenuItem>
+                    <MenuItem value="Y">사용</MenuItem>
+                    <MenuItem value="N">미사용</MenuItem>
+                  </Select>
+                </FormControl>
 
                 <FormControl fullWidth size="small">
                   <InputLabel>정렬 기준</InputLabel>
@@ -341,6 +383,19 @@ export default function MonsterManagementPage() {
                         <TableCell align="center">{row.monster_id}</TableCell>
                         <TableCell align="left">{row.kr_name}</TableCell>
                         {!mobile && <TableCell align="left">{row.un_name}</TableCell>}
+                        {!mobile && (
+                          <TableCell align="center">
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                color: row.un_name_status === 'BATCH' ? 'warning.main' : 'success.main',
+                                fontWeight: row.un_name_status === 'BATCH' ? 600 : 400,
+                              }}
+                            >
+                              {getUnNameStatusLabel(row.un_name_status)}
+                            </Typography>
+                          </TableCell>
+                        )}
                         <TableCell align="center">{row.monster_elemental}</TableCell>
                         <TableCell align="center">{row.star}</TableCell>
                         {!mobile && <TableCell align="center">{row.arousal_type}</TableCell>}
@@ -401,6 +456,28 @@ export default function MonsterManagementPage() {
                 onChange={(e) => setEditData({ ...editData, un_name: e.target.value })}
                 size="small"
               />
+              <FormControl fullWidth size="small">
+                <InputLabel>영문명 구분</InputLabel>
+                <Select
+                  value={editData.un_name_status || 'BATCH'}
+                  label="영문명 구분"
+                  onChange={(e) => setEditData({ ...editData, un_name_status: e.target.value })}
+                >
+                  <MenuItem value="BATCH">갱신필요</MenuItem>
+                  <MenuItem value="VERIFIED">검증완료</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl fullWidth size="small">
+                <InputLabel>사용여부</InputLabel>
+                <Select
+                  value={editData.usg_yn || 'Y'}
+                  label="사용여부"
+                  onChange={(e) => setEditData({ ...editData, usg_yn: e.target.value })}
+                >
+                  <MenuItem value="Y">사용</MenuItem>
+                  <MenuItem value="N">미사용</MenuItem>
+                </Select>
+              </FormControl>
               <FormControl fullWidth size="small">
                 <InputLabel>속성</InputLabel>
                 <Select

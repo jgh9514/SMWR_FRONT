@@ -15,17 +15,19 @@ import type { BattleGroup } from '@/features/battle-history/types/battle-history
 
 interface BattleHistoryDetailContentProps {
   groupedBattles: BattleGroup[];
+  backPath?: string;
 }
 
 export default function BattleHistoryDetailContent({
   groupedBattles,
+  backPath = '/battle-history',
 }: BattleHistoryDetailContentProps) {
   return (
     <Box>
       <PageBanner />
 
       <Container maxWidth={false} sx={{ py: { xs: 3, md: 4 }, px: { xs: 1, md: 3 } }}>
-        <PageHeader title="전적 상세" backPath="/battle-history" />
+        <PageHeader title="전적 상세" backPath={backPath} />
         {groupedBattles.length === 0 ? (
           <EmptyState message="전적 데이터가 없습니다." />
         ) : (

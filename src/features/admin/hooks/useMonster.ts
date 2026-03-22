@@ -10,6 +10,10 @@ export interface MonsterItem {
   monster_elemental: string;
   kr_name: string;
   un_name: string;
+  /** 영문명 검증 상태: BATCH=배치수집/갱신필요, VERIFIED=검증완료 */
+  un_name_status?: string;
+  /** 사용여부 Y/N */
+  usg_yn?: string;
   star_type: string;
   star: number;
   arousal_type: string;

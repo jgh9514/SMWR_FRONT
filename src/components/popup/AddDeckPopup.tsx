@@ -23,6 +23,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useMonsterList, type MonsterOption, useApiPostMutation } from '@/hooks/api';
+import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { DeckMonsterStats } from '@/features/siege/types/siege';
@@ -42,6 +43,7 @@ export default function AddDeckPopup({
   type: propType,
   defenseMonster: propDefenseMonster,
 }: AddDeckPopupProps) {
+  const { isMobile } = useResponsive();
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [step, setStep] = useState(1);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
@@ -249,8 +251,16 @@ export default function AddDeckPopup({
                     return krName.includes(searchTerm) || unName.includes(searchTerm) || modifiedName.includes(searchTerm);
                   }).slice(0, 200);
                 }}
+                slotProps={{
+                  popper: {
+                    placement: isMobile ? 'top-start' : 'bottom-start',
+                    modifiers: isMobile
+                      ? [{ name: 'flip', enabled: false }, { name: 'preventOverflow', enabled: true }]
+                      : undefined,
+                  },
+                }}
                 ListboxProps={{
-                  style: { maxHeight: 400, overflow: 'auto' },
+                  style: { maxHeight: isMobile ? 300 : 400, overflow: 'auto' },
                 }}
                 value={selectedMonsterList}
                 onChange={(_, newValue) => {
@@ -262,6 +272,15 @@ export default function AddDeckPopup({
                     placeholder="몬스터 검색 및 선택"
                     variant="outlined"
                     aria-label="몬스터 검색 입력"
+                    inputProps={{
+                      ...params.inputProps,
+                      onFocus: (e) => {
+                        params.inputProps?.onFocus?.(e as React.FocusEvent<HTMLInputElement>);
+                        if (isMobile && e.target instanceof HTMLInputElement) {
+                          e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                        }
+                      },
+                    }}
                   />
                 )}
                 renderOption={(props, option) => {

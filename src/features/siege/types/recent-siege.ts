@@ -4,6 +4,7 @@
 
 export interface SiegeItem {
   match_id: string;
+  guild_count?: number; // 2=1대1 레전드 토너먼트, 3=3파전 일반 점령전
   guild_1st: string;
   guild_2nd: string;
   guild_3rd: string;

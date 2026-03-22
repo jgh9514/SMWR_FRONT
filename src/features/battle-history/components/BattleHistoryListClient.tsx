@@ -14,22 +14,34 @@ import type { UserItem } from '@/features/battle-history/types/battle-history';
 
 interface BattleHistoryListClientProps {
   userList: UserItem[];
+  seasonNo?: string;
+  emptyMessage?: string;
+  children?: React.ReactNode;
 }
 
 export default function BattleHistoryListClient({
   userList,
+  seasonNo,
+  emptyMessage = '전적 데이터가 없습니다.',
+  children,
 }: BattleHistoryListClientProps) {
+  const detailHref = (wizardId: string) =>
+    seasonNo
+      ? `/battle-history/detail/${wizardId}?season_no=${seasonNo}`
+      : `/battle-history/detail/${wizardId}`;
+
   return (
     <Box>
       <PageBanner />
 
       <Container sx={{ px: { xs: 1, md: 2 } }}>
         <PageHeader title="전적 목록" />
+        {children}
 
         {userList.length === 0 ? (
           <Card>
             <CardContent>
-              <EmptyState message="전적 데이터가 없습니다." />
+              <EmptyState message={emptyMessage} />
             </CardContent>
           </Card>
         ) : (
@@ -53,7 +65,7 @@ export default function BattleHistoryListClient({
                 <Card
                   key={item.wizard_id}
                   component={Link}
-                  href={`/battle-history/detail/${item.wizard_id}`}
+                  href={detailHref(item.wizard_id)}
                   sx={{
                     cursor: 'pointer',
                     textDecoration: 'none',

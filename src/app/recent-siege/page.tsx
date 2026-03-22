@@ -526,7 +526,8 @@ export default function RecentSiegePage() {
                         <>
                           {renderGuildBox('1st', myGuildRank === '1st')}
                           {renderGuildBox('2nd', myGuildRank === '2nd')}
-                          {renderGuildBox('3rd', myGuildRank === '3rd')}
+                          {/* 1대1 레전드 토너먼트(guild_count=2)일 때는 3번째 박스 숨김 */}
+                          {(item.guild_count ?? 3) >= 3 && renderGuildBox('3rd', myGuildRank === '3rd')}
                         </>
                       );
                     })()}

@@ -68,3 +68,20 @@ export interface MonsterDetailParams {
   recommendedOffset?: number;
 }
 
+/** 기본 정보만 */
+export interface MonsterDetailBasicResponse {
+  enemyData: EnemyData[];
+}
+
+/** 추천 공덱만 */
+export interface MonsterDetailRecommendedResponse {
+  recommendedList: RecommendedItem[];
+  recommendedTotalCount: number;
+}
+
+/** 공성률 이력만 */
+export interface MonsterDetailHistoryResponse {
+  historyList: HistoryItem[];
+  historyTotalCount: number;
+}
+

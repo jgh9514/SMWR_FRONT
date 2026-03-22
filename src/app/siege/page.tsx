@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import {
   Box,
   Button,
@@ -91,8 +92,9 @@ function SiegeResultsSkeleton({ mobile }: { mobile: boolean }) {
         gridTemplateColumns: {
           xs: 'repeat(2, 1fr)',
           sm: 'repeat(3, 1fr)',
-          md: 'repeat(4, 1fr)',
-          lg: 'repeat(5, 1fr)',
+          md: 'repeat(2, 1fr)', // 태블릿: 사이드바 있을 때 메인 영역 좁음 → 2열로 찌그러짐 방지
+          lg: 'repeat(3, 1fr)',
+          xl: 'repeat(5, 1fr)', // 대형 데스크톱에서 5열
         },
         gap: { xs: 1.5, md: 2 },
         mb: { xs: 3, md: 4 },
@@ -123,7 +125,7 @@ function SiegeResultsSection({
   itemsPerPage,
   currentPage,
   isMobile,
-  onItemClick,
+  getDetailHref,
   onPrev,
   onNext,
 }: {
@@ -131,7 +133,7 @@ function SiegeResultsSection({
   itemsPerPage: number;
   currentPage: number;
   isMobile: boolean;
-  onItemClick: (item: MonsterItem) => void;
+  getDetailHref: (item: MonsterItem) => string;
   onPrev: () => void;
   onNext: () => void;
 }) {
@@ -157,8 +159,9 @@ function SiegeResultsSection({
           gridTemplateColumns: {
             xs: 'repeat(2, 1fr)',
             sm: 'repeat(3, 1fr)',
-            md: 'repeat(4, 1fr)',
-            lg: 'repeat(5, 1fr)',
+            md: 'repeat(2, 1fr)', // 태블릿: 사이드바 있을 때 메인 영역 좁음 → 2열로 찌그러짐 방지
+            lg: 'repeat(3, 1fr)',
+            xl: 'repeat(5, 1fr)', // 대형 데스크톱에서 5열
           },
           gap: { xs: 1.5, md: 2 },
           mb: { xs: 3, md: 4 },
@@ -174,8 +177,12 @@ function SiegeResultsSection({
           return (
             <Card
               key={item.key}
+              component={Link}
+              href={getDetailHref(item)}
               sx={{
                 cursor: 'pointer',
+                textDecoration: 'none',
+                color: 'inherit',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 boxShadow: 1,
                 borderRadius: 2,
@@ -184,15 +191,6 @@ function SiegeResultsSection({
                   boxShadow: 6,
                   transform: 'translateY(-4px)',
                 },
-              }}
-              onClick={() => onItemClick(item)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  onItemClick(item);
-                }
               }}
               aria-label={`${item.key} 방어덱 상세 보기`}
             >
@@ -293,7 +291,6 @@ function SiegeResultsSection({
 }
 
 function SiegeContent() {
-  const router = useRouter();
   const { isMobile } = useResponsive();
   const searchParams = useSearchParams();
   const matchIdFromQuery = searchParams?.get('match_id');
@@ -494,12 +491,6 @@ function SiegeContent() {
     pagination.reset();
   }, [pagination, selectedMonsterList, selectedGuilds, deckStarFilter, onlyLoseAtLeastOnce]);
 
-  const handleMonsterClick = useCallback((item: MonsterItem) => {
-    // match_id가 있으면 상세에서도 해당 점령전만 보이도록 전달
-    const detailParam = matchIdFromQuery ? `${item.key}_${matchIdFromQuery}` : item.key;
-    router.push(`/siege/siege-detail/${detailParam}`);
-  }, [matchIdFromQuery, router]);
-
   const handlePageChange = useCallback(
     (_: unknown, page: number) => {
       // 현재 스크롤 위치 저장
@@ -650,6 +641,14 @@ function SiegeContent() {
               return krName.includes(searchTerm) || unName.includes(searchTerm) || modifiedName.includes(searchTerm);
             }).slice(0, 200);
           }}
+          slotProps={{
+            popper: {
+              placement: isMobile ? 'top-start' : 'bottom-start',
+              modifiers: isMobile
+                ? [{ name: 'flip', enabled: false }, { name: 'preventOverflow', enabled: true }]
+                : undefined,
+            },
+          }}
           ListboxProps={{
             style: { maxHeight: isMobile ? 300 : 400, overflow: 'auto' },
           }}
@@ -669,6 +668,15 @@ function SiegeContent() {
               variant="outlined"
               size={isMobile ? 'small' : 'medium'}
               aria-label="몬스터 검색 입력"
+              inputProps={{
+                ...params.inputProps,
+                onFocus: (e) => {
+                  params.inputProps?.onFocus?.(e as React.FocusEvent<HTMLInputElement>);
+                  if (isMobile && e.target instanceof HTMLInputElement) {
+                    e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                  }
+                },
+              }}
             />
           )}
           renderOption={(props, option) => {
@@ -1129,7 +1137,9 @@ function SiegeContent() {
                     itemsPerPage={pagination.itemsPerPage}
                     currentPage={pagination.currentPage}
                     isMobile={isMobile}
-                    onItemClick={handleMonsterClick}
+                    getDetailHref={(item) =>
+                      `/siege/siege-detail/${matchIdFromQuery ? `${item.key}_${matchIdFromQuery}` : item.key}`
+                    }
                     onPrev={() => handlePageChange(null, pagination.currentPage - 1)}
                     onNext={() => handlePageChange(null, pagination.currentPage + 1)}
                   />

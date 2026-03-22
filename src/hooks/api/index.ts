@@ -9,6 +9,7 @@ export { useApiPostMutation } from './useApiMutation';
 export * from '@/features/siege/hooks/useSiegeList';
 export * from '@/features/siege/hooks/useRecentSiege';
 export * from '@/features/siege/hooks/useMonsterDetail';
+export * from '@/features/siege/hooks/useMonsterDetailSections';
 export * from '@/features/siege/hooks/useMonsterInfo';
 export type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 export * from '@/features/rta/hooks/useRtaData';

@@ -1,6 +1,12 @@
 import 'server-only';
 
-import type { BattleItem, RecordDetailParams, RecordListParams, UserItem } from '@/features/battle-history/types/battle-history';
+import type {
+  BattleItem,
+  RecordDetailParams,
+  RecordListParams,
+  SeasonItem,
+  UserItem,
+} from '@/features/battle-history/types/battle-history';
 import type { Notice, NoticeListParams, NoticeListResponse } from '@/features/community/types/community';
 import type { MonsterDetail, RtaMonsterStatsResponse } from '@/features/rta/types/rta';
 import type { MonsterInfoResponse } from '@/features/siege/hooks/useMonsterInfo';
@@ -157,12 +163,25 @@ export async function getRtaMonsterDetailData(monsterId: number): Promise<Monste
   }
 }
 
+export async function getSeasonListData(): Promise<SeasonItem[]> {
+  return serverApiPost<SeasonItem[]>(
+    '/summonerswar/season-list',
+    {},
+    PUBLIC_REVALIDATE_SECONDS.battleHistory,
+  );
+}
+
 export async function getBattleHistoryListData(
   params: RecordListParams = { paging: 20, offset: 0 },
 ): Promise<UserItem[]> {
+  const body = {
+    paging: params.paging ?? 20,
+    offset: params.offset ?? 0,
+    ...(params.season_no != null && params.season_no !== '' && { season_no: params.season_no }),
+  };
   return serverApiPost<UserItem[]>(
     '/summonerswar/record-list',
-    params,
+    body,
     PUBLIC_REVALIDATE_SECONDS.battleHistory,
   );
 }
@@ -170,9 +189,15 @@ export async function getBattleHistoryListData(
 export async function getBattleHistoryDetailData(
   params: RecordDetailParams,
 ): Promise<BattleItem[]> {
+  const body = {
+    wizard_id: params.wizard_id,
+    paging: params.paging,
+    offset: params.offset,
+    ...(params.season_no != null && params.season_no !== '' && { season_no: params.season_no }),
+  };
   return serverApiPost<BattleItem[]>(
     '/summonerswar/record-detail',
-    params,
+    body,
     PUBLIC_REVALIDATE_SECONDS.battleHistory,
   );
 }

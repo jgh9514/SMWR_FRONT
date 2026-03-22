@@ -39,9 +39,27 @@ export interface BattleGroup {
   loseCount: number;
 }
 
+export interface SeasonItem {
+  season_no?: number;
+  seasonNo?: number; // camelCase fallback
+  start_date?: string;
+  end_date?: string | null;
+  start_yyyymm?: string;
+  end_yyyymm?: string;
+}
+
+/** API 응답에서 season_no 추출 (snake_case/camelCase 모두 지원) */
+export function getSeasonNo(item: Record<string, unknown>): number {
+  const v = item?.season_no ?? item?.seasonNo ?? item?.SEASON_NO;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** season_no: 없으면 전체, 있으면 해당 시즌만 */
 export interface RecordListParams {
   paging?: number;
   offset?: number;
+  season_no?: number | string;
 }
 
 export interface RecordDetailParams extends RecordListParams {

@@ -1,6 +1,5 @@
 import MonsterDetailPage from '../../../_components/MonsterDetailPage';
 
-export default function SiegeDetailDrawerPage() {
+export default function SiegeDetailPage() {
   return <MonsterDetailPage />;
 }
-

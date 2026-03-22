@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
-import BattleHistoryListClient from '@/features/battle-history/components/BattleHistoryListClient';
-import { DEFAULT_PAGE_OFFSET, DEFAULT_PAGE_SIZE } from '@/shared/constants';
-import { getBattleHistoryListData } from '@/shared/lib/api/server';
+import { Suspense } from 'react';
+import BattleHistoryPageClient from '@/features/battle-history/components/BattleHistoryPageClient';
+import { getSeasonListData } from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
@@ -16,10 +16,7 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function BattleHistoryPage() {
-  const userList = await getBattleHistoryListData({
-    paging: DEFAULT_PAGE_SIZE,
-    offset: DEFAULT_PAGE_OFFSET,
-  }).catch(() => []);
+  const seasonList = await getSeasonListData().catch(() => []);
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -31,7 +28,7 @@ export default async function BattleHistoryPage() {
       '소환사별 시즌 전적, 승률, 승패 수를 기준으로 점령전 전투 기록을 빠르게 찾아보고 상세 로그까지 이어서 확인할 수 있습니다.',
     mainEntity: {
       '@type': 'ItemList',
-      numberOfItems: userList.length,
+      numberOfItems: 0,
     },
   };
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -42,7 +39,9 @@ export default async function BattleHistoryPage() {
   return (
     <>
       <JsonLd data={[jsonLd, breadcrumbJsonLd]} />
-      <BattleHistoryListClient userList={userList} />
+      <Suspense fallback={null}>
+        <BattleHistoryPageClient initialSeasonList={seasonList} />
+      </Suspense>
     </>
   );
 }
