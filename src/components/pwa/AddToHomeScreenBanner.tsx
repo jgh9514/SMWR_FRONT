@@ -13,7 +13,10 @@ import {
 import GetAppIcon from '@mui/icons-material/GetApp';
 import LanguageIcon from '@mui/icons-material/Language';
 
-const DISMISS_KEY = 'smwr-pwa-banner-dismissed';
+/** 이번 브라우저 세션(탭 닫으면 초기화) — "웹으로 보기" 등 */
+const SESSION_DISMISS_KEY = 'smwr-pwa-banner-dismissed-v2';
+/** 크롬 등에서 앱 설치까지 완료한 경우만 영구 저장 — 브라우저 껐다 켜도 안 띄움 */
+const INSTALLED_KEY = 'smwr-pwa-installed';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -30,14 +33,24 @@ export default function AddToHomeScreenBanner() {
     if (typeof window === 'undefined') return;
     if (window.matchMedia('(display-mode: standalone)').matches) return;
     if ((window.navigator as { standalone?: boolean }).standalone) return;
-    if (localStorage.getItem(DISMISS_KEY)) return;
+    try {
+      if (sessionStorage.getItem(SESSION_DISMISS_KEY)) return;
+      if (localStorage.getItem(INSTALLED_KEY)) return;
+    } catch {
+      // 스토리지 비허용 시 팝업 시도
+    }
 
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ios;
+    const uaMobile =
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ios;
+    /** 좁은 뷰포트(태블릿·폴드·데스크톱 좁은 창)도 UA 없이 표시 */
+    const narrow =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(max-width: 768px)').matches;
+    const mobile = uaMobile || narrow;
     setIsIOS(ios);
 
-    // 데스크톱에서는 표시 안 함
     if (!mobile) return;
 
     const handler = (e: Event) => {
@@ -69,25 +82,41 @@ export default function AddToHomeScreenBanner() {
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
           setOpen(false);
-          localStorage.setItem(DISMISS_KEY, 'app');
+          try {
+            localStorage.setItem(INSTALLED_KEY, '1');
+          } catch {
+            // no-op
+          }
         }
       } finally {
         setInstalling(false);
       }
     } else if (isIOS) {
       setOpen(false);
-      localStorage.setItem(DISMISS_KEY, 'app');
+      try {
+        sessionStorage.setItem(SESSION_DISMISS_KEY, 'app');
+      } catch {
+        // no-op
+      }
       toast('Safari 하단 공유(□↑) → "홈 화면에 추가"로 설치할 수 있어요.', { duration: 6000 });
     } else {
       setOpen(false);
-      localStorage.setItem(DISMISS_KEY, 'app');
+      try {
+        sessionStorage.setItem(SESSION_DISMISS_KEY, 'app');
+      } catch {
+        // no-op
+      }
       toast('브라우저 메뉴(⋮)에서 "홈 화면에 추가" 또는 "앱 설치"를 선택해 주세요.', { duration: 6000 });
     }
   };
 
   const handleWeb = () => {
     setOpen(false);
-    localStorage.setItem(DISMISS_KEY, 'web');
+    try {
+      sessionStorage.setItem(SESSION_DISMISS_KEY, 'web');
+    } catch {
+      // no-op
+    }
   };
 
   return (
@@ -96,6 +125,8 @@ export default function AddToHomeScreenBanner() {
       onClose={handleWeb}
       maxWidth="xs"
       fullWidth
+      /** 공지 등 다른 Dialog 위에 올림 */
+      sx={{ zIndex: 2000 }}
       PaperProps={{
         sx: {
           borderRadius: 2,

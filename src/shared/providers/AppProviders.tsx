@@ -361,6 +361,8 @@ export default function AppProviders({ children }: AppProvidersProps) {
     return (
       <MuiThemeProvider theme={muiTheme}>
         <CssBaseline />
+        {/* 인증 대기 중에도 PWA 팝업은 마운트 (이전에는 여기서 빠져 useEffect 미실행) */}
+        <AddToHomeScreenBanner />
         {/* 로그인 검증 완료 전에는 화면을 아예 렌더하지 않는다 (깜빡임/동시 호출 방지) */}
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }} />
       </MuiThemeProvider>
