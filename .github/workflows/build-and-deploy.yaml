@@ -70,8 +70,8 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          # EC2/k3s 등 amd64 단일 노드면 arm64 빌드 생략 (CI 시간·러너 부하 절감)
-          platforms: linux/amd64
+          # amd64/arm64 모두 푸시 — 노드가 ARM(Graviton 등)이면 멀티 아키텍스트 없으면 ImagePullBackOff
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
