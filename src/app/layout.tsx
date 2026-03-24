@@ -25,8 +25,8 @@ export const metadata: Metadata = {
     title: 'SMWR',
   },
   icons: {
-    icon: '/images/default-monster.png',
-    apple: '/images/default-monster.png',
+    icon: '/images/ci_active.png',
+    apple: '/images/ci_active.png',
   },
   openGraph: {
     title: '전투 로그 분석 시스템',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: getAbsoluteUrl('/images/default-monster.png'),
+        url: getAbsoluteUrl('/images/ci_active.png'),
         alt: '전투 로그 분석 시스템',
       },
     ],
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: '전투 로그 분석 시스템',
     description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
-    images: [getAbsoluteUrl('/images/default-monster.png')],
+    images: [getAbsoluteUrl('/images/ci_active.png')],
   },
 };
 

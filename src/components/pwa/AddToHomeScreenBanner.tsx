@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
   Dialog,
   DialogTitle,
@@ -48,6 +49,13 @@ export default function AddToHomeScreenBanner() {
 
     if (ios) {
       setOpen(true);
+    } else {
+      // Android 등: SW/설치 조건 미충족 시 beforeinstallprompt 가 영원히 안 옴 → 그래도 선택 팝업은 띄움
+      const t = window.setTimeout(() => setOpen(true), 500);
+      return () => {
+        clearTimeout(t);
+        window.removeEventListener('beforeinstallprompt', handler);
+      };
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handler);
@@ -69,10 +77,11 @@ export default function AddToHomeScreenBanner() {
     } else if (isIOS) {
       setOpen(false);
       localStorage.setItem(DISMISS_KEY, 'app');
-      // iOS는 수동으로 홈 화면 추가해야 함
+      toast('Safari 하단 공유(□↑) → "홈 화면에 추가"로 설치할 수 있어요.', { duration: 6000 });
     } else {
       setOpen(false);
       localStorage.setItem(DISMISS_KEY, 'app');
+      toast('브라우저 메뉴(⋮)에서 "홈 화면에 추가" 또는 "앱 설치"를 선택해 주세요.', { duration: 6000 });
     }
   };
 
