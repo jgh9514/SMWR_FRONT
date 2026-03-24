@@ -16,8 +16,8 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-latest
-    # EC2/k3s가 amd64일 때만 — 멀티 플랫폼(arm64) QEMU 빌드는 시간·메모리 부담 큼
+    # k3s 노드가 ARM64(Graviton/t4g 등)면 이미지도 linux/arm64 — 네이티브 러너로 QEMU 없이 빌드
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 90
 
     steps:
@@ -72,8 +72,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          # 서버(노드)가 amd64일 때만 — ARM(Graviton) 노드면 platforms에 linux/arm64 추가 또는 네이티브 빌드
-          platforms: linux/amd64
+          platforms: linux/arm64
           push: true
           tags: ${{ env.DOCKER_IMAGE }}:${{ env.DOCKER_TAG }}
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
