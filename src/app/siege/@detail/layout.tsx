@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Box, IconButton, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -11,6 +12,16 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const hasContent = pathname?.startsWith('/siege/siege-detail/') ?? false;
+
+  // 상세 패널 열릴 때 배경(body) 스크롤 막기 → y축 스크롤 중복 방지
+  useEffect(() => {
+    if (!hasContent) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [hasContent]);
 
   const close = () => {
     router.back();
