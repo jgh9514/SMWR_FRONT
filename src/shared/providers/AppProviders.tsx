@@ -26,11 +26,6 @@ const AddToHomeScreenBanner = dynamic(() => import('@/components/pwa/AddToHomeSc
   loading: () => null,
 });
 
-const ServiceWorkerRegister = dynamic(() => import('@/components/pwa/ServiceWorkerRegister'), {
-  ssr: false,
-  loading: () => null,
-});
-
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
@@ -366,7 +361,6 @@ export default function AppProviders({ children }: AppProvidersProps) {
     return (
       <MuiThemeProvider theme={muiTheme}>
         <CssBaseline />
-        <ServiceWorkerRegister />
         {/* 로그인 검증 완료 전에는 화면을 아예 렌더하지 않는다 (깜빡임/동시 호출 방지) */}
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }} />
       </MuiThemeProvider>
@@ -380,7 +374,6 @@ export default function AppProviders({ children }: AppProvidersProps) {
         <QueryClientProvider client={queryClient}>
           <AuthGuard>
             <ClientOnlyToaster />
-            <ServiceWorkerRegister />
             {shouldShowHeader && <FixedHeader />}
             <main suppressHydrationWarning>
               <Box sx={mainSx}>

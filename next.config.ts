@@ -1,7 +1,23 @@
 import type { NextConfig } from "next";
+import withPWAInit from "@ducanh2912/next-pwa";
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
+
+const withPWA = withPWAInit({
+  dest: "public",
+  /** 기본: 항상 PWA 활성. 로컬에서만 SW 끄려면 DISABLE_PWA=true */
+  disable: process.env.DISABLE_PWA === "true" || process.env.DISABLE_PWA === "1",
+  register: true,
+  scope: "/",
+  sw: "/sw.js",
+  reloadOnOnline: true,
+  workboxOptions: {
+    skipWaiting: true,
+    clientsClaim: true,
+    disableDevLogs: true,
+  },
+});
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -35,4 +51,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);

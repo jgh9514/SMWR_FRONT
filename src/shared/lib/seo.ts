@@ -5,7 +5,7 @@ const SITE_NAME = '전투 로그 분석 시스템';
 const DEFAULT_DESCRIPTION =
   '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼';
 const DEFAULT_KEYWORDS = ['서머너즈워', '점령전', '실레나', 'RTA', '몬스터 검색', '전투 로그'];
-const DEFAULT_OG_IMAGE = '/images/ci_active.png';
+const DEFAULT_OG_IMAGE = '/icons/ci_active.png';
 
 interface BuildMetadataOptions {
   title: string;

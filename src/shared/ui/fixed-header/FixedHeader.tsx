@@ -40,7 +40,6 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import CircleIcon from '@mui/icons-material/Circle';
 import { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
-import { getMonsterImageUrl } from '@/shared/utils/image';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
 import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
@@ -445,9 +444,8 @@ export default function FixedHeader() {
     return getMenuCategories(isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn);
   }, [isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn]);
 
-  const logoUrl = isClient
-    ? getMonsterImageUrl('/images/ci_active.png')
-    : '/images/ci_active.png';
+  /** /images/* 는 백엔드 프록시 — 로고는 Next public /icons 만 사용 */
+  const logoUrl = '/icons/ci_active.png';
 
   return (
     <>

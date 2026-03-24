@@ -10,13 +10,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/images/ci_active.png",
+      "src": "/icons/ci_active.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/images/ci_active.png",
+      "src": "/icons/ci_active.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
