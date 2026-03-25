@@ -12,10 +12,25 @@ const withPWA = withPWAInit({
   scope: "/",
   sw: "/sw.js",
   reloadOnOnline: true,
+  /**
+   * 기본 런타임 캐시에 `/api/` GET용 NetworkFirst(apis)가 있어,
+   * PWA에서 API 응답이 캐시·오래된 5xx와 섞일 수 있음 → NetworkOnly로 덮어씀.
+   */
+  extendDefaultRuntimeCaching: true,
   workboxOptions: {
     skipWaiting: true,
     clientsClaim: true,
     disableDevLogs: true,
+    runtimeCaching: [
+      {
+        urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
+          sameOrigin !== false && url.pathname.startsWith("/api/"),
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "apis",
+        },
+      },
+    ],
   },
 });
 
