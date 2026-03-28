@@ -7,6 +7,9 @@ WORKDIR /app
 RUN corepack enable && corepack prepare yarn@4.10.3 --activate
 
 COPY package.json yarn.lock .yarnrc.yml ./
+# postinstall: node scripts/copy-smarteditor.mjs (deps 단계에는 소스가 일부만 있음)
+COPY scripts/copy-smarteditor.mjs scripts/copy-smarteditor.mjs
+RUN mkdir -p public
 RUN yarn install --immutable
 
 FROM node:20-alpine AS builder

@@ -43,7 +43,7 @@ const getStoredUserInfo = (): UserInfo | null => {
 
 export default function NoticeDetailClient({ notice }: NoticeDetailClientProps) {
   const [userInfo] = useState<UserInfo | null>(() => getStoredUserInfo());
-  const increaseViewMutation = useIncreaseNoticeView({
+  const { mutate: increaseNoticeView } = useIncreaseNoticeView({
     onError: (error: Error) => {
       logger.warn('공지사항 조회수 증가 실패', {
         error: {
@@ -58,9 +58,8 @@ export default function NoticeDetailClient({ notice }: NoticeDetailClientProps) 
     if (!notice.notice_id) {
       return;
     }
-
-    increaseViewMutation.mutate({ notice_id: notice.notice_id });
-  }, [increaseViewMutation, notice.notice_id]);
+    increaseNoticeView({ notice_id: notice.notice_id });
+  }, [increaseNoticeView, notice.notice_id]);
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
