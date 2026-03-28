@@ -65,6 +65,18 @@ const nextConfig: NextConfig = {
   },
   // Docker를 위한 standalone 출력 모드 활성화
   output: 'standalone',
+  async headers() {
+    return [
+      {
+        source: '/manifest.webmanifest',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }],
+      },
+      {
+        source: '/icons/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }],
+      },
+    ];
+  },
   // 이미지 요청을 백엔드로 프록시
   async rewrites() {
     let backendURL: string;

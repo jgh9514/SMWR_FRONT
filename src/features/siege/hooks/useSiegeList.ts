@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useApiPostQuery, useApiPostSuspenseQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { GuildItem, MonsterItem, SiegeSearchParams } from '@/types';
+import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 
 export type MonsterOption = {
   monster_id: string;
@@ -14,13 +15,26 @@ export type MonsterOption = {
   image_url: string;
   modified_kr_name?: string;
   monster_elemental?: string; // 몬스터 속성 (Fire, Water, Wind, Light, Dark)
+  /** 별 개수 — monster-list API `star` (정규화 후 number) */
+  star?: number;
+  /** Normal / Awakened */
+  arousal_type?: string;
+  /** Attack, Defense, Support, HP 등 */
+  archetype?: string;
+  /** 각성 시 보너스 텍스트(에센스 상세 없을 때 대체 표시) */
+  awaken_bonus?: string;
+  skill_ups_to_max?: number;
+  /** 노말↔각성 페어링 (com2us) */
+  com2us_id?: number;
+  awakens_from_id?: number;
+  awakens_to_id?: number;
 };
 
-const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v1';
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v6';
 const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
 
 type MonsterListCachePayload = {
-  v: 1;
+  v: 2;
   ts: number; // epoch ms
   data: MonsterOption[];
 };
@@ -31,7 +45,7 @@ function readMonsterListCache(): { isFresh: boolean; data: MonsterOption[] } | n
     const raw = window.localStorage.getItem(MONSTER_LIST_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as MonsterListCachePayload;
-    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.data) || typeof parsed.ts !== 'number') return null;
+    if (!parsed || parsed.v !== 2 || !Array.isArray(parsed.data) || typeof parsed.ts !== 'number') return null;
     const isFresh = Date.now() - parsed.ts < MONSTER_LIST_CACHE_TTL_MS;
     return { isFresh, data: parsed.data };
   } catch {
@@ -42,7 +56,7 @@ function readMonsterListCache(): { isFresh: boolean; data: MonsterOption[] } | n
 function writeMonsterListCache(data: MonsterOption[]) {
   if (typeof window === 'undefined') return;
   try {
-    const payload: MonsterListCachePayload = { v: 1, ts: Date.now(), data };
+    const payload: MonsterListCachePayload = { v: 2, ts: Date.now(), data };
     window.localStorage.setItem(MONSTER_LIST_CACHE_KEY, JSON.stringify(payload));
   } catch {
     // localStorage quota/disabled 등은 무시
@@ -57,10 +71,11 @@ export const useMonsterList = (params: Record<string, unknown> = {}) => {
   const isCacheable = params && Object.keys(params).length === 0;
   const [cacheSnapshot] = useState(() => (isCacheable ? readMonsterListCache() : null));
 
-  const q = useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, { 
+  const q = useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, {
     enabled: !(isCacheable && cacheSnapshot?.isFresh),
     initialData: isCacheable ? cacheSnapshot?.data : undefined,
     placeholderData: isCacheable ? cacheSnapshot?.data : undefined,
+    select: (data) => normalizeMonsterList(data),
     staleTime: 30 * 60 * 1000, // 30분 (몬스터 목록은 자주 변경되지 않음)
     gcTime: 60 * 60 * 1000, // 1시간
     refetchOnWindowFocus: false,

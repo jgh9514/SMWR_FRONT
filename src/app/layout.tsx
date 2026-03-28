@@ -5,6 +5,9 @@ import AppProviders from '@/shared/providers/AppProviders';
 import ErrorBoundary from '@/shared/ui/error-boundary/ErrorBoundary';
 import { getSiteUrl } from '@/shared/lib/env';
 import { getAbsoluteUrl } from '@/shared/lib/seo';
+import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
+
+const iconQ = getPwaIconCacheQuery();
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
@@ -17,7 +20,8 @@ export const metadata: Metadata = {
   alternates: {
     canonical: '/',
   },
-  manifest: '/manifest.json',
+  /** `app/manifest.ts` → `/manifest.webmanifest` */
+  manifest: '/manifest.webmanifest',
   themeColor: '#16213e',
   appleWebApp: {
     capable: true,
@@ -25,8 +29,11 @@ export const metadata: Metadata = {
     title: 'SMWR',
   },
   icons: {
-    icon: '/icons/ci_active.png',
-    apple: '/icons/ci_active.png',
+    icon: [
+      { url: `/icons/192.png${iconQ}`, sizes: '192x192', type: 'image/png' },
+      { url: `/icons/512.png${iconQ}`, sizes: '512x512', type: 'image/png' },
+    ],
+    apple: { url: `/icons/192.png${iconQ}`, sizes: '192x192', type: 'image/png' },
   },
   openGraph: {
     title: '전투 로그 분석 시스템',
@@ -37,7 +44,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: getAbsoluteUrl('/icons/ci_active.png'),
+        url: getAbsoluteUrl(`/icons/512.png${iconQ}`),
         alt: '전투 로그 분석 시스템',
       },
     ],
@@ -46,7 +53,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: '전투 로그 분석 시스템',
     description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
-    images: [getAbsoluteUrl('/icons/ci_active.png')],
+    images: [getAbsoluteUrl(`/icons/512.png${iconQ}`)],
   },
 };
 

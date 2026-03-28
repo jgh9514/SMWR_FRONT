@@ -1,10 +1,14 @@
 import type { Metadata } from 'next';
 import MonsterSearchClient from '@/features/siege/components/MonsterSearchClient';
-import { getMonsterListData } from '@/shared/lib/api/server';
+import {
+  getDevilmonImageUrlForSearch,
+  getMonsterListData,
+  MONSTER_LIST_REVALIDATE_SECONDS,
+} from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
-export const revalidate = 86400;
+export const revalidate = MONSTER_LIST_REVALIDATE_SECONDS;
 
 export const metadata: Metadata = buildPublicMetadata({
   title: '몬스터 검색',
@@ -15,7 +19,10 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function MonsterSearchPage() {
-  const monsterList = await getMonsterListData().catch(() => []);
+  const [monsterList, devilmonImageUrl] = await Promise.all([
+    getMonsterListData().catch(() => []),
+    getDevilmonImageUrlForSearch(),
+  ]);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -37,7 +44,7 @@ export default async function MonsterSearchPage() {
   return (
     <>
       <JsonLd data={[jsonLd, breadcrumbJsonLd]} />
-      <MonsterSearchClient monsterList={monsterList} />
+      <MonsterSearchClient monsterList={monsterList} devilmonImageUrl={devilmonImageUrl} />
     </>
   );
 }

@@ -11,6 +11,9 @@ import type { Notice, NoticeListParams, NoticeListResponse } from '@/features/co
 import type { MonsterDetail, RtaMonsterStatsResponse } from '@/features/rta/types/rta';
 import type { MonsterInfoResponse } from '@/features/siege/hooks/useMonsterInfo';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
+import { DEVILMON_MONSTER_ID } from '@/features/siege/lib/devilmon';
+import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
+import { getRenderableImageUrl } from '@/shared/utils/image';
 import type { ApiResponse } from './types';
 
 export const PUBLIC_REVALIDATE_SECONDS = {
@@ -22,6 +25,9 @@ export const PUBLIC_REVALIDATE_SECONDS = {
   noticeList: 60 * 5,
   noticeDetail: 60 * 5,
 } as const;
+
+/** 몬스터 목록 API + monster-search 페이지 ISR — 별·목록 갱신 반영 */
+export const MONSTER_LIST_REVALIDATE_SECONDS = 60 * 10;
 
 const NOTICE_STATIC_PAGE_SIZE = 100;
 const NOTICE_STATIC_MAX_PAGES = 10;
@@ -112,11 +118,12 @@ function parseRecentMatches(detail: MonsterDetail): MonsterDetail {
 }
 
 export async function getMonsterListData(): Promise<MonsterOption[]> {
-  return serverApiPost<MonsterOption[]>(
+  const raw = await serverApiPost<unknown[]>(
     '/summonerswar/monster-list',
     {},
-    PUBLIC_REVALIDATE_SECONDS.monsterCatalog,
+    MONSTER_LIST_REVALIDATE_SECONDS,
   );
+  return normalizeMonsterList(raw);
 }
 
 export async function getMonsterInfoData(monsterId: string): Promise<MonsterInfoResponse | null> {
@@ -133,6 +140,16 @@ export async function getMonsterInfoData(monsterId: string): Promise<MonsterInfo
   } catch {
     return null;
   }
+}
+
+/** 몬스터 목록에 없어도 `/monster/info`로 데빌몬 아이콘 URL 확보 (monster-search 등) */
+export async function getDevilmonImageUrlForSearch(): Promise<string> {
+  const info = await getMonsterInfoData(DEVILMON_MONSTER_ID);
+  const url = info?.image_url;
+  if (url != null && String(url).trim() !== '') {
+    return getRenderableImageUrl(url);
+  }
+  return '/images/default-monster.png';
 }
 
 export async function getRtaMonsterStatsData(
