@@ -7833,6 +7833,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"smarteditor2@npm:^2.10.0":
+  version: 2.10.0
+  resolution: "smarteditor2@npm:2.10.0"
+  checksum: 10c0/485b681ff72382a7f8ffc8e2b163f1925208866733797bc2a85ca08c130b4a5bb8d11382d82e8495af8545a4564d75d3223c88f663f256e73505f512c4212bbc
+  languageName: node
+  linkType: hard
+
 "smob@npm:^1.0.0":
   version: 1.6.1
   resolution: "smob@npm:1.6.1"
@@ -8623,6 +8630,7 @@ __metadata:
     react-is: "npm:^19.2.4"
     recharts: "npm:^3.5.1"
     recoil: "npm:^0.7.7"
+    smarteditor2: "npm:^2.10.0"
     tailwindcss: "npm:^4"
     typescript: "npm:^5"
     webpack: "npm:^5.105.4"

@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import {
   Alert,
@@ -14,7 +13,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Pagination,
   Table,
   TableBody,
@@ -26,27 +24,14 @@ import {
   Typography,
   Chip,
   CircularProgress,
-  TextField,
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import { apiClient } from '@/shared/lib/api/client';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
-import {
-  useNoticeList,
-  useSaveNotice,
-  useDeleteNotice,
-} from '@/hooks/api';
+import { useNoticeList, useDeleteNotice } from '@/hooks/api';
 import type { Notice, NoticeListResponse } from '@/features/community/types/community';
 import type { UserInfo } from '@/features/auth/types/auth';
-import { validateAndSanitizeInput } from '@/shared/utils/validation';
-import { DEFAULT_PAGE_SIZE, MAX_TITLE_LENGTH } from '@/shared/constants/validation';
+import { DEFAULT_PAGE_SIZE } from '@/shared/constants/validation';
 import NoticeAdminControls from './NoticeAdminControls';
-
-const RichTextEditor = dynamic(() => import('@/shared/ui/editor/RichTextEditor'), {
-  ssr: false,
-  loading: () => <Box sx={{ minHeight: 300 }} />,
-});
 
 interface NoticeBoardClientProps {
   initialData: NoticeListResponse;
@@ -70,22 +55,12 @@ const getStoredUserInfo = (): UserInfo | null => {
   }
 };
 
-export default function NoticeBoardClient({
-  initialData,
-}: NoticeBoardClientProps) {
+export default function NoticeBoardClient({ initialData }: NoticeBoardClientProps) {
   const router = useRouter();
   const [page, setPage] = useState(initialData.page || 1);
   const [selectedNoticeId, setSelectedNoticeId] = useState<string | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [isEditPrefilling, setIsEditPrefilling] = useState(false);
   const [userInfo] = useState<UserInfo | null>(() => getStoredUserInfo());
-  const [formData, setFormData] = useState({
-    title: '',
-    content: '',
-    is_important: false,
-    is_popup: false,
-  });
 
   const limit = initialData.limit || DEFAULT_PAGE_SIZE;
   const isAdmin = useMemo(() => {
@@ -100,24 +75,6 @@ export default function NoticeBoardClient({
     },
   );
 
-  const saveNoticeMutation = useSaveNotice({
-    onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success(selectedNoticeId ? '공지사항이 수정되었습니다.' : '공지사항이 등록되었습니다.');
-        setEditDialogOpen(false);
-        setFormData({ title: '', content: '', is_important: false, is_popup: false });
-        setSelectedNoticeId(null);
-        noticeListQuery.refetch();
-      } else {
-        throw new Error(res.message || '공지사항 저장에 실패했습니다.');
-      }
-    },
-    onError: (error: Error) => {
-      logger.error('공지사항 저장 실패', error);
-      showToast.error(error.message || '공지사항 저장에 실패했습니다.');
-    },
-  });
-
   const deleteNoticeMutation = useDeleteNotice({
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
@@ -126,7 +83,7 @@ export default function NoticeBoardClient({
         setSelectedNoticeId(null);
         noticeListQuery.refetch();
       } else {
-        throw new Error(res.message || '공지사항 삭제에 실패했습니다.');
+        showToast.error(res?.message || '공지사항 삭제에 실패했습니다.');
       }
     },
     onError: (error: Error) => {
@@ -139,68 +96,18 @@ export default function NoticeBoardClient({
     router.push(`/notice/${noticeId}`);
   };
 
-  const handleOpenEdit = async (notice?: Notice) => {
-    if (!notice?.notice_id) {
-      setSelectedNoticeId(null);
-      setFormData({ title: '', content: '', is_important: false, is_popup: false });
-      setEditDialogOpen(true);
-      return;
-    }
+  const handleCreate = () => {
+    router.push('/notice/write');
+  };
 
-    setSelectedNoticeId(notice.notice_id);
-    setEditDialogOpen(true);
-    setIsEditPrefilling(true);
-
-    try {
-      const detail = await apiClient.post<Notice>('/community/notice/detail', {
-        notice_id: notice.notice_id,
-      });
-
-      setFormData({
-        title: detail.title || '',
-        content: detail.content || '',
-        is_important: detail.is_important || false,
-        is_popup: detail.is_popup || false,
-      });
-    } catch (error) {
-      logger.error('공지사항 상세 조회 실패', error);
-      showToast.error('공지사항 상세를 불러오지 못했습니다.');
-      setEditDialogOpen(false);
-    } finally {
-      setIsEditPrefilling(false);
-    }
+  const handleEdit = (notice?: Notice) => {
+    if (!notice?.notice_id) return;
+    router.push(`/notice/${notice.notice_id}/edit`);
   };
 
   const handleOpenDelete = (noticeId: string) => {
     setSelectedNoticeId(noticeId);
     setDeleteDialogOpen(true);
-  };
-
-  const handleSave = () => {
-    try {
-      const sanitizedTitle = validateAndSanitizeInput(formData.title.trim(), MAX_TITLE_LENGTH);
-      if (!sanitizedTitle) {
-        showToast.error('제목을 입력해주세요.');
-        return;
-      }
-
-      const sanitizedContent = formData.content.trim();
-      if (!sanitizedContent || sanitizedContent === '<p><br></p>') {
-        showToast.error('내용을 입력해주세요.');
-        return;
-      }
-
-      saveNoticeMutation.mutate({
-        notice_id: selectedNoticeId || undefined,
-        title: sanitizedTitle,
-        content: sanitizedContent,
-        is_important: formData.is_important,
-        is_popup: formData.is_popup,
-      });
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '입력값 검증에 실패했습니다.';
-      showToast.error(errorMessage);
-    }
   };
 
   const handleDelete = () => {
@@ -241,10 +148,8 @@ export default function NoticeBoardClient({
         <NoticeAdminControls
           isAdmin={isAdmin}
           mode="toolbar"
-          onCreate={() => {
-            void handleOpenEdit();
-          }}
-          onEdit={handleOpenEdit}
+          onCreate={handleCreate}
+          onEdit={handleEdit}
           onDelete={handleOpenDelete}
         />
       </Box>
@@ -294,7 +199,7 @@ export default function NoticeBoardClient({
                         isAdmin={isAdmin}
                         mode="row"
                         notice={notice}
-                        onEdit={handleOpenEdit}
+                        onEdit={handleEdit}
                         onDelete={handleOpenDelete}
                       />
                     </Box>
@@ -380,7 +285,7 @@ export default function NoticeBoardClient({
                             isAdmin={isAdmin}
                             mode="row"
                             notice={notice}
-                            onEdit={handleOpenEdit}
+                            onEdit={handleEdit}
                             onDelete={handleOpenDelete}
                           />
                         </TableCell>
@@ -412,85 +317,6 @@ export default function NoticeBoardClient({
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="h6">{selectedNoticeId ? '공지사항 수정' : '공지사항 작성'}</Typography>
-            <IconButton onClick={() => setEditDialogOpen(false)} size="small">
-              <CloseIcon />
-            </IconButton>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="제목"
-              value={formData.title}
-              onChange={(event) => setFormData({ ...formData, title: event.target.value })}
-              fullWidth
-              required
-              disabled={saveNoticeMutation.isPending || isEditPrefilling}
-            />
-            {isEditPrefilling ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                <CircularProgress />
-              </Box>
-            ) : (
-              <RichTextEditor
-                value={formData.content}
-                onChange={(value) => setFormData({ ...formData, content: value })}
-                placeholder="내용을 입력하세요..."
-                minHeight={300}
-              />
-            )}
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <input
-                  type="checkbox"
-                  id="is_important"
-                  checked={formData.is_important}
-                  onChange={(event) => setFormData({ ...formData, is_important: event.target.checked })}
-                  disabled={saveNoticeMutation.isPending || isEditPrefilling}
-                />
-                <label htmlFor="is_important">
-                  <Typography variant="body2">중요 공지로 설정</Typography>
-                </label>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <input
-                  type="checkbox"
-                  id="is_popup"
-                  checked={formData.is_popup}
-                  onChange={(event) => setFormData({ ...formData, is_popup: event.target.checked })}
-                  disabled={saveNoticeMutation.isPending || isEditPrefilling}
-                />
-                <label htmlFor="is_popup">
-                  <Typography variant="body2">팝업으로 표시</Typography>
-                </label>
-              </Box>
-            </Box>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setEditDialogOpen(false)} disabled={saveNoticeMutation.isPending || isEditPrefilling}>
-            취소
-          </Button>
-          <Button
-            onClick={handleSave}
-            variant="contained"
-            disabled={
-              isEditPrefilling ||
-              saveNoticeMutation.isPending ||
-              !formData.title.trim() ||
-              !formData.content.trim() ||
-              formData.content === '<p><br></p>'
-            }
-          >
-            {saveNoticeMutation.isPending ? '저장 중...' : '저장'}
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>공지사항 삭제</DialogTitle>

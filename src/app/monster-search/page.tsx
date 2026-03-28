@@ -1,14 +1,11 @@
 import type { Metadata } from 'next';
 import MonsterSearchClient from '@/features/siege/components/MonsterSearchClient';
-import {
-  getDevilmonImageUrlForSearch,
-  getMonsterListData,
-  MONSTER_LIST_REVALIDATE_SECONDS,
-} from '@/shared/lib/api/server';
+import { getDevilmonImageUrlForSearch, getMonsterListData } from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
-export const revalidate = MONSTER_LIST_REVALIDATE_SECONDS;
+/** ISR(초). `MONSTER_LIST_REVALIDATE_SECONDS`(server.ts)와 동일하게 유지 */
+export const revalidate = 600;
 
 export const metadata: Metadata = buildPublicMetadata({
   title: '몬스터 검색',
