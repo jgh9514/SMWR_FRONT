@@ -94,7 +94,7 @@ export default function SignupPage() {
   const sendCodeMutation = useSendEmailVerification({
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
-        const message = res.dev_code 
+        const message = res.dev_code
           ? `인증 코드가 발송되었습니다. (개발 모드: ${res.dev_code})`
           : (res.message || '인증 코드가 발송되었습니다.');
         showToast.success(message);
@@ -102,7 +102,8 @@ export default function SignupPage() {
         setCountdown(300); // 5분 (300초)
         setResendCooldown(10); // 과도한 재발송 방지(10초)
       } else {
-        throw new Error(res.message || '인증 코드 발송에 실패했습니다.');
+        const msg = (res as { message?: string } | undefined)?.message || '인증 코드 발송에 실패했습니다.';
+        showToast.error(msg);
       }
     },
     onError: (error: Error) => {
