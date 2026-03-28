@@ -15,6 +15,10 @@ const withPWA = withPWAInit({
   /**
    * 기본 런타임 캐시에 `/api/` GET용 NetworkFirst(apis)가 있어,
    * PWA에서 API 응답이 캐시·오래된 5xx와 섞일 수 있음 → NetworkOnly로 덮어씀.
+   *
+   * 같은 이유로 기본 `pages`(HTML) NetworkFirst도 덮음: 설치형 PWA만 오래된 HTML을
+   * 캐시에서 주면 배포 후 예전 `/_next/static/` 청크 URL을 물어 JS 로드/동작 오류가 날 수 있음.
+   * 문서 탐색(navigate)만 네트워크로 고정하고, 정적 청크는 기존 규칙으로 캐시.
    */
   extendDefaultRuntimeCaching: true,
   workboxOptions: {
@@ -28,6 +32,25 @@ const withPWA = withPWAInit({
         handler: "NetworkOnly",
         options: {
           cacheName: "apis",
+        },
+      },
+      {
+        urlPattern: ({
+          request,
+          url,
+          sameOrigin,
+        }: {
+          request: Request;
+          url: URL;
+          sameOrigin?: boolean;
+        }) =>
+          request.mode === "navigate" &&
+          sameOrigin !== false &&
+          !url.pathname.startsWith("/api/"),
+        handler: "NetworkOnly",
+        method: "GET",
+        options: {
+          cacheName: "pages",
         },
       },
     ],
