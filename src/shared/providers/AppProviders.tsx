@@ -248,9 +248,25 @@ export default function AppProviders({ children }: AppProvidersProps) {
 
   const isProtectedPath = useMemo(() => {
     const currentPath = pathname || '';
-    // 로그인 필수 경로들 (필요 시 확장)
-    const protectedPrefixes = ['/siege', '/recent-siege', '/guild-management', '/settings', '/log-upload', '/account-summary'];
-    return protectedPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
+    // 로그인 필수 경로 (공개 SEO 페이지·목록은 제외)
+    const protectedPrefixes = [
+      '/siege',
+      '/recent-siege',
+      '/guild-management',
+      '/settings',
+      '/log-upload',
+      '/account-summary',
+    ];
+    if (protectedPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`))) {
+      return true;
+    }
+    if (currentPath === '/notice/write') {
+      return true;
+    }
+    if (/^\/notice\/[^/]+\/edit$/.test(currentPath)) {
+      return true;
+    }
+    return false;
   }, [pathname]);
 
   const isGuildRequiredPath = useMemo(() => {
@@ -333,7 +349,6 @@ export default function AppProviders({ children }: AppProvidersProps) {
 
     if (isProtectedPath && !isAuthenticated()) {
       router.replace('/login');
-      // replace 직후 refresh 경합 방지
       setTimeout(() => router.refresh(), 0);
       return;
     }
@@ -354,7 +369,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
         setTimeout(() => router.refresh(), 0);
       }
     }
-  }, [authBootstrapped, isAdminPath, isGuildRequiredPath, isProtectedPath, isPublicPath, router]);
+  }, [authBootstrapped, isAdminPath, isGuildRequiredPath, isProtectedPath, isPublicPath, pathname, router]);
 
   // 인증 bootstrap 전에는 "아예" 화면을 그리지 않음(헤더/페이지/list 호출 방지)
   if (!authBootstrapped && !isPublicPath && !isAdminPath) {

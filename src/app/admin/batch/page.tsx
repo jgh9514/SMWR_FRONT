@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import {
   Box,
   Button,
@@ -38,6 +38,16 @@ import { logger } from '@/shared/lib/logger';
 import { PageHeader } from '@/shared/ui';
 import { formatDate } from '@/shared/utils/format';
 
+/**
+ * 배치 SSE URL. EventSource는 크로스 오리진(예: :3000 페이지 → :8080 API)에서
+ * 표준 API로 HttpOnly 쿠키를 보내지 않습니다. Axios(withCredentials)와 달리 인증이 빠집니다.
+ * 페이지와 동일 출처의 `/api/v1`(Next 프록시)으로 붙여 쿠키가 전달되게 합니다.
+ */
+function getBatchLogStreamUrl(streamId: string): string {
+  if (typeof window === 'undefined') return '';
+  return `${window.location.origin}/api/v1/batch/logs/stream/${encodeURIComponent(streamId)}`;
+}
+
 export default function BatchManagementPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -48,6 +58,14 @@ export default function BatchManagementPage() {
   );
   const [resultDialogOpen, setResultDialogOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<string>('');
+  const [streamLogOpen, setStreamLogOpen] = useState(false);
+  const [streamLogText, setStreamLogText] = useState('');
+  const [streamLogStatus, setStreamLogStatus] = useState<
+    'idle' | 'connecting' | 'running' | 'success' | 'fail' | 'error'
+  >('idle');
+  const streamEsRef = useRef<EventSource | null>(null);
+  const streamRunStartedRef = useRef(false);
+  const streamLogPreRef = useRef<HTMLPreElement | null>(null);
   const incident = searchParams.get('incident');
   const historyFilter = searchParams.get('filter');
   const incidentMessage = useMemo(() => {
@@ -56,6 +74,20 @@ export default function BatchManagementPage() {
     }
     return null;
   }, [incident]);
+
+  const closeStreamLog = useCallback(() => {
+    if (streamEsRef.current) {
+      streamEsRef.current.close();
+      streamEsRef.current = null;
+    }
+    streamRunStartedRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (streamLogPreRef.current && streamLogOpen) {
+      streamLogPreRef.current.scrollTop = streamLogPreRef.current.scrollHeight;
+    }
+  }, [streamLogText, streamLogOpen]);
 
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
@@ -147,11 +179,17 @@ export default function BatchManagementPage() {
     return cronExpr;
   };
 
-  // 배치 수동 실행 Mutation (행 단위 실행)
+  // 배치 수동 실행 Mutation (행 단위 실행) — WAS는 Quartz 트리거만 하고 즉시 응답; 실제 결과는 이력에 쌓임
   const runMutation = useBatchRun({
     onSuccess: (response: BatchRunResponse) => {
       if (response.result === 'SUCCESS') {
-        showToast.success('배치가 실행되었습니다.');
+        showToast.success(
+          response.message ??
+            '배치가 백그라운드에서 시작되었습니다. 잠시 후 실행 이력을 새로고침해 결과를 확인하세요.',
+        );
+        void refetchHistory();
+        window.setTimeout(() => void refetchHistory(), 4000);
+        window.setTimeout(() => void refetchHistory(), 15000);
       } else {
         showToast.error(response.message || '배치 실행에 실패했습니다.');
       }
@@ -172,12 +210,77 @@ export default function BatchManagementPage() {
       const res = await confirm('해당 배치를 실행하시겠습니까?', `배치ID: ${config.bat_id}\n배치명: ${config.bat_nm}`);
       if (!res) return;
 
-      runMutation.mutate({
-        job_key: config.bat_id,
+      const streamId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setStreamLogOpen(true);
+      setStreamLogText('');
+      setStreamLogStatus('connecting');
+
+      const url = getBatchLogStreamUrl(streamId);
+      if (!url) {
+        showToast.error('API 주소를 확인할 수 없습니다.');
+        setStreamLogOpen(false);
+        setStreamLogStatus('idle');
+        return;
+      }
+      const es = new EventSource(url);
+      streamEsRef.current = es;
+      streamRunStartedRef.current = false;
+
+      es.addEventListener('log', (ev: MessageEvent) => {
+        const msg = typeof ev.data === 'string' ? ev.data : '';
+        setStreamLogText((prev) => (prev ? `${prev}\n` : '') + msg);
       });
+
+      es.addEventListener('done', (ev: MessageEvent) => {
+        try {
+          const data = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
+          const st = data?.status as string | undefined;
+          setStreamLogStatus(st === 'SUCCESS' ? 'success' : 'fail');
+        } catch {
+          setStreamLogStatus('fail');
+        }
+        es.close();
+        streamEsRef.current = null;
+        void refetchHistory();
+        window.setTimeout(() => void refetchHistory(), 4000);
+        window.setTimeout(() => void refetchHistory(), 15000);
+      });
+
+      es.onopen = () => {
+        if (streamRunStartedRef.current) return;
+        streamRunStartedRef.current = true;
+        setStreamLogStatus('running');
+        runMutation.mutate(
+          { job_key: config.bat_id, stream_id: streamId },
+          {
+            onError: () => {
+              setStreamLogStatus('error');
+              closeStreamLog();
+              showToast.error('배치 실행 요청에 실패했습니다.');
+            },
+          },
+        );
+      };
+
+      es.onerror = () => {
+        if (es.readyState === EventSource.CLOSED) {
+          streamEsRef.current = null;
+          if (!streamRunStartedRef.current) {
+            setStreamLogStatus('error');
+            showToast.error('실시간 로그 연결에 실패했습니다.');
+          }
+        }
+      };
     },
-    [runMutation],
+    [runMutation, refetchHistory, closeStreamLog],
   );
+
+  const handleCloseStreamLogDialog = useCallback(() => {
+    closeStreamLog();
+    setStreamLogOpen(false);
+    setStreamLogText('');
+    setStreamLogStatus('idle');
+  }, [closeStreamLog]);
 
   const handleViewResult = useCallback((resultText: string) => {
     setSelectedResult(resultText || '결과가 없습니다.');
@@ -377,6 +480,53 @@ export default function BatchManagementPage() {
             </CardContent>
           </Card>
         </Box>
+
+        {/* 수동 실행 실시간 로그 (SSE) */}
+        <Dialog open={streamLogOpen} onClose={handleCloseStreamLogDialog} maxWidth="md" fullWidth>
+          <DialogTitle>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
+              <Typography variant="h6">배치 실행 로그 (실시간)</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {streamLogStatus === 'connecting' && <Chip size="small" label="연결 중" color="default" />}
+                {streamLogStatus === 'running' && <Chip size="small" label="실행 중" color="warning" />}
+                {streamLogStatus === 'success' && <Chip size="small" label="완료" color="success" />}
+                {(streamLogStatus === 'fail' || streamLogStatus === 'error') && (
+                  <Chip size="small" label={streamLogStatus === 'error' ? '오류' : '실패'} color="error" />
+                )}
+                <IconButton onClick={handleCloseStreamLogDialog} size="small" aria-label="닫기">
+                  <CloseIcon />
+                </IconButton>
+              </Box>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <Box
+              ref={streamLogPreRef}
+              component="pre"
+              sx={{
+                p: 2,
+                m: 0,
+                bgcolor: 'background.default',
+                borderRadius: 1,
+                border: '1px solid',
+                borderColor: 'divider',
+                maxHeight: 420,
+                overflow: 'auto',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                fontFamily: 'monospace',
+                fontSize: '0.8125rem',
+              }}
+            >
+              {streamLogText || (streamLogStatus === 'connecting' ? 'SSE 연결 대기 중…' : '로그가 없습니다.')}
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseStreamLogDialog} variant="contained">
+              닫기
+            </Button>
+          </DialogActions>
+        </Dialog>
 
         {/* 결과 보기 팝업 */}
         <Dialog

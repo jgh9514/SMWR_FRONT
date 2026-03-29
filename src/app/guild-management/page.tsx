@@ -69,6 +69,17 @@ function toGuildRole(role?: string): UserInfo['guild_role'] {
   return undefined;
 }
 
+/** API가 application_id를 숫자로 줄 수 있어 문자열만 허용하던 필터와 제목 카운트가 어긋나지 않게 통일 */
+function isRenderablePendingJoinApplication(
+  app: GuildJoinApplication,
+): app is GuildJoinApplication & { application_id: string | number } {
+  const st = String(app.status ?? '').toUpperCase();
+  if (st !== 'PENDING') return false;
+  const id = app.application_id;
+  if (id === null || id === undefined) return false;
+  return String(id).trim().length > 0;
+}
+
 export default function GuildManagementPage() {
   const router = useRouter();
   const isClient = useSyncExternalStore(
@@ -154,6 +165,12 @@ export default function GuildManagementPage() {
   const guildJoinApplicationListQuery = useGuildJoinApplicationList(userInfo?.guild_id || '', {
     enabled: !!userInfo?.guild_id && (isLeader || isManager),
   });
+
+  const pendingGuildJoinApplications = useMemo(() => {
+    const list = guildJoinApplicationListQuery.data;
+    if (!list?.length) return [];
+    return list.filter(isRenderablePendingJoinApplication);
+  }, [guildJoinApplicationListQuery.data]);
 
   // 초대 코드 채번 Mutation
   const generateInviteCodeMutation = useGenerateInviteCode({
@@ -696,14 +713,14 @@ export default function GuildManagementPage() {
         <Card>
           <CardHeader
             avatar={<PersonAddIcon color="primary" />}
-            title={`가입 신청 (${guildJoinApplicationListQuery.data?.filter((app: GuildJoinApplication) => app.status === 'PENDING').length || 0}명)`}
+            title={`가입 신청 (${pendingGuildJoinApplications.length}명)`}
           />
           <CardContent>
             {guildJoinApplicationListQuery.isLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : guildJoinApplicationListQuery.data && guildJoinApplicationListQuery.data.filter((app: GuildJoinApplication) => app.status === 'PENDING').length > 0 ? (
+            ) : pendingGuildJoinApplications.length > 0 ? (
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
                 <Table size="small" stickyHeader>
                   <TableHead>
@@ -714,23 +731,18 @@ export default function GuildManagementPage() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {guildJoinApplicationListQuery.data
-                      .filter(
-                        (
-                          app: GuildJoinApplication,
-                        ): app is GuildJoinApplication & { application_id: string } =>
-                          app.status === 'PENDING' && typeof app.application_id === 'string' && app.application_id.length > 0,
-                      )
-                      .map((app) => (
-                        <TableRow key={app.application_id}>
+                    {pendingGuildJoinApplications.map((app) => {
+                      const applicationId = String(app.application_id);
+                      return (
+                        <TableRow key={applicationId}>
                           <TableCell align="center">{app.user_id}</TableCell>
-                          <TableCell align="center">{app.user_name}</TableCell>
+                          <TableCell align="center">{app.user_name ?? app.user_nm}</TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                               <IconButton
                                 color="success"
                                 size="small"
-                                onClick={() => handleProcessApplication(app.application_id, 'APPROVED')}
+                                onClick={() => handleProcessApplication(applicationId, 'APPROVED')}
                                 disabled={processJoinApplicationMutation.isPending}
                               >
                                 <CheckCircleIcon fontSize="small" />
@@ -738,7 +750,7 @@ export default function GuildManagementPage() {
                               <IconButton
                                 color="error"
                                 size="small"
-                                onClick={() => handleProcessApplication(app.application_id, 'REJECTED')}
+                                onClick={() => handleProcessApplication(applicationId, 'REJECTED')}
                                 disabled={processJoinApplicationMutation.isPending}
                               >
                                 <CancelIcon fontSize="small" />
@@ -746,7 +758,8 @@ export default function GuildManagementPage() {
                             </Box>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

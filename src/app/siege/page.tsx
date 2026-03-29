@@ -39,6 +39,7 @@ import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterItem, SiegeSearchParams } from '@/types';
 import type { GuildInfo } from '@/features/siege/types/siege';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
+import { SiegeManualDefenseDeckDialog } from '@/features/siege/components/SiegeManualDefenseDeckDialog';
 
 const LEADER_INDEX = 0;
 const MAX_MONSTERS = 3;
@@ -168,8 +169,8 @@ function SiegeResultsSection({
         }}
       >
         {list.map((item) => {
-          const winCount = item.win_count || 0;
-          const loseCount = item.lose_count || 0;
+          const winCount = Number(item.win_count) || 0;
+          const loseCount = Number(item.lose_count) || 0;
           const total = winCount + loseCount;
           const winRate = total > 0 ? Math.round((winCount / total) * 100) : 0;
           const winPercentage = total > 0 ? (winCount / total) * 100 : 0;
@@ -240,14 +241,13 @@ function SiegeResultsSection({
                       fontSize: { xs: '0.7rem', md: '0.75rem' },
                     }}
                   >
-                    {total > 0 ? `${winRate}%` : '100%'}
+                    {total > 0 ? `${winRate}%` : '0%'}
                   </Typography>
                   <Typography
                     variant="caption"
                     sx={{
                       color: 'text.secondary',
                       fontSize: { xs: '0.65rem', md: '0.75rem' },
-                      display: total > 0 ? 'block' : 'none',
                     }}
                   >
                     {winCount}승 {loseCount}패
@@ -301,6 +301,7 @@ function SiegeContent() {
   const [selectedGuilds, setSelectedGuilds] = useState<string[]>([]);
   const [deckStarFilter, setDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
   const [onlyLoseAtLeastOnce, setOnlyLoseAtLeastOnce] = useState(false);
+  const [manualDefenseDeckDialogOpen, setManualDefenseDeckDialogOpen] = useState(false);
 
   // 검색 적용값(applied): "검색 버튼"을 눌렀을 때만 이 값이 바뀌고, 실제 조회는 이 값으로만 수행
   const [appliedMonsterIds, setAppliedMonsterIds] = useState<string[]>([]);
@@ -926,18 +927,44 @@ function SiegeContent() {
 
           {/* 메인 콘텐츠 영역 */}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography
-              variant="h4"
-              component="h1"
+            <Box
               sx={{
-                fontWeight: 700,
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                alignItems: { xs: 'stretch', sm: 'flex-start' },
+                justifyContent: 'space-between',
+                gap: { xs: 1.5, sm: 2 },
                 mb: { xs: 3, md: 4 },
-                fontSize: { xs: '24px', md: '32px' },
-                color: 'text.primary',
               }}
             >
-              길드 공성전 방어덱 분석
-            </Typography>
+              <Typography
+                variant="h4"
+                component="h1"
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: '24px', md: '32px' },
+                  color: 'text.primary',
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                길드 공성전 방어덱 분석
+              </Typography>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => setManualDefenseDeckDialogOpen(true)}
+                sx={{ flexShrink: 0, alignSelf: { xs: 'stretch', sm: 'center' } }}
+                aria-label="방덱 수동 등록 열기"
+              >
+                방덱 수동 등록
+              </Button>
+            </Box>
+
+            <SiegeManualDefenseDeckDialog
+              open={manualDefenseDeckDialogOpen}
+              onClose={() => setManualDefenseDeckDialogOpen(false)}
+            />
 
             {/* 모바일: 길드 선택 섹션 */}
             {availableGuilds.length > 0 && (

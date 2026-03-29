@@ -53,3 +53,47 @@ export const getStaticImageUrl = (imagePath: string): string => {
   return imagePath;
 };
 
+/** MyBatis `mapUnderscoreToCamelCase` → JSON 키가 `effectIconPath`인 경우가 있어 스네이크/카멜 둘 다 허용 */
+export type SkillEffectIconFields = {
+  effect_icon_path?: string | null;
+  effect_icon_filename?: string | null;
+  effectIconPath?: string | null;
+  effectIconFilename?: string | null;
+};
+
+/**
+ * 스킬 이펙트 아이콘 — `skill_effect_master.icon_path` 조인값(`effect_icon_path` / `effectIconPath`)
+ */
+export function resolveSkillEffectImageUrl(ef: SkillEffectIconFields): string | null {
+  const path = pickNonEmpty(ef.effect_icon_path, ef.effectIconPath);
+  if (path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    const clean = path.startsWith('/') ? path : `/${path}`;
+    return getCdnImageUrl(clean);
+  }
+  const fn = pickNonEmpty(ef.effect_icon_filename, ef.effectIconFilename);
+  if (!fn) return null;
+  if (fn.startsWith('http://') || fn.startsWith('https://')) return fn;
+
+  const fromCdn = getCdnImageUrl(`/skill-effects/${fn}`);
+  if (fromCdn.startsWith('http://') || fromCdn.startsWith('https://')) {
+    return fromCdn;
+  }
+  // Swarfarm: buff_ / debuff_ 모두 herders/images/buffs/ (동일 폴더)
+  const folder =
+    fn.startsWith('buff_') || fn.startsWith('debuff_') ? 'buffs' : 'skill-effects';
+  return `https://swarfarm.com/static/herders/images/${folder}/${encodeURIComponent(fn)}`;
+}
+
+function pickNonEmpty(
+  ...vals: (string | null | undefined)[]
+): string | undefined {
+  for (const v of vals) {
+    if (v == null) continue;
+    const t = String(v).trim();
+    if (t !== '') return t;
+  }
+  return undefined;
+}

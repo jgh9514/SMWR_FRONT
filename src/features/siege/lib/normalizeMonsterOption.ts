@@ -28,6 +28,12 @@ export function normalizeMonsterOption(row: Record<string, unknown>): MonsterOpt
   const com2us_id = parseOptInt(row.com2us_id ?? row.com2usId);
   const awakens_from_id = parseOptInt(row.awakens_from_id ?? row.awakensFromId);
   const awakens_to_id = parseOptInt(row.awakens_to_id ?? row.awakensToId);
+  const family_id = parseOptInt(row.family_id ?? row.familyId);
+
+  const obRaw = row.obtainable;
+  let obtainable: boolean | undefined;
+  if (obRaw === true || obRaw === 'true' || obRaw === 1) obtainable = true;
+  else if (obRaw === false || obRaw === 'false' || obRaw === 0) obtainable = false;
 
   return {
     monster_id: String(row.monster_id ?? row.monsterId ?? ''),
@@ -44,10 +50,30 @@ export function normalizeMonsterOption(row: Record<string, unknown>): MonsterOpt
     com2us_id,
     awakens_from_id,
     awakens_to_id,
+    family_id,
+    obtainable,
   };
+}
+
+/**
+ * monster-list는 WAS에서 usg_yn=Y & obtainable 이지만,
+ * 캐시/구버전/비정상 행이 섞일 수 있어 동일 조건으로 한 번 더 걸러냄.
+ * (예: obtainable=false·usg_yn=N 노말 행은 SQL상 목록에 없어야 함)
+ */
+function rawRowAllowedForMonsterList(row: Record<string, unknown>): boolean {
+  const usg = row.usg_yn ?? row.usgYn;
+  if (usg !== undefined && usg !== null && String(usg).trim().toUpperCase() !== 'Y') {
+    return false;
+  }
+  const ob = row.obtainable;
+  if (ob === false || ob === 'false' || ob === 'f' || ob === 0) return false;
+  return true;
 }
 
 export function normalizeMonsterList(rows: unknown): MonsterOption[] {
   if (!Array.isArray(rows)) return [];
-  return rows.map((r) => normalizeMonsterOption(r as Record<string, unknown>));
+  return rows
+    .filter((r) => rawRowAllowedForMonsterList(r as Record<string, unknown>))
+    .map((r) => normalizeMonsterOption(r as Record<string, unknown>))
+    .filter((m) => m.obtainable !== false);
 }

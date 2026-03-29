@@ -57,13 +57,13 @@ export default function BattleHistoryListClient({
               py: { xs: 2, md: 3 },
             }}
           >
-            {userList.map((item) => {
+            {userList.map((item, index) => {
               const winRate = item.total_rate || 0;
               const isHighWinRate = winRate >= 50;
 
               return (
                 <Card
-                  key={item.wizard_id}
+                  key={`${String(item.wizard_id)}-${index}`}
                   component={Link}
                   href={detailHref(item.wizard_id)}
                   sx={{

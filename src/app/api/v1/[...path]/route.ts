@@ -232,17 +232,51 @@ async function proxyRequest(
       },
     });
 
-    // 응답 본문 가져오기
-    const responseText = await response.text();
-    
-    // 응답 헤더 준비
+    // 응답 헤더 준비 (스트리밍 응답은 본문을 읽기 전에 헤더만 구성)
     const responseHeaders = new Headers();
-    
+
     // Content-Type 전달
     const contentType = response.headers.get('content-type');
     if (contentType) {
       responseHeaders.set('Content-Type', contentType);
     }
+
+    // SSE(text/event-stream)는 버퍼링하지 않고 스트림 그대로 전달 (실시간 로그 등)
+    if (contentType?.includes('text/event-stream') && response.body) {
+      const cacheControl = response.headers.get('cache-control');
+      if (cacheControl) {
+        responseHeaders.set('Cache-Control', cacheControl);
+      }
+      const transferEncoding = response.headers.get('transfer-encoding');
+      if (transferEncoding) {
+        responseHeaders.set('Transfer-Encoding', transferEncoding);
+      }
+      const connection = response.headers.get('connection');
+      if (connection) {
+        responseHeaders.set('Connection', connection);
+      }
+      // CORS 헤더 전달
+      const accessControlAllowOrigin = response.headers.get('access-control-allow-origin');
+      if (accessControlAllowOrigin) {
+        responseHeaders.set('Access-Control-Allow-Origin', accessControlAllowOrigin);
+      }
+      const accessControlAllowCredentials = response.headers.get('access-control-allow-credentials');
+      if (accessControlAllowCredentials) {
+        responseHeaders.set('Access-Control-Allow-Credentials', accessControlAllowCredentials);
+      }
+      const setCookie = response.headers.get('set-cookie');
+      if (setCookie) {
+        responseHeaders.set('Set-Cookie', setCookie);
+      }
+      return new NextResponse(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    }
+
+    // 응답 본문 가져오기 (비스트리밍)
+    const responseText = await response.text();
 
     // CORS 헤더 전달 (백엔드에서 설정한 CORS 헤더를 그대로 전달)
     // 백엔드 SimpleCorsFilter가 설정한 CORS 헤더를 브라우저로 전달해야 함

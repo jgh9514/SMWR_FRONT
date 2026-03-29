@@ -110,3 +110,23 @@ export function isAuthenticated(): boolean {
   return !!storedUser || storedLoggedIn === 'true';
 }
 
+/**
+ * 로그인/회원가입·에러 전용 등 인증 없이 머물러도 되는 경로
+ */
+export function isAuthFlowPublicPath(pathname: string): boolean {
+  if (pathname === '/login' || pathname === '/signup') return true;
+  if (pathname.startsWith('/error/')) return true;
+  return false;
+}
+
+/**
+ * 세션이 없을 때 로그인 화면으로 이동합니다.
+ * - 이미 로그인/회원가입/에러 페이지면 이동하지 않습니다.
+ */
+export function redirectToLogin(): void {
+  if (typeof window === 'undefined') return;
+  const pathname = window.location.pathname;
+  if (isAuthFlowPublicPath(pathname)) return;
+  window.location.assign('/login');
+}
+

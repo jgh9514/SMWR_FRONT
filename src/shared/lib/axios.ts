@@ -5,7 +5,7 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 import { API_TIMEOUT_MS } from '@/shared/constants';
 import { showApiError } from './error-handler';
-import { isForceLoggedOut } from '@/shared/utils/auth';
+import { isForceLoggedOut, redirectToLogin } from '@/shared/utils/auth';
 import { logger } from '@/shared/lib/logger';
 import { apiClient } from '@/shared/lib/api/client';
 
@@ -144,8 +144,6 @@ axiosInstance.interceptors.response.use(
       const url = error.config?.url;
       const data = error.response?.data;
 
-      // 리다이렉트로 에러가 사라져 원인 추적이 어려워지는 문제 방지:
-      // - 401/403/5xx도 페이지 이동하지 않고, 토스트 + 콘솔 로그로 남긴다.
       logger.error('[Axios] API error response', error, { status, method, url, data });
 
       if (status === 401) {
@@ -157,6 +155,22 @@ axiosInstance.interceptors.response.use(
           const urlStr = String(url || '');
           if (!urlStr.includes('/auth/login-check')) {
             await tryReauthOnce();
+          } else {
+            // login-check가 401이면 세션 없음 — tryReauth를 호출하지 않으므로 여기서 표시 정보만 정리
+            try {
+              localStorage.removeItem('isLoggedIn');
+              localStorage.removeItem('userInfo');
+            } catch {
+              // no-op
+            }
+          }
+          // 재인증 후에도 서버가 비로그인이면 로그인 페이지로 이동 (Suspense/ErrorBoundary에 401이 던져지지 않도록)
+          const stillLoggedOut = localStorage.getItem('isLoggedIn') !== 'true';
+          if (stillLoggedOut) {
+            redirectToLogin();
+            return new Promise(() => {
+              /* 페이지 이동 중 — 후속 reject로 ErrorBoundary가 깨지지 않도록 대기만 함 */
+            });
           }
         }
         showApiError(error);

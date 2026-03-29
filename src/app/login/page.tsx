@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
@@ -23,7 +23,10 @@ import LoginIcon from '@mui/icons-material/Login';
 import FindAccountPopup from '@/components/popup/FindAccountPopup';
 import type { LoginParams } from '@/types';
 
-function LoginContent() {
+/** 로그인 성공·이미 로그인된 상태로 진입 시 이동 경로 (returnUrl 미사용) */
+const MAIN_PATH = '/';
+
+export default function LoginPage() {
   const router = useRouter();
   const [frmDatas, setFrmDatas] = useState({
     user_id: '',
@@ -84,8 +87,7 @@ function LoginContent() {
     
     const token = getAuthTokenFromCookie();
     if (token) {
-      // 쿠키가 있으면 이미 로그인된 상태이므로 메인으로 이동
-      router.push('/');
+      router.push(MAIN_PATH);
     }
   }, [router]);
 
@@ -136,8 +138,7 @@ function LoginContent() {
           
           if (tokenCookie || retryCount >= COOKIE_CHECK_MAX_RETRIES) {
             setTimeout(() => {
-              // 로그인 성공 후에는 이전 페이지(returnUrl) 무시하고 메인으로 이동
-              router.push('/');
+              router.push(MAIN_PATH);
             }, COOKIE_CHECK_RETRY_DELAY_MS);
           } else {
             retryCount++;
@@ -336,25 +337,3 @@ function LoginContent() {
     </Box>
   );
 }
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          p: 2.5,
-        }}
-      >
-        <Typography>로딩 중...</Typography>
-      </Box>
-    }>
-      <LoginContent />
-    </Suspense>
-  );
-}
-

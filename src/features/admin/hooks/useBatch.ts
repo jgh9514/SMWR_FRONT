@@ -19,6 +19,8 @@ export interface BatchRunRequest {
   job_key?: string;
   cd?: string;
   job_data?: Record<string, unknown>;
+  /** 수동 실행 실시간 로그(SSE)용. 먼저 GET /batch/logs/stream/{stream_id} 연결 후 동일 ID로 실행 요청 */
+  stream_id?: string;
 }
 
 export interface BatchRunResponse {

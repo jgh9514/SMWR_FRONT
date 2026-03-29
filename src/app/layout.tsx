@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import React from 'react';
 import './globals.css';
 import AppProviders from '@/shared/providers/AppProviders';
@@ -8,6 +8,10 @@ import { getAbsoluteUrl } from '@/shared/lib/seo';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 
 const iconQ = getPwaIconCacheQuery();
+
+export const viewport: Viewport = {
+  themeColor: '#16213e',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
@@ -22,7 +26,6 @@ export const metadata: Metadata = {
   },
   /** `app/manifest.ts` → `/manifest.webmanifest` */
   manifest: '/manifest.webmanifest',
-  themeColor: '#16213e',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

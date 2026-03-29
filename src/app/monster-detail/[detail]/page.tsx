@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import MonsterDetailContent from '@/features/siege/components/MonsterDetailContent';
-import { getMonsterInfoData, getMonsterListData } from '@/shared/lib/api/server';
+import { getDevilmonImageUrlForSearch, getMonsterInfoData, getMonsterListData } from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 import { getRenderableImageUrl } from '@/shared/utils/image';
@@ -79,7 +79,11 @@ export default async function MonsterDetailPage({
   params,
 }: MonsterDetailPageProps) {
   const { detail } = await params;
-  const monsterInfo = await getMonsterInfoData(detail);
+  const [monsterInfo, devilmonImageUrl, monsterList] = await Promise.all([
+    getMonsterInfoData(detail),
+    getDevilmonImageUrlForSearch(),
+    getMonsterListData(),
+  ]);
 
   if (!monsterInfo) {
     notFound();
@@ -116,7 +120,7 @@ export default async function MonsterDetailPage({
   return (
     <>
       <JsonLd data={[jsonLd, breadcrumbJsonLd]} />
-      <MonsterDetailContent monsterInfo={monsterInfo} />
+      <MonsterDetailContent monsterInfo={monsterInfo} devilmonImageUrl={devilmonImageUrl} />
     </>
   );
 }

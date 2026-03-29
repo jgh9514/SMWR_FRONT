@@ -28,10 +28,14 @@ export type MonsterOption = {
   com2us_id?: number;
   awakens_from_id?: number;
   awakens_to_id?: number;
+  /** 같은 패밀리(다른 속성) 묶음용 */
+  family_id?: number;
+  /** monster-list 응답 — 획득 불가 제외용(캐시/구버전 대비) */
+  obtainable?: boolean;
 };
 
-const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v6';
-const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v8';
+const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60; // 1일
 
 type MonsterListCachePayload = {
   v: 2;
@@ -134,6 +138,25 @@ export const useEnemyTeamListSuspense = (params: SiegeSearchParams & { paging?: 
     // 페이지네이션/조건 변경 시 이전 데이터 유지 -> Suspense로 매번 화면이 날아가는 걸 방지
     placeholderData: (previousData) => previousData,
   });
+};
+
+/** 방덱 수동 등록(siege_defense_deck_manual) — 전투 집계 없이 목록 노출 */
+export type RegisterSiegeDefenseDeckManualPayload = {
+  def_monster_1: string;
+  def_monster_2: string;
+  def_monster_3: string;
+  season_yyyymm?: string;
+};
+
+export const useRegisterSiegeDefenseDeckManual = (
+  options?: Parameters<
+    typeof useApiPostMutation<string, RegisterSiegeDefenseDeckManualPayload>
+  >[1],
+) => {
+  return useApiPostMutation<string, RegisterSiegeDefenseDeckManualPayload>(
+    '/summonerswar/siege-defense-deck-manual',
+    options,
+  );
 };
 
 /**

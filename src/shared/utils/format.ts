@@ -64,36 +64,44 @@ export function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
+/** 해당 월의 n번째 목요일 기준 일 수 오프셋 (목=0) */
+const SIEGE_DAY_CODE_OFFSET_FROM_THURSDAY: Record<string, number> = {
+  '01': -3, // 월 — 일반(레토 길드 1차 등)
+  '02': -2, // 화 — 1대1 스페셜매치
+  '03': 0, // 목 — 일반 목요일 (match_id 9~10번이 03인 경우)
+  '04': 1, // 금 — 1대1 스페셜매치
+};
+
 /**
  * 점령전 ID에서 날짜 계산
- * 점령전 ID 형식: YYYYMMWWDDXXXXXX
+ * 형식: YYYYMMWWDDXXXXXX
  * - YYYY: 년도 (4자리)
  * - MM: 월 (2자리)
- * - WW: 주차 (2자리, 해당 월의 n번째 목요일이 속한 주를 n주차로 취급)
- * - DD: 요일 코드 (01=해당 주의 월요일, 02=해당 주의 목요일)
- * - XXXXXX: 점령전 ID (나머지)
- * 
+ * - WW: 주차 (2자리, 해당 월의 n번째 목요일이 속한 주)
+ * - DD: 요일 코드 — 01=월, 02=화(1대1 스페셜), 03=목(일반), 04=금(1대1 스페셜)
+ * - XXXXXX: 나머지
+ *
+ * 구 match_id가 02=목이던 데이터는 03=목으로 바뀌는 전제가 있으면 그에 맞고,
+ * 여전히 02=목만 쓰는 ID는 날짜가 어긋날 수 있음(서버 규칙과 동기화 필요).
+ *
  * @param siegeId - 점령전 ID 문자열 (예: "2025120102000016")
  * @returns 날짜 문자열 (예: "2025-12-04") 또는 빈 문자열
  */
 export function parseSiegeDate(siegeId: string): string {
   if (!siegeId || siegeId.length < 10) return '';
-  
+
+  const dayCode = siegeId.substring(8, 10);
+  const dayOffsetFromThursday = SIEGE_DAY_CODE_OFFSET_FROM_THURSDAY[dayCode];
+  if (dayOffsetFromThursday === undefined) return '';
+
   try {
     const year = parseInt(siegeId.substring(0, 4), 10);
     const month = parseInt(siegeId.substring(4, 6), 10);
     const week = parseInt(siegeId.substring(6, 8), 10);
-    const dayCode = siegeId.substring(8, 10);
-    
+
     if (isNaN(year) || isNaN(month) || isNaN(week) || month < 1 || month > 12 || week < 1 || week > 6) {
       return '';
     }
-
-    // week(WW)는 "그 달의 n번째 목요일(02)"을 기준으로 잡는다.
-    // dayCode가 01이면 그 목요일이 속한 주의 월요일(목-3일), 02이면 목요일 그대로.
-    const targetIsThursday = dayCode === '02';
-    const targetIsMonday = dayCode === '01';
-    if (!targetIsThursday && !targetIsMonday) return '';
 
     const lastDayOfMonth = new Date(year, month, 0).getDate();
 
@@ -112,8 +120,6 @@ export function parseSiegeDate(siegeId: string): string {
 
     if (nthThursdayDate == null) return '';
 
-    const dayOffsetFromThursday = targetIsThursday ? 0 : -3; // 월요일은 목요일 기준 -3일
-
     const date = new Date(year, month - 1, nthThursdayDate + dayOffsetFromThursday);
 
     return formatDate(date, 'YYYY-MM-DD');
@@ -127,13 +133,34 @@ export function parseSiegeDate(siegeId: string): string {
  * @param siegeId - 점령전 ID 문자열
  * @returns 날짜와 요일 라벨 (예: "2025-12-04 (목)") 또는 빈 문자열
  */
+const SIEGE_DAY_CODE_LABEL: Record<string, string> = {
+  '01': '월',
+  '02': '화',
+  '03': '목',
+  '04': '금',
+};
+
 export function formatSiegeDateLabel(siegeId: string): string {
   const date = parseSiegeDate(siegeId);
   if (!date) return '';
-  
+
   const dayCode = siegeId.substring(8, 10);
-  const dayLabel = dayCode === '01' ? '월' : dayCode === '02' ? '목' : '';
-  
+  let dayLabel = SIEGE_DAY_CODE_LABEL[dayCode] ?? '';
+
+  if (!dayLabel) {
+    const parts = date.split('-');
+    if (parts.length === 3) {
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const d = parseInt(parts[2], 10);
+      if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+        const dow = new Date(y, m - 1, d).getDay();
+        const labels = ['일', '월', '화', '수', '목', '금', '토'];
+        dayLabel = labels[dow] ?? '';
+      }
+    }
+  }
+
   return dayLabel ? `${date} (${dayLabel})` : date;
 }
 

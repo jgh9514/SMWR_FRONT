@@ -204,7 +204,8 @@ export interface GuildMember {
  * 길드 가입 신청 정보 (길드에 가입 신청)
  */
 export interface GuildJoinApplication {
-  application_id?: string;
+  /** JSON 직렬화 시 숫자로 올 수 있음 (PK bigint 등) */
+  application_id?: string | number;
   user_id?: string;
   user_name?: string;
   user_nm?: string;

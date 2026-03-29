@@ -9,6 +9,8 @@ export type NotificationType =
   | 'GUILD_MEMBER_JOINED'      // 길드원 가입
   | 'GUILD_MEMBER_LEFT'         // 길드원 탈퇴
   | 'GUILD_APPLICATION_PENDING' // 길드 신청 대기 (관리자용)
+  | 'GUILD_JOIN_APPLICATION_PENDING' // 길드 가입 신청 접수 (길드장/매니저)
+  | 'GUILD_JOIN_APPLICATION_APPROVED' // 길드 가입 승인 (신청자)
   | 'INQUIRY_PENDING'            // 1대1 문의 대기 (관리자용)
   | 'INQUIRY_ANSWERED'           // 1대1 문의 답변 완료
   | 'NOTICE_NEW'                 // 새 공지사항

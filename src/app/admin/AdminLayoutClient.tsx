@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Box, Skeleton, Alert } from '@mui/material';
 import { getAuthTokenFromCookie } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
@@ -18,7 +18,6 @@ export default function AdminLayoutClient({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [isChecking, setIsChecking] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
 
@@ -34,8 +33,7 @@ export default function AdminLayoutClient({
         if (!token) {
           const storedUserInfo = localStorage.getItem('userInfo');
           if (!storedUserInfo) {
-            const returnUrl = encodeURIComponent(pathname);
-            router.push(`/login?returnUrl=${returnUrl}`);
+            router.push('/login');
             return;
           }
         }
@@ -80,7 +78,7 @@ export default function AdminLayoutClient({
     };
 
     void checkAuthAndRole();
-  }, [router, pathname]);
+  }, [router]);
 
   if (isChecking) {
     return (
