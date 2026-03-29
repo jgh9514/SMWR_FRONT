@@ -138,7 +138,7 @@ function isAttr(e: string): e is AttributeType {
 /** WAS는 snake_case, 일부 게이트웨이/직렬화는 camelCase일 수 있음 */
 function detailContextFrom(info: MonsterInfoResponse): MonsterDetailContextPayload | null | undefined {
   if (info.detail_context) return info.detail_context;
-  const alt = (info as Record<string, unknown>).detailContext;
+  const alt = (info as unknown as Record<string, unknown>)['detailContext'];
   return (alt as MonsterDetailContextPayload | undefined) ?? undefined;
 }
 
@@ -791,7 +791,7 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
               {leader_skill_description || skillsSortedBySlot.length > 0 ? (
                 <Grid container spacing={2}>
                   {leader_skill_description ? (
-                    <Grid item xs={12} sm={6} md={3}>
+                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
                       <Box
                         sx={{
                           display: 'flex',
@@ -829,7 +829,7 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
                   {skillsSortedBySlot.map((skill: MonsterSkill) => {
                     const levelLines = parseSkillLevelLines(skill.level_progress_description);
                     return (
-                      <Grid item xs={12} sm={6} md={3} key={skill.skill_id}>
+                      <Grid size={{ xs: 12, sm: 6, md: 3 }} key={skill.skill_id}>
                         <Box
                           sx={{
                             display: 'flex',
