@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import GetAppIcon from '@mui/icons-material/GetApp';
 import LanguageIcon from '@mui/icons-material/Language';
+import { useResponsive } from '@/shared/hooks/useResponsive';
 
 /** 이번 브라우저 세션(탭 닫으면 초기화) — "웹으로 보기" 등 */
 const SESSION_DISMISS_KEY = 'smwr-pwa-banner-dismissed-v2';
@@ -24,6 +25,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function AddToHomeScreenBanner() {
+  const { isMobile } = useResponsive();
   const [open, setOpen] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -31,6 +33,11 @@ export default function AddToHomeScreenBanner() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    /** 데스크톱·넓은 창에서는 홈 화면 추가 UX가 어색해 모바일 뷰포트에서만 노출 */
+    if (!isMobile) {
+      setOpen(false);
+      return;
+    }
     if (window.matchMedia('(display-mode: standalone)').matches) return;
     if ((window.navigator as { standalone?: boolean }).standalone) return;
     try {
@@ -42,37 +49,23 @@ export default function AddToHomeScreenBanner() {
 
     const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    const uaMobile =
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ios;
-    /** 좁은 뷰포트(태블릿·폴드·데스크톱 좁은 창)도 UA 없이 표시 */
-    const narrow =
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(max-width: 768px)').matches;
-    const mobile = uaMobile || narrow;
     setIsIOS(ios);
 
-    if (!mobile) return;
+    /** iOS: Safari 등에서 "홈 화면에 추가"로 설치 가능한 환경만 (별도 beforeinstallprompt 없음) */
+    if (ios) {
+      setOpen(true);
+      return;
+    }
 
+    /** Chromium 계열: PWA 설치 조건을 만족해 beforeinstallprompt 가 실제로 올 때만 표시 */
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setOpen(true);
     };
     window.addEventListener('beforeinstallprompt', handler);
-
-    if (ios) {
-      setOpen(true);
-    } else {
-      // Android 등: SW/설치 조건 미충족 시 beforeinstallprompt 가 영원히 안 옴 → 그래도 선택 팝업은 띄움
-      const t = window.setTimeout(() => setOpen(true), 500);
-      return () => {
-        clearTimeout(t);
-        window.removeEventListener('beforeinstallprompt', handler);
-      };
-    }
-
     return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
+  }, [isMobile]);
 
   const handleApp = async () => {
     if (deferredPrompt) {

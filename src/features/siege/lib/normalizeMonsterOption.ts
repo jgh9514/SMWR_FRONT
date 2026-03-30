@@ -70,10 +70,24 @@ function rawRowAllowedForMonsterList(row: Record<string, unknown>): boolean {
   return true;
 }
 
-export function normalizeMonsterList(rows: unknown): MonsterOption[] {
+/** DB/관리자 값은 Normal / Awakened 등 — 점령전 검색은 각성 행만 쓰기 위해 필터 */
+function rawRowIsAwakenedMonster(row: Record<string, unknown>): boolean {
+  const a = row.arousal_type ?? row.arousalType;
+  if (a === undefined || a === null || a === '') return false;
+  return String(a).trim().toLowerCase() === 'awakened';
+}
+
+export type NormalizeMonsterListOptions = {
+  /** true면 각성(Awakened) 행만 — 점령전 검색/덱 등 */
+  awakenedOnly?: boolean;
+};
+
+export function normalizeMonsterList(rows: unknown, options?: NormalizeMonsterListOptions): MonsterOption[] {
   if (!Array.isArray(rows)) return [];
+  const awakenedOnly = options?.awakenedOnly === true;
   return rows
     .filter((r) => rawRowAllowedForMonsterList(r as Record<string, unknown>))
+    .filter((r) => !awakenedOnly || rawRowIsAwakenedMonster(r as Record<string, unknown>))
     .map((r) => normalizeMonsterOption(r as Record<string, unknown>))
     .filter((m) => m.obtainable !== false);
 }

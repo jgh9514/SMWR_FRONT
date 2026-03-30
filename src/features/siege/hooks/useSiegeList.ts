@@ -34,7 +34,7 @@ export type MonsterOption = {
   obtainable?: boolean;
 };
 
-const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v8';
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v9';
 const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60; // 1일
 
 type MonsterListCachePayload = {
@@ -79,7 +79,7 @@ export const useMonsterList = (params: Record<string, unknown> = {}) => {
     enabled: !(isCacheable && cacheSnapshot?.isFresh),
     initialData: isCacheable ? cacheSnapshot?.data : undefined,
     placeholderData: isCacheable ? cacheSnapshot?.data : undefined,
-    select: (data) => normalizeMonsterList(data),
+    select: (data) => normalizeMonsterList(data, { awakenedOnly: true }),
     staleTime: 30 * 60 * 1000, // 30분 (몬스터 목록은 자주 변경되지 않음)
     gcTime: 60 * 60 * 1000, // 1시간
     refetchOnWindowFocus: false,
