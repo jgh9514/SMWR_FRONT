@@ -34,7 +34,7 @@ export type MonsterOption = {
   obtainable?: boolean;
 };
 
-const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v11';
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v12';
 const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60; // 1일
 
 type MonsterListCachePayload = {
@@ -70,9 +70,14 @@ function writeMonsterListCache(data: MonsterOption[]) {
 /**
  * 몬스터 목록 조회
  */
-export const useMonsterList = (params: Record<string, unknown> = {}) => {
-  // monster-list는 사실상 고정 데이터라 (params가 비어있을 때) localStorage TTL 캐시를 사용
-  const isCacheable = params && Object.keys(params).length === 0;
+/** 점령전 전용: WAS에서 1각 제외(2각 존재 시). 키만 있으면 캐시 비활성화되므로 상수로 고정 */
+export const MONSTER_LIST_SIEGE_PARAMS: Record<string, unknown> = {
+  siegeDedupeSecondAwakening: true,
+};
+
+export const useMonsterList = (params: Record<string, unknown> = MONSTER_LIST_SIEGE_PARAMS) => {
+  // monster-list는 고정 데이터에 가깝고, siegeDedupeSecondAwakening 일 때만 로컬 TTL 캐시(빈 body로 호출하면 캐시·SQL 모두 비권장)
+  const isCacheable = params?.siegeDedupeSecondAwakening === true;
   const [cacheSnapshot] = useState(() => (isCacheable ? readMonsterListCache() : null));
 
   const q = useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, {
