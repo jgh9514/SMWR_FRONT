@@ -183,7 +183,7 @@ type ElementFilter = 'all' | AttributeType;
 type StarFilter = 'all' | (typeof STAR_FILTERS)[number];
 type ArchetypeFilter = 'all' | (typeof ARCHETYPE_FILTERS)[number];
 
-type SortKey = 'star' | 'monster' | 'awakened' | 'second' | 'essence' | 'skill';
+type SortKey = 'monsterId' | 'star' | 'monster' | 'awakened' | 'second' | 'essence' | 'skill';
 
 interface MonsterSearchClientProps {
   monsterList: MonsterOption[];
@@ -360,7 +360,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
   const [archetypeFilter, setArchetypeFilter] = useState<ArchetypeFilter>('all');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>('star');
+  const [sortKey, setSortKey] = useState<SortKey>('monsterId');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
 
@@ -449,6 +449,13 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
       const sb = rb.secondAwakening;
       let cmp = 0;
       switch (sortKey) {
+        case 'monsterId':
+          cmp = (primaryMonster(ra)?.monster_id ?? '').localeCompare(
+            primaryMonster(rb)?.monster_id ?? '',
+            undefined,
+            { numeric: true, sensitivity: 'base' },
+          );
+          break;
         case 'star':
           cmp = (primaryMonster(ra)?.star ?? -1) - (primaryMonster(rb)?.star ?? -1);
           break;
@@ -471,7 +478,9 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
           cmp = 0;
       }
       if (cmp !== 0) return cmp * dir;
-      return ra.key.localeCompare(rb.key);
+      const ida = primaryMonster(ra)?.monster_id ?? '';
+      const idb = primaryMonster(rb)?.monster_id ?? '';
+      return ida.localeCompare(idb, undefined, { numeric: true, sensitivity: 'base' }) * dir;
     });
     return rows;
   }, [filteredPairs, sortKey, sortDir]);
@@ -829,10 +838,16 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                   <Table
                     size="small"
                     stickyHeader
-                    sx={{ minWidth: 1092, tableLayout: 'fixed' }}
+                    sx={{ minWidth: 1164, tableLayout: 'fixed' }}
                   >
                     <TableHead>
                       <TableRow>
+                        <TableCell
+                          sx={{ fontWeight: 700, cursor: 'pointer', width: 72, minWidth: 72, maxWidth: 72 }}
+                          onClick={() => handleSort('monsterId')}
+                        >
+                          ID{sortIndicator('monsterId')}
+                        </TableCell>
                         <TableCell
                           sx={{ fontWeight: 700, cursor: 'pointer', ...starGradeColumnSx }}
                           onClick={() => handleSort('star')}
@@ -866,6 +881,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                     <TableBody>
                       {pagedPairs.map((row) => {
                         const star = getStarCount(primaryMonster(row));
+                        const pid = primaryMonster(row)?.monster_id;
                         return (
                           <TableRow
                             key={row.key}
@@ -873,6 +889,11 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                             className="searchable"
                             sx={{ '&:last-child td': { border: 0 } }}
                           >
+                            <TableCell sx={{ verticalAlign: 'middle', width: 72, minWidth: 72, maxWidth: 72 }}>
+                              <Typography variant="caption" color="text.secondary" noWrap title={pid}>
+                                {pid ?? '—'}
+                              </Typography>
+                            </TableCell>
                             <TableCell sx={starGradeColumnSx}>
                               <RatingPill star={star} />
                             </TableCell>

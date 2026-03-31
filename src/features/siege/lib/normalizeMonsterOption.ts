@@ -134,6 +134,10 @@ export type NormalizeMonsterListOptions = {
   awakenedOnly?: boolean;
 };
 
+function sortByMonsterId(a: MonsterOption, b: MonsterOption): number {
+  return a.monster_id.localeCompare(b.monster_id, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 export function normalizeMonsterList(rows: unknown, options?: NormalizeMonsterListOptions): MonsterOption[] {
   if (!Array.isArray(rows)) return [];
   const awakenedOnly = options?.awakenedOnly === true;
@@ -144,5 +148,9 @@ export function normalizeMonsterList(rows: unknown, options?: NormalizeMonsterLi
   if (awakenedOnly) {
     list = filterPreferSecondAwakeningRows(list);
   }
-  return list.map((r) => normalizeMonsterOption(r)).filter((m) => m.obtainable !== false);
+  const mapped = list.map((r) => normalizeMonsterOption(r)).filter((m) => m.obtainable !== false);
+  if (awakenedOnly) {
+    mapped.sort(sortByMonsterId);
+  }
+  return mapped;
 }

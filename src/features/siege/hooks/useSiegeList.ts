@@ -34,7 +34,7 @@ export type MonsterOption = {
   obtainable?: boolean;
 };
 
-const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v12';
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v13';
 const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60; // 1일
 
 type MonsterListCachePayload = {
