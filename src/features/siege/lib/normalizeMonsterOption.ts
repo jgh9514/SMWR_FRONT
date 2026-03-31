@@ -1,4 +1,5 @@
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
+import { monsterAwakenStepDigit, monsterEvolutionGroupKey } from '@/features/siege/lib/monsterIdEvolution';
 
 /**
  * WAS(MyBatis mapUnderscoreToCamelCase) + Jackson Map 직렬화로
@@ -72,9 +73,60 @@ function rawRowAllowedForMonsterList(row: Record<string, unknown>): boolean {
 
 /** DB/관리자 값은 Normal / Awakened 등 — 점령전 검색은 각성 행만 쓰기 위해 필터 */
 function rawRowIsAwakenedMonster(row: Record<string, unknown>): boolean {
+  const mid = String(row.monster_id ?? row.monsterId ?? '');
+  // 2각은 monster_id 자리로만 구분되는 경우가 있어 arousal 과 무관하게 포함
+  if (monsterAwakenStepDigit(mid) === 2) return true;
   const a = row.arousal_type ?? row.arousalType;
   if (a === undefined || a === null || a === '') return false;
   return String(a).trim().toLowerCase() === 'awakened';
+}
+
+/** 1각·2각은 monster_id 접두가 달라질 수 있어, 진화 그룹은 family_id + 속성으로 묶음 */
+function rawRowFamilyElementKey(row: Record<string, unknown>): string {
+  const fidRaw = row.family_id ?? row.familyId;
+  const elRaw = row.monster_elemental ?? row.monsterElemental;
+  const elNorm = elRaw != null && elRaw !== '' ? String(elRaw).trim().toLowerCase() : '';
+  if (fidRaw !== undefined && fidRaw !== null && fidRaw !== '') {
+    const fid = typeof fidRaw === 'number' ? fidRaw : Number(String(fidRaw).trim());
+    if (!Number.isNaN(fid)) {
+      return `f:${fid}|e:${elNorm}`;
+    }
+  }
+  const mid = String(row.monster_id ?? row.monsterId ?? '');
+  return `eid:${monsterEvolutionGroupKey(mid)}`;
+}
+
+/**
+ * 같은 패밀리·같은 속성에 2각(끝에서 두 번째 자리=2) 행이 있으면 1각 행은 제외하고 2각만 유지.
+ * 2각이 없는 몹은 1각만 남김.
+ */
+function filterPreferSecondAwakeningRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+  const byGroup = new Map<string, Record<string, unknown>[]>();
+  for (const r of rows) {
+    const key = rawRowFamilyElementKey(r);
+    let list = byGroup.get(key);
+    if (!list) {
+      list = [];
+      byGroup.set(key, list);
+    }
+    list.push(r);
+  }
+  const out: Record<string, unknown>[] = [];
+  for (const group of byGroup.values()) {
+    const hasSecond = group.some((r) => {
+      const mid = String(r.monster_id ?? r.monsterId ?? '');
+      return monsterAwakenStepDigit(mid) === 2;
+    });
+    if (hasSecond) {
+      for (const r of group) {
+        const mid = String(r.monster_id ?? r.monsterId ?? '');
+        if (monsterAwakenStepDigit(mid) === 2) out.push(r);
+      }
+    } else {
+      out.push(...group);
+    }
+  }
+  return out;
 }
 
 export type NormalizeMonsterListOptions = {
@@ -85,9 +137,12 @@ export type NormalizeMonsterListOptions = {
 export function normalizeMonsterList(rows: unknown, options?: NormalizeMonsterListOptions): MonsterOption[] {
   if (!Array.isArray(rows)) return [];
   const awakenedOnly = options?.awakenedOnly === true;
-  return rows
+  let list = rows
     .filter((r) => rawRowAllowedForMonsterList(r as Record<string, unknown>))
     .filter((r) => !awakenedOnly || rawRowIsAwakenedMonster(r as Record<string, unknown>))
-    .map((r) => normalizeMonsterOption(r as Record<string, unknown>))
-    .filter((m) => m.obtainable !== false);
+    .map((r) => r as Record<string, unknown>);
+  if (awakenedOnly) {
+    list = filterPreferSecondAwakeningRows(list);
+  }
+  return list.map((r) => normalizeMonsterOption(r)).filter((m) => m.obtainable !== false);
 }
