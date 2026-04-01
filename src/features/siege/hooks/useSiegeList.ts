@@ -194,3 +194,24 @@ export const useDeleteDeck = (
   return useApiPostMutation<{ result: string }, { deck_id: string }>('/summonerswar/deck-detail-delete', options);
 };
 
+export type DeckVoteType = 'UP' | 'DOWN' | 'CLEAR';
+
+export type DeckVotePayload = {
+  deck_id: string;
+  /** 현재 점령 상세에서 보고 있는 방덱(적 수비 3마리) — 공덱(deck_id)과 쌍으로 투표 구분 */
+  def_monster_1: string;
+  def_monster_2: string;
+  def_monster_3: string;
+  vote: DeckVoteType;
+};
+
+/**
+ * 공덱 추천/비추천 — 특정 방덱(def) + 특정 공덱(deck_id)당 사용자 1건
+ * 백엔드: POST /api/v1/summonerswar/deck-vote
+ */
+export const useDeckVoteMutation = (
+  options?: Parameters<typeof useApiPostMutation<{ result: string }, DeckVotePayload>>[1],
+) => {
+  return useApiPostMutation<{ result: string }, DeckVotePayload>('/summonerswar/deck-vote', options);
+};
+

@@ -24,7 +24,9 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImage';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useDeckDetail, useDeleteDeck, useApiPostMutation } from '@/hooks/api';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
+import { useDeckDetail, useDeleteDeck, useDeckVoteMutation, useApiPostMutation } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import MonsterDetailCard from '@/features/siege/components/MonsterDetailCard';
@@ -39,6 +41,32 @@ const createInitialDeckStats = (): DeckMonsterStats[] => [
   { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
   { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
 ];
+
+function pickDeckNumeric(r: DeckDetailRecord | null | undefined, ...keys: string[]): number {
+  if (!r) return 0;
+  for (const k of keys) {
+    const v = r[k];
+    if (v !== undefined && v !== null && v !== '') {
+      const n = Number(v);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return 0;
+}
+
+function pickDeckMyVote(r: DeckDetailRecord | null | undefined): string {
+  if (!r) return '';
+  const a = r.my_vote ?? r.myVote;
+  return a != null ? String(a).trim().toUpperCase() : '';
+}
+
+function pickDeckDefStr(r: DeckDetailRecord | null | undefined, snake: string, camel: string): string {
+  if (!r) return '';
+  const a = r[snake];
+  const b = r[camel];
+  const v = a !== undefined && a !== null && String(a) !== '' ? a : b;
+  return v != null && String(v) !== '' ? String(v) : '';
+}
 
 const normalizeStatValue = (value: unknown, defaultValue = 0): number => {
   if (value === null || value === undefined || value === '') {
@@ -89,6 +117,16 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const detailDataRecord = detailData as DeckDetailRecord | null | undefined;
 
   // 삭제 Mutation
+  const deckVoteMutation = useDeckVoteMutation({
+    onSuccess: () => {
+      showToast.success('투표가 반영되었습니다.');
+      refetch();
+    },
+    onError: () => {
+      showToast.error('투표 처리에 실패했습니다.');
+    },
+  });
+
   const deleteDeckMutation = useDeleteDeck({
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
@@ -560,6 +598,76 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                 );
               })}
             </Box>
+
+            {detailDataRecord?.deck_id != null && (
+              <Box
+                sx={{
+                  mb: 2,
+                  p: 1.5,
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  display: 'flex',
+                  flexDirection: { xs: 'column', sm: 'row' },
+                  alignItems: { xs: 'stretch', sm: 'center' },
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  이 방덱에 대한 이 공덱 추천이 도움이 되었나요?
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                  {(() => {
+                    const did = String(detailDataRecord.deck_id);
+                    const d1 = pickDeckDefStr(detailDataRecord, 'def_monster_1', 'defMonster1');
+                    const d2 = pickDeckDefStr(detailDataRecord, 'def_monster_2', 'defMonster2');
+                    const d3 = pickDeckDefStr(detailDataRecord, 'def_monster_3', 'defMonster3');
+                    const canVote = d1 !== '' && d2 !== '' && d3 !== '';
+                    const myV = pickDeckMyVote(detailDataRecord);
+                    const upN = pickDeckNumeric(detailDataRecord, 'recommend_count', 'recommendCount');
+                    const downN = pickDeckNumeric(detailDataRecord, 'not_recommend_count', 'notRecommendCount');
+                    const busy = deckVoteMutation.isPending;
+                    const send = (vote: 'UP' | 'DOWN' | 'CLEAR') => {
+                      deckVoteMutation.mutate({
+                        deck_id: did,
+                        def_monster_1: d1,
+                        def_monster_2: d2,
+                        def_monster_3: d3,
+                        vote,
+                      });
+                    };
+                    const onUp = () => send(myV === 'UP' ? 'CLEAR' : 'UP');
+                    const onDown = () => send(myV === 'DOWN' ? 'CLEAR' : 'DOWN');
+                    return (
+                      <>
+                        <Button
+                          size="small"
+                          variant={myV === 'UP' ? 'contained' : 'outlined'}
+                          color="primary"
+                          startIcon={<ThumbUpIcon />}
+                          onClick={onUp}
+                          disabled={busy || !canVote}
+                        >
+                          추천 {upN}
+                        </Button>
+                        <Button
+                          size="small"
+                          variant={myV === 'DOWN' ? 'contained' : 'outlined'}
+                          color="error"
+                          startIcon={<ThumbDownIcon />}
+                          onClick={onDown}
+                          disabled={busy || !canVote}
+                        >
+                          비추천 {downN}
+                        </Button>
+                      </>
+                    );
+                  })()}
+                </Box>
+              </Box>
+            )}
 
             {/* 선택된 몬스터 상세 정보 */}
             {selectedMonster ? (

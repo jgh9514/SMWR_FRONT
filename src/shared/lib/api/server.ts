@@ -13,7 +13,7 @@ import type { MonsterInfoResponse } from '@/features/siege/hooks/useMonsterInfo'
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import { DEVILMON_MONSTER_ID } from '@/features/siege/lib/devilmon';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
-import { getRenderableImageUrl } from '@/shared/utils/image';
+import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { ApiResponse } from './types';
 
 export const PUBLIC_REVALIDATE_SECONDS = {
@@ -142,14 +142,14 @@ export async function getMonsterInfoData(monsterId: string): Promise<MonsterInfo
   }
 }
 
-/** 몬스터 목록에 없어도 `/monster/info`로 데빌몬 아이콘 URL 확보 (monster-search 등) */
+/** 몬스터 목록에 없어도 `/monster/info`로 데빌몬 아이콘 URL 확보 — DB `image_url` → CloudFront(S3)와 동일하게 해석 */
 export async function getDevilmonImageUrlForSearch(): Promise<string> {
   const info = await getMonsterInfoData(DEVILMON_MONSTER_ID);
   const url = info?.image_url;
   if (url != null && String(url).trim() !== '') {
-    return getRenderableImageUrl(url);
+    return getMonsterImageUrl(url);
   }
-  return '/images/default-monster.png';
+  return getMonsterImageUrl('/images/default-monster.png');
 }
 
 export async function getRtaMonsterStatsData(
