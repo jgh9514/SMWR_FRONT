@@ -21,6 +21,7 @@ import {
   InputAdornment,
   Button,
   Pagination,
+  CircularProgress,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -33,6 +34,8 @@ import { getRenderableImageUrl } from '@/shared/utils/image';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import type { AttributeType } from '@/features/siege/types/monster';
 import { monsterAwakenStepDigit, monsterEvolutionGroupKey } from '@/features/siege/lib/monsterIdEvolution';
+import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
+import { apiClient } from '@/shared/lib/api/client';
 
 const attributeIcons: Record<AttributeType, string> = {
   fire: '/images/Fire_Icon.png',
@@ -363,9 +366,43 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
   const [sortKey, setSortKey] = useState<SortKey>('monsterId');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
+  /** SSR에서 API 실패·빈 캐시 시 브라우저에서 동일 API로 재시도 */
+  const [clientMonsterList, setClientMonsterList] = useState<MonsterOption[] | undefined>(undefined);
+  const [clientFetchError, setClientFetchError] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  useEffect(() => {
+    if (monsterList.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await apiClient.post<unknown[]>('/summonerswar/monster-list', {});
+        const normalized = normalizeMonsterList(raw);
+        if (!cancelled) {
+          setClientFetchError(false);
+          setClientMonsterList(normalized);
+        }
+      } catch {
+        if (!cancelled) {
+          setClientFetchError(true);
+          setClientMonsterList([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [monsterList.length]);
+
+  const effectiveMonsterList = useMemo(() => {
+    if (monsterList.length > 0) return monsterList;
+    if (clientMonsterList !== undefined) return clientMonsterList;
+    return [];
+  }, [monsterList, clientMonsterList]);
+
+  const isMonsterListLoading = monsterList.length === 0 && clientMonsterList === undefined && !clientFetchError;
 
   const activeFilterCount =
     (elementFilter !== 'all' ? 1 : 0) +
@@ -386,7 +423,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
     setArchetypeFilter('all');
   };
 
-  const pairs = useMemo(() => buildMonsterPairs(monsterList), [monsterList]);
+  const pairs = useMemo(() => buildMonsterPairs(effectiveMonsterList), [effectiveMonsterList]);
 
   const filteredPairs = useMemo(() => {
     const keyword = searchKeyword.toLowerCase().trim();
@@ -489,11 +526,15 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
   const totalPages = Math.max(1, Math.ceil(totalPairCount / MONSTER_SEARCH_PAGE_SIZE));
 
   useEffect(() => {
-    setPage(1);
+    queueMicrotask(() => {
+      setPage(1);
+    });
   }, [searchKeyword, elementFilter, starFilter, archetypeFilter]);
 
   useEffect(() => {
-    setPage((p) => Math.min(p, totalPages));
+    queueMicrotask(() => {
+      setPage((p) => Math.min(p, totalPages));
+    });
   }, [totalPages]);
 
   const pagedPairs = useMemo(() => {
@@ -802,15 +843,24 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
               )}
             </Box>
 
-            {sortedPairs.length === 0 ? (
+            {isMonsterListLoading ? (
+              <Box sx={{ textAlign: 'center', py: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                <CircularProgress size={36} />
+                <Typography variant="body2" color="text.secondary">
+                  몬스터 목록을 불러오는 중입니다…
+                </Typography>
+              </Box>
+            ) : sortedPairs.length === 0 ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
                 <Typography variant="body2" color="text.secondary">
-                  {searchKeyword ||
-                  elementFilter !== 'all' ||
-                  starFilter !== 'all' ||
-                  archetypeFilter !== 'all'
-                    ? '조건에 맞는 몬스터가 없습니다.'
-                    : '몬스터가 없습니다.'}
+                  {clientFetchError && !searchKeyword && elementFilter === 'all' && starFilter === 'all' && archetypeFilter === 'all'
+                    ? '몬스터 목록을 불러오지 못했습니다. 백엔드 서버 실행 여부와 NEXT_PUBLIC_API_BASE_URL 설정을 확인해 주세요.'
+                    : searchKeyword ||
+                        elementFilter !== 'all' ||
+                        starFilter !== 'all' ||
+                        archetypeFilter !== 'all'
+                      ? '조건에 맞는 몬스터가 없습니다.'
+                      : '몬스터가 없습니다.'}
                 </Typography>
               </Box>
             ) : (

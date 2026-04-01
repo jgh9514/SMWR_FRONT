@@ -63,8 +63,13 @@ export function normalizeMonsterOption(row: Record<string, unknown>): MonsterOpt
  */
 function rawRowAllowedForMonsterList(row: Record<string, unknown>): boolean {
   const usg = row.usg_yn ?? row.usgYn;
-  if (usg !== undefined && usg !== null && String(usg).trim().toUpperCase() !== 'Y') {
-    return false;
+  if (usg !== undefined && usg !== null && String(usg).trim() !== '') {
+    const s = String(usg).trim().toUpperCase();
+    // WAS/SQL은 Y만 쓰지만, 직렬화·캐시에 따라 값 형태가 달라질 수 있음.
+    // 'Y'가 아닌 모든 값을 배제하면(예: 숫자 1) 목록 전체가 비는 경우가 있어, 명시적 비활성만 제외.
+    if (s === 'N' || s === 'NO' || s === 'F' || s === 'FALSE' || s === '0') {
+      return false;
+    }
   }
   const ob = row.obtainable;
   if (ob === false || ob === 'false' || ob === 'f' || ob === 0) return false;
