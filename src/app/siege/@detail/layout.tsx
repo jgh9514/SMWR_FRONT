@@ -24,7 +24,11 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
   }, [hasContent]);
 
   const close = () => {
-    router.back();
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push('/siege');
   };
 
   if (!hasContent) return null;

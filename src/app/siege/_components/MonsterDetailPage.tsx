@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useSyncExternalStore } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -75,6 +75,7 @@ function HistorySkeleton() {
 
 export default function MonsterDetailPage() {
   const params = useParams();
+  const pathname = usePathname();
   const router = useRouter();
   const theme = useTheme();
   const isClient = useSyncExternalStore(
@@ -86,8 +87,21 @@ export default function MonsterDetailPage() {
   const mobile = isClient ? mobileQuery : false;
   const detailParam = useMemo(() => {
     const rawDetail = params?.detail;
-    return Array.isArray(rawDetail) ? rawDetail[0] : rawDetail;
-  }, [params]);
+    const fromParams = Array.isArray(rawDetail) ? rawDetail[0] : rawDetail;
+    if (typeof fromParams === 'string' && fromParams.trim()) {
+      return fromParams.trim();
+    }
+    // 병렬 라우트 새로고침 등에서 params.detail 이 비는 경우 URL에서 복구
+    const m = pathname?.match(/\/siege\/siege-detail\/([^/?#]+)/);
+    if (m?.[1]) {
+      try {
+        return decodeURIComponent(m[1]);
+      } catch {
+        return m[1];
+      }
+    }
+    return undefined;
+  }, [params, pathname]);
   const parsedDetail = useMemo(() => {
     if (!detailParam) {
       return {

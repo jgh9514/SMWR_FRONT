@@ -17,6 +17,7 @@ import {
   AccordionSummary,
   AccordionDetails,
   TextField,
+  useTheme,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import BrokenImageIcon from '@mui/icons-material/BrokenImage';
@@ -55,6 +56,7 @@ interface DeckDetailPopupProps {
 }
 
 export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem }: DeckDetailPopupProps) {
+  const theme = useTheme();
   const [lastSelectedItem, setLastSelectedItem] = useState<RecommendedItem | null>(null);
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
   const [selectedMonsterIndex, setSelectedMonsterIndex] = useState(0);
@@ -69,14 +71,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     
     // deck_id를 우선 사용하고, 없으면 team_id 사용
     const deckId = lastSelectedItem.deck_id || lastSelectedItem.team_id;
-    if (!deckId) {
-      console.warn('DeckDetailPopup: deck_id와 team_id가 모두 없습니다.', lastSelectedItem);
-      return null;
-    }
+    if (!deckId) return null;
     
-    const params = { deck_id: String(deckId) };
-    console.log('DeckDetailPopup: API 파라미터:', params);
-    return params;
+    return { deck_id: String(deckId) };
   }, [lastSelectedItem]);
 
   const {
@@ -85,16 +82,6 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     error: queryError,
     refetch,
   } = useDeckDetail(deckParams);
-
-  // 디버깅: API 응답 확인
-  useEffect(() => {
-    if (detailData) {
-      console.log('DeckDetailPopup: API 응답 데이터:', detailData);
-    }
-    if (queryError) {
-      console.error('DeckDetailPopup: API 에러:', queryError);
-    }
-  }, [detailData, queryError]);
 
   const error = queryError ? (queryError instanceof Error ? queryError.message : '데이터를 불러오는데 실패했습니다.') : null;
 
@@ -384,92 +371,73 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   }, [detailDataRecord, extractStatsFromDetail, isEditing]);
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
       fullWidth
       sx={{
-        zIndex: (theme) => theme.zIndex.modal + 1, // 헤더보다 높은 z-index
+        zIndex: (t) => t.zIndex.modal + 1,
       }}
       PaperProps={{
         sx: {
-          borderRadius: 3,
-          boxShadow: 24,
-          margin: { xs: 2, sm: 4 }, // 상단 여백 추가
-          maxHeight: { xs: 'calc(100vh - 32px)', sm: 'calc(100vh - 64px)' }, // 헤더 높이 고려
+          borderRadius: 2,
+          overflow: 'hidden',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: theme.shadows[8],
+          m: { xs: 2, sm: 3 },
+          maxHeight: { xs: 'calc(100vh - 32px)', sm: 'calc(100vh - 64px)' },
         },
       }}
     >
       <DialogTitle
         sx={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          px: 3,
-          py: 2,
-          flexShrink: 0,
+          justifyContent: 'space-between',
+          gap: 1,
+          px: 2,
+          py: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
         }}
       >
-        <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
-          공덱 상세정보
+        <Typography variant="subtitle1" component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
+          공덱 상세
         </Typography>
         <IconButton
           onClick={handleClose}
-          sx={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            color: 'white',
-            '&:hover': { 
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-            },
-          }}
           size="small"
+          aria-label="닫기"
+          sx={{
+            color: 'text.secondary',
+            '&:hover': { bgcolor: 'action.hover' },
+          }}
         >
-          <CloseIcon />
+          <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
-      <DialogContent 
-        sx={{ 
-          p: { xs: 2, sm: 3 }, 
-          pt: { xs: 3, sm: 4 },
-          pb: { xs: 2, sm: 3 },
-          maxHeight: { xs: 'calc(100vh - 200px)', sm: 'calc(100vh - 240px)' }, // DialogTitle과 DialogActions 높이 고려
+      <DialogContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          bgcolor: 'grey.50',
+          maxHeight: { xs: 'calc(100vh - 200px)', sm: 'calc(100vh - 240px)' },
           overflowY: 'auto',
           overflowX: 'hidden',
-          position: 'relative',
-          '& > *:first-of-type': {
-            mt: 0, // 첫 번째 요소의 margin-top 제거
-          },
-          '&::-webkit-scrollbar': {
-            width: '8px',
-          },
-          '&::-webkit-scrollbar-track': {
-            background: 'transparent',
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: 'rgba(0,0,0,0.2)',
-            borderRadius: '4px',
-            '&:hover': {
-              background: 'rgba(0,0,0,0.3)',
-            },
-          },
+          '& > *:first-of-type': { mt: 0 },
         }}
       >
         {loading && (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 8 }}>
-            <Skeleton variant="circular" width={64} height={64} />
-            <Box sx={{ width: 240, mt: 3 }}>
-              <Skeleton variant="text" height={24} />
-              <Skeleton variant="text" height={24} />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, py: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5 }}>
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} variant="rounded" width={88} height={88} sx={{ borderRadius: 1.5 }} />
+              ))}
             </Box>
+            <Skeleton variant="rounded" height={180} sx={{ borderRadius: 1.5 }} />
           </Box>
         )}
 
@@ -490,124 +458,107 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
 
         {!loading && !error && detailDataRecord && hasValidData && !isEditing && (
           <Box>
-            {/* 공덱 구성 이미지 */}
-            <Box 
-              sx={{ 
-                mb: 4, 
-                display: 'flex', 
-                justifyContent: 'center', 
+            <Box
+              sx={{
+                mb: 2,
+                p: 1.5,
+                borderRadius: 2,
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                display: 'flex',
+                justifyContent: 'center',
                 alignItems: 'center',
-                gap: { xs: 1.5, sm: 2 },
+                gap: { xs: 1.25, sm: 1.75 },
                 flexWrap: 'wrap',
               }}
             >
-              {monsterImageUrls.map((imageUrl, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    position: 'relative',
-                    transform: index === selectedMonsterIndex ? 'scale(1.05)' : 'scale(1)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      transform: index === selectedMonsterIndex ? 'scale(1.05)' : 'scale(1.02)',
-                    },
-                  }}
-                  onClick={() => selectMonster(index)}
-                >
-                  {imageUrl && !imageLoadErrors.has(imageUrl) ? (
-                    <Box
-                      sx={{
-                        position: 'relative',
-                        width: { xs: 80, sm: 100 },
-                        height: { xs: 80, sm: 100 },
-                        backgroundColor: '#574424',
-                        border: index === 0 
-                          ? { xs: '3px solid #d79f34', sm: '4px solid #d79f34' }
-                          : { xs: '3px solid #6d5424', sm: '4px solid #6d5424' },
-                        borderRadius: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        boxShadow: index === selectedMonsterIndex
-                          ? '0 4px 12px rgba(102, 126, 234, 0.3)'
-                          : '0 2px 4px rgba(0, 0, 0, 0.1)',
-                      }}
-                    >
-                      <Avatar
-                        src={imageUrl}
-                        alt={`몬스터 ${index + 1}`}
+              {monsterImageUrls.map((imageUrl, index) => {
+                const selected = index === selectedMonsterIndex;
+                return (
+                  <Box
+                    key={index}
+                    sx={{
+                      position: 'relative',
+                      cursor: 'pointer',
+                      transition: theme.transitions.create(['transform', 'box-shadow'], {
+                        duration: theme.transitions.duration.shorter,
+                      }),
+                      transform: selected ? 'scale(1.02)' : 'scale(1)',
+                      '&:hover': { transform: selected ? 'scale(1.02)' : 'scale(1.01)' },
+                    }}
+                    onClick={() => selectMonster(index)}
+                  >
+                    {imageUrl && !imageLoadErrors.has(imageUrl) ? (
+                      <Box
                         sx={{
-                          width: '100%',
-                          height: '100%',
-                          borderRadius: 0,
+                          position: 'relative',
+                          width: { xs: 76, sm: 92 },
+                          height: { xs: 76, sm: 92 },
+                          bgcolor: 'grey.200',
+                          borderRadius: 2,
+                          border: '2px solid',
+                          borderColor: selected ? 'primary.main' : 'grey.300',
+                          boxShadow: selected ? 3 : 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          overflow: 'hidden',
                         }}
-                        onError={() => handleImageError(imageUrl)}
-                      />
-                      {index === 0 && (
-                        <Chip
-                          label="Leader"
-                          size="small"
+                      >
+                        <Avatar
+                          src={imageUrl}
+                          alt={`몬스터 ${index + 1}`}
                           sx={{
-                            position: 'absolute',
-                            top: { xs: -6, sm: -8 },
-                            right: { xs: -6, sm: -8 },
-                            fontSize: { xs: '9px', sm: '10px' },
-                            height: { xs: 18, sm: 20 },
-                            minWidth: { xs: 18, sm: 'auto' },
-                            bgcolor: 'primary.main',
-                            color: 'white',
-                            fontWeight: 600,
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                            width: '100%',
+                            height: '100%',
+                            borderRadius: 0,
                           }}
+                          onError={() => handleImageError(imageUrl)}
                         />
-                      )}
-                    </Box>
-                  ) : (
-                    <Box
-                      sx={{
-                        width: { xs: 80, sm: 100 },
-                        height: { xs: 80, sm: 100 },
-                        backgroundColor: '#574424',
-                        border: { xs: '3px solid #6d5424', sm: '4px solid #6d5424' },
-                        borderRadius: 1.5,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 0.5,
-                      }}
-                    >
-                      <BrokenImageIcon sx={{ fontSize: { xs: 20, sm: 24 }, color: 'rgba(255,255,255,0.5)' }} />
-                      <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.7)' }}>
-                        없음
-                      </Typography>
-                    </Box>
-                  )}
-                  {index === selectedMonsterIndex && (
-                    <Box
-                      sx={{
-                        position: 'absolute',
-                        bottom: { xs: -28, sm: -32 },
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        bgcolor: 'primary.main',
-                        color: 'white',
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: 1,
-                        fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                        fontWeight: 600,
-                        boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      선택됨
-                    </Box>
-                  )}
-                </Box>
-              ))}
+                        {index === 0 && (
+                          <Chip
+                            label="L"
+                            size="small"
+                            color="primary"
+                            sx={{
+                              position: 'absolute',
+                              top: 6,
+                              left: 6,
+                              height: 22,
+                              minWidth: 22,
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              '& .MuiChip-label': { px: 0.75 },
+                            }}
+                          />
+                        )}
+                      </Box>
+                    ) : (
+                      <Box
+                        sx={{
+                          width: { xs: 76, sm: 92 },
+                          height: { xs: 76, sm: 92 },
+                          bgcolor: 'grey.200',
+                          borderRadius: 2,
+                          border: '2px dashed',
+                          borderColor: 'grey.400',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 0.5,
+                        }}
+                      >
+                        <BrokenImageIcon sx={{ fontSize: 22, color: 'grey.500' }} />
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                          없음
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
             </Box>
 
             {/* 선택된 몬스터 상세 정보 */}
@@ -615,14 +566,13 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
               <Box
                 onTouchStart={onTouchStart}
                 onTouchEnd={onTouchEnd}
-                sx={{ 
+                sx={{
                   touchAction: 'pan-y',
-                  mt: { xs: 4, sm: 5 },
-                  animation: 'fadeIn 0.3s ease-in',
-                  '@keyframes fadeIn': {
-                    from: { opacity: 0, transform: 'translateY(10px)' },
-                    to: { opacity: 1, transform: 'translateY(0)' },
-                  },
+                  p: { xs: 1.5, sm: 2 },
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
                 }}
               >
                 <MonsterDetailCard monster={selectedMonster} monsterIndex={selectedMonsterIndex + 1} />
@@ -659,7 +609,17 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                   onChange={(_, expanded) => {
                     setExpandedPanel((prev) => (expanded ? [...prev, index] : prev.filter((p) => p !== index)));
                   }}
-                  sx={{ mb: 1 }}
+                  disableGutters
+                  elevation={0}
+                  sx={{
+                    mb: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1.5,
+                    overflow: 'hidden',
+                    bgcolor: 'background.paper',
+                    '&:before': { display: 'none' },
+                  }}
                 >
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
@@ -727,88 +687,50 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         )}
       </DialogContent>
 
-      <DialogActions sx={{ 
-        p: { xs: 2, sm: 3 }, 
-        pt: 2.5,
-        borderTop: '1px solid', 
-        borderColor: 'divider',
-        gap: 1,
-      }}>
+      <DialogActions
+        sx={{
+          px: 2,
+          py: 1.5,
+          gap: 1,
+          flexWrap: 'wrap',
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+        }}
+      >
         {!isEditing && (
-          <Button 
-            color="error" 
-            variant="outlined" 
+          <Button
+            color="error"
+            variant="outlined"
             onClick={onDeleteClick}
             disabled={deleteDeckMutation.isPending}
-            sx={{ 
-              borderRadius: 2,
-              px: 3,
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: 'error.main',
-                color: 'white',
-              },
-            }}
+            size="medium"
           >
-            {deleteDeckMutation.isPending ? '삭제 중...' : '삭제'}
+            {deleteDeckMutation.isPending ? '삭제 중…' : '삭제'}
           </Button>
         )}
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ flex: 1, minWidth: 8 }} />
         {!isEditing && (
           <Button
             color="primary"
             variant="outlined"
             onClick={onEditClick}
             disabled={loading || !!error || !detailDataRecord}
-            sx={{ borderRadius: 2, px: 3, fontWeight: 600 }}
           >
             수정
           </Button>
         )}
         {isEditing && (
           <>
-            <Button
-              color="inherit"
-              variant="outlined"
-              onClick={onEditCancel}
-              disabled={updateDeckMutation.isPending}
-              sx={{ borderRadius: 2, px: 3, fontWeight: 600 }}
-            >
+            <Button color="inherit" variant="text" onClick={onEditCancel} disabled={updateDeckMutation.isPending}>
               취소
             </Button>
-            <Button
-              color="primary"
-              variant="contained"
-              onClick={onEditSave}
-              disabled={updateDeckMutation.isPending}
-              sx={{ 
-                borderRadius: 2,
-                px: 3,
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%)',
-                },
-              }}
-            >
-              {updateDeckMutation.isPending ? '저장 중...' : '저장'}
+            <Button color="primary" variant="contained" onClick={onEditSave} disabled={updateDeckMutation.isPending}>
+              {updateDeckMutation.isPending ? '저장 중…' : '저장'}
             </Button>
           </>
         )}
-        <Button 
-          color="primary" 
-          variant="contained" 
-          onClick={handleClose}
-          sx={{ 
-            borderRadius: 2,
-            px: 3,
-            fontWeight: 600,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #5568d3 0%, #6a3d8f 100%)',
-            },
-          }}
-        >
+        <Button color="primary" variant="text" onClick={handleClose}>
           닫기
         </Button>
       </DialogActions>
