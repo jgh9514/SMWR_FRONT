@@ -29,21 +29,13 @@ import SearchIcon from '@mui/icons-material/Search';
 import StarIcon from '@mui/icons-material/Star';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import CloseIcon from '@mui/icons-material/Close';
-import { PageHeader } from '@/shared/ui';
+import { AttributeElementIcon, PageHeader } from '@/shared/ui';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import type { AttributeType } from '@/features/siege/types/monster';
 import { monsterAwakenStepDigit, monsterEvolutionGroupKey } from '@/features/siege/lib/monsterIdEvolution';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 import { apiClient } from '@/shared/lib/api/client';
-
-const attributeIcons: Record<AttributeType, string> = {
-  fire: '/images/Fire_Icon.png',
-  water: '/images/Water_Icon.png',
-  wind: '/images/Wind_Icon.png',
-  light: '/images/Light_Icon.png',
-  dark: '/images/Dark_Icon.png',
-};
 
 const attributeLabels: Record<AttributeType, string> = {
   fire: '불',
@@ -186,7 +178,7 @@ type ElementFilter = 'all' | AttributeType;
 type StarFilter = 'all' | (typeof STAR_FILTERS)[number];
 type ArchetypeFilter = 'all' | (typeof ARCHETYPE_FILTERS)[number];
 
-type SortKey = 'monsterId' | 'star' | 'monster' | 'awakened' | 'second' | 'essence' | 'skill';
+type SortKey = 'star' | 'monster' | 'awakened' | 'second' | 'essence' | 'skill';
 
 interface MonsterSearchClientProps {
   monsterList: MonsterOption[];
@@ -363,7 +355,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
   const [archetypeFilter, setArchetypeFilter] = useState<ArchetypeFilter>('all');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [filterDrawerOpen, setFilterDrawerOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>('monsterId');
+  const [sortKey, setSortKey] = useState<SortKey>('monster');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [page, setPage] = useState(1);
   /** SSR에서 API 실패·빈 캐시 시 브라우저에서 동일 API로 재시도 */
@@ -486,13 +478,6 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
       const sb = rb.secondAwakening;
       let cmp = 0;
       switch (sortKey) {
-        case 'monsterId':
-          cmp = (primaryMonster(ra)?.monster_id ?? '').localeCompare(
-            primaryMonster(rb)?.monster_id ?? '',
-            undefined,
-            { numeric: true, sensitivity: 'base' },
-          );
-          break;
         case 'star':
           cmp = (primaryMonster(ra)?.star ?? -1) - (primaryMonster(rb)?.star ?? -1);
           break;
@@ -596,8 +581,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
             }}
           >
             <strong>속성</strong>: 불·물·바람·빛·어둠. <strong>등급</strong>: 별(자연별).{' '}
-            <strong>역할</strong>: 공격(Attack), 방어(Defense), 체력(HP), 지원(Support).{' '}
-            <strong>monster_id</strong>는 끝에서 두 번째 자리가 각성 단계, 마지막 자리가 속성입니다. 한 줄에{' '}
+            <strong>역할</strong>: 공격(Attack), 방어(Defense), 체력(HP), 지원(Support). 한 줄에{' '}
             <strong>노말 · 1차 각성 · 2차 각성</strong>을 나란히 둡니다.
           </Box>
         </Collapse>
@@ -623,12 +607,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
               title={`${attributeLabels[attr]} 속성`}
               sx={toggleBtnSx(elementFilter === attr)}
             >
-              <Box
-                component="img"
-                src={getRenderableImageUrl(attributeIcons[attr])}
-                alt={attributeLabels[attr]}
-                sx={{ width: 22, height: 22, objectFit: 'contain' }}
-              />
+              <AttributeElementIcon attribute={attr} size={22} titleAccess={attributeLabels[attr]} />
             </Box>
           ))}
         </Box>
@@ -888,16 +867,10 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                   <Table
                     size="small"
                     stickyHeader
-                    sx={{ minWidth: 1164, tableLayout: 'fixed' }}
+                    sx={{ minWidth: 1092, tableLayout: 'fixed' }}
                   >
                     <TableHead>
                       <TableRow>
-                        <TableCell
-                          sx={{ fontWeight: 700, cursor: 'pointer', width: 72, minWidth: 72, maxWidth: 72 }}
-                          onClick={() => handleSort('monsterId')}
-                        >
-                          ID{sortIndicator('monsterId')}
-                        </TableCell>
                         <TableCell
                           sx={{ fontWeight: 700, cursor: 'pointer', ...starGradeColumnSx }}
                           onClick={() => handleSort('star')}
@@ -931,7 +904,6 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                     <TableBody>
                       {pagedPairs.map((row) => {
                         const star = getStarCount(primaryMonster(row));
-                        const pid = primaryMonster(row)?.monster_id;
                         return (
                           <TableRow
                             key={row.key}
@@ -939,11 +911,6 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                             className="searchable"
                             sx={{ '&:last-child td': { border: 0 } }}
                           >
-                            <TableCell sx={{ verticalAlign: 'middle', width: 72, minWidth: 72, maxWidth: 72 }}>
-                              <Typography variant="caption" color="text.secondary" noWrap title={pid}>
-                                {pid ?? '—'}
-                              </Typography>
-                            </TableCell>
                             <TableCell sx={starGradeColumnSx}>
                               <RatingPill star={star} />
                             </TableCell>

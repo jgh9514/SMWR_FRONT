@@ -36,7 +36,6 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import GroupIcon from '@mui/icons-material/Group';
 import AnnouncementIcon from '@mui/icons-material/Announcement';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import CircleIcon from '@mui/icons-material/Circle';
@@ -83,12 +82,6 @@ const getMenuCategories = (
       title: '홈',
       path: '/',
       icon: <HomeIcon />,
-      category: 'main',
-    },
-    {
-      title: '프로젝트 소개',
-      path: '/about',
-      icon: <InfoOutlinedIcon />,
       category: 'main',
     },
     {

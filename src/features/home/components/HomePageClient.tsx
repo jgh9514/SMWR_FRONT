@@ -415,14 +415,10 @@ export default function HomePageClient() {
             color="text.secondary"
             sx={{
               fontSize: { xs: '14px', md: '16px' },
-              mb: 2,
             }}
           >
             점령전과 실레나 전투 데이터를 분석하고 관리하세요
           </Typography>
-          <Button variant="outlined" color="primary" size="small" onClick={() => router.push('/about')}>
-            프로젝트 소개
-          </Button>
         </Box>
 
         <Box

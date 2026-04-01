@@ -11,4 +11,5 @@ export { default as LoadingState } from './loading-state/LoadingState';
 export { default as ErrorBoundary } from './error-boundary/ErrorBoundary';
 export { default as AdminHeader } from './admin-header/AdminHeader';
 export { default as AdminSidebar } from './admin-sidebar/AdminSidebar';
+export { default as AttributeElementIcon } from './attribute-element-icon/AttributeElementIcon';
 

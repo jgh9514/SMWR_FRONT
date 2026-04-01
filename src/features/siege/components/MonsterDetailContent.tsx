@@ -22,6 +22,7 @@ import {
 import StarIcon from '@mui/icons-material/Star';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Link from 'next/link';
+import { AttributeElementIcon } from '@/shared/ui';
 import { getRenderableImageUrl, resolveSkillEffectImageUrl } from '@/shared/utils/image';
 import type {
   MonsterInfoResponse,
@@ -63,14 +64,6 @@ function parseSkillLevelLines(raw: string | null | undefined): string[] {
   }
   return s.split(/\r?\n/).filter(Boolean);
 }
-
-const attributeIcons: Record<AttributeType, string> = {
-  fire: '/images/Fire_Icon.png',
-  water: '/images/Water_Icon.png',
-  wind: '/images/Wind_Icon.png',
-  light: '/images/Light_Icon.png',
-  dark: '/images/Dark_Icon.png',
-};
 
 const attributeLabelsKo: Record<AttributeType, string> = {
   fire: '불',
@@ -588,18 +581,16 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
                   }}
                 >
                   <Box
-                    component="img"
-                    src={attributeIcons[sAttr]}
-                    alt=""
                     sx={{
                       position: 'absolute',
                       bottom: 4,
                       right: 4,
-                      width: 22,
-                      height: 22,
+                      lineHeight: 0,
                       filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))',
                     }}
-                  />
+                  >
+                    <AttributeElementIcon attribute={sAttr} size={22} />
+                  </Box>
                 </Box>
               </Link>
             ))}
@@ -655,14 +646,7 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
 
           <InfoRow label="속성">
             <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, justifyContent: 'flex-end' }}>
-              {attr ? (
-                <Box
-                  component="img"
-                  src={attributeIcons[attr]}
-                  alt=""
-                  sx={{ width: 16, height: 16 }}
-                />
-              ) : null}
+              {attr ? <AttributeElementIcon attribute={attr} size={16} titleAccess={attributeLabelsKo[attr]} /> : null}
               <Typography component="span" variant="body2">
                 {attr ? attributeLabelsKo[attr] : monster_elemental}
                 {attr ? ` (${attributeLabelsEn[attr]})` : ''}

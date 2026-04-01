@@ -20,19 +20,12 @@ import DataTable from '@/shared/ui/data-table/DataTable';
 import type { TableColumn } from '@/shared/ui/data-table/DataTable';
 import { Avatar, Badge, CardActionArea, TextField, InputAdornment } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import { AttributeElementIcon } from '@/shared/ui';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import { useAccountSummaryImportDetail, useRuneScoreSummary, useSwexMonsterCatalog, useSwexRuneList } from '@/hooks/api';
 import type { SwexMonsterCatalogItem, SwexRuneItem } from '@/features/account-summary/types/account-summary';
 
 type AttributeKey = 'fire' | 'water' | 'wind' | 'light' | 'dark';
-
-const attributeIcons: Record<Exclude<AttributeKey, 'all'>, string> = {
-  fire: '/images/Fire_Icon.png',
-  water: '/images/Water_Icon.png',
-  wind: '/images/Wind_Icon.png',
-  light: '/images/Light_Icon.png',
-  dark: '/images/Dark_Icon.png',
-};
 
 const attributeLabels: Record<AttributeKey, string> = {
   fire: '불',
@@ -339,14 +332,7 @@ export default function AccountSummaryDetailPage() {
                     <Tab
                       key={attr}
                       value={attr}
-                      icon={
-                        <Box
-                          component="img"
-                          src={getMonsterImageUrl(attributeIcons[attr])}
-                          alt={attributeLabels[attr]}
-                          sx={{ width: 22, height: 22 }}
-                        />
-                      }
+                      icon={<AttributeElementIcon attribute={attr} size={22} titleAccess={attributeLabels[attr]} />}
                       aria-label={attributeLabels[attr]}
                     />
                   ))}
@@ -365,7 +351,6 @@ export default function AccountSummaryDetailPage() {
                   const owned = (m.owned_count || 0) > 0;
                   const img = getMonsterImageUrl(m.image_url);
                   const attrKey = getMonsterAttributeKey(m.monster_elemental);
-                  const attrIcon = attrKey ? getMonsterImageUrl(attributeIcons[attrKey]) : null;
                   return (
                     <Card key={m.monster_id} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
                       <CardActionArea
@@ -389,22 +374,28 @@ export default function AccountSummaryDetailPage() {
                               alt={m.kr_name}
                               sx={{ width: 56, height: 56, mx: 'auto', mb: 0.5, bgcolor: 'background.paper' }}
                             />
-                            {attrIcon && (
+                            {attrKey ? (
                               <Box
-                                component="img"
-                                src={attrIcon}
-                                alt={attrKey ? attributeLabels[attrKey] : ''}
                                 sx={{
                                   position: 'absolute',
                                   left: -2,
                                   bottom: 6,
-                                  width: 16,
-                                  height: 16,
+                                  lineHeight: 0,
                                   borderRadius: '50%',
                                   bgcolor: 'rgba(0,0,0,0.1)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  p: 0.125,
                                 }}
-                              />
-                            )}
+                              >
+                                <AttributeElementIcon
+                                  attribute={attrKey}
+                                  size={16}
+                                  titleAccess={attributeLabels[attrKey]}
+                                />
+                              </Box>
+                            ) : null}
                           </Box>
                         </Badge>
                         <Typography variant="caption" sx={{ display: 'block', fontWeight: 700, lineHeight: 1.2 }}>
