@@ -36,6 +36,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import type { TooltipValueType } from 'recharts';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { useRtaDashboard, useRtaSummonerRanking } from '@/features/rta/hooks/useRtaData';
@@ -601,11 +602,16 @@ export default function RtaSummonerRankingClient() {
                       tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
                     />
                     <Tooltip
-                      formatter={(value: number | string | undefined) =>
-                        value != null && value !== ''
-                          ? Math.round(Number(value)).toLocaleString()
-                          : '—'
-                      }
+                      formatter={(value: TooltipValueType | undefined) => {
+                        if (value == null) return '—';
+                        if (Array.isArray(value)) {
+                          return value
+                            .map((v) => (v === '' ? '—' : Math.round(Number(v)).toLocaleString()))
+                            .join(', ');
+                        }
+                        if (value === '') return '—';
+                        return Math.round(Number(value)).toLocaleString();
+                      }}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     {CUT_TIER_ORDER.map((tk) => (

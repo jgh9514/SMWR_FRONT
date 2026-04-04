@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "type-check": "tsc --noEmit",
+    "type-check": "node scripts/typecheck.mjs",
     "lint:all": "yarn type-check && yarn lint"
   },
   "dependencies": {
