@@ -20,6 +20,7 @@ import StarIcon from '@mui/icons-material/Star';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import { useRtaSummonerRanking } from '@/features/rta/hooks/useRtaData';
 import { getRatingColor, getRatingStars } from '@/shared/utils';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaSummonerRankingRow } from '@/features/rta/types/rta';
 
 const PAGE_SIZE = 50;
@@ -27,19 +28,6 @@ const PAGE_SIZE = 50;
 function toNum(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-function formatWhen(raw: unknown): string {
-  if (raw == null || raw === '') return '—';
-  const d = new Date(String(raw));
-  if (Number.isNaN(d.getTime())) return String(raw);
-  return d.toLocaleString('ko-KR', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 export default function RtaSummonerRankingClient() {
@@ -55,11 +43,14 @@ export default function RtaSummonerRankingClient() {
     return rankings.map((row: RtaSummonerRankingRow) => ({
       rank: toNum(row.rank_position),
       wizardId: row.wizard_id != null ? String(row.wizard_id) : '',
+      channelUid:
+        row.channel_uid != null && String(row.channel_uid).trim() !== ''
+          ? String(row.channel_uid)
+          : undefined,
       name: row.wizard_name?.trim() || '—',
       country: row.country?.trim() || '',
       score: toNum(row.score),
       rating: row.rating_id != null ? toNum(row.rating_id) : null,
-      lastAt: row.last_match_at,
     }));
   }, [rankings]);
 
@@ -83,7 +74,7 @@ export default function RtaSummonerRankingClient() {
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 720, lineHeight: 1.6 }}>
           수집된 <strong>실레나 리플레이</strong>만을 대상으로, 소환사마다 <strong>가장 최근에 기록된 경기</strong>의 RTA
-          점수·레이팅을 사용해 순위를 매깁니다. 게임 내 공식 랭킹·전체 유저와는 다를 수 있습니다.
+          점수로 순위를 매깁니다. 게임 내 공식 랭킹·전체 유저와는 다를 수 있습니다.
         </Typography>
       </Card>
 
@@ -99,20 +90,18 @@ export default function RtaSummonerRankingClient() {
             <Table size="small" sx={{ tableLayout: 'fixed', width: '100%' }} stickyHeader>
               <TableHead>
                 <TableRow>
-                  <TableCell width="8%">순위</TableCell>
+                  <TableCell width="10%">순위</TableCell>
                   <TableCell width="12%">국가</TableCell>
-                  <TableCell width="28%">소환사</TableCell>
-                  <TableCell width="14%" align="right">
+                  <TableCell width="50%">소환사</TableCell>
+                  <TableCell width="28%" align="right">
                     RTA 점수
                   </TableCell>
-                  <TableCell width="22%">레이팅</TableCell>
-                  <TableCell width="16%">최근 리플레이</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={4}>
                       <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
                         표시할 랭킹 데이터가 없습니다.
                       </Typography>
@@ -145,41 +134,74 @@ export default function RtaSummonerRankingClient() {
                         }}
                         title={r.name}
                       >
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          {r.name}
-                        </Typography>
-                        {r.wizardId ? (
-                          <Typography variant="caption" color="text.secondary" noWrap display="block">
-                            {r.wizardId}
-                          </Typography>
-                        ) : null}
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
-                        {r.score.toLocaleString()}
-                      </TableCell>
-                      <TableCell sx={{ verticalAlign: 'middle' }}>
-                        {r.rating != null ? (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                            {Array.from({ length: getRatingStars(r.rating) }).map((_, i) => (
-                              <StarIcon
-                                key={i}
-                                sx={{ fontSize: 14, color: getRatingColor(r.rating ?? undefined), flexShrink: 0 }}
-                              />
-                            ))}
-                            <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                              {r.rating}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                          <Box
+                            component="img"
+                            src={getSwexPlayerImageUrl(r.channelUid || r.wizardId)}
+                            alt=""
+                            loading="lazy"
+                            sx={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              flexShrink: 0,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              bgcolor: 'action.hover',
+                            }}
+                          />
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={600} noWrap>
+                              {r.name}
                             </Typography>
+                            {r.wizardId ? (
+                              <Typography variant="caption" color="text.secondary" noWrap display="block">
+                                {r.wizardId}
+                              </Typography>
+                            ) : null}
                           </Box>
-                        ) : (
-                          <Typography variant="body2" color="text.disabled">
-                            —
-                          </Typography>
-                        )}
+                        </Box>
                       </TableCell>
-                      <TableCell sx={{ verticalAlign: 'middle' }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                          {formatWhen(r.lastAt)}
-                        </Typography>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          verticalAlign: 'middle',
+                          fontWeight: 800,
+                          fontVariantNumeric: 'tabular-nums',
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            gap: 1,
+                            flexWrap: 'nowrap',
+                          }}
+                        >
+                          {r.rating != null && getRatingStars(r.rating) > 0 ? (
+                            <Box
+                              component="span"
+                              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, flexShrink: 0 }}
+                              aria-hidden
+                            >
+                              {Array.from({ length: getRatingStars(r.rating) }).map((_, i) => (
+                                <StarIcon
+                                  key={i}
+                                  sx={{
+                                    fontSize: 14,
+                                    color: getRatingColor(r.rating ?? undefined),
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              ))}
+                            </Box>
+                          ) : null}
+                          <Typography component="span" variant="body2" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>
+                            {r.score.toLocaleString()}
+                          </Typography>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   ))

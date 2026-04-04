@@ -81,6 +81,30 @@ function normalizeTrio(row: TrioComboStat): TrioComboStat {
   };
 }
 
+/**
+ * MyBatis mapUnderscoreToCamelCase + Map 결과 시 `monster_image_3` → `monsterImage3` 등으로 올 수 있어
+ * 스네이크/카멜·언더스코어 유무 조합을 모두 허용한다.
+ */
+function pickDuoMonsterImage(row: DuoComboStat, slot: 1 | 2): string | undefined {
+  const r = row as Record<string, unknown>;
+  const keys = [`monster_image_${slot}`, `monsterImage${slot}`, `monster_image${slot}`] as const;
+  for (const k of keys) {
+    const v = r[k];
+    if (v != null && String(v).trim() !== '') return String(v);
+  }
+  return undefined;
+}
+
+function pickTrioMonsterImage(row: TrioComboStat, slot: 1 | 2 | 3): string | undefined {
+  const r = row as Record<string, unknown>;
+  const keys = [`monster_image_${slot}`, `monsterImage${slot}`, `monster_image${slot}`] as const;
+  for (const k of keys) {
+    const v = r[k];
+    if (v != null && String(v).trim() !== '') return String(v);
+  }
+  return undefined;
+}
+
 function MonsterCell({
   name,
   image,
@@ -667,13 +691,13 @@ export default function RtaMonsterStatsClient({
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       <MonsterCell
                         name={row.monster_name_1}
-                        image={row.monster_image_1}
+                        image={pickDuoMonsterImage(row, 1)}
                         elemental={row.monster_elemental_1}
                         monsterId={row.monster_id_1}
                       />
                       <MonsterCell
                         name={row.monster_name_2}
-                        image={row.monster_image_2}
+                        image={pickDuoMonsterImage(row, 2)}
                         elemental={row.monster_elemental_2}
                         monsterId={row.monster_id_2}
                       />
@@ -718,7 +742,7 @@ export default function RtaMonsterStatsClient({
                           <Box sx={{ minWidth: 0 }}>
                             <MonsterCell
                               name={row.monster_name_1}
-                              image={row.monster_image_1}
+                              image={pickDuoMonsterImage(row, 1)}
                               elemental={row.monster_elemental_1}
                               monsterId={row.monster_id_1}
                             />
@@ -729,7 +753,7 @@ export default function RtaMonsterStatsClient({
                           <Box sx={{ minWidth: 0 }}>
                             <MonsterCell
                               name={row.monster_name_2}
-                              image={row.monster_image_2}
+                              image={pickDuoMonsterImage(row, 2)}
                               elemental={row.monster_elemental_2}
                               monsterId={row.monster_id_2}
                             />
@@ -822,19 +846,19 @@ export default function RtaMonsterStatsClient({
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       <MonsterCell
                         name={row.monster_name_1}
-                        image={row.monster_image_1}
+                        image={pickTrioMonsterImage(row, 1)}
                         elemental={row.monster_elemental_1}
                         monsterId={row.monster_id_1}
                       />
                       <MonsterCell
                         name={row.monster_name_2}
-                        image={row.monster_image_2}
+                        image={pickTrioMonsterImage(row, 2)}
                         elemental={row.monster_elemental_2}
                         monsterId={row.monster_id_2}
                       />
                       <MonsterCell
                         name={row.monster_name_3}
-                        image={row.monster_image_3}
+                        image={pickTrioMonsterImage(row, 3)}
                         elemental={row.monster_elemental_3}
                         monsterId={row.monster_id_3}
                       />
@@ -848,7 +872,7 @@ export default function RtaMonsterStatsClient({
             </Box>
           ) : (
             <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflowX: 'auto' }}>
-              <Table size="small" stickyHeader sx={{ minWidth: 720, tableLayout: 'fixed', width: '100%' }}>
+              <Table size="small" stickyHeader sx={{ minWidth: 640, tableLayout: 'fixed', width: '100%' }}>
                 <TableHead>
                   <TableRow>
                     <TableCell width="4%">#</TableCell>
@@ -865,43 +889,43 @@ export default function RtaMonsterStatsClient({
                   {sortedTrio.map((row, i) => (
                     <TableRow key={`${row.monster_id_1}-${row.monster_id_2}-${row.monster_id_3}-${i}`} hover>
                       <TableCell>{i + 1}</TableCell>
-                      <TableCell sx={{ verticalAlign: 'middle' }}>
+                      <TableCell sx={{ verticalAlign: 'middle', maxWidth: 0 }}>
                         <Box
                           sx={{
-                            display: 'grid',
-                            gridTemplateColumns: 'minmax(0, 1fr) 22px minmax(0, 1fr) 22px minmax(0, 1fr)',
+                            display: 'flex',
                             alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: { xs: 0.25, sm: 0.5 },
                             width: '100%',
                             minWidth: 0,
-                            columnGap: 0.25,
                           }}
                         >
-                          <Box sx={{ minWidth: 0 }}>
+                          <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden' }}>
                             <MonsterCell
                               name={row.monster_name_1}
-                              image={row.monster_image_1}
+                              image={pickTrioMonsterImage(row, 1)}
                               elemental={row.monster_elemental_1}
                               monsterId={row.monster_id_1}
                             />
                           </Box>
-                          <Typography variant="body2" color="text.disabled" sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.disabled" sx={{ flexShrink: 0, px: 0.25 }}>
                             +
                           </Typography>
-                          <Box sx={{ minWidth: 0 }}>
+                          <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden' }}>
                             <MonsterCell
                               name={row.monster_name_2}
-                              image={row.monster_image_2}
+                              image={pickTrioMonsterImage(row, 2)}
                               elemental={row.monster_elemental_2}
                               monsterId={row.monster_id_2}
                             />
                           </Box>
-                          <Typography variant="body2" color="text.disabled" sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" color="text.disabled" sx={{ flexShrink: 0, px: 0.25 }}>
                             +
                           </Typography>
-                          <Box sx={{ minWidth: 0 }}>
+                          <Box sx={{ flex: '1 1 0', minWidth: 0, overflow: 'hidden' }}>
                             <MonsterCell
                               name={row.monster_name_3}
-                              image={row.monster_name_3}
+                              image={pickTrioMonsterImage(row, 3)}
                               elemental={row.monster_elemental_3}
                               monsterId={row.monster_id_3}
                             />

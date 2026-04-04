@@ -243,6 +243,8 @@ export interface RtaSummonerRankingRow {
   wizard_id?: string;
   wizard_name?: string;
   country?: string;
+  /** SWEX playerImage — 없으면 RTA 목록과 같이 wizard_id 로 폴백 */
+  channel_uid?: string | number | null;
   score?: number;
   rating_id?: number | null;
   last_match_at?: string;
