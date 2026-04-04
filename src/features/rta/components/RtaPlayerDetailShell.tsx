@@ -68,10 +68,11 @@ export default function RtaPlayerDetailShell({
   /** URL에는 wizard_id만 사용. 프로필·통계는 추후 API 연동 */
   const name = `소환사 ${wizardId}`;
   const profileSrc = getSwexPlayerImageUrl(wizardId);
-  const score: number | null = null;
-  const rank: number | null = null;
-  const rating: number | null = null;
-  const winRate: number | null = null;
+  // const x: number | null = null 만 있으면 TS가 항상 null로 좁혀 `!= null` 분기에서 never가 됨
+  const score = null as number | null;
+  const rank = null as number | null;
+  const rating = null as number | null;
+  const winRate = null as number | null;
 
   const [season, setSeason] = useState(SEASON_OPTIONS[0].value);
   const [fav, setFav] = useState(false);
