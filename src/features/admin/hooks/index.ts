@@ -3,8 +3,6 @@
  */
 
 export * from './useUser';
-export * from './useRole';
-export * from './useUserRole';
 export * from './useDashboard';
 export * from './useBatch';
 export * from './useLog';
