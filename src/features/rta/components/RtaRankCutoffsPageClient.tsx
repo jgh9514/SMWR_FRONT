@@ -25,7 +25,7 @@ export default function RtaRankCutoffsPageClient() {
       ) : error ? (
         <Typography color="error">{error.message || '불러오기에 실패했습니다.'}</Typography>
       ) : (
-        <RtaRankCutoffsSection rankCutoffDaily={data?.rank_cutoff_daily} />
+        <RtaRankCutoffsSection rankCutoffAnchors={data?.rank_cutoff_anchors} />
       )}
     </Box>
   );

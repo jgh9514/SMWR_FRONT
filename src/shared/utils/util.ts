@@ -80,3 +80,40 @@ export const getRatingStars = (rating: number | string | undefined): number => {
   return Math.min(Math.max(onesDigit, 0), 3); // 0~3 범위로 제한
 };
 
+/**
+ * RTA rating_id 구간별 티어 아이콘 (public/icons, 대시보드 SQL 티어 분기와 동일)
+ * ≥5000 G, ≥4000 P, ≥3000 C, ≥2000 F, 그 외 Ch
+ */
+/**
+ * RTA rating_id → 티어 문자열 (예: Ch2, F3, G1). 대시보드 SQL tier_key 규칙과 동일.
+ */
+export function getRtaTierShortLabel(rating: number | string | undefined): string {
+  if (rating === undefined || rating === null) return '—';
+  const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
+  if (isNaN(ratingNum)) return '—';
+  const head =
+    ratingNum >= 5000
+      ? 'G'
+      : ratingNum >= 4000
+        ? 'P'
+        : ratingNum >= 3000
+          ? 'C'
+          : ratingNum >= 2000
+            ? 'F'
+            : 'Ch';
+  const mod = ratingNum % 10;
+  const sub = [1, 2, 3].includes(mod) ? String(mod) : '2';
+  return `${head}${sub}`;
+}
+
+export function getRatingStarIconPath(rating: number | string | undefined): string | null {
+  if (rating === undefined || rating === null) return null;
+  const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
+  if (isNaN(ratingNum)) return null;
+  if (ratingNum >= 5000) return '/icons/guardian_star.png';
+  if (ratingNum >= 4000) return '/icons/punisher_star.png';
+  if (ratingNum >= 3000) return '/icons/conqueror_star.png';
+  if (ratingNum >= 2000) return '/icons/fighter_star.png';
+  return '/icons/challenger_star.png';
+}
+

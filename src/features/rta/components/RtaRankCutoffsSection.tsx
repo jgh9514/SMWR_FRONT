@@ -18,12 +18,18 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import type { RtaRankCutoffDailyRow } from '@/features/rta/types/rta';
-
-const ICON_PUNISHER_STAR = '/icons/punisher_star.png';
-const ICON_GUARDIAN_STAR = '/icons/guardian_star.png';
+import type { RtaRankCutoffAnchorRow } from '@/features/rta/types/rta';
 
 const CUT_KEYS = ['P2', 'P3', 'G1', 'G2', 'G3'] as const;
+
+/** 표시 순서·라벨 (서버 anchor_key 와 동일) */
+const ANCHOR_ROWS: { key: string; label: string }[] = [
+  { key: '3h', label: '3시간 전' },
+  { key: '6h', label: '6시간 전' },
+  { key: '12h', label: '12시간 전' },
+  { key: '3d', label: '3일 전' },
+  { key: '7d', label: '7일 전' },
+];
 
 const TIER_COLOR_P = 'rgb(7, 186, 173)';
 const TIER_COLOR_G = 'rgb(155, 89, 182)';
@@ -38,8 +44,14 @@ function tierStarCount(tierKey: string): number {
   return Number.isFinite(n) && n >= 1 && n <= 3 ? n : 2;
 }
 
+/** 티어 키(Ch1, F2, C1, P2, G3 …) → public/icons 별 PNG */
 function tierStarIconSrc(tierKey: string): string {
-  return tierKey.startsWith('P') ? ICON_PUNISHER_STAR : ICON_GUARDIAN_STAR;
+  if (tierKey.startsWith('Ch')) return '/icons/challenger_star.png';
+  if (tierKey.startsWith('F')) return '/icons/fighter_star.png';
+  if (tierKey.startsWith('C')) return '/icons/conqueror_star.png';
+  if (tierKey.startsWith('P')) return '/icons/punisher_star.png';
+  if (tierKey.startsWith('G')) return '/icons/guardian_star.png';
+  return '/icons/challenger_star.png';
 }
 
 function toNum(v: unknown): number {
@@ -47,49 +59,19 @@ function toNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function normalizeDate(raw: unknown): string {
-  if (raw == null) return '';
-  const s = String(raw);
-  return s.length >= 10 ? s.slice(0, 10) : s;
-}
-
-/** 날짜별 → 티어 → 점수 */
-function pivotByDate(rows: RtaRankCutoffDailyRow[]): Map<string, Record<string, number>> {
-  const byDate = new Map<string, Record<string, number>>();
+/** anchor_key → tier_key → 점수 */
+function pivotByAnchor(rows: RtaRankCutoffAnchorRow[]): Map<string, Record<string, number>> {
+  const byAnchor = new Map<string, Record<string, number>>();
   for (const row of rows) {
-    const d = normalizeDate(row.bucket_date);
-    if (!d) continue;
-    const k = row.tier_key;
-    if (!(CUT_KEYS as readonly string[]).includes(k)) continue;
-    if (!byDate.has(d)) byDate.set(d, {});
-    const rec = byDate.get(d)!;
-    rec[k] = toNum(row.cutoff_score);
+    const ak = String(row.anchor_key ?? '').trim();
+    if (!ak) continue;
+    const tk = row.tier_key;
+    if (!(CUT_KEYS as readonly string[]).includes(tk)) continue;
+    if (!byAnchor.has(ak)) byAnchor.set(ak, {});
+    const rec = byAnchor.get(ak)!;
+    rec[tk] = toNum(row.cutoff_score);
   }
-  return byDate;
-}
-
-function formatRelativeFromDate(dateStr: string): string {
-  const d = new Date(dateStr.slice(0, 10) + 'T12:00:00');
-  if (Number.isNaN(d.getTime())) return dateStr;
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays <= 0) return '오늘';
-  if (diffDays === 1) return '1일 전';
-  if (diffDays < 7) return `${diffDays}일 전`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
-  return `${Math.floor(diffDays / 30)}개월 전`;
-}
-
-function formatDateTimeLine(dateStr: string): string {
-  const d = new Date(dateStr.slice(0, 10) + 'T12:00:00');
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return byAnchor;
 }
 
 function TierStars({ tierKey }: { tierKey: string }) {
@@ -116,40 +98,38 @@ function TierHeaderCell({ tierKey }: { tierKey: string }) {
 }
 
 export interface RtaRankCutoffsSectionProps {
-  rankCutoffDaily: RtaRankCutoffDailyRow[] | undefined;
+  rankCutoffAnchors: RtaRankCutoffAnchorRow[] | undefined;
 }
 
-export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoffsSectionProps) {
-  const { latest, tableRows, lastUpdatedLabel } = useMemo(() => {
-    const rows = rankCutoffDaily ?? [];
-    const byDate = pivotByDate(rows);
-    const dates = [...byDate.keys()].sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCutoffsSectionProps) {
+  const { latest, tableRows, summaryLabel } = useMemo(() => {
+    const rows = rankCutoffAnchors ?? [];
+    const byAnchor = pivotByAnchor(rows);
 
-    const latestDate = dates[0];
+    const firstKey = ANCHOR_ROWS[0]?.key;
     const latest: Record<string, number> = {};
-    if (latestDate) {
-      const rec = byDate.get(latestDate) ?? {};
+    if (firstKey) {
+      const rec = byAnchor.get(firstKey) ?? {};
       for (const k of CUT_KEYS) {
         latest[k] = rec[k] ?? 0;
       }
     }
 
     const tableRows: {
-      bucketDate: string;
-      rel: string;
-      line2: string;
+      anchorKey: string;
+      label: string;
       scores: Record<string, number>;
       deltas: Record<string, number | null>;
     }[] = [];
 
-    for (let i = 0; i < dates.length; i++) {
-      const bucketDate = dates[i];
-      const cur = byDate.get(bucketDate) ?? {};
-      const older = i + 1 < dates.length ? byDate.get(dates[i + 1]) ?? {} : null;
+    for (let i = 0; i < ANCHOR_ROWS.length; i++) {
+      const { key, label } = ANCHOR_ROWS[i];
+      const cur = byAnchor.get(key) ?? {};
+      const next = i + 1 < ANCHOR_ROWS.length ? byAnchor.get(ANCHOR_ROWS[i + 1].key) ?? {} : null;
       const deltas: Record<string, number | null> = {};
       for (const k of CUT_KEYS) {
         const c = cur[k];
-        const o = older ? older[k] : undefined;
+        const o = next ? next[k] : undefined;
         if (o === undefined || c === undefined) {
           deltas[k] = null;
         } else {
@@ -157,20 +137,20 @@ export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoff
         }
       }
       tableRows.push({
-        bucketDate,
-        rel: formatRelativeFromDate(bucketDate),
-        line2: formatDateTimeLine(bucketDate),
+        anchorKey: key,
+        label,
         scores: { ...cur },
         deltas,
       });
     }
 
-    const lastUpdatedLabel = latestDate ? formatRelativeFromDate(latestDate) : '';
+    const summaryLabel = ANCHOR_ROWS[0]?.label ?? '—';
 
-    return { latest, tableRows, lastUpdatedLabel };
-  }, [rankCutoffDaily]);
+    return { latest, tableRows, summaryLabel };
+  }, [rankCutoffAnchors]);
 
-  const hasAny = CUT_KEYS.some((k) => (latest[k] ?? 0) > 0) || tableRows.length > 0;
+  const hasAny =
+    CUT_KEYS.some((k) => (latest[k] ?? 0) > 0) || (rankCutoffAnchors?.length ?? 0) > 0;
 
   if (!hasAny) {
     return (
@@ -231,6 +211,10 @@ export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoff
         </Box>
       </Box>
 
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, lineHeight: 1.5 }}>
+        각 행은 서버 시각 기준 해당 시점이 속한 <strong>날짜</strong>에서, 그 시각 <strong>이전</strong>까지 수집된 리플레이만으로 티어별 최저점을 봅니다.
+      </Typography>
+
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' }, gap: 1.5, mb: 2 }}>
         {CUT_KEYS.map((k) => (
           <Paper
@@ -260,7 +244,7 @@ export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoff
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5, mb: 2, opacity: 0.65 }}>
         <AccessTimeIcon sx={{ fontSize: 14 }} />
-        <Typography variant="caption">{lastUpdatedLabel || '—'} 갱신 기준</Typography>
+        <Typography variant="caption">상단 카드: {summaryLabel} 스냅샷</Typography>
       </Box>
 
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', borderColor: 'divider' }}>
@@ -268,7 +252,7 @@ export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoff
           <Table size="small" sx={{ minWidth: 520 }}>
             <TableHead>
               <TableRow sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-                <TableCell sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600, py: 1.5 }}>Time</TableCell>
+                <TableCell sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600, py: 1.5 }}>기준</TableCell>
                 {CUT_KEYS.map((k) => (
                   <TierHeaderCell key={k} tierKey={k} />
                 ))}
@@ -277,16 +261,13 @@ export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoff
             <TableBody>
               {tableRows.map((row) => (
                 <TableRow
-                  key={row.bucketDate}
+                  key={row.anchorKey}
                   hover
                   sx={{ '&:last-child td': { borderBottom: 0 }, borderColor: 'divider' }}
                 >
                   <TableCell sx={{ py: 1.25, verticalAlign: 'top' }}>
                     <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
-                      {row.rel}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem', opacity: 0.85 }}>
-                      {row.line2}
+                      {row.label}
                     </Typography>
                   </TableCell>
                   {CUT_KEYS.map((k) => {
@@ -329,7 +310,7 @@ export default function RtaRankCutoffsSection({ rankCutoffDaily }: RtaRankCutoff
       </Paper>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, lineHeight: 1.5 }}>
-        일자·티어별 해당 리플레이 중 <strong>최저 점수</strong>로 추정한 값입니다. 공식 컷과 다를 수 있습니다.
+        티어별 <strong>최저 점수</strong>로 추정한 값입니다. 공식 컷과 다를 수 있으며, 하단 ±는 바로 아래 행(더 과거 앵커) 대비 차이입니다.
       </Typography>
     </Card>
   );

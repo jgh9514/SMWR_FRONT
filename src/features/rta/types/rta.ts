@@ -221,9 +221,10 @@ export interface RtaTierDailyRow {
   sort_order?: number;
 }
 
-/** 일·티어별 최저 점수 (랭크 컷 추정) */
-export interface RtaRankCutoffDailyRow {
-  bucket_date: string;
+/** 앵커 시각(3h·6h·12h·3d·7d) × 티어별 최저 점수 (랭크 컷 추정) */
+export interface RtaRankCutoffAnchorRow {
+  sort_order?: number;
+  anchor_key?: string;
   tier_key: string;
   cutoff_score: number;
 }
@@ -234,7 +235,7 @@ export interface RtaDashboardResponse {
     min_date?: string;
     max_date?: string;
   };
-  rank_cutoff_daily?: RtaRankCutoffDailyRow[];
+  rank_cutoff_anchors?: RtaRankCutoffAnchorRow[];
 }
 
 /** RTA 소환사 랭킹 한 행 (리플레이 집계 기준) */
@@ -248,6 +249,34 @@ export interface RtaSummonerRankingRow {
   score?: number;
   rating_id?: number | null;
   last_match_at?: string;
+  /** 수집 리플레이 전체 기준 승·경기 수 (집계 방식 설명과 동일 데이터셋) */
+  win_count?: number;
+  match_count?: number;
+  /** 벤 슬롯 제외 필드 출전 횟수 상위 1~3위 (MyBatis camelCase 병행 가능) */
+  most_monster_1_id?: string | number;
+  most_monster_1_name?: string;
+  most_monster_1_image?: string;
+  most_monster_1_pick_count?: number;
+  most_monster_2_id?: string | number;
+  most_monster_2_name?: string;
+  most_monster_2_image?: string;
+  most_monster_2_pick_count?: number;
+  most_monster_3_id?: string | number;
+  most_monster_3_name?: string;
+  most_monster_3_image?: string;
+  most_monster_3_pick_count?: number;
+  mostMonster1Id?: string | number;
+  mostMonster1Name?: string;
+  mostMonster1Image?: string;
+  mostMonster1PickCount?: number;
+  mostMonster2Id?: string | number;
+  mostMonster2Name?: string;
+  mostMonster2Image?: string;
+  mostMonster2PickCount?: number;
+  mostMonster3Id?: string | number;
+  mostMonster3Name?: string;
+  mostMonster3Image?: string;
+  mostMonster3PickCount?: number;
 }
 
 export interface RtaSummonerRankingResponse {

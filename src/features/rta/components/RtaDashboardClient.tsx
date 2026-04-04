@@ -363,7 +363,7 @@ export default function RtaDashboardClient() {
             소환사 (매치당 2명 집계)
           </Typography>
         </Card>
-        {data ? <RtaRankCutoffsSection rankCutoffDaily={data.rank_cutoff_daily} /> : null}
+        {data ? <RtaRankCutoffsSection rankCutoffAnchors={data.rank_cutoff_anchors} /> : null}
         </>
       )}
     </Box>

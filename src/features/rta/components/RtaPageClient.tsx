@@ -12,16 +12,19 @@ import {
   Collapse,
   Button,
   Container,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import StarIcon from '@mui/icons-material/Star';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/hooks/useRtaData';
+import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
-import { getRatingColor, getRatingStars } from '@/shared/utils';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
 
 export default function RtaPageClient() {
+  const theme = useTheme();
+  const rtaStarSize = useMediaQuery(theme.breakpoints.up('md')) ? 12 : 10;
   const [expandedMatches, setExpandedMatches] = useState<{ [key: number]: boolean }>({});
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -280,12 +283,7 @@ export default function RtaPageClient() {
                             justifyContent: 'flex-start',
                           }}
                         >
-                          {Array.from({ length: getRatingStars(match.p1Rating) }).map((_, i) => (
-                            <StarIcon
-                              key={i}
-                              sx={{ fontSize: { xs: 10, md: 12 }, color: getRatingColor(match.p1Rating) }}
-                            />
-                          ))}
+                          <RtaRatingStarIcons rating={match.p1Rating} size={rtaStarSize} />
                           <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                             {match.p1Score}
                           </Typography>
@@ -411,12 +409,7 @@ export default function RtaPageClient() {
                           <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                             {match.p2Score}
                           </Typography>
-                          {Array.from({ length: getRatingStars(match.p2Rating) }).map((_, i) => (
-                            <StarIcon
-                              key={i}
-                              sx={{ fontSize: { xs: 10, md: 12 }, color: getRatingColor(match.p2Rating) }}
-                            />
-                          ))}
+                          <RtaRatingStarIcons rating={match.p2Rating} size={rtaStarSize} />
                         </Box>
                       </Box>
                     </Box>
