@@ -31,7 +31,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useRouter } from 'next/navigation';
 import { useRoleList, useRoleSave } from '@/hooks/api';
 import { isEmpty, searchDataExtraction } from '@/shared/utils/util';
-import { useCommonCodes } from '@/features/admin/hooks/useCommonCode';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { PageHeader, LoadingState, EmptyState } from '@/shared/ui';
 import { useResponsive } from '@/shared/hooks/useResponsive';
@@ -58,13 +57,10 @@ export default function RoleManagementPage() {
   const [roleDialog, setRoleDialog] = useState(false);
   const [editingRole, setEditingRole] = useState<RoleEditingItem>({});
 
-  const initialCodeGroups: CodeListData = {
+  const codeList: CodeListData = {
     CO00000001: { cd: [], cd_nm: [] },
     CO00000004: { cd: [], cd_nm: [] },
   };
-  
-  const { data: codeListData = initialCodeGroups } = useCommonCodes(initialCodeGroups);
-  const codeList = codeListData;
 
   const bsnsCdOptions = useMemo(() => {
     const codeData = codeList.CO00000001;

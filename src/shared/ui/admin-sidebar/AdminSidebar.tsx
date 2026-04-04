@@ -21,14 +21,12 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PeopleIcon from '@mui/icons-material/People';
 import SecurityIcon from '@mui/icons-material/Security';
-import CodeIcon from '@mui/icons-material/Code';
 import LanguageIcon from '@mui/icons-material/Language';
 import HistoryIcon from '@mui/icons-material/History';
 import GroupIcon from '@mui/icons-material/Group';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import PetsIcon from '@mui/icons-material/Pets';
 import DashboardIcon from '@mui/icons-material/Dashboard';
-import StorageIcon from '@mui/icons-material/Storage';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import type { MenuCategory, AdminMenuItem } from '@/features/admin/types/admin';
 
@@ -70,22 +68,8 @@ const menuCategories: MenuCategoryWithItems[] = [
     ],
   },
   {
-    title: '코드 및 다국어 관리',
+    title: '다국어',
     items: [
-      {
-        title: '코드 관리',
-        description: '공통 코드 그룹 및 코드 관리',
-        icon: <CodeIcon />,
-        path: '/admin/cdmn',
-        color: '#f57c00',
-      },
-      {
-        title: '코드 관계',
-        description: '코드 간 계층 관계 관리',
-        icon: <CodeIcon />,
-        path: '/admin/cdrelmn',
-        color: '#5d4037',
-      },
       {
         title: '다국어 관리',
         description: '다국어 텍스트 관리',
@@ -137,13 +121,6 @@ const menuCategories: MenuCategoryWithItems[] = [
         icon: <PetsIcon />,
         path: '/admin/monster',
         color: '#9c27b0',
-      },
-      {
-        title: 'DDL 비교',
-        description: 'DB DDL과 Entity 비교',
-        icon: <StorageIcon />,
-        path: '/admin/ddl-comparison',
-        color: '#1976d2',
       },
       {
         title: '쿼리 성능',

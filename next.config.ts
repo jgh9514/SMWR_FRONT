@@ -93,6 +93,15 @@ const nextConfig: NextConfig = {
     }
     
     return [
+      /**
+       * 브라우저 axios baseURL이 `/api/v1`일 때 동일 호스트로 요청이 들어오므로,
+       * Next가 받지 않고 Spring WAS로 넘겨야 한다. (없으면 /api/v1/** → 404)
+       * 앞단 Nginx/Ingress가 이미 /api를 WAS로만 보내면 이 rewrite는 타지 않음.
+       */
+      {
+        source: '/api/v1/:path*',
+        destination: `${backendURL}/api/v1/:path*`,
+      },
       {
         source: '/images/:path*',
         destination: `${backendURL}/images/:path*`,

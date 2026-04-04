@@ -1,4 +1,4 @@
-import type { CodeGroups, SearchData, SearchDataValue } from '@/shared/types/util';
+import type { SearchData, SearchDataValue } from '@/shared/types/util';
 
 /**
  * 값이 null, undefined 또는 빈 문자열인지 확인하는 함수
@@ -24,73 +24,6 @@ export const hasValue = (value: unknown): boolean => {
  */
 export const nvl = <T>(value: unknown, defaultValue: T): T => {
   return hasValue(value) ? (value as T) : defaultValue;
-}
-
-interface CodeItem {
-  cd: string;
-  cd_nm: string;
-  up_cd?: string;
-}
-
-interface CodeResponse {
-  [key: string]: CodeItem[];
-}
-
-type ApiPostFunction = (url: string, data: unknown) => Promise<CodeResponse>;
-
-export const getCommonCodeArray = async (
-  codeGroups: CodeGroups,
-  apiPost?: ApiPostFunction
-): Promise<CodeGroups> => {
-  const { apiClient } = await import('@/shared/lib/api/client');
-  const postFn = apiPost || apiClient.post.bind(apiClient);
-  
-  for (const codeGroup in codeGroups) {
-    const schData = {
-      cd_grp_no: codeGroup,
-    };
-    const response = await postFn(`/comm/comm-cd`, schData) as Record<string, CodeItem[]>;
- 
-    const dataArray = response[codeGroup] || [];
-
-    codeGroups[codeGroup] = {
-      cd: dataArray.map((item: CodeItem) => item.cd),
-      cd_nm: dataArray.map((item: CodeItem) => item.cd_nm),
-      up_cd: dataArray.map((item: CodeItem) => item.up_cd || ''),
-    };
-  }
-  return codeGroups;
-};
-
-export interface HierarchyCodeData {
-  keys: Array<[string, string]>;
-  values: string[];
-  tags: string[];
-}
-
-export const getCommonCodeArrayToHierarchy = async (
-  codeGroup: string,
-  apiPost?: ApiPostFunction
-): Promise<HierarchyCodeData> => {
-  const { apiClient } = await import('@/shared/lib/api/client');
-  const postFn = apiPost || apiClient.post.bind(apiClient);
-  
-  const schData = {
-    cd_grp_no: codeGroup
-  };
-  const response = await postFn(`/comm/comm-cd`, schData) as Record<string, CodeItem[]>;
-  
-  const dataArray = response[codeGroup] || [];
-  
-  const returnData: HierarchyCodeData = {  
-    keys: [],
-    values: [],
-    tags: []
-  };
-  returnData.tags = dataArray.map((item: CodeItem) => item.cd);
-  returnData.values = dataArray.map((item: CodeItem) => item.cd_nm);
-  returnData.keys = dataArray.map((item: CodeItem) => [item.up_cd || '', item.cd]);
-  return returnData;
 }
 
 /**

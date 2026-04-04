@@ -22,7 +22,6 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { useRouter } from 'next/navigation';
 import { searchDataExtraction } from '@/shared/utils/util';
-import { useCommonCodes } from '@/features/admin/hooks/useCommonCode';
 import { showToast } from '@/shared/lib/notification';
 import { useMlangList } from '@/features/admin/hooks';
 import type { SearchData } from '@/shared/types/util';
@@ -79,12 +78,6 @@ export default function MultiLanguageManagementPage() {
       prev.includes(mlangId) ? prev.filter((v) => v !== mlangId) : [...prev, mlangId],
     );
   };
-
-  const initialCodeGroups = {
-    CO00000001: { cd: [], cd_nm: [] },
-    CO00000008: { cd: [], cd_nm: [] },
-  };
-  useCommonCodes(initialCodeGroups);
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 4 } }}>

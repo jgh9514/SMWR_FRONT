@@ -67,80 +67,6 @@ export interface RoleItem {
   row_status?: string;
 }
 
-export interface CodeGroup {
-  id?: string;
-  cd_grp_no: string;
-  cd_grp_nm: string;
-  bsns_cd?: string;
-  dtl_bsns_cd?: string;
-  row_status?: string;
-}
-
-export interface CodeItem {
-  id: string;
-  cd_grp_no: string;
-  cd_grp_nm?: string;
-  cd: string;
-  cd_nm: string;
-  srt_sn?: string;
-  buf_fst_txt?: string;
-  buf_snd_txt?: string;
-  buf_trd_txt?: string;
-  buf_fth_txt?: string;
-  buf_ffh_txt?: string;
-  row_status?: string;
-}
-
-export interface CodeSaveRequest {
-  insertGrpRow: CodeGroup[];
-  updateGrpRow: CodeGroup[];
-  deleteGrpRow: CodeGroup[];
-  insertRow: CodeItem[];
-  updateRow: CodeItem[];
-  deleteRow: CodeItem[];
-  bsns_cd?: string;
-  cd_grp_no?: string;
-}
-
-export interface CodeRelSaveRequest {
-  insertRow: ChildItem[];
-  updateRow: ChildItem[];
-  deleteRow: ChildItem[];
-  up_cd_grp_no?: string;
-  up_cd?: string;
-}
-
-export interface CodeRelSaveResponse {
-  result: string;
-  message?: string;
-}
-
-export interface ParentItem {
-  cd_grp_no: string;
-  cd_grp_nm?: string;
-  cd: string;
-  cd_nm: string;
-  children?: ChildItem[];
-}
-
-export interface ChildItem {
-  id?: string;
-  cd_grp_no: string;
-  cd_grp_nm?: string;
-  cd: string;
-  cd_nm: string;
-  up_cd: string;
-  row_status?: string;
-}
-
-export interface PopupItem {
-  id?: string;
-  cd_grp_no: string;
-  cd_grp_nm?: string;
-  cd: string;
-  cd_nm: string;
-}
-
 export interface UserRoleItem {
   user_id: string;
   role_id: string;
@@ -177,42 +103,6 @@ export interface MlangItem {
   upd_date?: string;
   row_status?: string;
 }
-
-export type CommonCodeList = {
-  CO00000001: {
-    cd: string[];
-    cd_nm: string[];
-    up_cd?: string[];
-  };
-  CO00000002?: {
-    cd: string[];
-    cd_nm: string[];
-    up_cd?: string[];
-  };
-  CO00000004?: {
-    cd: string[];
-    cd_nm: string[];
-    up_cd?: string[];
-  };
-  CO00000005?: {
-    cd: string[];
-    cd_nm: string[];
-    up_cd?: string[];
-  };
-  CO00000008?: {
-    cd: string[];
-    cd_nm: string[];
-    up_cd?: string[];
-  };
-};
-
-export type BsnsDtlCd = {
-  id: string;
-  levels: number;
-  tags: string[];
-  keys: Array<[string, string]>;
-  values: string[];
-};
 
 /**
  * 대시보드 통계 타입 (백엔드 응답 구조에 맞춤)
@@ -363,72 +253,6 @@ export interface OpsOverviewResponse {
   metrics?: OpsMetricsSnapshot;
   api_logs?: ApiLogDiagnostics;
   health?: OpsHealthSummary;
-}
-
-/**
- * DDL Comparison 관련 타입
- */
-
-// 컬럼 정보
-export interface ColumnInfo {
-  columnName: string;
-  dataType: string;
-  nullable: boolean;
-  defaultValue?: string;
-  comment?: string;
-  isPrimaryKey?: boolean;
-  isForeignKey?: boolean;
-  maxLength?: number;
-  precision?: number;
-  scale?: number;
-}
-
-// 테이블 정보
-export interface TableInfo {
-  tableName: string;
-  comment?: string;
-  columns: ColumnInfo[];
-  primaryKeys?: string[];
-  foreignKeys?: string[];
-  indexes?: string[];
-}
-
-// DB 테이블 조회 응답
-export interface DbTablesResponse {
-  schema: string;
-  tables: TableInfo[];
-  totalCount: number;
-}
-
-// Entity 테이블 조회 응답
-export interface EntityTablesResponse {
-  entities: TableInfo[];
-  totalCount: number;
-}
-
-// 차이점 정보
-export interface DifferenceInfo {
-  type: 'missing_in_db' | 'missing_in_entity' | 'column_mismatch' | 'type_mismatch';
-  tableName: string;
-  columnName?: string;
-  dbValue?: string;
-  entityValue?: string;
-  description: string;
-}
-
-// DDL 비교 결과
-export interface DdlComparisonResult {
-  schema: string;
-  matchedTables: string[];
-  missingInDb: string[];
-  missingInEntity: string[];
-  differences: DifferenceInfo[];
-  summary: {
-    totalDbTables: number;
-    totalEntityTables: number;
-    matchedCount: number;
-    differenceCount: number;
-  };
 }
 
 /**
