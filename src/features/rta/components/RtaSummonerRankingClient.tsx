@@ -601,8 +601,10 @@ export default function RtaSummonerRankingClient() {
                       tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
                     />
                     <Tooltip
-                      formatter={(value: number | string) =>
-                        value != null && value !== '' ? Math.round(Number(value)).toLocaleString() : '—'
+                      formatter={(value: number | string | undefined) =>
+                        value != null && value !== ''
+                          ? Math.round(Number(value)).toLocaleString()
+                          : '—'
                       }
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
