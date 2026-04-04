@@ -2,8 +2,15 @@
  * JSON 업로드 관련 Hook
  */
 
+export { extractSiegeLogListFromFileText } from '@/features/log-upload/utils/extractSiegeLogList';
+export {
+  extractRankerReplayItemsFromLogText,
+  type ArenaReplayItem,
+} from '@/features/log-upload/utils/extractRankerRtpvpReplayList';
+
 import { useApiMutation } from '@/hooks/api/useApiMutation';
 import { apiClient } from '@/shared/lib/api/client';
+import { RTA_UPLOAD_TIMEOUT_MS } from '@/shared/constants';
 import { SiegeUploadResponse, ArenaUploadResponse } from '@/types';
 import type {
   SiegeItem,
@@ -11,31 +18,38 @@ import type {
   SiegeSaveRequest,
   GuildInfo,
 } from '@/features/log-upload/types/log-upload';
+import {
+  extractSiegeLogListFromFileText,
+  type RawGuildInfo,
+} from '@/features/log-upload/utils/extractSiegeLogList';
+import {
+  chunkArray,
+  remapSiegeOptionsForChunk,
+  SIEGE_LOG_CHUNK_SIZE,
+} from '@/features/log-upload/utils/siegeUploadChunks';
+import {
+  extractRankerReplayItemsFromLogText,
+  normalizeRidKey,
+  type ArenaReplayItem,
+} from '@/features/log-upload/utils/extractRankerRtpvpReplayList';
 
-interface RawGuildInfo {
-  guild_id?: string | number | null;
-  guild_name?: string | null;
-  rating_id?: number;
-  match_rank?: string | number | null;
-  siege_id?: string | number | null;
-  match_id?: string | number | null;
-  log_timestamp?: string | number | null;
-}
+/** 실레나 rta-upload 요청 분할 — 청크가 크면 한 요청이 30초를 넘겨 조용히 끊길 수 있어 작게 유지 */
+export const RTA_UPLOAD_CHUNK_SIZE = 15;
 
-interface RawLogEntry {
-  guild_info_list?: RawGuildInfo[];
-  battle_log_list?: unknown[];
-}
-
-interface ArenaReplayItem {
-  rid?: string | number;
-  [key: string]: unknown;
-}
-
-interface ArenaReplayLine {
-  command?: string;
-  ranker_replay_list?: ArenaReplayItem[];
-}
+export type ArenaUploadInput =
+  | File
+  | {
+      /** 단일 또는 여러 로그 파일 — 전부 읽어 `\n`으로 이어 붙인 뒤 추출 */
+      file?: File | File[];
+      /** 붙여 넣기 버퍼 등 병합 */
+      extraText?: string;
+      /** 세션에 기록된 rid는 업로드 목록에서 제외 */
+      skipLocalUploadedRids?: boolean;
+      /** skipLocalUploadedRids 일 때 사용 (이 페이지 메모리, 새로고침 시 초기화) */
+      skipUploadedRidSet?: Set<string>;
+      /** 업로드 성공 시(fail===0) 응답에 recordedRids 포함 */
+      recordRidsOnFullSuccess?: boolean;
+    };
 
 /**
  * 파일을 읽어서 텍스트로 반환하는 유틸리티 함수
@@ -53,41 +67,8 @@ const readFileAsText = (file: File): Promise<string> => {
 };
 
 /**
- * JSON 문자열인지 확인하는 유틸리티 함수
- */
-const isJSON = (str: string): boolean => {
-  try {
-    JSON.parse(str);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/**
  * 파일에서 log_list 추출하는 유틸리티 함수
  */
-const isRawLogEntry = (value: unknown): value is RawLogEntry => {
-  return typeof value === 'object' && value !== null;
-};
-
-const extractLogList = (jsonData: unknown): RawLogEntry[] => {
-  if (Array.isArray(jsonData)) {
-    return jsonData.filter(isRawLogEntry);
-  }
-
-  if (
-    typeof jsonData === 'object' &&
-    jsonData !== null &&
-    'log_list' in jsonData &&
-    Array.isArray(jsonData.log_list)
-  ) {
-    return jsonData.log_list.filter(isRawLogEntry);
-  }
-
-  return isRawLogEntry(jsonData) ? [jsonData] : [];
-};
-
 const toGuildInfo = (guildInfo: RawGuildInfo): GuildInfo => ({
   guildId: guildInfo.guild_id?.toString(),
   guildName: guildInfo.guild_name?.toString(),
@@ -103,21 +84,48 @@ export const useSiegeValidation = (
 ) => {
   return useApiMutation<SiegeValidationResponse, File>({
     mutationFn: async (file: File) => {
-      // 파일을 읽어서 JSON으로 파싱
       const text = await readFileAsText(file);
-      const jsonData = JSON.parse(text);
-      const logList = extractLogList(jsonData);
-      
+      const logList = extractSiegeLogListFromFileText(text);
+      if (logList.length === 0) {
+        throw new Error(
+          'GetGuildSiegeBattleLog 형식의 전투 로그가 없습니다. 랭킹 응답만 있거나 파일 형식을 확인해 주세요.',
+        );
+      }
+
       // Validation API 호출 (중복 체크만 수행)
-      const payload = {
-        log_list: logList,
-      };
-      
-      const response = await apiClient.post<SiegeValidationResponse>(
-        '/summonerswar/siege-validate',
-        payload,
-      );
-      
+      const chunks = chunkArray(logList, SIEGE_LOG_CHUNK_SIZE);
+      let response: SiegeValidationResponse;
+
+      if (chunks.length === 1) {
+        response = await apiClient.post<SiegeValidationResponse>('/summonerswar/siege-validate', {
+          log_list: logList,
+        });
+      } else {
+        let totalBattleCount = 0;
+        const siegeItemsMerged: SiegeItem[] = [];
+        for (let c = 0; c < chunks.length; c++) {
+          const base = c * SIEGE_LOG_CHUNK_SIZE;
+          const chunk = chunks[c];
+          const part = await apiClient.post<SiegeValidationResponse>('/summonerswar/siege-validate', {
+            log_list: chunk,
+          });
+          totalBattleCount += part.totalBattleCount ?? 0;
+          const items = part.siegeItems ?? [];
+          for (const it of items) {
+            const idx = it.index;
+            siegeItemsMerged.push({
+              ...it,
+              index: idx !== undefined ? base + idx : undefined,
+            });
+          }
+        }
+        response = {
+          totalSiegeCount: logList.length,
+          totalBattleCount,
+          siegeItems: siegeItemsMerged,
+        };
+      }
+
       // 파일에서 기본 정보 추출 (백엔드가 반환하지 않는 경우)
       if (!response.siegeItems || response.siegeItems.length === 0) {
         const siegeItems: SiegeItem[] = [];
@@ -169,12 +177,38 @@ export const useSiegeSave = (
 ) => {
   return useApiMutation<SiegeUploadResponse, SiegeSaveRequest>({
     mutationFn: async (request: SiegeSaveRequest) => {
-      const response = await apiClient.post<SiegeUploadResponse>(
-        '/summonerswar/siege-upload',
-        request,
-      );
-      
-      return response;
+      const list = request.log_list ?? [];
+      const chunks = chunkArray(list, SIEGE_LOG_CHUNK_SIZE);
+
+      if (chunks.length === 1) {
+        return apiClient.post<SiegeUploadResponse>('/summonerswar/siege-upload', request);
+      }
+
+      let insertedSiegeCount = 0;
+      let insertedBattleCount = 0;
+      let totalBattleCountSum = 0;
+      let last: SiegeUploadResponse | undefined;
+
+      for (let c = 0; c < chunks.length; c++) {
+        const base = c * SIEGE_LOG_CHUNK_SIZE;
+        const chunk = chunks[c];
+        const payload: SiegeSaveRequest = {
+          log_list: chunk,
+          siegeOptions: remapSiegeOptionsForChunk(request.siegeOptions, base, chunk.length),
+        };
+        last = await apiClient.post<SiegeUploadResponse>('/summonerswar/siege-upload', payload);
+        insertedSiegeCount += last.insertedSiegeCount ?? 0;
+        insertedBattleCount += last.insertedBattleCount ?? 0;
+        totalBattleCountSum += last.totalBattleCount ?? 0;
+      }
+
+      return {
+        ...last,
+        totalSiegeCount: list.length,
+        totalBattleCount: totalBattleCountSum,
+        insertedSiegeCount,
+        insertedBattleCount,
+      } as SiegeUploadResponse;
     },
     ...options,
   });
@@ -189,15 +223,18 @@ export const useSiegeUpload = (
 ) => {
   return useApiMutation<SiegeUploadResponse, File>({
     mutationFn: async (file: File) => {
-      // 파일을 읽어서 JSON으로 파싱
       const text = await readFileAsText(file);
-      const jsonData = JSON.parse(text);
-      const logList = extractLogList(jsonData);
-      
+      const logList = extractSiegeLogListFromFileText(text);
+      if (logList.length === 0) {
+        throw new Error(
+          'GetGuildSiegeBattleLog 형식의 전투 로그가 없습니다. 랭킹 응답만 있거나 파일 형식을 확인해 주세요.',
+        );
+      }
+
       const payload = {
         log_list: logList,
       };
-      
+
       const response = await apiClient.post<SiegeUploadResponse>('/summonerswar/siege-upload', payload);
       
       // 파일에서 통계 계산
@@ -248,57 +285,93 @@ export const useSiegeUpload = (
   });
 };
 
+async function postArenaChunks(items: ArenaReplayItem[]): Promise<ArenaUploadResponse> {
+  let success = 0;
+  let fail = 0;
+  for (let i = 0; i < items.length; i += RTA_UPLOAD_CHUNK_SIZE) {
+    const chunk = items.slice(i, i + RTA_UPLOAD_CHUNK_SIZE);
+    const r = await apiClient.post<ArenaUploadResponse>(
+      '/summonerswar/rta-upload',
+      { arenaJson: chunk },
+      { timeout: RTA_UPLOAD_TIMEOUT_MS },
+    );
+    success += r.success ?? 0;
+    fail += r.fail ?? 0;
+  }
+  return { success, fail };
+}
+
 /**
  * 실레나 로그 업로드 Mutation
- * 원본 Vue 파일의 로직을 따라줌:
- * 1. 파일을 줄 단위로 파싱
- * 2. getRankerRtpvpReplayList 명령어만 추출
- * 3. rid 기준으로 중복 제거
+ * - getRankerRtpvpReplayList / getRtpvpRatingReplayList 추출 (NDJSON / API Command+Response)
+ * - rid 기준 파일 내 중복 제거
+ * - 청크 업로드(버퍼링)
+ * - 옵션: 세션 rid 집합 제외, 전체 성공 시 recordedRids 반환
  */
 export const useArenaUpload = (
-  options?: Omit<Parameters<typeof useApiMutation<ArenaUploadResponse, File>>[0], 'mutationFn'>,
+  options?: Omit<Parameters<typeof useApiMutation<ArenaUploadResponse, ArenaUploadInput>>[0], 'mutationFn'>,
 ) => {
-  return useApiMutation<ArenaUploadResponse, File>({
-    mutationFn: async (file: File) => {
-      // 파일을 텍스트로 읽기
-      const text = await readFileAsText(file);
-      
-      // 줄 단위로 분리
-      const jsonArray = text.split('\r\n');
-      const jsonObjects: ArenaReplayItem[] = [];
-      const uniqueObjects: Record<string, boolean> = {};
-      
-      // 각 줄을 파싱하여 실레나 데이터 추출
-      jsonArray.forEach((item) => {
-        if (isJSON(item)) {
-          try {
-            const jsonData = JSON.parse(item) as ArenaReplayLine;
-            // getRankerRtpvpReplayList 명령어인 경우만 추출
-            if (
-              jsonData.command === 'getRankerRtpvpReplayList' &&
-              jsonData.ranker_replay_list !== undefined
-            ) {
-              jsonData.ranker_replay_list.forEach((obj) => {
-                // rid 기준으로 중복 제거
-                const replayId = obj.rid?.toString();
-                if (replayId && !uniqueObjects[replayId]) {
-                  uniqueObjects[replayId] = true;
-                  jsonObjects.push(obj);
-                }
-              });
-            }
-          } catch {
-            // JSON 파싱 실패 시 무시
+  return useApiMutation<ArenaUploadResponse, ArenaUploadInput>({
+    mutationFn: async (input: ArenaUploadInput) => {
+      let text = '';
+      let recordRids = false;
+      let skipLocal = false;
+      let sessionSkipSet: Set<string> | undefined;
+
+      if (input instanceof File) {
+        text = await readFileAsText(input);
+      } else {
+        if (!input.file && !(input.extraText && input.extraText.trim())) {
+          throw new Error('파일을 선택하거나 버퍼에 로그를 추가해 주세요.');
+        }
+        recordRids = input.recordRidsOnFullSuccess === true;
+        skipLocal = input.skipLocalUploadedRids === true;
+        sessionSkipSet = input.skipUploadedRidSet;
+        const parts: string[] = [];
+        if (input.file) {
+          const files = Array.isArray(input.file) ? input.file : [input.file];
+          for (const f of files) {
+            parts.push(await readFileAsText(f));
           }
         }
-      });
-      
-      // 백엔드가 기대하는 형식으로 변환
-      const payload = {
-        arenaJson: jsonObjects,
-      };
-      
-      return apiClient.post<ArenaUploadResponse>('/summonerswar/rta-upload', payload);
+        if (input.extraText?.trim()) {
+          parts.push(input.extraText);
+        }
+        text = parts.join('\n');
+      }
+
+      if (!text.trim()) {
+        throw new Error('로그 내용이 비어 있습니다. 파일을 선택하거나 버퍼를 채워 주세요.');
+      }
+
+      let items = extractRankerReplayItemsFromLogText(text);
+      if (items.length === 0) {
+        throw new Error(
+          'getRankerRtpvpReplayList / getRtpvpRatingReplayList 데이터가 없습니다. 프록시 로그(Response) 또는 NDJSON을 확인해 주세요.',
+        );
+      }
+
+      if (skipLocal) {
+        const s = sessionSkipSet ?? new Set<string>();
+        items = items.filter((it) => {
+          const id = normalizeRidKey(it.rid);
+          return id !== '' && !s.has(id);
+        });
+      }
+      if (items.length === 0) {
+        throw new Error(
+          '업로드할 신규 전투가 없습니다. (세션에 기록된 rid와 모두 겹치거나 중복만 있음)',
+        );
+      }
+
+      const result = await postArenaChunks(items);
+
+      if (recordRids && (result.fail ?? 0) === 0 && items.length > 0) {
+        const recordedRids = items.map((x) => normalizeRidKey(x.rid)).filter((id) => id !== '');
+        return { ...result, recordedRids };
+      }
+
+      return result;
     },
     ...options,
   });

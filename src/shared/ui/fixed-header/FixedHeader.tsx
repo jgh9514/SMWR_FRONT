@@ -26,6 +26,8 @@ import HomeIcon from '@mui/icons-material/Home';
 import CastleIcon from '@mui/icons-material/Castle';
 import HistoryIcon from '@mui/icons-material/History';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import SearchIcon from '@mui/icons-material/Search';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -94,6 +96,18 @@ const getMenuCategories = (
       title: 'RTA 몬스터별 통계',
       path: '/rta/monster-stats',
       icon: <BarChartIcon />,
+      category: 'main',
+    },
+    {
+      title: 'RTA 대시보드',
+      path: '/rta/dashboard',
+      icon: <DashboardIcon />,
+      category: 'main',
+    },
+    {
+      title: 'RTA 소환사 랭킹',
+      path: '/rta/summoner-ranking',
+      icon: <EmojiEventsIcon />,
       category: 'main',
     },
   ];

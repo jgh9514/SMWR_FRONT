@@ -33,11 +33,28 @@ export interface HistoryItem {
   total_rate?: number;
   win_count?: number;
   lose_count?: number;
+  /** 공격 조합(공성률 이력 행) — 공덱 상세·투표 연동용 */
+  atk_monster_1?: string;
+  atk_monster_2?: string;
+  atk_monster_3?: string;
+  /** 추천 공덱 테이블에 등록된 경우에만 존재 */
+  deck_id?: string | number;
+  recommend_count?: number;
+  not_recommend_count?: number;
+  /** 로그인 사용자 기준 UP / DOWN / null */
+  my_vote?: string;
 }
 
 export interface RecommendedItem {
   team_id?: string;
   deck_id?: string;
+  /** 방덱(적 수비) — deck_id 없이 상세 조회 시 */
+  def_monster_1?: string;
+  def_monster_2?: string;
+  def_monster_3?: string;
+  atk_monster_1?: string;
+  atk_monster_2?: string;
+  atk_monster_3?: string;
   image_url1?: string;
   image_url2?: string;
   image_url3?: string;

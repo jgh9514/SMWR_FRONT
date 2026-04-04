@@ -4,12 +4,8 @@
 
 export * from './useUser';
 export * from './useRole';
-export * from './useMenu';
 export * from './useCode';
-export * from './useApi';
-export * from './usePage';
 export * from './useUserRole';
-export * from './useRoleMenu';
 export * from './useDashboard';
 export * from './useBatch';
 export * from './useLog';

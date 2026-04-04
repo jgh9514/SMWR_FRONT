@@ -24,6 +24,9 @@ import {
   FormControlLabel,
   Radio,
   RadioGroup,
+  Checkbox,
+  TextField,
+  FormGroup,
 } from '@mui/material';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
@@ -31,7 +34,13 @@ import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteIcon from '@mui/icons-material/Delete';
 import WarningIcon from '@mui/icons-material/Warning';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import { useSiegeValidation, useSiegeSave, useArenaUpload } from '@/hooks/api';
+import {
+  useSiegeValidation,
+  useSiegeSave,
+  useArenaUpload,
+  extractRankerReplayItemsFromLogText,
+} from '@/hooks/api';
+import { extractSiegeLogListFromFileText } from '@/features/log-upload/utils/extractSiegeLogList';
 import type {
   SiegeSaveRequest,
   SiegeValidationResponse,
@@ -41,6 +50,9 @@ import { validateFile } from '@/shared/utils/security';
 import { logger } from '@/shared/lib/logger';
 import type { UserInfo } from '@/features/auth/types/auth';
 import type { SiegeUploadResponse, ArenaUploadResponse } from '@/types';
+
+/** 로그 파일 선택·드롭 최대 크기 (실레나 대용량, WAS `max-http-post-size`·multipart와 맞춤) */
+const LOG_UPLOAD_MAX_FILE_BYTES = 32 * 1024 * 1024;
 
 function LogUploadContent() {
   const searchParams = useSearchParams();
@@ -77,6 +89,22 @@ function LogUploadContent() {
   const [siegeValidationResult, setSiegeValidationResult] = useState<SiegeValidationResponse | null>(null);
   const [siegeResult, setSiegeResult] = useState<SiegeUploadResponse | null>(null);
   const [arenaResult, setArenaResult] = useState<ArenaUploadResponse | null>(null);
+  const [arenaPasteText, setArenaPasteText] = useState('');
+  /** 붙여 넣기·파일 이어붙이기용 (메모리만, 새로고침 시 초기화) */
+  const [arenaBufferText, setArenaBufferText] = useState('');
+  /** 이번 탭에서 «실패 0건이면 rid 기록»으로 누적한 rid (메모리만) */
+  const [arenaUploadedRids, setArenaUploadedRids] = useState<Set<string>>(() => new Set());
+  const [arenaSkipLocalRids, setArenaSkipLocalRids] = useState(false);
+  const [arenaRecordRids, setArenaRecordRids] = useState(false);
+
+  const arenaBufferReplayCount = useMemo(() => {
+    if (!arenaBufferText.trim()) return 0;
+    try {
+      return extractRankerReplayItemsFromLogText(arenaBufferText).length;
+    } catch {
+      return 0;
+    }
+  }, [arenaBufferText]);
   const [siegeOptions, setSiegeOptions] = useState<Record<string, 'skip' | 'overwrite'>>({});
   const [logListData, setLogListData] = useState<unknown[]>([]);
   const [dragActive, setDragActive] = useState<{ siege: boolean; arena: boolean }>({
@@ -91,9 +119,9 @@ function LogUploadContent() {
     // 파일 검증
     for (const file of selectedFiles) {
       const validation = validateFile(file, {
-        allowedExtensions: ['json', 'txt'],
-        allowedMimeTypes: ['application/json', 'text/plain'],
-        maxSizeBytes: 10 * 1024 * 1024, // 10MB
+        allowedExtensions: type === 'arena' ? ['json', 'txt', 'log'] : ['json', 'txt'],
+        allowedMimeTypes: type === 'arena' ? [] : ['application/json', 'text/plain'],
+        maxSizeBytes: LOG_UPLOAD_MAX_FILE_BYTES,
       });
 
       if (!validation.valid) {
@@ -121,9 +149,61 @@ function LogUploadContent() {
       setLogListData([]);
     } else {
       setFiles2([]);
-      // 실레나 파일 제거 시 결과 초기화
       setArenaResult(null);
     }
+  };
+
+  const handleArenaAppendBuffer = () => {
+    const t = arenaPasteText.trim();
+    if (!t) {
+      showToast.error('추가할 텍스트를 붙여 넣어 주세요.');
+      return;
+    }
+    const add = t.trimEnd() + (t.endsWith('\n') ? '' : '\n');
+    setArenaBufferText((prev) => prev + (prev && !prev.endsWith('\n') ? '\n' : '') + add);
+    setArenaPasteText('');
+    showToast.success('버퍼에 추가했습니다.');
+  };
+
+  const handleArenaClearBuffer = () => {
+    setArenaBufferText('');
+    showToast.success('버퍼를 비웠습니다.');
+  };
+
+  const handleArenaDownloadBuffer = () => {
+    const t = arenaBufferText;
+    if (!t.trim()) {
+      showToast.error('버퍼가 비어 있습니다.');
+      return;
+    }
+    const blob = new Blob([t], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `rta-ranker-buffer-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast.success('버퍼 내용을 파일로 저장했습니다.');
+  };
+
+  const handleArenaClearRidCache = () => {
+    setArenaUploadedRids(new Set());
+    showToast.success('세션 rid 기록을 비웠습니다.');
+  };
+
+  const handleArenaLoadFileToBuffer = async () => {
+    if (files2.length === 0) {
+      showToast.error('먼저 파일을 선택하세요.');
+      return;
+    }
+    const texts = await Promise.all(files2.map((f) => f.text()));
+    const joined = texts.join('\n');
+    const add = joined.trimEnd() + (joined.endsWith('\n') ? '' : '\n');
+    setArenaBufferText((prev) => prev + (prev && !prev.endsWith('\n') ? '\n' : '') + add);
+    showToast.success(
+      files2.length === 1
+        ? '선택한 파일 내용을 버퍼에 이어 붙였습니다.'
+        : `선택한 ${files2.length}개 파일 내용을 순서대로 버퍼에 이어 붙였습니다.`,
+    );
   };
 
   // 드래그 앤 드롭 핸들러
@@ -148,9 +228,9 @@ function LogUploadContent() {
       // 파일 검증
       for (const file of droppedFiles) {
         const validation = validateFile(file, {
-          allowedExtensions: ['json', 'txt'],
-          allowedMimeTypes: ['application/json', 'text/plain'],
-          maxSizeBytes: 10 * 1024 * 1024, // 10MB
+          allowedExtensions: type === 'arena' ? ['json', 'txt', 'log'] : ['json', 'txt'],
+          allowedMimeTypes: type === 'arena' ? [] : ['application/json', 'text/plain'],
+          maxSizeBytes: LOG_UPLOAD_MAX_FILE_BYTES,
         });
 
         if (!validation.valid) {
@@ -183,7 +263,7 @@ function LogUploadContent() {
     },
     onError: (error: Error) => {
       logger.error('점령전 검증 실패', error, { context: 'LogUploadPage' });
-      showToast.error('점령전 검증에 실패했습니다.');
+      showToast.error(error.message || '점령전 검증에 실패했습니다.');
     },
   });
 
@@ -204,11 +284,25 @@ function LogUploadContent() {
   const arenaUploadMutation = useArenaUpload({
     onSuccess: (data: ArenaUploadResponse) => {
       setArenaResult(data);
+      if (data.recordedRids?.length) {
+        setArenaUploadedRids((prev) => {
+          const next = new Set(prev);
+          for (const r of data.recordedRids!) {
+            if (r) next.add(r);
+          }
+          return next;
+        });
+      }
       showToast.success('실레나 로그가 업로드되었습니다.');
     },
     onError: (error: Error) => {
       logger.error('실레나 업로드 실패', error, { context: 'LogUploadPage' });
-      showToast.error('실레나 업로드에 실패했습니다.');
+      const msg =
+        /timeout|ECONNABORTED/i.test(String((error as Error & { code?: string }).message)) ||
+        (error as Error & { code?: string }).code === 'ECONNABORTED'
+          ? '실레나 업로드가 시간 초과로 끊겼습니다. 네트워크·서버 부하를 확인하거나 잠시 후 다시 시도해 주세요.'
+          : '실레나 업로드에 실패했습니다.';
+      showToast.error(msg);
     },
   });
 
@@ -225,17 +319,14 @@ function LogUploadContent() {
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const jsonData = JSON.parse(text);
-        let logList: unknown[];
-        
-        if (Array.isArray(jsonData)) {
-          logList = jsonData;
-        } else if (jsonData.log_list && Array.isArray(jsonData.log_list)) {
-          logList = jsonData.log_list;
-        } else {
-          logList = [jsonData];
+        const logList = extractSiegeLogListFromFileText(text);
+        if (logList.length === 0) {
+          showToast.error(
+            'GetGuildSiegeBattleLog 전투 로그가 없습니다. 랭킹(GetGuildSiegeRankingInfo)만 있거나 Response JSON이 잘렸는지 확인해 주세요.',
+          );
+          setLogListData([]);
+          return;
         }
-        
         setLogListData(logList);
         siegeValidationMutation.mutate(file);
       } catch (error) {
@@ -269,14 +360,22 @@ function LogUploadContent() {
     }));
   };
 
-  // 실레나 업로드 처리
+  // 실레나 업로드 처리 (파일 + 로컬 NDJSON 버퍼 병합, 청크 업로드)
   const handleArenaUpload = () => {
-    if (files2.length === 0) {
-      showToast.error('파일을 선택해주세요.');
+    const extra = arenaBufferText;
+    const hasFiles = files2.length > 0;
+    if (!hasFiles && !extra.trim()) {
+      showToast.error('파일을 선택하거나 버퍼에 로그를 추가해 주세요.');
       return;
     }
 
-    arenaUploadMutation.mutate(files2[0]);
+    arenaUploadMutation.mutate({
+      file: hasFiles ? (files2.length === 1 ? files2[0] : files2) : undefined,
+      extraText: extra.trim() ? extra : undefined,
+      skipLocalUploadedRids: arenaSkipLocalRids,
+      skipUploadedRidSet: arenaUploadedRids,
+      recordRidsOnFullSuccess: arenaRecordRids,
+    });
   };
 
   // 권한 없으면 접근 차단
@@ -337,9 +436,9 @@ function LogUploadContent() {
               • 점령전 로그: JSON 또는 TXT 형식의 파일을 업로드하세요.
             </Typography>
           )}
-          {showRtaUpload && (
+            {showRtaUpload && (
             <Typography variant="body2" color="text.secondary" sx={{ mt: showSiegeUpload ? 1 : 0 }}>
-              • 실레나 로그: TXT 또는 LOG 형식의 파일을 업로드하세요. (관리자 전용)
+              • 실레나: 프록시 로그(API Command / Response) 또는 NDJSON. getRankerRtpvpReplayList·getRtpvpRatingReplayList 응답을 추출합니다.
             </Typography>
           )}
         </CardContent>
@@ -794,6 +893,69 @@ function LogUploadContent() {
                 }
               />
               <CardContent>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  붙여 넣기 버퍼에 로그를 이어 붙인 뒤 파일과 합쳐 업로드합니다. 이 탭을 닫거나 새로고침하면 버퍼·rid 기록이
+                  초기화됩니다.
+                </Typography>
+
+                <Paper variant="outlined" sx={{ p: 2, mb: 2, bgcolor: 'action.hover' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                    로그 버퍼 (메모리)
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                    추출 예상: {arenaBufferReplayCount}건 (rid 기준) · 세션 rid 기록: {arenaUploadedRids.size}개
+                  </Typography>
+                  <TextField
+                    multiline
+                    minRows={3}
+                    fullWidth
+                    size="small"
+                    placeholder="프록시 로그 일부를 붙여 넣은 뒤 «버퍼에 추가»"
+                    value={arenaPasteText}
+                    onChange={(e) => setArenaPasteText(e.target.value)}
+                    sx={{ mb: 1 }}
+                  />
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                    <Button size="small" variant="outlined" onClick={handleArenaAppendBuffer}>
+                      버퍼에 추가
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={handleArenaLoadFileToBuffer} disabled={files2.length === 0}>
+                      선택 파일 → 버퍼에 이어 붙이기
+                    </Button>
+                    <Button size="small" color="warning" onClick={handleArenaClearBuffer}>
+                      버퍼 비우기
+                    </Button>
+                    <Button size="small" variant="text" onClick={handleArenaDownloadBuffer}>
+                      버퍼 다운로드(.txt)
+                    </Button>
+                    <Button size="small" variant="text" color="secondary" onClick={handleArenaClearRidCache}>
+                      rid 기록만 비우기
+                    </Button>
+                  </Box>
+                  <FormGroup>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={arenaSkipLocalRids}
+                          onChange={(e) => setArenaSkipLocalRids(e.target.checked)}
+                          size="small"
+                        />
+                      }
+                      label="세션에 기록된 rid는 제외 («실패 0건이면 rid 기록»을 켠 경우에만 누적)"
+                    />
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={arenaRecordRids}
+                          onChange={(e) => setArenaRecordRids(e.target.checked)}
+                          size="small"
+                        />
+                      }
+                      label="이번 업로드가 실패 0건이면 rid를 세션에 기록 (새로고침 전까지 유지)"
+                    />
+                  </FormGroup>
+                </Paper>
+
                 {/* 파일 선택 영역 */}
                 <Paper
                   variant="outlined"
@@ -827,7 +989,8 @@ function LogUploadContent() {
                   <input
                     id="arena-file-input"
                     type="file"
-                    accept=".txt,.log"
+                    accept=".txt,.log,.json"
+                    multiple
                     onChange={(e) => handleFileSelect(e, 'arena')}
                     style={{ display: 'none' }}
                   />
@@ -838,17 +1001,26 @@ function LogUploadContent() {
                         파일을 선택하거나 여기에 드래그하세요
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        TXT 또는 LOG 파일만 업로드 가능합니다
+                        TXT / LOG / JSON (NDJSON 가능)
                       </Typography>
                     </>
                   ) : (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <InsertDriveFileIcon sx={{ color: 'success.main' }} />
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {files2[0].name}
+                      <Typography variant="body1" sx={{ fontWeight: 600, textAlign: 'center' }}>
+                        {files2.length === 1
+                          ? files2[0].name
+                          : `${files2.length}개 파일 — ${files2
+                              .slice(0, 2)
+                              .map((f) => f.name)
+                              .join(', ')}${files2.length > 2 ? ` 외 ${files2.length - 2}개` : ''}`}
                       </Typography>
                       <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                        ({(files2[0].size / 1024).toFixed(2)} KB)
+                        (
+                        {files2.length === 1
+                          ? `${(files2[0].size / 1024).toFixed(2)} KB`
+                          : `${(files2.reduce((s, f) => s + f.size, 0) / 1024).toFixed(2)} KB 합계`}
+                        )
                       </Typography>
                       <IconButton
                         size="small"
@@ -870,11 +1042,13 @@ function LogUploadContent() {
                   color="secondary"
                   fullWidth
                   onClick={handleArenaUpload}
-                  disabled={arenaUploadMutation.isPending || files2.length === 0}
+                  disabled={
+                    arenaUploadMutation.isPending || (files2.length === 0 && !arenaBufferText.trim())
+                  }
                   startIcon={<FileUploadIcon />}
                   size="large"
                 >
-                  {arenaUploadMutation.isPending ? '업로드 중...' : '실레나 업로드'}
+                  {arenaUploadMutation.isPending ? '업로드 중...' : '실레나 업로드 (파일+버퍼 병합)'}
                 </Button>
                 {arenaUploadMutation.isPending && <LinearProgress sx={{ mb: 2 }} />}
                 {arenaResult && (

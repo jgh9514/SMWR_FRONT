@@ -8,6 +8,8 @@ import HistoryIcon from '@mui/icons-material/History';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import SearchIcon from '@mui/icons-material/Search';
 import BarChartIcon from '@mui/icons-material/BarChart';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import ForumIcon from '@mui/icons-material/Forum';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -259,6 +261,20 @@ export default function HomePageClient() {
           icon: <BarChartIcon />,
           path: '/rta/monster-stats',
           color: '#e91e63',
+        },
+        {
+          title: 'RTA 대시보드',
+          description: '티어별 소환사 분포와 기간 필터를 확인하세요',
+          icon: <DashboardIcon />,
+          path: '/rta/dashboard',
+          color: '#00897b',
+        },
+        {
+          title: 'RTA 소환사 랭킹',
+          description: '수집 리플레이 기준 최신 점수 순위를 확인하세요',
+          icon: <EmojiEventsIcon />,
+          path: '/rta/summoner-ranking',
+          color: '#6a1b9a',
         },
       ];
 

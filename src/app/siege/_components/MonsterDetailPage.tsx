@@ -18,19 +18,34 @@ import {
   useTheme,
   CircularProgress,
   Skeleton,
+  Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import {
   useMonsterDetailBasic,
   useMonsterDetailRecommended,
   useMonsterDetailHistory,
+  useDeckVoteMutation,
 } from '@/hooks/api';
+import { showToast } from '@/shared/lib/notification';
 import AddDeckPopup from '@/components/popup/AddDeckPopup';
 import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData } from '@/types';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
+
+/** 이력 API의 deck_id(또는 camelCase) — 있으면 등록 공덱 투표로 병합 */
+function getHistoryRowDeckId(item: HistoryItem): string | null {
+  const rec = item as HistoryItem & { deckId?: unknown };
+  const raw = item.deck_id ?? rec.deckId;
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (s === '' || s === '0') return null;
+  return s;
+}
 
 function BasicInfoSkeleton() {
   return (
@@ -177,7 +192,41 @@ export default function MonsterDetailPage() {
   const handleDeckDetailPopupClose = () => {
     setDeckDetailPopupOpen(false);
     setSelectedDeckItem(null);
-    recommended.refetch();
+    void recommended.refetch();
+    void history.refetch();
+  };
+
+  const deckVoteMutation = useDeckVoteMutation({
+    onSuccess: () => {
+      showToast.success('투표가 반영되었습니다.');
+      void history.refetch();
+      void recommended.refetch();
+    },
+    onError: () => {
+      showToast.error('투표 처리에 실패했습니다.');
+    },
+  });
+
+  const sendHistoryVote = (item: HistoryItem, vote: 'UP' | 'DOWN' | 'CLEAR') => {
+    if (!schData.dm1 || !schData.dm2 || !schData.dm3) return;
+    const a1 = item.atk_monster_1;
+    const a2 = item.atk_monster_2;
+    const a3 = item.atk_monster_3;
+    if (!a1 || !a2 || !a3) {
+      showToast.error('이 공격 조합 정보가 없어 투표할 수 없습니다.');
+      return;
+    }
+    const did = getHistoryRowDeckId(item);
+    deckVoteMutation.mutate({
+      ...(did ? { deck_id: did } : {}),
+      def_monster_1: schData.dm1,
+      def_monster_2: schData.dm2,
+      def_monster_3: schData.dm3,
+      atk_monster_1: String(a1),
+      atk_monster_2: String(a2),
+      atk_monster_3: String(a3),
+      vote,
+    });
   };
 
   const goBack = () => {
@@ -587,60 +636,143 @@ export default function MonsterDetailPage() {
                                 sx={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: 2,
-                                  flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                                  justifyContent: 'space-between',
+                                  gap: 1.5,
+                                  flexWrap: 'wrap',
                                 }}
                               >
-                                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, minWidth: { xs: 'auto', md: 180 } }}>
-                                  {[1, 2, 3].map((i) => {
-                                    const imageUrl = item[`image_url${i}` as keyof HistoryItem] as string | undefined;
-                                    if (i === 3 && !imageUrl) return null;
-                                    return (
-                                      <Avatar
-                                        key={i}
-                                        src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
-                                        sx={{
-                                          width: { xs: 44, md: 56 },
-                                          height: { xs: 44, md: 56 },
-                                          border: '2px solid #34495e',
-                                          boxShadow: 1,
-                                          ml: i > 1 ? -0.5 : 0,
-                                          flexShrink: 0,
-                                          bgcolor: 'background.paper',
-                                          '& img': { objectFit: 'contain' },
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </Box>
-                                <Box sx={{ flex: 1, minWidth: 0, maxWidth: { xs: '100%', md: 300 } }}>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                    <Chip
-                                      label={`${item.total_rate || 0}%`}
-                                      sx={{
-                                        bgcolor: item.total_rate && item.total_rate >= 50 ? '#34495e' : '#95a5a6',
-                                        color: 'white',
-                                        fontWeight: 500,
-                                        height: 24,
-                                      }}
-                                      size="small"
-                                    />
-                                    <Typography variant="caption" sx={{ color: '#7f8c8d', fontSize: '0.75rem' }}>
-                                      {item.win_count || 0}승 {item.lose_count || 0}패
-                                    </Typography>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                    flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                                    flex: 1,
+                                    minWidth: 0,
+                                  }}
+                                >
+                                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, minWidth: { xs: 'auto', md: 180 } }}>
+                                    {[1, 2, 3].map((i) => {
+                                      const imageUrl = item[`image_url${i}` as keyof HistoryItem] as string | undefined;
+                                      if (i === 3 && !imageUrl) return null;
+                                      return (
+                                        <Avatar
+                                          key={i}
+                                          src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
+                                          sx={{
+                                            width: { xs: 44, md: 56 },
+                                            height: { xs: 44, md: 56 },
+                                            border: '2px solid #34495e',
+                                            boxShadow: 1,
+                                            ml: i > 1 ? -0.5 : 0,
+                                            flexShrink: 0,
+                                            bgcolor: 'background.paper',
+                                            '& img': { objectFit: 'contain' },
+                                          }}
+                                        />
+                                      );
+                                    })}
                                   </Box>
-                                  <LinearProgress
-                                    variant="determinate"
-                                    value={item.total_rate || 0}
-                                    sx={{
-                                      height: 6,
-                                      borderRadius: 1,
-                                      bgcolor: '#e0e0e0',
-                                      '& .MuiLinearProgress-bar': {
-                                        bgcolor: item.total_rate && item.total_rate >= 50 ? '#34495e' : '#95a5a6',
-                                      },
-                                    }}
-                                  />
+                                  <Box sx={{ flex: 1, minWidth: 0, maxWidth: { xs: '100%', md: 300 } }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                      <Chip
+                                        label={`${item.total_rate || 0}%`}
+                                        sx={{
+                                          bgcolor: item.total_rate && item.total_rate >= 50 ? '#34495e' : '#95a5a6',
+                                          color: 'white',
+                                          fontWeight: 500,
+                                          height: 24,
+                                        }}
+                                        size="small"
+                                      />
+                                      <Typography variant="caption" sx={{ color: '#7f8c8d', fontSize: '0.75rem' }}>
+                                        {item.win_count || 0}승 {item.lose_count || 0}패
+                                      </Typography>
+                                    </Box>
+                                    <LinearProgress
+                                      variant="determinate"
+                                      value={item.total_rate || 0}
+                                      sx={{
+                                        height: 6,
+                                        borderRadius: 1,
+                                        bgcolor: '#e0e0e0',
+                                        '& .MuiLinearProgress-bar': {
+                                          bgcolor: item.total_rate && item.total_rate >= 50 ? '#34495e' : '#95a5a6',
+                                        },
+                                      }}
+                                    />
+                                  </Box>
+                                </Box>
+                                <Box
+                                  sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.75,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {(() => {
+                                    const canVote =
+                                      Boolean(schData.dm1 && schData.dm2 && schData.dm3) &&
+                                      Boolean(
+                                        item.atk_monster_1 &&
+                                          item.atk_monster_2 &&
+                                          item.atk_monster_3,
+                                      );
+                                    const myV = String(item.my_vote ?? '')
+                                      .trim()
+                                      .toUpperCase();
+                                    const upN = Number(item.recommend_count ?? 0);
+                                    const downN = Number(item.not_recommend_count ?? 0);
+                                    const busy = deckVoteMutation.isPending;
+                                    const buttons = (
+                                      <>
+                                        <Button
+                                          size="small"
+                                          variant={myV === 'UP' ? 'contained' : 'outlined'}
+                                          color="primary"
+                                          startIcon={<ThumbUpIcon sx={{ fontSize: 18 }} />}
+                                          onClick={() =>
+                                            sendHistoryVote(item, myV === 'UP' ? 'CLEAR' : 'UP')
+                                          }
+                                          disabled={busy || !canVote}
+                                          sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: '0.8rem' }}
+                                        >
+                                          {upN}
+                                        </Button>
+                                        <Button
+                                          size="small"
+                                          variant={myV === 'DOWN' ? 'contained' : 'outlined'}
+                                          color="error"
+                                          startIcon={<ThumbDownIcon sx={{ fontSize: 18 }} />}
+                                          onClick={() =>
+                                            sendHistoryVote(item, myV === 'DOWN' ? 'CLEAR' : 'DOWN')
+                                          }
+                                          disabled={busy || !canVote}
+                                          sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: '0.8rem' }}
+                                        >
+                                          {downN}
+                                        </Button>
+                                      </>
+                                    );
+                                    if (!canVote) {
+                                      return (
+                                        <Tooltip
+                                          title="전투 이력에서 공격 덱(3마리) 정보를 찾을 수 없을 때는 투표할 수 없습니다."
+                                          arrow
+                                          placement="top"
+                                        >
+                                          <Box
+                                            component="span"
+                                            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}
+                                          >
+                                            {buttons}
+                                          </Box>
+                                        </Tooltip>
+                                      );
+                                    }
+                                    return buttons;
+                                  })()}
                                 </Box>
                               </Box>
                             </CardContent>

@@ -126,17 +126,30 @@ export async function getMonsterListData(): Promise<MonsterOption[]> {
   return normalizeMonsterList(raw);
 }
 
+/** WAS는 미존재 시 빈 Map `{}`를 200으로 줄 수 있어, 필드 검증 없이 쓰면 상세 UI가 런타임 오류 남 */
+function isValidMonsterInfoPayload(data: unknown): data is MonsterInfoResponse {
+  if (data == null || typeof data !== 'object') return false;
+  const o = data as Record<string, unknown>;
+  const id = o.monster_id ?? o.monsterId;
+  return id != null && String(id).trim() !== '';
+}
+
 export async function getMonsterInfoData(monsterId: string): Promise<MonsterInfoResponse | null> {
-  if (!monsterId) {
+  const trimmed = monsterId?.trim();
+  if (!trimmed) {
     return null;
   }
 
   try {
-    return await serverApiPost<MonsterInfoResponse>(
+    const data = await serverApiPost<MonsterInfoResponse>(
       '/summonerswar/monster/info',
-      { monster_id: monsterId },
+      { monster_id: trimmed },
       PUBLIC_REVALIDATE_SECONDS.monsterDetail,
     );
+    if (!isValidMonsterInfoPayload(data)) {
+      return null;
+    }
+    return data;
   } catch {
     return null;
   }

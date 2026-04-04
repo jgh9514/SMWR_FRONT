@@ -32,6 +32,9 @@ export interface RawMatchItem {
   p2_first_pick?: string;
   p1_wizard_id?: string;
   p2_wizard_id?: string;
+  /** SWEX playerImage/{channel_uid}.jpg — wizard_id 와 다를 수 있음 */
+  p1_channel_uid?: string | number;
+  p2_channel_uid?: string | number;
   p1_country?: string;
   p2_country?: string;
   p1_score?: string | number;
@@ -47,11 +50,14 @@ export interface RawMatchItem {
 // 클라이언트에서 사용하는 매치 데이터 (camelCase)
 export interface MatchItem {
   p1Id: string;
+  /** 프로필용, 없으면 p1Id(wizard)로 폴백 */
+  p1ChannelUid?: string;
   p1Name: string;
   p1Country?: string;
   p1Rating: number;
   p1Score: number;
   p2Id: string;
+  p2ChannelUid?: string;
   p2Name: string;
   p2Country?: string;
   p2Rating: number;
@@ -104,8 +110,42 @@ export interface MonsterStats {
   ban_rate: number; // 벤율 (%)
 }
 
+/** 2마리가 같은 팀 덱에 동시에 포함된 경우의 승률 */
+export interface DuoComboStat {
+  monster_id_1?: string;
+  monster_id_2?: string;
+  monster_name_1?: string;
+  monster_name_2?: string;
+  monster_image_1?: string;
+  monster_image_2?: string;
+  monster_elemental_1?: string;
+  monster_elemental_2?: string;
+  match_count: number;
+  win_rate: number;
+}
+
+/** 3마리가 같은 팀 덱에 동시에 포함된 경우의 승률 */
+export interface TrioComboStat {
+  monster_id_1?: string;
+  monster_id_2?: string;
+  monster_id_3?: string;
+  monster_name_1?: string;
+  monster_name_2?: string;
+  monster_name_3?: string;
+  monster_image_1?: string;
+  monster_image_2?: string;
+  monster_image_3?: string;
+  monster_elemental_1?: string;
+  monster_elemental_2?: string;
+  monster_elemental_3?: string;
+  match_count: number;
+  win_rate: number;
+}
+
 export interface RtaMonsterStatsResponse {
   stats: MonsterStats[];
+  duo_stats?: DuoComboStat[];
+  trio_stats?: TrioComboStat[];
   total_matches: number;
   has_more?: boolean; // 더 불러올 데이터가 있는지
 }
@@ -164,5 +204,52 @@ export interface MonsterDetail {
       monster_image?: string;
     }>;
   }>;
+}
+
+/** RTA 대시보드 티어 분포 (rating_id 기반) */
+export interface RtaTierBucket {
+  tier_key: string;
+  player_count: number;
+  sort_order?: number;
+}
+
+/** 일별×티어 집계 행 (서버 전체 조회 후 클라이언트에서 기간 합산) */
+export interface RtaTierDailyRow {
+  bucket_date: string;
+  tier_key: string;
+  player_count: number;
+  sort_order?: number;
+}
+
+/** 일·티어별 최저 점수 (랭크 컷 추정) */
+export interface RtaRankCutoffDailyRow {
+  bucket_date: string;
+  tier_key: string;
+  cutoff_score: number;
+}
+
+export interface RtaDashboardResponse {
+  daily_tiers: RtaTierDailyRow[];
+  date_range?: {
+    min_date?: string;
+    max_date?: string;
+  };
+  rank_cutoff_daily?: RtaRankCutoffDailyRow[];
+}
+
+/** RTA 소환사 랭킹 한 행 (리플레이 집계 기준) */
+export interface RtaSummonerRankingRow {
+  rank_position?: number;
+  wizard_id?: string;
+  wizard_name?: string;
+  country?: string;
+  score?: number;
+  rating_id?: number | null;
+  last_match_at?: string;
+}
+
+export interface RtaSummonerRankingResponse {
+  total: number;
+  rankings: RtaSummonerRankingRow[];
 }
 

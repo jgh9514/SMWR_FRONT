@@ -199,15 +199,22 @@ async function proxyRequest(
       headers: Object.keys(headers),
     });
 
+    const pathJoined = pathSegments.join('/');
+    const isRtaUpload = pathJoined.includes('rta-upload');
+    /** 기본 fetch 무제한 대기 시 브라우저/axios는 먼저 끊기고 프록시만 멈춘 것처럼 보일 수 있음 — rta-upload 만 장시간 허용 */
+    const fetchInit: RequestInit = {
+      method,
+      headers,
+      body: body || undefined,
+    };
+    const abortSignalAny = AbortSignal as typeof AbortSignal & { timeout?: (ms: number) => AbortSignal };
+    if (isRtaUpload && typeof abortSignalAny.timeout === 'function') {
+      fetchInit.signal = abortSignalAny.timeout(180000);
+    }
+
     let response: Response;
     try {
-      response = await fetch(backendURL, {
-        method,
-        headers,
-        body: body || undefined,
-        // Node.js fetch에서는 credentials 옵션이 의미 없음
-        // 쿠키는 이미 headers['Cookie']로 전달됨
-      });
+      response = await fetch(backendURL, fetchInit);
     } catch (fetchError) {
       const proxyFetchError = fetchError as ProxyFetchError;
       logger.error('[프록시] fetch 실패', fetchError, {

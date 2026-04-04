@@ -2,15 +2,16 @@
  * API 클라이언트
  */
 
+import type { AxiosRequestConfig } from 'axios';
 import axiosInstance from '@/shared/lib/axios';
 import type { ApiResponse } from './types';
 
 class ApiClient {
   /**
-   * POST 요청
+   * POST 요청 (timeout 등 axios 설정이 필요하면 config 전달)
    */
-  async post<T = unknown>(url: string, data?: unknown): Promise<T> {
-    const response = await axiosInstance.post<ApiResponse<T>>(url, data);
+  async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    const response = await axiosInstance.post<ApiResponse<T>>(url, data, config);
     return this.extractData(response.data);
   }
 

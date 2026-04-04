@@ -175,12 +175,41 @@ export const useTotalPageCount = (params: SiegeSearchParams, enabled = false) =>
   });
 };
 
+/** deck_id 우선, 없으면 방덱(def)+공덱(atk) 3쌍으로 조회 */
+export type DeckDetailQueryParams =
+  | { deck_id: string }
+  | {
+      def_monster_1: string;
+      def_monster_2: string;
+      def_monster_3: string;
+      atk_monster_1: string;
+      atk_monster_2: string;
+      atk_monster_3: string;
+    };
+
+function isDeckDetailQueryEnabled(p: DeckDetailQueryParams | null): boolean {
+  if (!p) return false;
+  if ('deck_id' in p && p.deck_id) return true;
+  if (
+    'def_monster_1' in p &&
+    p.def_monster_1 &&
+    p.def_monster_2 &&
+    p.def_monster_3 &&
+    p.atk_monster_1 &&
+    p.atk_monster_2 &&
+    p.atk_monster_3
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * 공덱 상세 정보 조회
  */
-export const useDeckDetail = (params: { deck_id: string } | null) => {
+export const useDeckDetail = (params: DeckDetailQueryParams | null) => {
   return useApiPostQuery<unknown>('/summonerswar/deck-detail', params, {
-    enabled: !!params?.deck_id,
+    enabled: isDeckDetailQueryEnabled(params),
   });
 };
 
@@ -197,11 +226,15 @@ export const useDeleteDeck = (
 export type DeckVoteType = 'UP' | 'DOWN' | 'CLEAR';
 
 export type DeckVotePayload = {
-  deck_id: string;
-  /** 현재 점령 상세에서 보고 있는 방덱(적 수비 3마리) — 공덱(deck_id)과 쌍으로 투표 구분 */
+  /** 추천 공덱에 등록된 경우. 없으면 atk만으로 자유 투표 */
+  deck_id?: string;
   def_monster_1: string;
   def_monster_2: string;
   def_monster_3: string;
+  /** deck_id 없을 때 필수(또는 서버가 등록 행으로 매칭할 때 자유 투표와 병합용) */
+  atk_monster_1?: string;
+  atk_monster_2?: string;
+  atk_monster_3?: string;
   vote: DeckVoteType;
 };
 

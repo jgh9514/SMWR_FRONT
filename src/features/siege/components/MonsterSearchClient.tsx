@@ -112,6 +112,13 @@ const starGradeColumnSx = {
   verticalAlign: 'middle' as const,
 };
 
+/** 상세 경로 — 빈 ID는 링크 없음 */
+function monsterDetailHref(monsterId: string | undefined): string | null {
+  const id = monsterId?.trim();
+  if (!id) return null;
+  return `/monster-detail/${encodeURIComponent(id)}`;
+}
+
 /**
  * monster_id 끝자리(속성) + 끝에서 두 번째(각성 단계)로 묶음.
  * 같은 그룹 안에서 각성 자리 숫자 오름차순 → [노말, 1차 각성, 2차 각성] 슬롯.
@@ -321,9 +328,26 @@ function MonsterIconCell({
       </Typography>
     );
   }
+  const href = monsterDetailHref(m.monster_id);
+  const img = (
+    <Box
+      component="img"
+      src={getRenderableImageUrl(m.image_url)}
+      alt=""
+      sx={{
+        width: sizePx,
+        height: sizePx,
+        objectFit: 'contain',
+        display: 'block',
+      }}
+    />
+  );
+  if (!href) {
+    return <Box sx={frameSx}>{img}</Box>;
+  }
   return (
     <Link
-      href={`/monster-detail/${m.monster_id}`}
+      href={href}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -333,17 +357,7 @@ function MonsterIconCell({
         flexShrink: 0,
       }}
     >
-      <Box
-        component="img"
-        src={getRenderableImageUrl(m.image_url)}
-        alt=""
-        sx={{
-          width: sizePx,
-          height: sizePx,
-          objectFit: 'contain',
-          display: 'block',
-        }}
-      />
+      {img}
     </Link>
   );
 }
@@ -904,6 +918,9 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                     <TableBody>
                       {pagedPairs.map((row) => {
                         const star = getStarCount(primaryMonster(row));
+                        const hrefNormal = row.normal ? monsterDetailHref(row.normal.monster_id) : null;
+                        const hrefAwakened = row.awakened ? monsterDetailHref(row.awakened.monster_id) : null;
+                        const hrefSecond = row.secondAwakening ? monsterDetailHref(row.secondAwakening.monster_id) : null;
                         return (
                           <TableRow
                             key={row.key}
@@ -919,12 +936,16 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                             </TableCell>
                             <TableCell sx={{ verticalAlign: 'middle' }}>
                               {row.normal ? (
-                                <Link
-                                  href={`/monster-detail/${row.normal.monster_id}`}
-                                  style={{ textDecoration: 'none', color: 'inherit' }}
-                                >
+                                hrefNormal ? (
+                                  <Link
+                                    href={hrefNormal}
+                                    style={{ textDecoration: 'none', color: 'inherit' }}
+                                  >
+                                    <MonsterTitleBlock m={row.normal} titleClass="title" />
+                                  </Link>
+                                ) : (
                                   <MonsterTitleBlock m={row.normal} titleClass="title" />
-                                </Link>
+                                )
                               ) : null}
                             </TableCell>
                             <TableCell align="center" sx={iconTableCellSx}>
@@ -932,12 +953,16 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                             </TableCell>
                             <TableCell sx={{ verticalAlign: 'middle' }}>
                               {row.awakened ? (
-                                <Link
-                                  href={`/monster-detail/${row.awakened.monster_id}`}
-                                  style={{ textDecoration: 'none', color: 'inherit' }}
-                                >
+                                hrefAwakened ? (
+                                  <Link
+                                    href={hrefAwakened}
+                                    style={{ textDecoration: 'none', color: 'inherit' }}
+                                  >
+                                    <MonsterTitleBlock m={row.awakened} titleClass="title" />
+                                  </Link>
+                                ) : (
                                   <MonsterTitleBlock m={row.awakened} titleClass="title" />
-                                </Link>
+                                )
                               ) : null}
                             </TableCell>
                             <TableCell align="center" sx={iconTableCellSx}>
@@ -949,12 +974,16 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                             </TableCell>
                             <TableCell sx={{ verticalAlign: 'middle' }}>
                               {row.secondAwakening ? (
-                                <Link
-                                  href={`/monster-detail/${row.secondAwakening.monster_id}`}
-                                  style={{ textDecoration: 'none', color: 'inherit' }}
-                                >
+                                hrefSecond ? (
+                                  <Link
+                                    href={hrefSecond}
+                                    style={{ textDecoration: 'none', color: 'inherit' }}
+                                  >
+                                    <MonsterTitleBlock m={row.secondAwakening} titleClass="title" />
+                                  </Link>
+                                ) : (
                                   <MonsterTitleBlock m={row.secondAwakening} titleClass="title" />
-                                </Link>
+                                )
                               ) : null}
                             </TableCell>
                             <TableCell sx={{ verticalAlign: 'middle', maxWidth: 200 }}>
@@ -1072,7 +1101,9 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                                   ? [{ label: '2차 각성' as const, m: row.secondAwakening }]
                                   : []),
                               ] as const
-                            ).map(({ label, m }) => (
+                            ).map(({ label, m }) => {
+                              const titleHref = monsterDetailHref(m.monster_id);
+                              return (
                               <Box
                                 key={label}
                                 sx={{
@@ -1087,15 +1118,20 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                                   <Typography variant="caption" color="text.secondary" display="block">
                                     {label}
                                   </Typography>
-                                  <Link
-                                    href={`/monster-detail/${m.monster_id}`}
-                                    style={{ textDecoration: 'none', color: 'inherit' }}
-                                  >
+                                  {titleHref ? (
+                                    <Link
+                                      href={titleHref}
+                                      style={{ textDecoration: 'none', color: 'inherit' }}
+                                    >
+                                      <MonsterTitleBlock m={m} />
+                                    </Link>
+                                  ) : (
                                     <MonsterTitleBlock m={m} />
-                                  </Link>
+                                  )}
                                 </Box>
                               </Box>
-                            ))}
+                            );
+                            })}
                           </Box>
 
                           {essenceText(row) ? (

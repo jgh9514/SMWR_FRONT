@@ -544,7 +544,7 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
             <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center', flexWrap: 'wrap' }}>
               <EvolutionStage label="노말" monster={normalM} />
               <EvolutionStage label="1차 각성" monster={awakenedM} />
-              <EvolutionStage label="2차 각성" monster={secondM} />
+              {secondM != null ? <EvolutionStage label="2차 각성" monster={secondM} /> : null}
             </Box>
           </Box>
         </Box>

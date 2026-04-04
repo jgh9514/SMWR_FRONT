@@ -17,8 +17,16 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function RtaMonsterStatsPage() {
-  const data = await getRtaMonsterStatsData(TOP_MONSTERS_LIMIT, 0).catch(() => ({ stats: [] }));
+  const data = await getRtaMonsterStatsData(TOP_MONSTERS_LIMIT, 0).catch(() => ({
+    stats: [],
+    duo_stats: [],
+    trio_stats: [],
+    total_matches: 0,
+  }));
   const stats = data.stats ?? [];
+  const duoStats = data.duo_stats ?? [];
+  const trioStats = data.trio_stats ?? [];
+  const totalMatches = data.total_matches ?? 0;
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
@@ -41,7 +49,12 @@ export default async function RtaMonsterStatsPage() {
   return (
     <>
       <JsonLd data={[jsonLd, breadcrumbJsonLd]} />
-      <RtaMonsterStatsClient stats={stats} />
+      <RtaMonsterStatsClient
+        stats={stats}
+        duoStats={duoStats}
+        trioStats={trioStats}
+        totalMatches={totalMatches}
+      />
     </>
   );
 }

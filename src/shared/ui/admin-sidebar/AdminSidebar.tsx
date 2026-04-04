@@ -21,12 +21,9 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PeopleIcon from '@mui/icons-material/People';
 import SecurityIcon from '@mui/icons-material/Security';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import ApiIcon from '@mui/icons-material/Api';
 import CodeIcon from '@mui/icons-material/Code';
 import LanguageIcon from '@mui/icons-material/Language';
 import HistoryIcon from '@mui/icons-material/History';
-import SettingsIcon from '@mui/icons-material/Settings';
 import GroupIcon from '@mui/icons-material/Group';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import PetsIcon from '@mui/icons-material/Pets';
@@ -69,46 +66,6 @@ const menuCategories: MenuCategoryWithItems[] = [
         icon: <PeopleIcon />,
         path: '/admin/roleuserlist',
         color: '#ed6c02',
-      },
-    ],
-  },
-  {
-    title: '메뉴 및 API 관리',
-    items: [
-      {
-        title: '메뉴 관리',
-        description: '시스템 메뉴 구조 관리',
-        icon: <MenuBookIcon />,
-        path: '/admin/menumn',
-        color: '#2e7d32',
-      },
-      {
-        title: '권한별 메뉴',
-        description: '권한별 메뉴 접근 권한 설정',
-        icon: <MenuBookIcon />,
-        path: '/admin/rolemenumn',
-        color: '#0288d1',
-      },
-      {
-        title: 'API 관리',
-        description: '시스템 API 목록 관리',
-        icon: <ApiIcon />,
-        path: '/admin/apimn',
-        color: '#7b1fa2',
-      },
-      {
-        title: '권한별 API',
-        description: '권한별 API 접근 권한 설정',
-        icon: <ApiIcon />,
-        path: '/admin/roleapimn',
-        color: '#c2185b',
-      },
-      {
-        title: '페이지 관리',
-        description: '시스템 페이지 정보 관리',
-        icon: <SettingsIcon />,
-        path: '/admin/pagemn',
-        color: '#00796b',
       },
     ],
   },

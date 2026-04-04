@@ -41,7 +41,8 @@ export async function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: MonsterDetailPageProps): Promise<Metadata> {
-  const { detail } = await params;
+  const { detail: detailParam } = await params;
+  const detail = decodeURIComponent(detailParam ?? '').trim();
   const monsterInfo = await getMonsterInfoData(detail);
 
   if (!monsterInfo) {
@@ -78,7 +79,8 @@ export async function generateMetadata({
 export default async function MonsterDetailPage({
   params,
 }: MonsterDetailPageProps) {
-  const { detail } = await params;
+  const { detail: detailParam } = await params;
+  const detail = decodeURIComponent(detailParam ?? '').trim();
   const [monsterInfo, devilmonImageUrl, monsterList] = await Promise.all([
     getMonsterInfoData(detail),
     getDevilmonImageUrlForSearch(),

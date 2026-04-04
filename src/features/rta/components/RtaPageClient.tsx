@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -17,8 +17,7 @@ import StarIcon from '@mui/icons-material/Star';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/hooks/useRtaData';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
-import { getMonsterImageUrl } from '@/shared/utils/image';
-import { getCdnImageUrl } from '@/shared/lib/env';
+import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { getRatingColor, getRatingStars } from '@/shared/utils';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
 
@@ -91,6 +90,14 @@ export default function RtaPageClient() {
       ),
       p1Id: match.p1_wizard_id || '',
       p2Id: match.p2_wizard_id || '',
+      p1ChannelUid:
+        match.p1_channel_uid != null && match.p1_channel_uid !== ''
+          ? String(match.p1_channel_uid)
+          : undefined,
+      p2ChannelUid:
+        match.p2_channel_uid != null && match.p2_channel_uid !== ''
+          ? String(match.p2_channel_uid)
+          : undefined,
       winnerPosition: (match.winner_position || '1') as '1' | '2',
       p1Country: match.p1_country,
       p2Country: match.p2_country,
@@ -122,15 +129,17 @@ export default function RtaPageClient() {
 
   const paginatedMatches = rtaData?.matches || [];
 
-  const toggleMatch = useCallback((index: number) => {
-    setExpandedMatches((prev) => ({
-      ...prev,
-      [index]: !prev[index],
-    }));
-  }, []);
+  /** 페이지 바뀌면 접기 상태 초기화(기본은 전부 펼침) */
+  useEffect(() => {
+    setExpandedMatches({});
+  }, [currentPage]);
 
-  const isFirstPickPlayer = useCallback((match: MatchItem) => {
-    return match.p1FirstPick === '1' || match.p2FirstPick === '0';
+  /** 기본 펼침: 명시적으로 false일 때만 접힘 */
+  const toggleMatch = useCallback((index: number) => {
+    setExpandedMatches((prev) => {
+      const open = prev[index] !== false;
+      return { ...prev, [index]: !open };
+    });
   }, []);
 
   const changePage = (page: number) => {
@@ -189,7 +198,7 @@ export default function RtaPageClient() {
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {paginatedMatches.map((match: MatchItem, index: number) => {
-              const isExpanded = expandedMatches[index];
+              const isExpanded = expandedMatches[index] !== false;
               return (
                 <Card
                   key={`${match.p1Id}-${match.p2Id}-${match.date}-${index}`}
@@ -228,7 +237,7 @@ export default function RtaPageClient() {
                       >
                         <Box sx={{ position: 'relative', flexShrink: 0 }}>
                           <Avatar
-                            src={getCdnImageUrl(`/playerImage/${match.p1Id || 'default'}.jpg`)}
+                            src={getSwexPlayerImageUrl(match.p1ChannelUid || match.p1Id)}
                             sx={{ width: { xs: 40, md: 50 }, height: { xs: 40, md: 50 } }}
                           />
                         </Box>
@@ -356,7 +365,7 @@ export default function RtaPageClient() {
                       >
                         <Box sx={{ position: 'relative', flexShrink: 0 }}>
                           <Avatar
-                            src={getCdnImageUrl(`/playerImage/${match.p2Id || 'default'}.jpg`)}
+                            src={getSwexPlayerImageUrl(match.p2ChannelUid || match.p2Id)}
                             sx={{ width: { xs: 40, md: 50 }, height: { xs: 40, md: 50 } }}
                           />
                         </Box>
@@ -435,9 +444,7 @@ export default function RtaPageClient() {
                               <Box
                                 sx={{
                                   width: '100%',
-                                  backgroundColor: (isFirstPickPlayer(match) && match.winnerPosition === '1') || (!isFirstPickPlayer(match) && match.winnerPosition === '2')
-                                    ? '#4caf50'
-                                    : '#f44336',
+                                  backgroundColor: match.winnerPosition === '1' ? '#4caf50' : '#f44336',
                                   clipPath: 'polygon(0% 0%, 80% 0%, 100% 100%, 0% 100%)',
                                   px: { xs: 1, md: 1.5 },
                                   py: { xs: 0.25, md: 0.3 },
@@ -454,9 +461,7 @@ export default function RtaPageClient() {
                                     textAlign: 'left',
                                   }}
                                 >
-                                  {(isFirstPickPlayer(match) && match.winnerPosition === '1') || (!isFirstPickPlayer(match) && match.winnerPosition === '2')
-                                    ? 'WIN'
-                                    : 'LOSE'}
+                                  {match.winnerPosition === '1' ? 'WIN' : 'LOSE'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -470,7 +475,7 @@ export default function RtaPageClient() {
                                 gridTemplateAreas: `"fp-0 fp-1 fp-3" "fp-0 fp-2 fp-4"`,
                               }}
                             >
-                              {(isFirstPickPlayer(match) ? match.p1Units : match.p2Units)?.map((unit, unitIndex) => {
+                              {match.p1Units?.map((unit, unitIndex) => {
                                 let gridArea = '';
                                 if (unitIndex === 0) gridArea = 'fp-0';
                                 else if (unitIndex === 1) gridArea = 'fp-1';
@@ -550,8 +555,7 @@ export default function RtaPageClient() {
                                   </Box>
                                 );
                               })}
-                              {(!(isFirstPickPlayer(match) ? match.p1Units : match.p2Units) ||
-                                (isFirstPickPlayer(match) ? match.p1Units : match.p2Units)?.length === 0) && (
+                              {(!match.p1Units || match.p1Units.length === 0) && (
                                 <Box sx={{ gridColumn: '1 / -1', textAlign: 'left', py: 1 }}>
                                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' } }}>
                                     몬스터 정보가 없습니다
@@ -587,9 +591,7 @@ export default function RtaPageClient() {
                               <Box
                                 sx={{
                                   width: '100%',
-                                  backgroundColor: (!isFirstPickPlayer(match) && match.winnerPosition === '1') || (isFirstPickPlayer(match) && match.winnerPosition === '2')
-                                    ? '#4caf50'
-                                    : '#f44336',
+                                  backgroundColor: match.winnerPosition === '2' ? '#4caf50' : '#f44336',
                                   clipPath: 'polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%)',
                                   px: { xs: 1, md: 1.5 },
                                   py: { xs: 0.25, md: 0.3 },
@@ -606,9 +608,7 @@ export default function RtaPageClient() {
                                     textAlign: 'right',
                                   }}
                                 >
-                                  {(!isFirstPickPlayer(match) && match.winnerPosition === '1') || (isFirstPickPlayer(match) && match.winnerPosition === '2')
-                                    ? 'WIN'
-                                    : 'LOSE'}
+                                  {match.winnerPosition === '2' ? 'WIN' : 'LOSE'}
                                 </Typography>
                               </Box>
                             </Box>
@@ -623,8 +623,8 @@ export default function RtaPageClient() {
                                 gridTemplateAreas: `"fp-1 fp-3 fp-5" "fp-2 fp-4 fp-5"`,
                               }}
                             >
-                              {(isFirstPickPlayer(match) ? match.p2Units : match.p1Units)?.map((unit, unitIndex) => {
-                                const units = isFirstPickPlayer(match) ? match.p2Units : match.p1Units;
+                              {match.p2Units?.map((unit, unitIndex) => {
+                                const units = match.p2Units;
                                 let gridArea = '';
                                 if (unitIndex === 0) gridArea = 'fp-1';
                                 else if (unitIndex === 1) gridArea = 'fp-2';
@@ -704,8 +704,7 @@ export default function RtaPageClient() {
                                   </Box>
                                 );
                               })}
-                              {(!(isFirstPickPlayer(match) ? match.p2Units : match.p1Units) ||
-                                (isFirstPickPlayer(match) ? match.p2Units : match.p1Units)?.length === 0) && (
+                              {(!match.p2Units || match.p2Units.length === 0) && (
                                 <Box sx={{ gridColumn: '1 / -1', textAlign: 'right', py: 1 }}>
                                   <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' } }}>
                                     몬스터 정보가 없습니다

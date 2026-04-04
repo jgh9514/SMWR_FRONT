@@ -97,3 +97,16 @@ function pickNonEmpty(
   }
   return undefined;
 }
+
+/** SWEX OSS 프로필 이미지 (channel_uid = 파일명, wizard_id 와 별개) */
+const SWEX_PLAYER_IMAGE_BASE = 'https://swex.oss-cn-hangzhou.aliyuncs.com/playerImage';
+
+export function getSwexPlayerImageUrl(
+  channelUid: string | number | null | undefined,
+): string {
+  const id = pickNonEmpty(
+    channelUid != null ? String(channelUid) : undefined,
+  );
+  const file = id ?? 'default';
+  return `${SWEX_PLAYER_IMAGE_BASE}/${file}.jpg`;
+}

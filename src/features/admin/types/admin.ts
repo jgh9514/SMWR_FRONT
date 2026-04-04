@@ -67,37 +67,6 @@ export interface RoleItem {
   row_status?: string;
 }
 
-export interface MenuItem {
-  menu_id: string;
-  menu_nm: string;
-  menu_lv?: number;
-  up_menu_id?: string;
-  menu_url?: string;
-  menu_icon?: string;
-  srt_sn?: string;
-  srt_path?: string;
-  use_yn?: string;
-  usg_yn?: string;
-  crt_date?: string;
-  upd_date?: string;
-  row_status?: string;
-}
-
-export interface ApiItem {
-  api_id: string;
-  api_nm: string;
-  api_exe_url: string;
-  api_txt?: string;
-  api_url?: string;
-  api_desc?: string;
-  bsns_cd?: string;
-  bsns_cd_nm?: string;
-  usg_yn?: string;
-  crt_date?: string;
-  upd_date?: string;
-  row_status?: string;
-}
-
 export interface CodeGroup {
   id?: string;
   cd_grp_no: string;
@@ -170,32 +139,6 @@ export interface PopupItem {
   cd_grp_nm?: string;
   cd: string;
   cd_nm: string;
-}
-
-export interface PageItem {
-  page_id: string;
-  page_nm: string;
-  page_url?: string;
-  page_desc?: string;
-  crt_date?: string;
-  upd_date?: string;
-  row_status?: string;
-}
-
-export interface ConditionItem {
-  id?: string;
-  condition_id: string;
-  cond_id?: string;
-  page_id: string;
-  condition_nm: string;
-  cond_nm?: string;
-  condition_type?: string;
-  cond_tp_cd?: string;
-  condition_value?: string;
-  mdat_yn?: string;
-  crt_date?: string;
-  upd_date?: string;
-  row_status?: string;
 }
 
 export interface UserRoleItem {

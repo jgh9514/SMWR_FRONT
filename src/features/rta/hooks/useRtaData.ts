@@ -9,7 +9,12 @@
 
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { RtaStatsResponse, RtaMatchCountResponse, RtaMatchesResponse, RtaMatchListParams } from '@/types';
-import type { RtaMonsterStatsResponse, MonsterDetail } from '@/features/rta/types/rta';
+import type {
+  MonsterDetail,
+  RtaDashboardResponse,
+  RtaMonsterStatsResponse,
+  RtaSummonerRankingResponse,
+} from '@/features/rta/types/rta';
 
 /**
  * RTA 통계 조회
@@ -63,6 +68,38 @@ export const useRtaMonsterStats = (limit: number = 20, offset: number = 0) => {
  * RTA 몬스터 상세 정보 조회
  * 백엔드: POST /api/v1/rta/monster-detail
  */
+/**
+ * RTA 대시보드 (일별×티어 전체 — 기간은 클라이언트에서 합산)
+ * 백엔드: POST /api/v1/rta/dashboard
+ */
+export const useRtaDashboard = () => {
+  return useApiPostQuery<RtaDashboardResponse>(
+    '/rta/dashboard',
+    {},
+    {
+      enabled: true,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
+/**
+ * RTA 소환사 랭킹
+ * 백엔드: POST /api/v1/rta/summoner-ranking
+ */
+export const useRtaSummonerRanking = (limit: number = 50, offset: number = 0) => {
+  return useApiPostQuery<RtaSummonerRankingResponse>(
+    '/rta/summoner-ranking',
+    { limit, offset },
+    {
+      enabled: true,
+      staleTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
 export const useRtaMonsterDetail = (monsterId: number | null) => {
   const isValidId = monsterId !== null && !isNaN(monsterId) && monsterId > 0;
   return useApiPostQuery<MonsterDetail>(

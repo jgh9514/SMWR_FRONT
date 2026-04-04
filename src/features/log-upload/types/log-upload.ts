@@ -42,5 +42,7 @@ export interface SiegeUploadResponse {
 export interface ArenaUploadResponse {
   success?: number;
   fail?: number;
+  /** 클라이언트 전용: 세션에서 rid 기록 시 돌려줌 (서버 응답과 무관) */
+  recordedRids?: string[];
 }
 

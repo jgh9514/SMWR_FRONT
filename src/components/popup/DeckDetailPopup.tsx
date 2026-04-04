@@ -26,7 +26,13 @@ import WarningIcon from '@mui/icons-material/Warning';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
-import { useDeckDetail, useDeleteDeck, useDeckVoteMutation, useApiPostMutation } from '@/hooks/api';
+import {
+  useDeckDetail,
+  useDeleteDeck,
+  useDeckVoteMutation,
+  useApiPostMutation,
+  type DeckDetailQueryParams,
+} from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import MonsterDetailCard from '@/features/siege/components/MonsterDetailCard';
@@ -94,14 +100,32 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const [editStats, setEditStats] = useState<DeckMonsterStats[]>(createInitialDeckStats);
 
   // 공덱 상세 조회 (React Query 사용)
-  const deckParams = useMemo(() => {
+  const deckParams = useMemo((): DeckDetailQueryParams | null => {
     if (!lastSelectedItem) return null;
-    
-    // deck_id를 우선 사용하고, 없으면 team_id 사용
+
     const deckId = lastSelectedItem.deck_id || lastSelectedItem.team_id;
-    if (!deckId) return null;
-    
-    return { deck_id: String(deckId) };
+    if (deckId) {
+      return { deck_id: String(deckId) };
+    }
+
+    const d1 = lastSelectedItem.def_monster_1;
+    const d2 = lastSelectedItem.def_monster_2;
+    const d3 = lastSelectedItem.def_monster_3;
+    const a1 = lastSelectedItem.atk_monster_1;
+    const a2 = lastSelectedItem.atk_monster_2;
+    const a3 = lastSelectedItem.atk_monster_3;
+    if (d1 && d2 && d3 && a1 && a2 && a3) {
+      return {
+        def_monster_1: String(d1),
+        def_monster_2: String(d2),
+        def_monster_3: String(d3),
+        atk_monster_1: String(a1),
+        atk_monster_2: String(a2),
+        atk_monster_3: String(a3),
+      };
+    }
+
+    return null;
   }, [lastSelectedItem]);
 
   const {
@@ -624,6 +648,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                     const d1 = pickDeckDefStr(detailDataRecord, 'def_monster_1', 'defMonster1');
                     const d2 = pickDeckDefStr(detailDataRecord, 'def_monster_2', 'defMonster2');
                     const d3 = pickDeckDefStr(detailDataRecord, 'def_monster_3', 'defMonster3');
+                    const a1 = pickDeckDefStr(detailDataRecord, 'atk_monster_1', 'atkMonster1');
+                    const a2 = pickDeckDefStr(detailDataRecord, 'atk_monster_2', 'atkMonster2');
+                    const a3 = pickDeckDefStr(detailDataRecord, 'atk_monster_3', 'atkMonster3');
                     const canVote = d1 !== '' && d2 !== '' && d3 !== '';
                     const myV = pickDeckMyVote(detailDataRecord);
                     const upN = pickDeckNumeric(detailDataRecord, 'recommend_count', 'recommendCount');
@@ -635,6 +662,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                         def_monster_1: d1,
                         def_monster_2: d2,
                         def_monster_3: d3,
+                        ...(a1 !== '' && a2 !== '' && a3 !== ''
+                          ? { atk_monster_1: a1, atk_monster_2: a2, atk_monster_3: a3 }
+                          : {}),
                         vote,
                       });
                     };
