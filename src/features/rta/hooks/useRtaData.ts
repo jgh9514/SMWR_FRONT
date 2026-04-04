@@ -21,10 +21,10 @@ import type {
  * 백엔드: POST /api/v1/rta/stats
  */
 export const useRtaStats = () => {
-  return useApiPostQuery<RtaStatsResponse>('/rta/stats', {}, { 
+  return useApiPostQuery<RtaStatsResponse>('/rta/stats', {}, {
     enabled: true,
-    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-    refetchOnWindowFocus: false, // 윈도우 포커스 시 리프레시 방지
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -33,10 +33,10 @@ export const useRtaStats = () => {
  * 백엔드: POST /api/v1/rta/matches/count
  */
 export const useRtaMatchCount = () => {
-  return useApiPostQuery<RtaMatchCountResponse>('/rta/matches/count', {}, { 
+  return useApiPostQuery<RtaMatchCountResponse>('/rta/matches/count', {}, {
     enabled: true,
-    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-    refetchOnWindowFocus: false, // 윈도우 포커스 시 리프레시 방지
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -45,10 +45,10 @@ export const useRtaMatchCount = () => {
  * 백엔드: POST /api/v1/rta/matches
  */
 export const useRtaMatchList = (params: RtaMatchListParams) => {
-  return useApiPostQuery<RtaMatchesResponse>('/rta/matches', params, { 
+  return useApiPostQuery<RtaMatchesResponse>('/rta/matches', params, {
     enabled: true,
-    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-    refetchOnWindowFocus: false, // 윈도우 포커스 시 리프레시 방지
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 };
 

@@ -86,7 +86,7 @@ function normalizeTrio(row: TrioComboStat): TrioComboStat {
  * 스네이크/카멜·언더스코어 유무 조합을 모두 허용한다.
  */
 function pickDuoMonsterImage(row: DuoComboStat, slot: 1 | 2): string | undefined {
-  const r = row as Record<string, unknown>;
+  const r = row as unknown as Record<string, unknown>;
   const keys = [`monster_image_${slot}`, `monsterImage${slot}`, `monster_image${slot}`] as const;
   for (const k of keys) {
     const v = r[k];
@@ -96,7 +96,7 @@ function pickDuoMonsterImage(row: DuoComboStat, slot: 1 | 2): string | undefined
 }
 
 function pickTrioMonsterImage(row: TrioComboStat, slot: 1 | 2 | 3): string | undefined {
-  const r = row as Record<string, unknown>;
+  const r = row as unknown as Record<string, unknown>;
   const keys = [`monster_image_${slot}`, `monsterImage${slot}`, `monster_image${slot}`] as const;
   for (const k of keys) {
     const v = r[k];
