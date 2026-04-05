@@ -12,16 +12,25 @@ import {
   Collapse,
   Button,
   Container,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasons, useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/hooks/useRtaData';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
+
+const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
+
+/** /rta 매치 목록: 최신순 기준 앞쪽(최근) 페이지만 최대 N페이지까지 노출 */
+const MAX_RTA_LIST_PAGES = 10;
 
 export default function RtaPageClient() {
   const theme = useTheme();
@@ -29,8 +38,37 @@ export default function RtaPageClient() {
   const [expandedMatches, setExpandedMatches] = useState<{ [key: number]: boolean }>({});
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { data: statsResponse } = useRtaStats();
-  const { data: countResponse } = useRtaMatchCount();
+  const { data: seasonsData } = useRtaSeasons();
+  const seasonOptions = useMemo(() => {
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return SEASON_FALLBACK;
+    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
+  }, [seasonsData]);
+
+  const resolvedDefaultSeason = useMemo(() => {
+    const def = seasonsData?.defaultSeasonCode;
+    const rows = seasonsData?.seasons;
+    if (def && rows?.some((r) => r.seasonCode === def)) return def;
+    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
+  }, [seasonsData]);
+
+  const [season, setSeason] = useState<string | null>(null);
+  useEffect(() => {
+    if (seasonOptions.length === 0) return;
+    setSeason((prev) => {
+      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
+      return resolvedDefaultSeason;
+    });
+  }, [seasonOptions, resolvedDefaultSeason]);
+
+  const seasonSelectValue = season ?? resolvedDefaultSeason;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [seasonSelectValue]);
+
+  const { data: statsResponse } = useRtaStats(seasonSelectValue);
+  const { data: countResponse } = useRtaMatchCount(seasonSelectValue);
   const {
     data: matchesResponse,
     isLoading: isLoadingMatches,
@@ -39,6 +77,7 @@ export default function RtaPageClient() {
   } = useRtaMatchList({
     limit: DEFAULT_PAGE_SIZE,
     offset: (currentPage - 1) * DEFAULT_PAGE_SIZE,
+    seasonCode: seasonSelectValue,
   });
 
   const rtaData = useMemo<RtaData | null>(() => {
@@ -50,15 +89,24 @@ export default function RtaPageClient() {
       ? rawMatches.map((m: RawMatchItem) => processRawMatchToMatchItem(m))
       : [];
 
+    const fullPages = Math.ceil(totalMatches / DEFAULT_PAGE_SIZE);
     return {
       stats: statsResponse,
       totalMatches,
       matches: processedMatches,
-      totalPages: Math.ceil(totalMatches / DEFAULT_PAGE_SIZE),
+      totalPages: Math.min(fullPages, MAX_RTA_LIST_PAGES),
     };
   }, [statsResponse, countResponse, matchesResponse]);
 
   const paginatedMatches = rtaData?.matches || [];
+
+  /** 총 페이지가 줄었을 때(시즌 변경·상한 적용) 현재 페이지 보정 */
+  useEffect(() => {
+    const tp = rtaData?.totalPages ?? 0;
+    if (tp >= 1 && currentPage > tp) {
+      setCurrentPage(tp);
+    }
+  }, [rtaData?.totalPages, currentPage]);
 
   /** 페이지 바뀌면 접기 상태 초기화(기본은 전부 펼침) */
   useEffect(() => {
@@ -123,9 +171,26 @@ export default function RtaPageClient() {
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
       <Card>
         <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-          <Typography variant="h5" sx={{ mb: 3, fontWeight: 700 }}>
-            RTA 매치 목록
-          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
+            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+              RTA 매치 목록
+            </Typography>
+            <FormControl size="small" sx={{ minWidth: 220 }}>
+              <InputLabel id="rta-list-season-label">시즌</InputLabel>
+              <Select
+                labelId="rta-list-season-label"
+                label="시즌"
+                value={seasonSelectValue}
+                onChange={(e) => setSeason(String(e.target.value))}
+              >
+                {seasonOptions.map((o) => (
+                  <MenuItem key={o.value} value={o.value}>
+                    {o.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {paginatedMatches.map((match: MatchItem, index: number) => {

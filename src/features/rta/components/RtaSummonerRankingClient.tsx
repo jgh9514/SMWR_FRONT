@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -39,24 +39,37 @@ import {
 import type { TooltipValueType } from 'recharts';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
-import { useRtaDashboard, useRtaSummonerRanking } from '@/features/rta/hooks/useRtaData';
-import { getRtaTierShortLabel, getRatingColor } from '@/shared/utils';
+import { useRtaDashboard, useRtaSeasons, useRtaSummonerRanking } from '@/features/rta/hooks/useRtaData';
+import { getRtaTierKeyStarIconPath, getRtaTierShortLabel, getRatingColor } from '@/shared/utils';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaRankCutoffAnchorRow, RtaSummonerRankingRow, RtaTierDailyRow } from '@/features/rta/types/rta';
 
 const PAGE_SIZE = 50;
 const DIST_SAMPLE = 500;
 
-/** 컷 카드·차트 표시 순서 (낮은 티어 → 높은 티어) */
+/** 컷 카드·차트 표시 순서 (낮은 티어 → 높은 티어: 심판자~레전드) */
+/** 티어 컷 카드·차트: 골드3 ~ 플래3 (6단계) */
 const CUT_TIER_ORDER = ['G3', 'G2', 'G1', 'P3', 'P2', 'P1'] as const;
+
+/** 앵커 컷 추이 Y축: G3(상한)·P1(하한) 점수 기준 ±이만큼 (0~전체 구간 대비 확대) */
+const CUT_CHART_Y_MARGIN = 100;
 
 const ANCHOR_CHART_KEYS = ['3h', '6h', '12h', '3d', '7d'] as const;
 
-const TIER_COLOR_P = 'rgb(7, 186, 173)';
-const TIER_COLOR_G = 'rgb(155, 89, 182)';
+/** WAS `rta.xml` 랭크 컷 COALESCE 마지막 값과 동일 — 실측 없을 때만 들어가므로 Δ 계산에서 제외 */
+const RTA_CUTOFF_FALLBACK_SCORE = 1000;
+
+/** P(플래티넘): 녹색 계열 — 차트·카드 라벨 공통 */
+const TIER_COLOR_P = '#43a047';
+/** G(골드): 빨간색 계열 */
+const TIER_COLOR_G = '#e53935';
+const TIER_COLOR_L = '#ffc107';
 
 function tierAccent(tierKey: string): string {
-  return tierKey.startsWith('P') ? TIER_COLOR_P : TIER_COLOR_G;
+  if (tierKey.startsWith('L')) return TIER_COLOR_L;
+  if (tierKey.startsWith('G')) return TIER_COLOR_G;
+  if (tierKey.startsWith('P')) return TIER_COLOR_P;
+  return '#999';
 }
 
 function tierStarCount(tierKey: string): number {
@@ -65,18 +78,9 @@ function tierStarCount(tierKey: string): number {
   return Number.isFinite(n) && n >= 1 && n <= 3 ? n : 2;
 }
 
-function tierStarIconSrc(tierKey: string): string {
-  if (tierKey.startsWith('Ch')) return '/icons/challenger_star.png';
-  if (tierKey.startsWith('F')) return '/icons/fighter_star.png';
-  if (tierKey.startsWith('C')) return '/icons/conqueror_star.png';
-  if (tierKey.startsWith('P')) return '/icons/punisher_star.png';
-  if (tierKey.startsWith('G')) return '/icons/guardian_star.png';
-  return '/icons/challenger_star.png';
-}
-
 function TierStars({ tierKey }: { tierKey: string }) {
   const n = tierStarCount(tierKey);
-  const src = tierStarIconSrc(tierKey);
+  const src = getRtaTierKeyStarIconPath(tierKey);
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
       {Array.from({ length: n }).map((_, i) => (
@@ -98,6 +102,18 @@ function pickRow<T>(row: unknown, snake: string, camel: string): T | undefined {
   if (Object.prototype.hasOwnProperty.call(r, snake)) return r[snake] as T;
   if (Object.prototype.hasOwnProperty.call(r, camel)) return r[camel] as T;
   return undefined;
+}
+
+/**
+ * 3h vs 3d 대비 점수차. 한쪽만 기본값(1000)이면 실측 대비가 아니므로 Δ 없음.
+ * 둘 다 1000만 있으면 역시 의미 없음.
+ */
+function cutDelta3hVs3d(score3h: number, score3d: number): number | null {
+  if (score3h <= 0 || score3d <= 0) return null;
+  const S = RTA_CUTOFF_FALLBACK_SCORE;
+  if ((score3d === S && score3h !== S) || (score3h === S && score3d !== S)) return null;
+  if (score3h === S && score3d === S) return null;
+  return score3h - score3d;
 }
 
 function pivotAnchors(rows: RtaRankCutoffAnchorRow[] | undefined): Map<string, Record<string, number>> {
@@ -143,6 +159,30 @@ function buildCutChartRows(byAnchor: Map<string, Record<string, number>>) {
     }
     return row;
   });
+}
+
+/** G3·P1만으로 Y 범위 산출(없으면 전 티어 값으로 폴백). Recharts domain [min, max] */
+function computeCutChartYDomain(
+  chartRows: Record<string, string | number | null>[],
+): [number, number] | undefined {
+  const collect = (keys: readonly string[]) => {
+    const nums: number[] = [];
+    for (const row of chartRows) {
+      for (const k of keys) {
+        const v = row[k];
+        if (typeof v === 'number' && Number.isFinite(v) && v > 0) nums.push(v);
+      }
+    }
+    return nums;
+  };
+  let nums = collect(['G3', 'P1']);
+  if (nums.length === 0) {
+    nums = collect([...CUT_TIER_ORDER]);
+  }
+  if (nums.length === 0) return undefined;
+  const lo = Math.min(...nums);
+  const hi = Math.max(...nums);
+  return [lo - CUT_CHART_Y_MARGIN, hi + CUT_CHART_Y_MARGIN];
 }
 
 function countrySharesFromRankings(rows: RtaSummonerRankingRow[]): { code: string; pct: number }[] {
@@ -317,12 +357,35 @@ function MostMonstersCell({ row }: { row: RtaSummonerRankingRow }) {
   );
 }
 
-const SEASON_OPTIONS = [{ value: 's36', label: '시즌 36 (SL)' }];
+const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
 
 export default function RtaSummonerRankingClient() {
   const theme = useTheme();
   const [page, setPage] = useState(1);
-  const [season, setSeason] = useState(SEASON_OPTIONS[0].value);
+  const { data: seasonsData } = useRtaSeasons();
+  const seasonOptions = useMemo(() => {
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return SEASON_FALLBACK;
+    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
+  }, [seasonsData]);
+
+  const resolvedDefaultSeason = useMemo(() => {
+    const def = seasonsData?.defaultSeasonCode;
+    const rows = seasonsData?.seasons;
+    if (def && rows?.some((r) => r.seasonCode === def)) return def;
+    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
+  }, [seasonsData]);
+
+  const [season, setSeason] = useState<string | null>(null);
+  useEffect(() => {
+    if (seasonOptions.length === 0) return;
+    setSeason((prev) => {
+      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
+      return resolvedDefaultSeason;
+    });
+  }, [seasonOptions, resolvedDefaultSeason]);
+
+  const seasonSelectValue = season ?? resolvedDefaultSeason;
   const offset = (page - 1) * PAGE_SIZE;
   const isFirstPage = page === 1;
 
@@ -330,11 +393,12 @@ export default function RtaSummonerRankingClient() {
   const { data: pageData, isLoading: loadingPage, error: errPage } = useRtaSummonerRanking(
     isFirstPage ? DIST_SAMPLE : PAGE_SIZE,
     isFirstPage ? 0 : offset,
+    seasonSelectValue,
   );
-  const { data: distOnlyData, isError: distSampleError } = useRtaSummonerRanking(DIST_SAMPLE, 0, {
+  const { data: distOnlyData, isError: distSampleError } = useRtaSummonerRanking(DIST_SAMPLE, 0, seasonSelectValue, {
     enabled: !isFirstPage,
   });
-  const { data: dashData, isLoading: dashLoading } = useRtaDashboard();
+  const { data: dashData, isLoading: dashLoading } = useRtaDashboard(seasonSelectValue);
 
   const total = toNum(pageData?.total);
   const rankings = isFirstPage
@@ -357,12 +421,9 @@ export default function RtaSummonerRankingClient() {
     const tierCounts = latestDayTierCounts(dailyTiers);
 
     const cutCards = CUT_TIER_ORDER.map((tk) => {
-      const score = latest[tk];
-      const before = prev[tk];
-      let delta: number | null = null;
-      if (score > 0 && before > 0) {
-        delta = score - before;
-      }
+      const score = toNum(latest[tk]);
+      const before = toNum(prev[tk]);
+      const delta = cutDelta3hVs3d(score, before);
       return {
         tierKey: tk,
         score,
@@ -380,6 +441,8 @@ export default function RtaSummonerRankingClient() {
 
     return { byAnchor, cutCards, chartRows, updatedLabel };
   }, [anchorRows, dailyTiers, maxDate]);
+
+  const cutChartYDomain = useMemo(() => computeCutChartYDomain(chartRows), [chartRows]);
 
   const countryChips = useMemo(
     () => countrySharesFromRankings(rankingsForCountry),
@@ -420,8 +483,8 @@ export default function RtaSummonerRankingClient() {
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640, lineHeight: 1.6 }}>
-          이번 시즌 상위권 소환사들의 <strong>모스트 몬스터</strong>와 티어 컷 추이를 확인해 보세요. 시즌 선택은 추후 DB
-          연동 예정입니다.
+          이번 시즌 상위권 소환사들의 <strong>모스트 몬스터</strong>와 티어 컷 추이를 확인해 보세요. 시즌 목록은 서버 DB
+          기준입니다 (랭킹 API 필터는 추후 연동).
         </Typography>
 
         <Stack
@@ -436,10 +499,10 @@ export default function RtaSummonerRankingClient() {
             <Select
               labelId="rta-season-label"
               label="시즌"
-              value={season}
+              value={seasonSelectValue}
               onChange={(e) => setSeason(String(e.target.value))}
             >
-              {SEASON_OPTIONS.map((o) => (
+              {seasonOptions.map((o) => (
                 <MenuItem key={o.value} value={o.value}>
                   {o.label}
                 </MenuItem>
@@ -631,6 +694,7 @@ export default function RtaSummonerRankingClient() {
                     <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
                     <XAxis dataKey="anchor" tick={{ fontSize: 11 }} stroke={theme.palette.text.secondary} />
                     <YAxis
+                      domain={cutChartYDomain ?? ['auto', 'auto']}
                       tick={{ fontSize: 11 }}
                       stroke={theme.palette.text.secondary}
                       tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}

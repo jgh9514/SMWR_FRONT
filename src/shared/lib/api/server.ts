@@ -179,10 +179,14 @@ export async function getDevilmonImageUrlForSearch(): Promise<string> {
 export async function getRtaMonsterStatsData(
   limit: number = 100,
   offset: number = 0,
+  seasonCode?: string | null,
 ): Promise<RtaMonsterStatsResponse> {
+  const body: Record<string, unknown> = { limit, offset };
+  const c = seasonCode?.trim();
+  if (c) body.seasonCode = c;
   return serverApiPost<RtaMonsterStatsResponse>(
     '/rta/monster-stats',
-    { limit, offset },
+    body,
     PUBLIC_REVALIDATE_SECONDS.rtaStats,
     { cache: 'no-store' },
   );
@@ -204,15 +208,21 @@ export const getRtaPlayerSummaryData = cache(async (wizardId: string): Promise<R
   }
 });
 
-export async function getRtaMonsterDetailData(monsterId: number): Promise<MonsterDetail | null> {
+export async function getRtaMonsterDetailData(
+  monsterId: number,
+  seasonCode?: string | null,
+): Promise<MonsterDetail | null> {
   if (!Number.isFinite(monsterId) || monsterId <= 0) {
     return null;
   }
 
   try {
+    const body: Record<string, unknown> = { monster_id: monsterId };
+    const c = seasonCode?.trim();
+    if (c) body.seasonCode = c;
     const detail = await serverApiPost<MonsterDetail>(
       '/rta/monster-detail',
-      { pk: monsterId },
+      body,
       PUBLIC_REVALIDATE_SECONDS.rtaDetail,
       { cache: 'no-store' },
     );

@@ -9,5 +9,11 @@ export * from './validation';
 export * from './auth';
 
 // Rating 관련 유틸리티 (명시적 export)
-export { getRatingColor, getRatingStars, getRatingStarIconPath, getRtaTierShortLabel } from './util';
+export {
+  getRatingColor,
+  getRatingStars,
+  getRatingStarIconPath,
+  getRtaTierKeyStarIconPath,
+  getRtaTierShortLabel,
+} from './util';
 

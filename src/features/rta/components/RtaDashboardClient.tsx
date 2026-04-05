@@ -1,13 +1,17 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   Box,
   Card,
   Chip,
   CircularProgress,
+  FormControl,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Slider,
   Typography,
   useMediaQuery,
@@ -18,7 +22,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
 import RtaTierOfficialRulesSection from '@/features/rta/components/RtaTierOfficialRulesSection';
-import { useRtaDashboard } from '@/features/rta/hooks/useRtaData';
+import { useRtaDashboard, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
 import type { RtaTierBucket, RtaTierDailyRow } from '@/features/rta/types/rta';
 
 const TIER_ORDER = [
@@ -37,20 +41,24 @@ const TIER_ORDER = [
   'G1',
   'G2',
   'G3',
+  'L1',
+  'L2',
+  'L3',
 ] as const;
 
 const TIER_BAR_COLORS: Record<string, string> = {
   Ch: 'rgb(139, 69, 19)',
   F: 'rgb(192, 192, 192)',
-  C: 'rgb(255, 215, 0)',
-  P: 'rgb(7, 186, 173)',
+  C: 'rgb(0, 186, 173)',
+  P: 'rgb(229, 57, 53)',
   G: 'rgb(155, 89, 182)',
+  L: 'rgb(255, 193, 7)',
 };
 
 function tierColor(tierKey: string): string {
   if (tierKey.startsWith('Ch')) return TIER_BAR_COLORS.Ch;
   const head = tierKey[0];
-  if (head === 'F' || head === 'C' || head === 'P' || head === 'G') {
+  if (head === 'F' || head === 'C' || head === 'P' || head === 'G' || head === 'L') {
     return TIER_BAR_COLORS[head];
   }
   return 'rgba(128,128,128,0.6)';
@@ -114,12 +122,39 @@ function aggregateDailyTiers(
   return sums;
 }
 
+const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
+
 export default function RtaDashboardClient() {
   const theme = useTheme();
   const isWide = useMediaQuery('(min-width:480px)');
   const [daysBack, setDaysBack] = useState(0);
 
-  const { data, isLoading, error } = useRtaDashboard();
+  const { data: seasonsData } = useRtaSeasons();
+  const seasonOptions = useMemo(() => {
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return SEASON_FALLBACK;
+    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
+  }, [seasonsData]);
+
+  const resolvedDefaultSeason = useMemo(() => {
+    const def = seasonsData?.defaultSeasonCode;
+    const rows = seasonsData?.seasons;
+    if (def && rows?.some((r) => r.seasonCode === def)) return def;
+    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
+  }, [seasonsData]);
+
+  const [season, setSeason] = useState<string | null>(null);
+  useEffect(() => {
+    if (seasonOptions.length === 0) return;
+    setSeason((prev) => {
+      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
+      return resolvedDefaultSeason;
+    });
+  }, [seasonOptions, resolvedDefaultSeason]);
+
+  const seasonSelectValue = season ?? resolvedDefaultSeason;
+
+  const { data, isLoading, error } = useRtaDashboard(seasonSelectValue);
 
   const rows = useMemo(() => {
     const maxDate = data?.date_range?.max_date;
@@ -153,6 +188,24 @@ export default function RtaDashboardClient() {
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: { xs: 2, md: 4 } }}>
       <PageHeader title="RTA 대시보드" />
+
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
+        <FormControl size="small" sx={{ minWidth: 220 }}>
+          <InputLabel id="rta-dash-season-label">시즌</InputLabel>
+          <Select
+            labelId="rta-dash-season-label"
+            label="시즌"
+            value={seasonSelectValue}
+            onChange={(e) => setSeason(String(e.target.value))}
+          >
+            {seasonOptions.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {o.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         수집된 실레나 리플레이 전체를 한 번 불러온 뒤, 슬라이더는 이 기기에서만 합산합니다.{' '}
@@ -246,7 +299,7 @@ export default function RtaDashboardClient() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
               {rows.map((row) => {
                 const pct = maxCount > 0 ? (row.player_count / maxCount) * 100 : 0;
-                const isP1 = row.tier_key === 'P1';
+                const isTopLegend = row.tier_key === 'L3';
                 return (
                   <Box key={row.tier_key}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -256,7 +309,7 @@ export default function RtaDashboardClient() {
                           width: 28,
                           fontSize: '10px',
                           fontWeight: 600,
-                          color: isP1 ? '#07baad' : 'text.secondary',
+                          color: isTopLegend ? '#ffc107' : 'text.secondary',
                         }}
                       >
                         {row.tier_key}
@@ -306,7 +359,7 @@ export default function RtaDashboardClient() {
               {rows.map((row) => {
                 const pct = maxCount > 0 ? row.player_count / maxCount : 0;
                 const barH = Math.max(4, pct * 160);
-                const isP1 = row.tier_key === 'P1';
+                const isTopLegend = row.tier_key === 'L3';
                 return (
                   <Box
                     key={row.tier_key}
@@ -346,7 +399,7 @@ export default function RtaDashboardClient() {
                       sx={{
                         fontSize: '0.75rem',
                         fontWeight: 600,
-                        color: isP1 ? '#07baad' : 'text.secondary',
+                        color: isTopLegend ? '#ffc107' : 'text.secondary',
                       }}
                     >
                       {row.tier_key}

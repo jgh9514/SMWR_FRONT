@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -28,14 +28,15 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import { useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
+import { useRtaPlayerSummary, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
+import { RtaPlayerSeasonContext } from '@/features/rta/context/RtaPlayerSeasonContext';
 import type { RtaPlayerSummary } from '@/features/rta/types/rta';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { showToast } from '@/shared/lib/notification';
 
-const SEASON_OPTIONS = [
+const SEASON_FALLBACK = [
   { value: 's36-sl', label: 'S36 SL', active: true },
   { value: 's35-sl', label: 'S35 SL', active: false },
 ];
@@ -75,7 +76,40 @@ export default function RtaPlayerDetailShell({
 }) {
   const pathname = usePathname();
 
-  const { data: summary, refetch, isFetching } = useRtaPlayerSummary(wizardId, initialSummary);
+  const { data: seasonsData } = useRtaSeasons();
+  const seasonOptions = useMemo(() => {
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return SEASON_FALLBACK;
+    return rows.map((r) => ({
+      value: r.seasonCode,
+      label: r.seasonName.length > 24 ? `${r.seasonName.slice(0, 22)}…` : r.seasonName,
+      active: r.isActive,
+    }));
+  }, [seasonsData]);
+
+  const resolvedDefaultSeason = useMemo(() => {
+    const def = seasonsData?.defaultSeasonCode;
+    const rows = seasonsData?.seasons;
+    if (def && rows?.some((r) => r.seasonCode === def)) return def;
+    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
+  }, [seasonsData]);
+
+  const [season, setSeason] = useState<string | null>(null);
+  useEffect(() => {
+    if (seasonOptions.length === 0) return;
+    setSeason((prev) => {
+      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
+      return resolvedDefaultSeason;
+    });
+  }, [seasonOptions, resolvedDefaultSeason]);
+
+  const seasonSelectValue = season ?? resolvedDefaultSeason;
+
+  const { data: summary, refetch, isFetching } = useRtaPlayerSummary(
+    wizardId,
+    initialSummary,
+    seasonSelectValue,
+  );
 
   const displayName = useMemo(() => {
     if (summary?.found) {
@@ -105,7 +139,6 @@ export default function RtaPlayerDetailShell({
     return d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
   }, [summary]);
 
-  const [season, setSeason] = useState(SEASON_OPTIONS[0].value);
   const [fav, setFav] = useState(false);
   const [akaAnchor, setAkaAnchor] = useState<HTMLElement | null>(null);
 
@@ -298,10 +331,10 @@ export default function RtaPlayerDetailShell({
           <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
             <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
-                value={season}
+                value={seasonSelectValue}
                 onChange={(e) => setSeason(String(e.target.value))}
                 renderValue={(v) => {
-                  const opt = SEASON_OPTIONS.find((o) => o.value === v);
+                  const opt = seasonOptions.find((o) => o.value === v);
                   return (
                     <Stack direction="row" alignItems="center" gap={1}>
                       <Box
@@ -321,7 +354,7 @@ export default function RtaPlayerDetailShell({
                   );
                 }}
               >
-                {SEASON_OPTIONS.map((o) => (
+                {seasonOptions.map((o) => (
                   <MenuItem key={o.value} value={o.value}>
                     <Stack direction="row" alignItems="center" gap={1}>
                       <Box
@@ -403,7 +436,9 @@ export default function RtaPlayerDetailShell({
         </Stack>
       </Box>
 
-      <Box sx={{ px: { xs: 2, sm: 3 }, pb: 4 }}>{children}</Box>
+      <Box sx={{ px: { xs: 2, sm: 3 }, pb: 4 }}>
+        <RtaPlayerSeasonContext.Provider value={seasonSelectValue}>{children}</RtaPlayerSeasonContext.Provider>
+      </Box>
     </Container>
   );
 }

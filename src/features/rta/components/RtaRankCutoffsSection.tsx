@@ -18,9 +18,11 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import { getRtaTierKeyStarIconPath } from '@/shared/utils';
 import type { RtaRankCutoffAnchorRow } from '@/features/rta/types/rta';
 
-const CUT_KEYS = ['P2', 'P3', 'G1', 'G2', 'G3'] as const;
+/** 컷 스냅샷 tier_key (골드3 → 플래3, 6열) */
+const CUT_KEYS = ['G3', 'G2', 'G1', 'P3', 'P2', 'P1'] as const;
 
 /** 표시 순서·라벨 (서버 anchor_key 와 동일) */
 const ANCHOR_ROWS: { key: string; label: string }[] = [
@@ -31,27 +33,21 @@ const ANCHOR_ROWS: { key: string; label: string }[] = [
   { key: '7d', label: '7일 전' },
 ];
 
-const TIER_COLOR_P = 'rgb(7, 186, 173)';
-const TIER_COLOR_G = 'rgb(155, 89, 182)';
+const TIER_COLOR_P = '#43a047';
+const TIER_COLOR_G = '#e53935';
+const TIER_COLOR_L = '#ffc107';
 
 function tierAccent(tierKey: string): string {
-  return tierKey.startsWith('P') ? TIER_COLOR_P : TIER_COLOR_G;
+  if (tierKey.startsWith('L')) return TIER_COLOR_L;
+  if (tierKey.startsWith('G')) return TIER_COLOR_G;
+  if (tierKey.startsWith('P')) return TIER_COLOR_P;
+  return '#999';
 }
 
 function tierStarCount(tierKey: string): number {
   const last = tierKey.slice(-1);
   const n = parseInt(last, 10);
   return Number.isFinite(n) && n >= 1 && n <= 3 ? n : 2;
-}
-
-/** 티어 키(Ch1, F2, C1, P2, G3 …) → public/icons 별 PNG */
-function tierStarIconSrc(tierKey: string): string {
-  if (tierKey.startsWith('Ch')) return '/icons/challenger_star.png';
-  if (tierKey.startsWith('F')) return '/icons/fighter_star.png';
-  if (tierKey.startsWith('C')) return '/icons/conqueror_star.png';
-  if (tierKey.startsWith('P')) return '/icons/punisher_star.png';
-  if (tierKey.startsWith('G')) return '/icons/guardian_star.png';
-  return '/icons/challenger_star.png';
 }
 
 function toNum(v: unknown): number {
@@ -76,7 +72,7 @@ function pivotByAnchor(rows: RtaRankCutoffAnchorRow[]): Map<string, Record<strin
 
 function TierStars({ tierKey }: { tierKey: string }) {
   const n = tierStarCount(tierKey);
-  const src = tierStarIconSrc(tierKey);
+  const src = getRtaTierKeyStarIconPath(tierKey);
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
       {Array.from({ length: n }).map((_, i) => (
@@ -170,7 +166,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
           <Typography sx={{ fontWeight: 600 }}>랭크 컷</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary">
-          P2·P3·G1~G3 구간에 해당하는 리플레이·점수 데이터가 쌓이면 최저점 기준 추정 컷을 표시합니다.
+          G3~P1 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
         </Typography>
       </Card>
     );

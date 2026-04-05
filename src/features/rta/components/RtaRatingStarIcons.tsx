@@ -11,7 +11,7 @@ export interface RtaRatingStarIconsProps {
 }
 
 /**
- * RTA 레이팅(rating_id)에 맞는 티어 별 PNG를 1~3개 표시 (getRatingStars 규칙 동일)
+ * RTA 레이팅(rating_id)에 맞는 티어 별 PNG 1~3개 (getRatingStars·public/icons 규칙 동일)
  */
 export default function RtaRatingStarIcons({ rating, size = 14, gap = 2 }: RtaRatingStarIconsProps) {
   const count = getRatingStars(rating);

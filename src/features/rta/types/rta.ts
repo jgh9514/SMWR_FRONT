@@ -97,6 +97,8 @@ export interface RtaData {
 export interface RtaMatchListParams {
   limit: number;
   offset: number;
+  /** rta_season.season_code — 없으면 서버가 금일 기준 기본 시즌 사용 */
+  seasonCode?: string | null;
 }
 
 // 몬스터별 통계 타입
@@ -150,6 +152,7 @@ export interface RtaMonsterStatsResponse {
   trio_stats?: TrioComboStat[];
   total_matches: number;
   has_more?: boolean; // 더 불러올 데이터가 있는지
+  seasonCode?: string | null;
 }
 
 // 몬스터 상세 정보 타입
@@ -238,6 +241,26 @@ export interface RtaDashboardResponse {
     max_date?: string;
   };
   rank_cutoff_anchors?: RtaRankCutoffAnchorRow[];
+  /** 적용된 시즌 코드 (요청 미지정 시 서버 기본) */
+  seasonCode?: string | null;
+}
+
+/** DB rta_season (GET /api/v1/rta/seasons) */
+export interface RtaSeasonRow {
+  seasonCode: string;
+  seasonNo: number;
+  leagueType: string;
+  seasonName: string;
+  startAt: string;
+  endAt: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface RtaSeasonsResponse {
+  seasons: RtaSeasonRow[];
+  /** 금일 시각이 시즌 구간에 포함될 때의 seasonCode (없으면 DB 최신 시즌). 서버 계산 */
+  defaultSeasonCode?: string | null;
 }
 
 /** RTA 소환사 랭킹 한 행 (리플레이 집계 기준) */
@@ -284,11 +307,13 @@ export interface RtaSummonerRankingRow {
 export interface RtaSummonerRankingResponse {
   total: number;
   rankings: RtaSummonerRankingRow[];
+  seasonCode?: string | null;
 }
 
 /** POST /rta/player/:wizardId/summary — MyBatis·JSON camelCase 병행 */
 export interface RtaPlayerSummary {
   found: boolean;
+  seasonCode?: string | null;
   rank_position?: number;
   rankPosition?: number;
   wizard_id?: string;

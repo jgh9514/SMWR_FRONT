@@ -50,16 +50,17 @@ export const searchDataExtraction = (schDatas: SearchData): Record<string, unkno
 };
 
 /**
- * RTA 레이팅 색상 계산 (Vue와 동일한 로직)
- * @param rating 레이팅 값 (number, string 또는 undefined)
- * @returns 색상 코드
+ * RTA 레이팅 색상 (rating_id 구간)
+ * 1000번대 Ch, 2000 F, 3000 C, 3500 P, 4000 G, 5000 L
  */
 export const getRatingColor = (rating: number | string | undefined): string => {
   if (rating === undefined || rating === null) return '#999';
   const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
   if (isNaN(ratingNum)) return '#999';
-  
-  if (ratingNum >= 4000) return '#ff3e00';
+
+  if (ratingNum >= 5000) return '#ffc107';
+  if (ratingNum >= 4000) return '#9b59b6';
+  if (ratingNum >= 3500) return '#e53935';
   if (ratingNum >= 3000) return '#00baad';
   if (ratingNum >= 2000) return '#ffc300';
   return '#999';
@@ -81,11 +82,7 @@ export const getRatingStars = (rating: number | string | undefined): number => {
 };
 
 /**
- * RTA rating_id 구간별 티어 아이콘 (public/icons, 대시보드 SQL 티어 분기와 동일)
- * ≥5000 G, ≥4000 P, ≥3000 C, ≥2000 F, 그 외 Ch
- */
-/**
- * RTA rating_id → 티어 문자열 (예: Ch2, F3, G1). 대시보드 SQL tier_key 규칙과 동일.
+ * RTA rating_id → 티어 문자열 (Ch / F / C / P / G / L). 대시보드 SQL tier_key 규칙과 동일.
  */
 export function getRtaTierShortLabel(rating: number | string | undefined): string {
   if (rating === undefined || rating === null) return '—';
@@ -93,14 +90,16 @@ export function getRtaTierShortLabel(rating: number | string | undefined): strin
   if (isNaN(ratingNum)) return '—';
   const head =
     ratingNum >= 5000
-      ? 'G'
+      ? 'L'
       : ratingNum >= 4000
-        ? 'P'
-        : ratingNum >= 3000
-          ? 'C'
-          : ratingNum >= 2000
-            ? 'F'
-            : 'Ch';
+        ? 'G'
+        : ratingNum >= 3500
+          ? 'P'
+          : ratingNum >= 3000
+            ? 'C'
+            : ratingNum >= 2000
+              ? 'F'
+              : 'Ch';
   const mod = ratingNum % 10;
   const sub = [1, 2, 3].includes(mod) ? String(mod) : '2';
   return `${head}${sub}`;
@@ -110,10 +109,22 @@ export function getRatingStarIconPath(rating: number | string | undefined): stri
   if (rating === undefined || rating === null) return null;
   const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
   if (isNaN(ratingNum)) return null;
-  if (ratingNum >= 5000) return '/icons/guardian_star.png';
-  if (ratingNum >= 4000) return '/icons/punisher_star.png';
+  if (ratingNum >= 5000) return '/icons/legend_star.png';
+  if (ratingNum >= 4000) return '/icons/guardian_star.png';
+  if (ratingNum >= 3500) return '/icons/punisher_star.png';
   if (ratingNum >= 3000) return '/icons/conqueror_star.png';
   if (ratingNum >= 2000) return '/icons/fighter_star.png';
+  return '/icons/challenger_star.png';
+}
+
+/** 티어 키(Ch1, F2, C3, P1, G2, L3 …) → public/icons 별 PNG */
+export function getRtaTierKeyStarIconPath(tierKey: string): string {
+  if (tierKey.startsWith('Ch')) return '/icons/challenger_star.png';
+  if (tierKey.startsWith('F')) return '/icons/fighter_star.png';
+  if (tierKey.startsWith('C')) return '/icons/conqueror_star.png';
+  if (tierKey.startsWith('P')) return '/icons/punisher_star.png';
+  if (tierKey.startsWith('G')) return '/icons/guardian_star.png';
+  if (tierKey.startsWith('L')) return '/icons/legend_star.png';
   return '/icons/challenger_star.png';
 }
 
