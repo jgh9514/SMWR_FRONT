@@ -6,7 +6,8 @@ import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/sh
 import JsonLd from '@/shared/ui/seo/JsonLd';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 
-export const revalidate = 600;
+/** 목록·상세 동일: RTA 통계 API는 POST + 실시간 반영 우선 */
+export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
 interface RtaMonsterDetailPageProps {

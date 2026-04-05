@@ -6,7 +6,8 @@ import JsonLd from '@/shared/ui/seo/JsonLd';
 
 const TOP_MONSTERS_LIMIT = 100;
 
-export const revalidate = 600;
+/** POST 기반 통계는 fetch Data Cache·ISR 조합에서 갱신이 멈추는 경우가 있어 매 요청 서버에서 최신 데이터를 가져온다. */
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = buildPublicMetadata({
   title: 'RTA 몬스터 통계',

@@ -5,7 +5,7 @@
   "packageManager": "yarn@4.10.3",
   "scripts": {
     "postinstall": "node scripts/copy-smarteditor.mjs",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint .",

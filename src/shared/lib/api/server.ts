@@ -81,11 +81,21 @@ function extractApiData<T>(response: ApiResponse<T> | T): T {
   return response as T;
 }
 
+type ServerApiPostOptions = {
+  /**
+   * POST는 Next Data Cache에 revalidate가 잘 안 먹는 경우가 있어,
+   * 실시간에 가까운 통계 API에는 `no-store`를 쓴다.
+   */
+  cache?: 'no-store';
+};
+
 async function serverApiPost<T>(
   path: string,
   body: unknown,
   revalidate: number,
+  options?: ServerApiPostOptions,
 ): Promise<T> {
+  const useNoStore = options?.cache === 'no-store';
   const response = await fetch(buildApiUrl(path), {
     method: 'POST',
     headers: {
@@ -93,7 +103,7 @@ async function serverApiPost<T>(
       'X-Requested-With': 'XMLHttpRequest',
     },
     body: JSON.stringify(body ?? {}),
-    next: { revalidate },
+    ...(useNoStore ? { cache: 'no-store' as const } : { next: { revalidate } }),
   });
 
   if (!response.ok) {
@@ -173,6 +183,7 @@ export async function getRtaMonsterStatsData(
     '/rta/monster-stats',
     { limit, offset },
     PUBLIC_REVALIDATE_SECONDS.rtaStats,
+    { cache: 'no-store' },
   );
 }
 
@@ -186,6 +197,7 @@ export async function getRtaMonsterDetailData(monsterId: number): Promise<Monste
       '/rta/monster-detail',
       { pk: monsterId },
       PUBLIC_REVALIDATE_SECONDS.rtaDetail,
+      { cache: 'no-store' },
     );
     return parseRecentMatches(detail);
   } catch {
