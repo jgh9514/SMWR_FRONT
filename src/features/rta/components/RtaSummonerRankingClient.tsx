@@ -45,7 +45,9 @@ import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image'
 import type { RtaRankCutoffAnchorRow, RtaSummonerRankingRow, RtaTierDailyRow } from '@/features/rta/types/rta';
 
 const PAGE_SIZE = 50;
-const DIST_SAMPLE = 500;
+/** WAS `RtaServiceImpl.RTA_SUMMONER_RANKING_MAX_ROWS`와 동일 — 노출·분포 샘플 상한 */
+const SUMMONER_RANKING_MAX = 500;
+const DIST_SAMPLE = SUMMONER_RANKING_MAX;
 
 /** 컷 카드·차트 표시 순서 (낮은 티어 → 높은 티어: 심판자~레전드) */
 /** 티어 컷 카드·차트: 골드3 ~ 플래3 (6단계) */
@@ -54,7 +56,8 @@ const CUT_TIER_ORDER = ['G3', 'G2', 'G1', 'P3', 'P2', 'P1'] as const;
 /** 앵커 컷 추이 Y축: G3(상한)·P1(하한) 점수 기준 ±이만큼 (0~전체 구간 대비 확대) */
 const CUT_CHART_Y_MARGIN = 100;
 
-const ANCHOR_CHART_KEYS = ['3h', '6h', '12h', '3d', '7d'] as const;
+/** X축: 좌=과거(앵커가 더 옛날) → 우=현재에 가까움 */
+const ANCHOR_CHART_KEYS = ['7d', '3d', '12h', '6h', '3h'] as const;
 
 /** WAS `rta.xml` 랭크 컷 COALESCE 마지막 값과 동일 — 실측 없을 때만 들어가므로 Δ 계산에서 제외 */
 const RTA_CUTOFF_FALLBACK_SCORE = 1000;
@@ -482,17 +485,11 @@ export default function RtaSummonerRankingClient() {
       <PageHeader title="RTA 소환사 랭킹" backPath="/rta" />
 
       <Box sx={{ mb: 3 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 640, lineHeight: 1.6 }}>
-          이번 시즌 상위권 소환사들의 <strong>모스트 몬스터</strong>와 티어 컷 추이를 확인해 보세요. 시즌 목록은 서버 DB
-          기준입니다 (랭킹 API 필터는 추후 연동).
-        </Typography>
-
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
           alignItems={{ xs: 'stretch', sm: 'center' }}
           justifyContent="space-between"
-          sx={{ mt: 2.5 }}
         >
           <FormControl size="small" sx={{ minWidth: 200 }}>
             <InputLabel id="rta-season-label">시즌</InputLabel>
@@ -687,7 +684,7 @@ export default function RtaSummonerRankingClient() {
 
               <Box sx={{ minHeight: 260 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  앵커별 컷 추이 (3h → 7d)
+                  앵커별 컷 추이 (7d → 3h, 과거 → 현재)
                 </Typography>
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={chartRows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -731,26 +728,6 @@ export default function RtaSummonerRankingClient() {
           )}
         </Card>
       )}
-
-      <Card
-        elevation={0}
-        sx={{
-          mb: 2,
-          p: { xs: 2, md: 2.5 },
-          borderRadius: 2,
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-        }}
-      >
-        <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-          집계 방식
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 720, lineHeight: 1.6, fontSize: '0.8rem' }}>
-          수집된 <strong>실레나 리플레이</strong>만을 대상으로, 소환사마다 <strong>가장 최근 경기</strong> 점수로 순위를 매깁니다.
-          모스트 몬스터는 벤 제외 필드 출전 기준입니다.
-        </Typography>
-      </Card>
 
       {loadingPage && !pageData ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
