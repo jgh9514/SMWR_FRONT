@@ -40,27 +40,30 @@ import type { TooltipValueType } from 'recharts';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { useRtaDashboard, useRtaSeasons, useRtaSummonerRanking } from '@/features/rta/hooks/useRtaData';
-import { getRtaTierKeyStarIconPath, getRtaTierShortLabel, getRatingColor } from '@/shared/utils';
+import {
+  getRtaTierKeyStarIconPath,
+  getRtaTierShortLabel,
+  getRatingColor,
+  RTA_LEGEND_STAR_WIDTH_RATIO,
+} from '@/shared/utils';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaRankCutoffAnchorRow, RtaSummonerRankingRow, RtaTierDailyRow } from '@/features/rta/types/rta';
 import { formatRtaCutoffScore, isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
+import {
+  ANCHOR_CHART_LABELS,
+  buildCutChartRows,
+  computeCutChartYDomain,
+  CUT_TIER_ORDER,
+  pivotRankCutoffAnchors,
+} from '@/features/rta/utils/rtaRankCutoffChart';
 
 const PAGE_SIZE = 50;
 /** WAS `RtaServiceImpl.RTA_SUMMONER_RANKING_MAX_ROWS`와 동일 — 노출·분포 샘플 상한 */
 const SUMMONER_RANKING_MAX = 500;
 const DIST_SAMPLE = SUMMONER_RANKING_MAX;
 
-/** 티어 컷 차트·데이터 순서 (낮은 티어 → 높은 티어: P1 ~ G3) */
-const CUT_TIER_ORDER = ['P1', 'P2', 'P3', 'G1', 'G2', 'G3'] as const;
-
 /** 티어 컷 카드 그리드만: 윗줄 G → 아랫줄 P (2행×3열) */
 const CUT_TIER_CARD_GRID_ORDER = ['G1', 'G2', 'G3', 'P1', 'P2', 'P3'] as const;
-
-/** 앵커 컷 추이 Y축: P1·G3 끝점 점수 우선으로 범위 산출, 없으면 전 티어 폴백 */
-const CUT_CHART_Y_MARGIN = 100;
-
-/** X축: 좌=과거(앵커가 더 옛날) → 우=현재에 가까움 */
-const ANCHOR_CHART_KEYS = ['7d', '3d', '12h', '6h', '3h'] as const;
 
 /** P(플래): 옥색(청록) — 차트·카드 라벨 공통 */
 const TIER_COLOR_P = '#00897b';
@@ -81,13 +84,46 @@ function tierStarCount(tierKey: string): number {
   return Number.isFinite(n) && n >= 1 && n <= 3 ? n : 2;
 }
 
+const TIER_STAR_PX = 14;
+const TIER_STAR_GAP_PX = 2;
+const TIER_STAR_TRIPLE_WIDTH = 3 * TIER_STAR_PX + 2 * TIER_STAR_GAP_PX;
+
 function TierStars({ tierKey }: { tierKey: string }) {
-  const n = tierStarCount(tierKey);
   const src = getRtaTierKeyStarIconPath(tierKey);
+  if (tierKey === 'L1') {
+    const legendW = TIER_STAR_PX * RTA_LEGEND_STAR_WIDTH_RATIO;
+    return (
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: TIER_STAR_TRIPLE_WIDTH,
+          minWidth: TIER_STAR_TRIPLE_WIDTH,
+        }}
+      >
+        <Image
+          src={src}
+          alt=""
+          width={legendW}
+          height={TIER_STAR_PX}
+          unoptimized
+          style={{
+            display: 'block',
+            width: legendW,
+            height: TIER_STAR_PX,
+            maxWidth: '100%',
+            objectFit: 'contain',
+          }}
+        />
+      </Box>
+    );
+  }
+  const n = tierStarCount(tierKey);
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
       {Array.from({ length: n }).map((_, i) => (
-        <Image key={i} src={src} alt="" width={14} height={14} unoptimized style={{ display: 'block' }} />
+        <Image key={i} src={src} alt="" width={TIER_STAR_PX} height={TIER_STAR_PX} unoptimized style={{ display: 'block' }} />
       ))}
     </Box>
   );
@@ -113,20 +149,6 @@ function cutDelta3hVs3d(score3h: number, score3d: number): number | null {
   return score3h - score3d;
 }
 
-function pivotAnchors(rows: RtaRankCutoffAnchorRow[] | undefined): Map<string, Record<string, number>> {
-  const byAnchor = new Map<string, Record<string, number>>();
-  for (const row of rows ?? []) {
-    const ak = String(row.anchor_key ?? '').trim();
-    if (!ak) continue;
-    const tk = row.tier_key;
-    if (!(CUT_TIER_ORDER as readonly string[]).includes(tk)) continue;
-    if (!byAnchor.has(ak)) byAnchor.set(ak, {});
-    const rec = byAnchor.get(ak)!;
-    rec[tk] = toNum(row.cutoff_score);
-  }
-  return byAnchor;
-}
-
 function latestDayTierCounts(daily: RtaTierDailyRow[] | undefined): Record<string, number> {
   if (!daily?.length) return {};
   let maxD = '';
@@ -144,44 +166,6 @@ function latestDayTierCounts(daily: RtaTierDailyRow[] | undefined): Record<strin
     out[k] = (out[k] ?? 0) + toNum(r.player_count);
   }
   return out;
-}
-
-function buildCutChartRows(byAnchor: Map<string, Record<string, number>>) {
-  return ANCHOR_CHART_KEYS.map((ak) => {
-    const rec = byAnchor.get(ak) ?? {};
-    const row: Record<string, string | number | null> = { anchor: ak };
-    for (const tk of CUT_TIER_ORDER) {
-      const v = rec[tk];
-      row[tk] = v != null && !isRtaCutoffMissing(v) ? v : null;
-    }
-    return row;
-  });
-}
-
-/** P1·G3 끝점으로 Y 범위 우선 산출(없으면 전 티어 폴백). Recharts domain [min, max] */
-function computeCutChartYDomain(
-  chartRows: Record<string, string | number | null>[],
-): [number, number] | undefined {
-  const collect = (keys: readonly string[]) => {
-    const nums: number[] = [];
-    for (const row of chartRows) {
-      for (const k of keys) {
-        const v = row[k];
-        if (typeof v === 'number' && Number.isFinite(v) && !isRtaCutoffMissing(v)) nums.push(v);
-      }
-    }
-    return nums;
-  };
-  const loKey = CUT_TIER_ORDER[0];
-  const hiKey = CUT_TIER_ORDER[CUT_TIER_ORDER.length - 1];
-  let nums = collect([loKey, hiKey]);
-  if (nums.length === 0) {
-    nums = collect([...CUT_TIER_ORDER]);
-  }
-  if (nums.length === 0) return undefined;
-  const lo = Math.min(...nums);
-  const hi = Math.max(...nums);
-  return [lo - CUT_CHART_Y_MARGIN, hi + CUT_CHART_Y_MARGIN];
 }
 
 function countrySharesFromRankings(rows: RtaSummonerRankingRow[]): { code: string; pct: number }[] {
@@ -414,7 +398,7 @@ export default function RtaSummonerRankingClient() {
   const maxDate = dashData?.date_range?.max_date;
 
   const { byAnchor, cutCards, chartRows, updatedLabel } = useMemo(() => {
-    const byAnchor = pivotAnchors(anchorRows);
+    const byAnchor = pivotRankCutoffAnchors(anchorRows);
     const latest = byAnchor.get('3h') ?? {};
     const prev = byAnchor.get('3d') ?? {};
     const tierCounts = latestDayTierCounts(dailyTiers);
@@ -690,7 +674,14 @@ export default function RtaSummonerRankingClient() {
                 <ResponsiveContainer width="100%" height={240}>
                   <LineChart data={chartRows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                    <XAxis dataKey="anchor" tick={{ fontSize: 11 }} stroke={theme.palette.text.secondary} />
+                    <XAxis
+                      dataKey="anchor"
+                      tick={{ fontSize: 11 }}
+                      stroke={theme.palette.text.secondary}
+                      tickFormatter={(v) =>
+                        typeof v === 'string' ? ANCHOR_CHART_LABELS[v] ?? String(v) : String(v)
+                      }
+                    />
                     <YAxis
                       domain={cutChartYDomain ?? ['auto', 'auto']}
                       tick={{ fontSize: 11 }}

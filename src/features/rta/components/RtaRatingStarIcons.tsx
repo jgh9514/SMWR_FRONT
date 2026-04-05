@@ -1,7 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { getRatingStarIconPath, getRatingStars, RATING_ID_LEGEND_RANK_1 } from '@/shared/utils';
+import {
+  getRatingStarIconPath,
+  getRatingStars,
+  RATING_ID_LEGEND_RANK_1,
+  RTA_LEGEND_STAR_WIDTH_RATIO,
+} from '@/shared/utils';
 
 export interface RtaRatingStarIconsProps {
   rating: number | string | undefined;
@@ -27,6 +32,9 @@ export default function RtaRatingStarIcons({ rating, size = 14, gap = 2 }: RtaRa
 
   const n = ratingNum(rating);
   const isLegendRank1 = n === RATING_ID_LEGEND_RANK_1;
+  /** 일반 별 3개 + 간격 2칸과 동일한 가로폭(레전드 배지는 가로가 약 2배라 이 안에 가운데 배치) */
+  const tripleStarSlotWidth = 3 * size + 2 * gap;
+  const legendW = size * RTA_LEGEND_STAR_WIDTH_RATIO;
 
   if (isLegendRank1) {
     return (
@@ -35,6 +43,8 @@ export default function RtaRatingStarIcons({ rating, size = 14, gap = 2 }: RtaRa
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
+          width: tripleStarSlotWidth,
+          minWidth: tripleStarSlotWidth,
           lineHeight: 0,
         }}
         aria-hidden
@@ -42,10 +52,17 @@ export default function RtaRatingStarIcons({ rating, size = 14, gap = 2 }: RtaRa
         <Image
           src={src}
           alt=""
-          width={size}
+          width={legendW}
           height={size}
           unoptimized
-          style={{ display: 'block', width: size, height: size, verticalAlign: 'middle' }}
+          style={{
+            display: 'block',
+            width: legendW,
+            height: size,
+            maxWidth: '100%',
+            objectFit: 'contain',
+            verticalAlign: 'middle',
+          }}
         />
       </span>
     );

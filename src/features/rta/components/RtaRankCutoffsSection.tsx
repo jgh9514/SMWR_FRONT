@@ -14,16 +14,32 @@ import {
   TableHead,
   TableRow,
   Typography,
+  useTheme,
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import { getRtaTierKeyStarIconPath } from '@/shared/utils';
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import type { TooltipValueType } from 'recharts';
+import { getRtaTierKeyStarIconPath, RTA_LEGEND_STAR_WIDTH_RATIO } from '@/shared/utils';
 import type { RtaRankCutoffAnchorRow } from '@/features/rta/types/rta';
 import { formatRtaCutoffScore, isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
-
-/** 컷 스냅샷 tier_key (낮은 티어 → 높은 티어: P1 ~ G3 — 표·집계 순서) */
-const CUT_KEYS = ['P1', 'P2', 'P3', 'G1', 'G2', 'G3'] as const;
+import {
+  ANCHOR_CHART_LABELS,
+  buildCutChartRows,
+  computeCutChartYDomain,
+  CUT_TIER_ORDER,
+  pivotRankCutoffAnchors,
+} from '@/features/rta/utils/rtaRankCutoffChart';
 
 /** 상단 카드만: 윗줄 G → 아랫줄 P (2행×3열) */
 const CUT_KEYS_CARD_GRID = ['G1', 'G2', 'G3', 'P1', 'P2', 'P3'] as const;
@@ -54,33 +70,47 @@ function tierStarCount(tierKey: string): number {
   return Number.isFinite(n) && n >= 1 && n <= 3 ? n : 2;
 }
 
-function toNum(v: unknown): number {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/** anchor_key → tier_key → 점수 */
-function pivotByAnchor(rows: RtaRankCutoffAnchorRow[]): Map<string, Record<string, number>> {
-  const byAnchor = new Map<string, Record<string, number>>();
-  for (const row of rows) {
-    const ak = String(row.anchor_key ?? '').trim();
-    if (!ak) continue;
-    const tk = row.tier_key;
-    if (!(CUT_KEYS as readonly string[]).includes(tk)) continue;
-    if (!byAnchor.has(ak)) byAnchor.set(ak, {});
-    const rec = byAnchor.get(ak)!;
-    rec[tk] = toNum(row.cutoff_score);
-  }
-  return byAnchor;
-}
+const TIER_STAR_PX = 12;
+/** gap 0.25 ≈ 2px — 별 3개 행과 동일한 총너비 */
+const TIER_STAR_GAP_PX = 2;
+const TIER_STAR_TRIPLE_WIDTH = 3 * TIER_STAR_PX + 2 * TIER_STAR_GAP_PX;
 
 function TierStars({ tierKey }: { tierKey: string }) {
-  const n = tierStarCount(tierKey);
   const src = getRtaTierKeyStarIconPath(tierKey);
+  if (tierKey === 'L1') {
+    const legendW = TIER_STAR_PX * RTA_LEGEND_STAR_WIDTH_RATIO;
+    return (
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: TIER_STAR_TRIPLE_WIDTH,
+          minWidth: TIER_STAR_TRIPLE_WIDTH,
+        }}
+      >
+        <Image
+          src={src}
+          alt=""
+          width={legendW}
+          height={TIER_STAR_PX}
+          unoptimized
+          style={{
+            display: 'block',
+            width: legendW,
+            height: TIER_STAR_PX,
+            maxWidth: '100%',
+            objectFit: 'contain',
+          }}
+        />
+      </Box>
+    );
+  }
+  const n = tierStarCount(tierKey);
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
       {Array.from({ length: n }).map((_, i) => (
-        <Image key={i} src={src} alt="" width={12} height={12} unoptimized style={{ display: 'block' }} />
+        <Image key={i} src={src} alt="" width={TIER_STAR_PX} height={TIER_STAR_PX} unoptimized style={{ display: 'block' }} />
       ))}
     </Box>
   );
@@ -99,18 +129,25 @@ function TierHeaderCell({ tierKey }: { tierKey: string }) {
 
 export interface RtaRankCutoffsSectionProps {
   rankCutoffAnchors: RtaRankCutoffAnchorRow[] | undefined;
+  /** `/rta/rank-cutoffs` 전용: 앵커별 컷 추이 라인 차트 표시 */
+  showTrendChart?: boolean;
 }
 
-export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCutoffsSectionProps) {
-  const { latest, tableRows, summaryLabel } = useMemo(() => {
+export default function RtaRankCutoffsSection({
+  rankCutoffAnchors,
+  showTrendChart = false,
+}: RtaRankCutoffsSectionProps) {
+  const theme = useTheme();
+
+  const { latest, tableRows, summaryLabel, chartRows, cutChartYDomain, hasCutChartData } = useMemo(() => {
     const rows = rankCutoffAnchors ?? [];
-    const byAnchor = pivotByAnchor(rows);
+    const byAnchor = pivotRankCutoffAnchors(rows);
 
     const firstKey = ANCHOR_ROWS[0]?.key;
     const latest: Record<string, number> = {};
     if (firstKey) {
       const rec = byAnchor.get(firstKey) ?? {};
-      for (const k of CUT_KEYS) {
+      for (const k of CUT_TIER_ORDER) {
         latest[k] = rec[k] ?? 0;
       }
     }
@@ -127,7 +164,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
       const cur = byAnchor.get(key) ?? {};
       const next = i + 1 < ANCHOR_ROWS.length ? byAnchor.get(ANCHOR_ROWS[i + 1].key) ?? {} : null;
       const deltas: Record<string, number | null> = {};
-      for (const k of CUT_KEYS) {
+      for (const k of CUT_TIER_ORDER) {
         const c = cur[k];
         const o = next ? next[k] : undefined;
         if (o === undefined || c === undefined) {
@@ -148,11 +185,20 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
 
     const summaryLabel = ANCHOR_ROWS[0]?.label ?? '—';
 
-    return { latest, tableRows, summaryLabel };
+    const chartRows = buildCutChartRows(byAnchor);
+    const cutChartYDomain = computeCutChartYDomain(chartRows);
+    const hasCutChartData = CUT_TIER_ORDER.some((tk) =>
+      chartRows.some((r) => {
+        const v = r[tk];
+        return typeof v === 'number' && Number.isFinite(v) && !isRtaCutoffMissing(v);
+      }),
+    );
+
+    return { latest, tableRows, summaryLabel, chartRows, cutChartYDomain, hasCutChartData };
   }, [rankCutoffAnchors]);
 
   const hasAny =
-    CUT_KEYS.some((k) => !isRtaCutoffMissing(latest[k])) || (rankCutoffAnchors?.length ?? 0) > 0;
+    CUT_TIER_ORDER.some((k) => !isRtaCutoffMissing(latest[k])) || (rankCutoffAnchors?.length ?? 0) > 0;
 
   if (!hasAny) {
     return (
@@ -195,27 +241,83 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
           <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
           <Typography sx={{ fontWeight: 600, fontSize: '1rem' }}>랭크 컷</Typography>
         </Box>
-        <Box
-          component={Link}
-          href="/rta/rank-cutoffs"
-          sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 0.5,
-            fontSize: '0.75rem',
-            color: 'text.secondary',
-            textDecoration: 'none',
-            '&:hover': { color: 'text.primary' },
-          }}
-        >
-          기록 보기
-          <ArrowForwardIcon sx={{ fontSize: 14 }} />
-        </Box>
+        {!showTrendChart ? (
+          <Box
+            component={Link}
+            href="/rta/rank-cutoffs"
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              fontSize: '0.75rem',
+              color: 'text.secondary',
+              textDecoration: 'none',
+              '&:hover': { color: 'text.primary' },
+            }}
+          >
+            기록 보기
+            <ArrowForwardIcon sx={{ fontSize: 14 }} />
+          </Box>
+        ) : null}
       </Box>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, lineHeight: 1.5 }}>
         각 행은 서버 시각 기준 해당 시점이 속한 <strong>날짜</strong>에서, 그 시각 <strong>이전</strong>까지 수집된 리플레이만으로 티어별 최저점을 봅니다.
       </Typography>
+
+      {showTrendChart && hasCutChartData ? (
+        <Box sx={{ mb: 2.5 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            앵커별 컷 추이 (7일 전 → 3시간 전, 과거 → 현재)
+          </Typography>
+          <Box sx={{ width: '100%', minHeight: 260 }}>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={chartRows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
+                <XAxis
+                  dataKey="anchor"
+                  tick={{ fontSize: 11 }}
+                  stroke={theme.palette.text.secondary}
+                  tickFormatter={(v) =>
+                    typeof v === 'string' && v in ANCHOR_CHART_LABELS ? ANCHOR_CHART_LABELS[v] : String(v)
+                  }
+                />
+                <YAxis
+                  domain={cutChartYDomain ?? ['auto', 'auto']}
+                  tick={{ fontSize: 11 }}
+                  stroke={theme.palette.text.secondary}
+                  tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : String(v))}
+                />
+                <Tooltip
+                  formatter={(value: TooltipValueType | undefined) => {
+                    if (value == null) return '—';
+                    if (Array.isArray(value)) {
+                      return value
+                        .map((x) => (x === '' ? '—' : Math.round(Number(x)).toLocaleString()))
+                        .join(', ');
+                    }
+                    if (value === '') return '—';
+                    return Math.round(Number(value)).toLocaleString();
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {CUT_TIER_ORDER.map((tk) => (
+                  <Line
+                    key={tk}
+                    type="monotone"
+                    dataKey={tk}
+                    name={tk}
+                    stroke={tierAccent(tk)}
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        </Box>
+      ) : null}
 
       <Box
         sx={{
@@ -263,7 +365,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
             <TableHead>
               <TableRow sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                 <TableCell sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600, py: 1.5 }}>기준</TableCell>
-                {CUT_KEYS.map((k) => (
+                {CUT_TIER_ORDER.map((k) => (
                   <TierHeaderCell key={k} tierKey={k} />
                 ))}
               </TableRow>
@@ -280,7 +382,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
                       {row.label}
                     </Typography>
                   </TableCell>
-                  {CUT_KEYS.map((k) => {
+                  {CUT_TIER_ORDER.map((k) => {
                     const sc = row.scores[k];
                     const d = row.deltas[k];
                     return (

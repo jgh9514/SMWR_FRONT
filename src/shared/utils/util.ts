@@ -111,6 +111,9 @@ export function getRtaTierShortLabel(rating: number | string | undefined): strin
 /** RTA 레전드 랭킹 1위 전용 rating_id (legend_star.png 단일 배지) */
 export const RATING_ID_LEGEND_RANK_1 = 5001;
 
+/** legend_star.png는 일반 티어 별(정사각) 대비 가로가 약 2배(동일 높이 기준) */
+export const RTA_LEGEND_STAR_WIDTH_RATIO = 2;
+
 export function getRatingStarIconPath(rating: number | string | undefined): string | null {
   if (rating === undefined || rating === null) return null;
   const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
