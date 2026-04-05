@@ -17,6 +17,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
+import RtaTierOfficialRulesSection from '@/features/rta/components/RtaTierOfficialRulesSection';
 import { useRtaDashboard } from '@/features/rta/hooks/useRtaData';
 import type { RtaTierBucket, RtaTierDailyRow } from '@/features/rta/types/rta';
 
@@ -364,6 +365,7 @@ export default function RtaDashboardClient() {
           </Typography>
         </Card>
         {data ? <RtaRankCutoffsSection rankCutoffAnchors={data.rank_cutoff_anchors} /> : null}
+        <RtaTierOfficialRulesSection />
         </>
       )}
     </Box>
