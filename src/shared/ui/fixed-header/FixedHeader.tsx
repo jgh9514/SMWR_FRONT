@@ -641,6 +641,9 @@ export default function FixedHeader() {
                         textTransform: 'none',
                         color: active ? 'primary.light' : 'rgba(255,255,255,0.85)',
                         bgcolor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        // 하위 메뉴 Paper(보통 zIndex.modal)보다 위에 두어 옆 대메뉴 클릭이 가로채이지 않게 함
+                        position: 'relative',
+                        zIndex: (theme) => theme.zIndex.modal + 1,
                         '&:hover': {
                           bgcolor: 'rgba(255,255,255,0.08)',
                         },
@@ -661,6 +664,7 @@ export default function FixedHeader() {
                         paper: {
                           sx: {
                             mt: 0.5,
+                            zIndex: (theme) => theme.zIndex.modal,
                             minWidth: 240,
                             maxWidth: 320,
                             borderRadius: 2,
