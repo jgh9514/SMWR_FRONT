@@ -12,7 +12,9 @@ export interface RawMatchItem {
   p2Name?: string;
   p2_player_name?: string;
   p2PlayerName?: string;
-  winner_position?: string;
+  /** 백엔드 직렬화에 따라 문자열 또는 숫자(1|2)로 올 수 있음 */
+  winner_position?: string | number;
+  winnerPosition?: string | number;
   date_add?: string;
   dateAdd?: string;
   date?: string;
@@ -282,5 +284,29 @@ export interface RtaSummonerRankingRow {
 export interface RtaSummonerRankingResponse {
   total: number;
   rankings: RtaSummonerRankingRow[];
+}
+
+/** POST /rta/player/:wizardId/summary — MyBatis·JSON camelCase 병행 */
+export interface RtaPlayerSummary {
+  found: boolean;
+  rank_position?: number;
+  rankPosition?: number;
+  wizard_id?: string;
+  wizard_name?: string;
+  wizardName?: string;
+  country?: string;
+  channel_uid?: string | number | null;
+  channelUid?: string | number | null;
+  score?: number;
+  rating_id?: number | null;
+  ratingId?: number | null;
+  match_count?: number;
+  matchCount?: number;
+  win_count?: number;
+  winCount?: number;
+  win_rate_pct?: number | null;
+  winRatePct?: number | null;
+  last_match_at?: string;
+  lastMatchAt?: string;
 }
 

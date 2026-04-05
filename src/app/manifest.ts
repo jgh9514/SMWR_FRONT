@@ -17,21 +17,21 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait-primary',
     icons: [
       {
-        src: `/icons/192.png${q}`,
+        src: `/icons/favicon.ico${q}`,
         sizes: '192x192',
-        type: 'image/png',
+        type: 'image/x-icon',
         purpose: 'any',
       },
       {
-        src: `/icons/512.png${q}`,
+        src: `/icons/favicon.ico${q}`,
         sizes: '512x512',
-        type: 'image/png',
+        type: 'image/x-icon',
         purpose: 'any',
       },
       {
-        src: `/icons/512.png${q}`,
+        src: `/icons/favicon.ico${q}`,
         sizes: '512x512',
-        type: 'image/png',
+        type: 'image/x-icon',
         purpose: 'maskable',
       },
     ],

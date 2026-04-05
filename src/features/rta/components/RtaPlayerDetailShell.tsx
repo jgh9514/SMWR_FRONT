@@ -28,6 +28,8 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
+import { useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
+import type { RtaPlayerSummary } from '@/features/rta/types/rta';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
@@ -45,6 +47,12 @@ type NavItem = {
   premium?: boolean;
 };
 
+function num(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 function buildNavItems(wizardId: string): NavItem[] {
   const base = `/rta/player/${wizardId}`;
   return [
@@ -58,21 +66,44 @@ function buildNavItems(wizardId: string): NavItem[] {
 
 export default function RtaPlayerDetailShell({
   wizardId,
+  initialSummary,
   children,
 }: {
   wizardId: string;
+  initialSummary: RtaPlayerSummary | null;
   children: ReactNode;
 }) {
   const pathname = usePathname();
 
-  /** URL에는 wizard_id만 사용. 프로필·통계는 추후 API 연동 */
-  const name = `소환사 ${wizardId}`;
-  const profileSrc = getSwexPlayerImageUrl(wizardId);
-  // const x: number | null = null 만 있으면 TS가 항상 null로 좁혀 `!= null` 분기에서 never가 됨
-  const score = null as number | null;
-  const rank = null as number | null;
-  const rating = null as number | null;
-  const winRate = null as number | null;
+  const { data: summary, refetch, isFetching } = useRtaPlayerSummary(wizardId, initialSummary);
+
+  const displayName = useMemo(() => {
+    if (summary?.found) {
+      const n = (summary.wizardName ?? summary.wizard_name)?.trim();
+      if (n) return n;
+    }
+    return `소환사 ${wizardId}`;
+  }, [summary, wizardId]);
+
+  const channelUid = summary?.channelUid ?? summary?.channel_uid;
+  const profileSrc = getSwexPlayerImageUrl(channelUid ?? wizardId);
+
+  const score = num(summary?.score);
+  const rank = num(summary?.rankPosition ?? summary?.rank_position);
+  const rating = num(summary?.ratingId ?? summary?.rating_id);
+  const winRate = num(summary?.winRatePct ?? summary?.win_rate_pct);
+  const matchCount = num(summary?.matchCount ?? summary?.match_count);
+  const winCount = num(summary?.winCount ?? summary?.win_count);
+
+  const countryLabel = (summary?.country || '').trim() || '—';
+
+  const lastMatchLabel = useMemo(() => {
+    const raw = summary?.lastMatchAt ?? summary?.last_match_at;
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
+  }, [summary]);
 
   const [season, setSeason] = useState(SEASON_OPTIONS[0].value);
   const [fav, setFav] = useState(false);
@@ -88,13 +119,18 @@ export default function RtaPlayerDetailShell({
     [pathname],
   );
 
-  const onRefresh = () => {
-    showToast.info('상세 데이터 연동은 준비 중입니다.');
+  const onRefresh = async () => {
+    try {
+      await refetch();
+      showToast.success('프로필 정보를 갱신했습니다.');
+    } catch {
+      showToast.info('갱신에 실패했습니다.');
+    }
   };
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-      <PageHeader title="RTA 소환사 상세" backPath="/rta/summoner-ranking" />
+      <PageHeader title={displayName} backPath="/rta/summoner-ranking" />
 
       <Box
         sx={{
@@ -121,7 +157,7 @@ export default function RtaPlayerDetailShell({
             <Box sx={{ position: 'relative', flexShrink: 0 }}>
               <Avatar
                 src={profileSrc}
-                alt={name}
+                alt={displayName}
                 variant="rounded"
                 sx={{
                   width: 80,
@@ -142,7 +178,7 @@ export default function RtaPlayerDetailShell({
                 gap={1.5}
               >
                 <Typography variant="h5" component="h1" fontWeight={800} noWrap sx={{ maxWidth: '100%' }}>
-                  {name}
+                  {displayName}
                 </Typography>
                 <Button
                   size="small"
@@ -177,7 +213,7 @@ export default function RtaPlayerDetailShell({
 
                 <Chip
                   size="small"
-                  label="ASIA"
+                  label={countryLabel}
                   sx={{
                     fontWeight: 700,
                     border: '1px solid',
@@ -237,6 +273,25 @@ export default function RtaPlayerDetailShell({
                 </Stack>
                 {rating != null ? <RtaRatingStarIcons rating={rating} size={16} /> : null}
               </Stack>
+
+              {summary && !summary.found ? (
+                <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+                  수집된 실레나 리플레이에 없는 소환사입니다. (ID: {wizardId})
+                </Typography>
+              ) : null}
+
+              {lastMatchLabel ? (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                  최근 수집 경기: {lastMatchLabel}
+                  {matchCount != null && matchCount > 0 ? (
+                    <>
+                      {' '}
+                      · 리플레이 {matchCount.toLocaleString()}경기
+                      {winCount != null ? ` (${winCount.toLocaleString()}승)` : ''}
+                    </>
+                  ) : null}
+                </Typography>
+              ) : null}
             </Stack>
           </Stack>
 
@@ -289,7 +344,8 @@ export default function RtaPlayerDetailShell({
               color="primary"
               size="small"
               startIcon={<RefreshIcon />}
-              onClick={onRefresh}
+              onClick={() => void onRefresh()}
+              disabled={isFetching}
               sx={{ whiteSpace: 'nowrap' }}
             >
               <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>

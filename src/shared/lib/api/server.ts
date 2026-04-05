@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import type {
   BattleItem,
   RecordDetailParams,
@@ -8,7 +9,7 @@ import type {
   UserItem,
 } from '@/features/battle-history/types/battle-history';
 import type { Notice, NoticeListParams, NoticeListResponse } from '@/features/community/types/community';
-import type { MonsterDetail, RtaMonsterStatsResponse } from '@/features/rta/types/rta';
+import type { MonsterDetail, RtaMonsterStatsResponse, RtaPlayerSummary } from '@/features/rta/types/rta';
 import type { MonsterInfoResponse } from '@/features/siege/hooks/useMonsterInfo';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import { DEVILMON_MONSTER_ID } from '@/features/siege/lib/devilmon';
@@ -186,6 +187,22 @@ export async function getRtaMonsterStatsData(
     { cache: 'no-store' },
   );
 }
+
+/** 레이아웃·generateMetadata에서 동일 요청 1회로 묶기 */
+export const getRtaPlayerSummaryData = cache(async (wizardId: string): Promise<RtaPlayerSummary | null> => {
+  const id = wizardId?.trim();
+  if (!id) {
+    return null;
+  }
+  try {
+    const path = `/rta/player/${encodeURIComponent(id)}/summary`;
+    return await serverApiPost<RtaPlayerSummary>(path, {}, PUBLIC_REVALIDATE_SECONDS.rtaDetail, {
+      cache: 'no-store',
+    });
+  } catch {
+    return null;
+  }
+});
 
 export async function getRtaMonsterDetailData(monsterId: number): Promise<MonsterDetail | null> {
   if (!Number.isFinite(monsterId) || monsterId <= 0) {

@@ -460,7 +460,7 @@ export default function FixedHeader() {
   );
 
   const iconQ = getPwaIconCacheQuery();
-  const logoIconUrl = `/icons/192.png${iconQ}`;
+  const logoIconUrl = `/icons/ci_active.png${iconQ}`;
   const wordmarkBase = SITE_NAME_DISPLAY.includes('.')
     ? SITE_NAME_DISPLAY.slice(0, SITE_NAME_DISPLAY.lastIndexOf('.'))
     : SITE_NAME_DISPLAY;

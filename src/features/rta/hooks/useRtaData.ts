@@ -7,12 +7,14 @@
  * - /matches: RTA 매치 목록 조회
  */
 
+import type { UseQueryOptions } from '@tanstack/react-query';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { RtaStatsResponse, RtaMatchCountResponse, RtaMatchesResponse, RtaMatchListParams } from '@/types';
 import type {
   MonsterDetail,
   RtaDashboardResponse,
   RtaMonsterStatsResponse,
+  RtaPlayerSummary,
   RtaSummonerRankingResponse,
 } from '@/features/rta/types/rta';
 
@@ -23,7 +25,8 @@ import type {
 export const useRtaStats = () => {
   return useApiPostQuery<RtaStatsResponse>('/rta/stats', {}, {
     enabled: true,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true,
   });
 };
@@ -35,7 +38,8 @@ export const useRtaStats = () => {
 export const useRtaMatchCount = () => {
   return useApiPostQuery<RtaMatchCountResponse>('/rta/matches/count', {}, {
     enabled: true,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true,
   });
 };
@@ -47,7 +51,8 @@ export const useRtaMatchCount = () => {
 export const useRtaMatchList = (params: RtaMatchListParams) => {
   return useApiPostQuery<RtaMatchesResponse>('/rta/matches', params, {
     enabled: true,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    gcTime: 0,
     refetchOnWindowFocus: true,
   });
 };
@@ -59,8 +64,9 @@ export const useRtaMatchList = (params: RtaMatchListParams) => {
 export const useRtaMonsterStats = (limit: number = 20, offset: number = 0) => {
   return useApiPostQuery<RtaMonsterStatsResponse>('/rta/monster-stats', { limit, offset }, { 
     enabled: true,
-    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-    refetchOnWindowFocus: false, // 윈도우 포커스 시 리프레시 방지
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -78,8 +84,9 @@ export const useRtaDashboard = () => {
     {},
     {
       enabled: true,
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: true,
     },
   );
 };
@@ -88,14 +95,42 @@ export const useRtaDashboard = () => {
  * RTA 소환사 랭킹
  * 백엔드: POST /api/v1/rta/summoner-ranking
  */
-export const useRtaSummonerRanking = (limit: number = 50, offset: number = 0) => {
+export const useRtaSummonerRanking = (
+  limit: number = 50,
+  offset: number = 0,
+  options?: Omit<UseQueryOptions<RtaSummonerRankingResponse, Error>, 'queryKey' | 'queryFn'>,
+) => {
   return useApiPostQuery<RtaSummonerRankingResponse>(
     '/rta/summoner-ranking',
     { limit, offset },
     {
       enabled: true,
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: true,
+      ...options,
+    },
+  );
+};
+
+/** RTA 소환사 상세 헤더 요약 (서버 initialData와 병행 가능) */
+export const useRtaPlayerSummary = (
+  wizardId: string,
+  initialData?: RtaPlayerSummary | null,
+  options?: Omit<UseQueryOptions<RtaPlayerSummary, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/summary` : '/rta/player/-/summary';
+  return useApiPostQuery<RtaPlayerSummary>(
+    path,
+    {},
+    {
+      enabled: Boolean(id),
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: true,
+      ...(initialData != null ? { initialData } : {}),
+      ...options,
     },
   );
 };
@@ -107,10 +142,11 @@ export const useRtaMonsterDetail = (monsterId: number | null) => {
     isValidId ? { pk: monsterId } : {}, 
     { 
       enabled: isValidId,
-      staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
-      refetchOnWindowFocus: false, // 윈도우 포커스 시 리프레시 방지
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnWindowFocus: true,
       refetchOnReconnect: false,
-      retry: false, // 429 방지를 위해 재시도 비활성화
+      retry: false,
     }
   );
 };

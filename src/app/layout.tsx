@@ -32,16 +32,9 @@ export const metadata: Metadata = {
     title: SITE_NAME_DISPLAY,
   },
   /**
-   * 파비콘은 `src/app/icon.png` + `apple-icon.png` 파일 규칙으로도 제공됨(운영에서 안정적).
-   * 여기서는 OG/공유용 큰 아이콘과 캐시 무효화 쿼리만 유지.
+   * 탭 파비콘: `src/app/favicon.ico` ← `public/icons/favicon.ico` 복사본(App Router 규칙).
+   * OG·트위터 미리보기: CI 로고 `/icons/ci_active.png`.
    */
-  icons: {
-    icon: [
-      { url: `/icons/192.png${iconQ}`, sizes: '192x192', type: 'image/png' },
-      { url: `/icons/512.png${iconQ}`, sizes: '512x512', type: 'image/png' },
-    ],
-    apple: { url: `/icons/192.png${iconQ}`, sizes: '192x192', type: 'image/png' },
-  },
   openGraph: {
     title: SITE_TITLE_DEFAULT,
     description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
@@ -51,7 +44,7 @@ export const metadata: Metadata = {
     type: 'website',
     images: [
       {
-        url: getAbsoluteUrl(`/icons/512.png${iconQ}`),
+        url: getAbsoluteUrl(`/icons/ci_active.png${iconQ}`),
         alt: SITE_TITLE_DEFAULT,
       },
     ],
@@ -60,7 +53,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: SITE_TITLE_DEFAULT,
     description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
-    images: [getAbsoluteUrl(`/icons/512.png${iconQ}`)],
+    images: [getAbsoluteUrl(`/icons/ci_active.png${iconQ}`)],
   },
 };
 

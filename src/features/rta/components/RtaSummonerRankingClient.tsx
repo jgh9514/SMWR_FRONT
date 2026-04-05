@@ -91,6 +91,15 @@ function toNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** MyBatis mapUnderscoreToCamelCase → API JSON 키가 camelCase일 수 있음 */
+function pickRow<T>(row: unknown, snake: string, camel: string): T | undefined {
+  if (row == null || typeof row !== 'object') return undefined;
+  const r = row as Record<string, unknown>;
+  if (Object.prototype.hasOwnProperty.call(r, snake)) return r[snake] as T;
+  if (Object.prototype.hasOwnProperty.call(r, camel)) return r[camel] as T;
+  return undefined;
+}
+
 function pivotAnchors(rows: RtaRankCutoffAnchorRow[] | undefined): Map<string, Record<string, number>> {
   const byAnchor = new Map<string, Record<string, number>>();
   for (const row of rows ?? []) {
@@ -315,13 +324,26 @@ export default function RtaSummonerRankingClient() {
   const [page, setPage] = useState(1);
   const [season, setSeason] = useState(SEASON_OPTIONS[0].value);
   const offset = (page - 1) * PAGE_SIZE;
+  const isFirstPage = page === 1;
 
-  const { data, isLoading, error } = useRtaSummonerRanking(PAGE_SIZE, offset);
-  const { data: distData } = useRtaSummonerRanking(DIST_SAMPLE, 0);
+  /** 1페이지: 상위 500건 한 번만 요청해 테이블(50)·국가 분포에 공유 — 예전 50+500 이중 호출 제거 */
+  const { data: pageData, isLoading: loadingPage, error: errPage } = useRtaSummonerRanking(
+    isFirstPage ? DIST_SAMPLE : PAGE_SIZE,
+    isFirstPage ? 0 : offset,
+  );
+  const { data: distOnlyData, isError: distSampleError } = useRtaSummonerRanking(DIST_SAMPLE, 0, {
+    enabled: !isFirstPage,
+  });
   const { data: dashData, isLoading: dashLoading } = useRtaDashboard();
 
-  const total = toNum(data?.total);
-  const rankings = data?.rankings ?? [];
+  const total = toNum(pageData?.total);
+  const rankings = isFirstPage
+    ? (pageData?.rankings ?? []).slice(0, PAGE_SIZE)
+    : (pageData?.rankings ?? []);
+  const rankingsForCountry = isFirstPage ? (pageData?.rankings ?? []) : (distOnlyData?.rankings ?? []);
+  const countrySampleLoading = isFirstPage
+    ? loadingPage && !pageData
+    : !isFirstPage && !distOnlyData && !distSampleError;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const anchorRows = dashData?.rank_cutoff_anchors;
@@ -360,28 +382,36 @@ export default function RtaSummonerRankingClient() {
   }, [anchorRows, dailyTiers, maxDate]);
 
   const countryChips = useMemo(
-    () => countrySharesFromRankings(distData?.rankings ?? []),
-    [distData?.rankings],
+    () => countrySharesFromRankings(rankingsForCountry),
+    [rankingsForCountry],
   );
 
   const hasCutData = CUT_TIER_ORDER.some((tk) => (byAnchor.get('3h')?.[tk] ?? 0) > 0);
 
   const rows = useMemo(() => {
-    return rankings.map((row: RtaSummonerRankingRow) => ({
-      rank: toNum(row.rank_position),
-      wizardId: row.wizard_id != null ? String(row.wizard_id) : '',
-      channelUid:
-        row.channel_uid != null && String(row.channel_uid).trim() !== ''
-          ? String(row.channel_uid)
-          : undefined,
-      name: row.wizard_name?.trim() || '—',
-      country: row.country?.trim() || '',
-      score: toNum(row.score),
-      rating: row.rating_id != null ? toNum(row.rating_id) : null,
-      winCount: toNum(row.win_count),
-      matchCount: toNum(row.match_count),
-      mostRow: row,
-    }));
+    return rankings.map((row: RtaSummonerRankingRow) => {
+      const rankRaw = pickRow<unknown>(row, 'rank_position', 'rankPosition');
+      const wid = pickRow<string | number>(row, 'wizard_id', 'wizardId');
+      const cuid = pickRow<string | number>(row, 'channel_uid', 'channelUid');
+      const wname = pickRow<string>(row, 'wizard_name', 'wizardName');
+      const rid = pickRow<unknown>(row, 'rating_id', 'ratingId');
+      const winc = pickRow<unknown>(row, 'win_count', 'winCount');
+      const mcnt = pickRow<unknown>(row, 'match_count', 'matchCount');
+
+      return {
+        rank: toNum(rankRaw),
+        wizardId: wid != null && String(wid).trim() !== '' ? String(wid) : '',
+        channelUid:
+          cuid != null && String(cuid).trim() !== '' ? String(cuid) : undefined,
+        name: (typeof wname === 'string' ? wname.trim() : '') || '—',
+        country: (typeof row.country === 'string' ? row.country.trim() : '') || '',
+        score: toNum(row.score),
+        rating: rid != null && rid !== '' ? toNum(rid) : null,
+        winCount: toNum(winc),
+        matchCount: toNum(mcnt),
+        mostRow: row,
+      };
+    });
   }, [rankings]);
 
   return (
@@ -422,9 +452,13 @@ export default function RtaSummonerRankingClient() {
               국가 비율 (상위 {DIST_SAMPLE}명 샘플)
             </Typography>
             <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
-              {countryChips.length === 0 && !distData ? (
+              {countryChips.length === 0 && countrySampleLoading ? (
                 <Typography variant="caption" color="text.disabled">
                   불러오는 중…
+                </Typography>
+              ) : countryChips.length === 0 && !isFirstPage && distSampleError ? (
+                <Typography variant="caption" color="text.disabled">
+                  국가 분포를 불러오지 못했습니다.
                 </Typography>
               ) : countryChips.length === 0 ? (
                 <Typography variant="caption" color="text.disabled">
@@ -654,12 +688,12 @@ export default function RtaSummonerRankingClient() {
         </Typography>
       </Card>
 
-      {isLoading && !data ? (
+      {loadingPage && !pageData ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
           <CircularProgress />
         </Box>
-      ) : error ? (
-        <Typography color="error">{error.message || '불러오기에 실패했습니다.'}</Typography>
+      ) : errPage ? (
+        <Typography color="error">{errPage.message || '불러오기에 실패했습니다.'}</Typography>
       ) : (
         <>
           <TableContainer

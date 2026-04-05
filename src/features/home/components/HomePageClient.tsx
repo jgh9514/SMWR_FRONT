@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useCallback, useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import { Box, Button, Card, CardContent, Container, Typography } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import CastleIcon from '@mui/icons-material/Castle';
@@ -409,20 +410,17 @@ export default function HomePageClient() {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 3, md: 6 } }}>
-      <Container maxWidth="lg">
-        <Box
-          component="header"
-          sx={{ textAlign: 'center', mb: { xs: 4, md: 6 } }}
-          role="banner"
-        >
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Container maxWidth="lg" sx={{ pt: { xs: 3, md: 5 }, pb: 0 }}>
+        <Box component="header" sx={{ textAlign: 'center', mb: { xs: 3, md: 4 } }}>
           <Typography
             variant="h3"
             component="h1"
             sx={{
               fontWeight: 700,
               mb: 1,
-              fontSize: { xs: '28px', md: '40px' },
+              fontSize: { xs: '22px', sm: '26px', md: '36px' },
+              lineHeight: 1.25,
             }}
           >
             {SITE_TITLE_DEFAULT}
@@ -438,6 +436,38 @@ export default function HomePageClient() {
           </Typography>
         </Box>
 
+        <Box
+          component="section"
+          aria-label="메인 배너"
+          sx={{
+            mb: { xs: 3, md: 6 },
+            mx: 'auto',
+            maxWidth: { xs: '100%', sm: 640, md: 800 },
+            borderRadius: 2,
+            overflow: 'hidden',
+            bgcolor: 'action.hover',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Image
+            src="/main_banner.png"
+            alt="skyarena.gg 포털 메인 배너"
+            width={1920}
+            height={1080}
+            priority
+            sizes="(max-width: 600px) calc(100vw - 32px), 800px"
+            style={{
+              width: '100%',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+        </Box>
+      </Container>
+
+      <Container maxWidth="lg" sx={{ pb: { xs: 3, md: 6 }, pt: 0 }}>
         <Box
           sx={{
             display: 'grid',

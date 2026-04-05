@@ -20,6 +20,7 @@ import { useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/h
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
+import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
 
 export default function RtaPageClient() {
@@ -40,86 +41,13 @@ export default function RtaPageClient() {
     offset: (currentPage - 1) * DEFAULT_PAGE_SIZE,
   });
 
-  const processMatchData = (match: RawMatchItem): MatchItem => {
-    const createUnits = (
-      unitNames?: string[],
-      unitImages?: string[],
-      bannedUnit?: number,
-      leaderUnit?: number
-    ) => {
-      if (!Array.isArray(unitNames) || !Array.isArray(unitImages) || unitNames.length === 0) {
-        return [];
-      }
-
-      return unitNames.map((name, i) => ({
-        name: name || `Unit ${i + 1}`,
-        image: unitImages[i] || getMonsterImageUrl('/images/default-unit.png'),
-        banned: bannedUnit === i + 1,
-        leader: leaderUnit === i + 1,
-      }));
-    };
-
-    return {
-      p1Name:
-        match.p1_name ||
-        match.p1Name ||
-        match.p1_player_name ||
-        match.p1PlayerName ||
-        'Player',
-      p2Name:
-        match.p2_name ||
-        match.p2Name ||
-        match.p2_player_name ||
-        match.p2PlayerName ||
-        'Opponent',
-      date:
-        match.date_add ||
-        match.dateAdd ||
-        match.date ||
-        match.created_at ||
-        match.updated_at ||
-        (typeof window !== 'undefined' ? new Date().toISOString() : ''),
-      p1Units: createUnits(
-        match.p1_unit_names,
-        match.p1_unit_images,
-        match.p1_banned_unit,
-        match.p1_leader_unit
-      ),
-      p2Units: createUnits(
-        match.p2_unit_names,
-        match.p2_unit_images,
-        match.p2_banned_unit,
-        match.p2_leader_unit
-      ),
-      p1Id: match.p1_wizard_id || '',
-      p2Id: match.p2_wizard_id || '',
-      p1ChannelUid:
-        match.p1_channel_uid != null && match.p1_channel_uid !== ''
-          ? String(match.p1_channel_uid)
-          : undefined,
-      p2ChannelUid:
-        match.p2_channel_uid != null && match.p2_channel_uid !== ''
-          ? String(match.p2_channel_uid)
-          : undefined,
-      winnerPosition: (match.winner_position || '1') as '1' | '2',
-      p1Country: match.p1_country,
-      p2Country: match.p2_country,
-      p1Score: Number(match.p1_score || match.p1Score || 0),
-      p2Score: Number(match.p2_score || match.p2Score || 0),
-      p1Rating: Number(match.p1_rating || match.p1Rating || 0),
-      p2Rating: Number(match.p2_rating || match.p2Rating || 0),
-      p1FirstPick: match.p1_first_pick || '0',
-      p2FirstPick: match.p2_first_pick || '0',
-    };
-  };
-
   const rtaData = useMemo<RtaData | null>(() => {
     if (!statsResponse || !countResponse || !matchesResponse) return null;
 
     const totalMatches = countResponse.count || 0;
     const rawMatches = matchesResponse.matches || matchesResponse || [];
     const processedMatches = Array.isArray(rawMatches)
-      ? rawMatches.map(processMatchData)
+      ? rawMatches.map((m: RawMatchItem) => processRawMatchToMatchItem(m))
       : [];
 
     return {
