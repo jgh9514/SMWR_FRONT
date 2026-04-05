@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Autocomplete, CircularProgress, TextField } from '@mui/material';
+import { Autocomplete, Avatar, Box, CircularProgress, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { useRtaSummonerSearch } from '@/features/rta/hooks/useRtaData';
 import type { RtaSummonerSearchHit } from '@/features/rta/types/rta';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 
 function pickWizardId(row: RtaSummonerSearchHit): string {
   const w = row.wizardId ?? row.wizard_id;
@@ -14,6 +15,20 @@ function pickWizardId(row: RtaSummonerSearchHit): string {
 
 function pickWizardName(row: RtaSummonerSearchHit): string {
   return String(row.wizardName ?? row.wizard_name ?? '').trim() || '—';
+}
+
+function pickChannelUid(row: RtaSummonerSearchHit): string | undefined {
+  const u = row.channelUid ?? row.channel_uid;
+  if (u == null || u === '') return undefined;
+  return String(u).trim();
+}
+
+/** flagcdn ISO 3166-1 alpha-2 (2글자)만 사용 */
+function countryFlagSrc(country: string | undefined): string | null {
+  const c = (country ?? '').trim();
+  if (!c || c === '—') return null;
+  if (!/^[a-z]{2}$/i.test(c)) return null;
+  return `https://flagcdn.com/w20/${c.toLowerCase()}.png`;
 }
 
 /**
@@ -50,11 +65,7 @@ export default function RtaSummonerSearchHeader() {
       options={options}
       loading={isFetching}
       filterOptions={(x) => x}
-      getOptionLabel={(o) => {
-        const id = pickWizardId(o);
-        const nm = pickWizardName(o);
-        return `${nm} (${id})`;
-      }}
+      getOptionLabel={(o) => pickWizardName(o)}
       isOptionEqualToValue={(a, b) => pickWizardId(a) === pickWizardId(b)}
       inputValue={input}
       onInputChange={(_, v) => setInput(v)}
@@ -77,6 +88,48 @@ export default function RtaSummonerSearchHeader() {
             '& .MuiAutocomplete-option': { fontSize: '0.875rem' },
           },
         },
+      }}
+      renderOption={(props, option) => {
+        const { key, ...other } = props;
+        const wid = pickWizardId(option);
+        const nm = pickWizardName(option);
+        const ch = pickChannelUid(option);
+        const flag = countryFlagSrc(option.country);
+        return (
+          <Box
+            component="li"
+            key={key}
+            {...other}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              py: 0.75,
+              px: 1,
+            }}
+          >
+            <Avatar
+              src={getSwexPlayerImageUrl(ch ?? wid)}
+              alt=""
+              sx={{ width: 28, height: 28, flexShrink: 0 }}
+            />
+            <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0, fontWeight: 600 }}>
+              {nm}
+            </Typography>
+            {flag ? (
+              <Box
+                component="img"
+                src={flag}
+                alt=""
+                sx={{ width: 20, height: 14, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
+              />
+            ) : (
+              <Typography variant="caption" color="text.disabled" sx={{ flexShrink: 0, width: 20, textAlign: 'center' }}>
+                —
+              </Typography>
+            )}
+          </Box>
+        );
       }}
       renderInput={(params) => (
         <TextField

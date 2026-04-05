@@ -4,26 +4,26 @@ import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/sh
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
 export const metadata: Metadata = buildPublicMetadata({
-  title: '프로젝트 소개',
+  title: '서비스 소개',
   description:
-    '전투 로그 분석 시스템의 목적, 기술 스택, 주요 기능 영역을 포트폴리오·제출용으로 요약한 페이지입니다.',
+    'SKYARENA에서 제공하는 RTA·점령전·몬스터 검색·커뮤니티·로그 업로드 등 주요 기능과 바로가기를 안내합니다.',
   path: '/about',
-  keywords: ['프로젝트 소개', '포트폴리오', '기술 스택', '서머너즈워'],
+  keywords: ['서비스 소개', 'RTA', '점령전', '몬스터 검색', '서머너즈워'],
 });
 
 export default function AboutPage() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'AboutPage',
-    name: '프로젝트 소개',
+    name: '서비스 소개',
     url: getAbsoluteUrl('/about'),
     inLanguage: 'ko-KR',
     description:
-      '전투 로그 분석 시스템의 목적, 기술 스택, 주요 기능 영역을 포트폴리오·제출용으로 요약한 페이지입니다.',
+      '이 사이트에서 제공하는 RTA·점령전·몬스터·커뮤니티·데이터 기능을 영역별로 안내합니다.',
   };
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: '홈', path: '/' },
-    { name: '프로젝트 소개', path: '/about' },
+    { name: '서비스 소개', path: '/about' },
   ]);
 
   return (

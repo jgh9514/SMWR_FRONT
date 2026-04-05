@@ -22,7 +22,6 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
-import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import {
   Area,
   AreaChart,
@@ -38,7 +37,7 @@ import { useRtaPlayerSeasonCode } from '@/features/rta/context/RtaPlayerSeasonCo
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
 import { getMatchPerspective } from '@/features/rta/utils/rtaPlayerPerspective';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
-import { getSwexPlayerImageUrl } from '@/shared/utils/image';
+import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 
 const HEATMAP_COLORS = {
   none: '#3f3f46',
@@ -92,6 +91,32 @@ function formatMatchTimeOnly(iso: string): string {
     minute: '2-digit',
     hour12: false,
   });
+}
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** 내 경기 카드: 30일 이내는 상대 시각, 이후는 일자+시각 */
+function formatMatchWhenUnderResult(
+  iso: string,
+): { type: 'relative'; text: string } | { type: 'absolute'; date: string; time: string } {
+  const d = parseMatchDate(iso);
+  if (d.getTime() === 0) {
+    return { type: 'absolute', date: '—', time: '' };
+  }
+  const diff = Date.now() - d.getTime();
+  if (diff < 0) {
+    return { type: 'absolute', date: formatMatchDateOnly(iso), time: formatMatchTimeOnly(iso) };
+  }
+  if (diff >= THIRTY_DAYS_MS) {
+    return { type: 'absolute', date: formatMatchDateOnly(iso), time: formatMatchTimeOnly(iso) };
+  }
+  const minute = Math.floor(diff / 60000);
+  const hour = Math.floor(diff / 3600000);
+  const day = Math.floor(diff / 86400000);
+  if (minute < 1) return { type: 'relative', text: '방금 전' };
+  if (minute < 60) return { type: 'relative', text: `${minute}분 전` };
+  if (hour < 24) return { type: 'relative', text: `${hour}시간 전` };
+  return { type: 'relative', text: `${day}일 전` };
 }
 
 /** 차트 툴팁 등 한 줄 일시 */
@@ -262,7 +287,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       sx={{
         display: 'grid',
         gap: 2,
-        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', xl: 'minmax(280px, 360px) 1fr' },
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 360px) 1fr' },
         alignItems: 'start',
       }}
     >
@@ -570,6 +595,7 @@ function MatchRow({
 }) {
   const { match, p, won } = c;
   const oppHref = `/rta/player/${encodeURIComponent(p.oppId)}`;
+  const when = formatMatchWhenUnderResult(match.date);
 
   return (
     <Card
@@ -599,12 +625,22 @@ function MatchRow({
           <Typography fontWeight={900} color={won ? 'success.main' : 'error.main'}>
             {won ? '승리' : '패배'}
           </Typography>
-          <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35 }}>
-            {formatMatchDateOnly(match.date)}
-          </Typography>
-          <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35, fontSize: 11 }}>
-            {formatMatchTimeOnly(match.date)}
-          </Typography>
+          {when.type === 'relative' ? (
+            <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35 }}>
+              {when.text}
+            </Typography>
+          ) : (
+            <>
+              <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35 }}>
+                {when.date}
+              </Typography>
+              {when.time ? (
+                <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35, fontSize: 11 }}>
+                  {when.time}
+                </Typography>
+              ) : null}
+            </>
+          )}
         </Stack>
 
         <Stack flex={1} spacing={1.5}>
@@ -654,10 +690,30 @@ function MatchRow({
             </Stack>
           </Stack>
 
-          <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" justifyContent="center">
-            <UnitStrip units={p.myUnits} firstPickIndex={p.myFirstPickIndex} />
-            <CompareArrowsIcon sx={{ fontSize: 20, color: 'text.disabled', mx: 0.5 }} aria-hidden />
-            <UnitStrip units={p.oppUnits} firstPickIndex={p.oppFirstPickIndex} />
+          <Stack
+            direction="row"
+            alignItems="center"
+            gap={{ xs: 0.5, md: 1 }}
+            flexWrap="wrap"
+            justifyContent="center"
+            sx={{ width: '100%' }}
+          >
+            <UnitPickGrid units={p.myUnits} side="p1" />
+            <Typography
+              variant="h6"
+              sx={{
+                alignSelf: 'center',
+                fontSize: { xs: '0.875rem', md: '1rem' },
+                fontWeight: 700,
+                color: 'primary.main',
+                px: { xs: 0.5, md: 1 },
+                flexShrink: 0,
+                lineHeight: 1,
+              }}
+            >
+              VS
+            </Typography>
+            <UnitPickGrid units={p.oppUnits} side="p2" />
           </Stack>
         </Stack>
       </Stack>
@@ -665,85 +721,135 @@ function MatchRow({
   );
 }
 
-function UnitStrip({
+/** /rta 매치 목록과 동일: 픽 순서(인덱스)에 맞춘 3×2 그리드 — P1 왼쪽·P2 오른쪽 레이아웃 */
+function UnitPickGrid({
   units,
-  firstPickIndex,
+  side,
 }: {
   units: { image: string; name: string; banned?: boolean; leader?: boolean }[];
-  firstPickIndex: number;
+  side: 'p1' | 'p2';
 }) {
+  const isP1 = side === 'p1';
+  const gridTemplateAreas = isP1
+    ? `"fp-0 fp-1 fp-3" "fp-0 fp-2 fp-4"`
+    : `"fp-1 fp-3 fp-5" "fp-2 fp-4 fp-5"`;
+
   return (
-    <Stack direction="row" gap={0.5} flexWrap="wrap" justifyContent="center">
-      {units.map((u, i) => (
-        <Box key={`${u.name}-${i}`} sx={{ position: 'relative' }}>
-          {firstPickIndex === i && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: -6,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 2,
-                px: 0.5,
-                py: 0,
-                fontSize: 6,
-                fontWeight: 800,
-                bgcolor: 'primary.main',
-                color: 'primary.contrastText',
-                borderRadius: 0.5,
-                lineHeight: 1.2,
-              }}
-            >
-              선픽
-            </Box>
-          )}
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateRows: 'repeat(2, 1fr)',
+        gap: { xs: 0.25, md: 0.5 },
+        width: 'fit-content',
+        maxWidth: '100%',
+        ...(isP1 ? {} : { ml: { sm: 'auto' } }),
+        gridTemplateAreas,
+      }}
+    >
+      {units.slice(0, 5).map((unit, unitIndex) => {
+        let gridArea = '';
+        if (isP1) {
+          if (unitIndex === 0) gridArea = 'fp-0';
+          else if (unitIndex === 1) gridArea = 'fp-1';
+          else if (unitIndex === 2) gridArea = 'fp-2';
+          else if (unitIndex === 3) gridArea = 'fp-3';
+          else if (unitIndex === 4) gridArea = 'fp-4';
+        } else {
+          if (unitIndex === 0) gridArea = 'fp-1';
+          else if (unitIndex === 1) gridArea = 'fp-2';
+          else if (unitIndex === 2) gridArea = 'fp-3';
+          else if (unitIndex === 3) gridArea = 'fp-4';
+          else if (unitIndex === 4) gridArea = 'fp-5';
+        }
+        const alignSelf = isP1
+          ? unitIndex === 0
+            ? 'center'
+            : 'stretch'
+          : units && unitIndex === units.length - 1
+            ? 'center'
+            : 'stretch';
+
+        return (
           <Box
+            key={unitIndex}
             sx={{
               position: 'relative',
-              width: { xs: 40, sm: 48, lg: 52 },
-              height: { xs: 40, sm: 48, lg: 52 },
-              borderRadius: 1,
-              overflow: 'hidden',
-              border: 2,
-              borderColor: u.leader ? 'warning.main' : 'divider',
-              boxShadow: u.leader ? 2 : 0,
+              p: 0.25,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gridArea,
+              alignSelf,
             }}
           >
-            <Image src={u.image} alt="" fill sizes="52px" className="object-cover" unoptimized />
-            {u.banned && (
+            <Avatar
+              src={getMonsterImageUrl(unit.image)}
+              alt={unit.name}
+              sx={{
+                width: { xs: 32, md: 36 },
+                height: { xs: 32, md: 36 },
+                border: unit.leader ? '2px solid gold' : '2px solid #d4a574',
+                borderRadius: '50%',
+                backgroundColor: 'transparent',
+                position: 'relative',
+              }}
+            />
+            {unit.banned && (
               <Box
                 sx={{
                   position: 'absolute',
-                  inset: 0,
-                  bgcolor: 'rgba(127, 29, 29, 0.45)',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  borderRadius: '50%',
+                  backgroundImage:
+                    'linear-gradient(to bottom right, transparent 48%, #fff 48%, #fff 52%, transparent 52%)',
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }}
+              />
+            )}
+            {unit.leader && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: -2,
+                  bottom: -2,
+                  width: { xs: 12, md: 14 },
+                  height: { xs: 12, md: 14 },
+                  backgroundColor: '#d32f2f',
+                  clipPath: 'polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  boxShadow: '0 0 2px 1px rgba(255, 255, 255, 0.8)',
                 }}
               >
-                <Typography color="error.light" fontWeight={800} fontSize={12}>
-                  금지
+                <Typography
+                  sx={{
+                    color: '#fff',
+                    fontSize: { xs: '7px', md: '9px' },
+                    fontWeight: 'bold',
+                    lineHeight: 1,
+                    textShadow: '0 0 1px rgba(255, 255, 255, 0.8)',
+                  }}
+                >
+                  L
                 </Typography>
               </Box>
             )}
-            <Typography
-              variant="caption"
-              sx={{
-                position: 'absolute',
-                bottom: 0,
-                right: 0,
-                px: 0.25,
-                fontSize: 9,
-                bgcolor: 'rgba(0,0,0,0.75)',
-                color: 'common.white',
-                lineHeight: 1.2,
-              }}
-            >
-              {i + 1}
-            </Typography>
           </Box>
+        );
+      })}
+      {(!units || units.length === 0) && (
+        <Box sx={{ gridColumn: '1 / -1', py: 0.5, textAlign: isP1 ? 'left' : 'right' }}>
+          <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' } }}>
+            몬스터 정보가 없습니다
+          </Typography>
         </Box>
-      ))}
-    </Stack>
+      )}
+    </Box>
   );
 }

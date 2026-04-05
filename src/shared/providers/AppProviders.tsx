@@ -26,6 +26,11 @@ const AddToHomeScreenBanner = dynamic(() => import('@/components/pwa/AddToHomeSc
   loading: () => null,
 });
 
+const SiteFooter = dynamic(() => import('@/shared/ui/site-footer/SiteFooter'), {
+  ssr: false,
+  loading: () => null,
+});
+
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
@@ -275,16 +280,21 @@ export default function AppProviders({ children }: AppProvidersProps) {
     return guildRequiredPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
   }, [pathname]);
 
-  // mainSx는 public path와 admin path에 따라 다르게 설정
-  const mainSx = useMemo(() => {
+  /** 메인 영역 + 푸터를 세로 flex로 묶어 푸터를 화면 하단에 붙임 */
+  const shellSx = useMemo(() => {
     const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
     const currentPath = pathname || '';
     const isPublic = publicPaths.includes(currentPath);
     const isAdmin = currentPath.startsWith('/admin');
-    return isPublic || isAdmin
-      ? { pt: 0, minHeight: '100vh' }
-      : { pt: { xs: 7, md: 8 }, minHeight: '100vh' };
+    return {
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100vh',
+      ...(isPublic || isAdmin ? {} : { pt: { xs: 7, md: 8 } }),
+    };
   }, [pathname]);
+
+  const shouldShowFooter = !isAdminPath;
 
   // 로그인 검증(bootstrap)이 끝날 때까지는 화면을 아예 렌더하지 않음
   // - public/admin 페이지는 즉시 렌더
@@ -392,11 +402,12 @@ export default function AppProviders({ children }: AppProvidersProps) {
           <AuthGuard>
             <ClientOnlyToaster />
             {shouldShowHeader && <FixedHeader />}
-            <main suppressHydrationWarning>
-              <Box sx={mainSx}>
+            <Box sx={shellSx}>
+              <Box component="main" sx={{ flex: 1, width: '100%' }} suppressHydrationWarning>
                 {children}
               </Box>
-            </main>
+              {shouldShowFooter && <SiteFooter />}
+            </Box>
             <>
               {/* 공지 팝업은 메인 화면에서만 동작 */}
               {!isPublicPath && !isAdminPath && isHomePath && <NoticePopup />}

@@ -12,12 +12,10 @@ import {
   FormControl,
   IconButton,
   MenuItem,
-  Popover,
   Select,
   Stack,
   Typography,
 } from '@mui/material';
-import HistoryIcon from '@mui/icons-material/History';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import StarIcon from '@mui/icons-material/Star';
@@ -52,6 +50,14 @@ function num(v: unknown): number | null {
   if (v == null || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/** ISO 3166-1 alpha-2 (2글자)일 때만 flagcdn 사용 */
+function countryFlagSrc(country: string | undefined): string | null {
+  const c = (country ?? '').trim();
+  if (!c || c === '—') return null;
+  if (!/^[a-z]{2}$/i.test(c)) return null;
+  return `https://flagcdn.com/w40/${c.toLowerCase()}.png`;
 }
 
 function buildNavItems(wizardId: string): NavItem[] {
@@ -130,6 +136,7 @@ export default function RtaPlayerDetailShell({
   const winCount = num(summary?.winCount ?? summary?.win_count);
 
   const countryLabel = (summary?.country || '').trim() || '—';
+  const countryFlag = countryFlagSrc(summary?.country);
 
   const lastMatchLabel = useMemo(() => {
     const raw = summary?.lastMatchAt ?? summary?.last_match_at;
@@ -140,7 +147,6 @@ export default function RtaPlayerDetailShell({
   }, [summary]);
 
   const [fav, setFav] = useState(false);
-  const [akaAnchor, setAkaAnchor] = useState<HTMLElement | null>(null);
 
   const navItems = useMemo(() => buildNavItems(wizardId), [wizardId]);
 
@@ -213,37 +219,22 @@ export default function RtaPlayerDetailShell({
                 <Typography variant="h5" component="h1" fontWeight={800} noWrap sx={{ maxWidth: '100%' }}>
                   {displayName}
                 </Typography>
-                <Button
-                  size="small"
-                  variant="text"
-                  color="inherit"
-                  onClick={(e) => setAkaAnchor(e.currentTarget)}
-                  startIcon={<HistoryIcon sx={{ fontSize: 14 }} />}
-                  sx={{
-                    minWidth: 0,
-                    px: 0.75,
-                    py: 0.25,
-                    fontSize: '0.75rem',
-                    color: 'text.secondary',
-                    '&:hover': { bgcolor: 'action.hover' },
-                  }}
-                  aria-label="이전 닉네임 보기"
-                >
-                  aka
-                </Button>
-                <Popover
-                  open={Boolean(akaAnchor)}
-                  anchorEl={akaAnchor}
-                  onClose={() => setAkaAnchor(null)}
-                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                >
-                  <Box sx={{ p: 2, maxWidth: 280 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      닉네임 변경 이력은 추후 연동 예정입니다.
-                    </Typography>
-                  </Box>
-                </Popover>
-
+                {countryFlag ? (
+                  <Box
+                    component="img"
+                    src={countryFlag}
+                    alt=""
+                    sx={{
+                      width: 28,
+                      height: 18,
+                      objectFit: 'cover',
+                      borderRadius: 0.5,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : null}
                 <Chip
                   size="small"
                   label={countryLabel}

@@ -321,6 +321,9 @@ export interface RtaSummonerSearchHit {
   wizard_name?: string;
   wizardName?: string;
   country?: string;
+  /** SWEX 프로필 이미지 — 없으면 wizard_id 로 폴백 */
+  channel_uid?: string | number | null;
+  channelUid?: string | number | null;
   score?: number;
   rating_id?: number;
   ratingId?: number;
