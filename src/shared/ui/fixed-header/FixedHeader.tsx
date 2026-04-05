@@ -664,7 +664,6 @@ export default function FixedHeader() {
                       anchorEl={menuOpen ? navHover?.anchor ?? null : null}
                       open={menuOpen}
                       onClose={closeNavHoverMenu}
-                      disablePortal
                       disableScrollLock
                       disableAutoFocus
                       anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
