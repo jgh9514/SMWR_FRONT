@@ -39,10 +39,10 @@ export default function RtaRankCutoffsPageClient() {
 
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: { xs: 2, md: 4 } }}>
-      <PageHeader title="랭크 컷 기록" backPath="/rta/dashboard" />
+      <PageHeader title="랭크 컷 기록" backPath="/" />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        <Link href="/rta/dashboard" style={{ color: 'inherit' }}>
-          ← RTA 대시보드
+        <Link href="/" style={{ color: 'inherit' }}>
+          ← 홈
         </Link>
       </Typography>
 

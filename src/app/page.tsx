@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     description:
       '점령전, 실레나, 몬스터 검색, 전적 조회, 공지사항까지 한 곳에서 확인할 수 있는 서머너즈워 분석 포털입니다.',
     path: '/',
-    keywords: ['홈', '서머너즈워 포털', '점령전 분석', 'RTA 분석'],
+    keywords: ['홈', '서머너즈워 포털', '점령전 분석', 'RTA 분석', 'RTA 티어 분포', '랭크 컷'],
   }),
   title: { absolute: SITE_TITLE_DEFAULT },
 };

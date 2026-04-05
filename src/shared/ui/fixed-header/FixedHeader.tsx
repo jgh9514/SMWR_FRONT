@@ -82,7 +82,7 @@ export interface NavGroup {
   /** 괄호 안 부제 (예: 실레나, 점령전) */
   hint?: string;
   items: NavLeaf[];
-  /** 데스크톱 대메뉴(대분류) 클릭 시 이동할 경로 (RTA·점령전 대시보드 등) */
+  /** 데스크톱 대메뉴(대분류) 클릭 시 이동할 경로 (메인 포털로 통일 시 `/`) */
   dashboardPath?: string;
 }
 
@@ -107,7 +107,7 @@ function getNavGroups(
     id: 'rta',
     label: 'RTA',
     hint: '실레나',
-    dashboardPath: '/rta/dashboard',
+    dashboardPath: '/',
     items: [
       { title: 'RTA 분석', path: '/rta', icon: <SportsEsportsIcon /> },
       { title: 'RTA 몬스터 통계', path: '/rta/monster-stats', icon: <BarChartIcon /> },
@@ -120,7 +120,7 @@ function getNavGroups(
     id: 'siege',
     label: 'Siege',
     hint: '점령전',
-    dashboardPath: '/siege/dashboard',
+    dashboardPath: '/',
     items: [
       { title: '전체 점령전', path: '/siege', icon: <CastleIcon /> },
       { title: '최근 점령전', path: '/recent-siege', icon: <HistoryIcon />, requiresGuild: true },
@@ -188,7 +188,7 @@ function getNavGroups(
 
 /**
  * 메뉴 항목 활성 여부.
- * `/rta`, `/siege` 처럼 하위에 전용 페이지(/rta/dashboard 등)가 있는 루트는
+ * `/rta`, `/siege` 처럼 하위에 전용 페이지가 있는 루트는
  * `startsWith('/rta/')` 를 쓰면 모든 RTA 화면에서 해당 항목이 항상 액티브가 되므로 **경로 일치만** 본다.
  */
 function isNavLeafActive(itemPath: string, pathname: string): boolean {

@@ -35,7 +35,6 @@ const SERVICES: ServiceBlock[] = [
       '수집된 리플레이 기준으로 대시보드, 소환사 랭킹, 플레이어별 전적·시너지·픽/밴 통계, 몬스터별 픽률·승률·조합 등을 제공합니다.',
     links: [
       { label: 'RTA 홈', href: '/rta' },
-      { label: '대시보드', href: '/rta/dashboard' },
       { label: '소환사 랭킹', href: '/rta/summoner-ranking' },
       { label: '몬스터 통계', href: '/rta/monster-stats' },
       { label: '티어·컷', href: '/rta/rank-cutoffs' },
@@ -48,7 +47,6 @@ const SERVICES: ServiceBlock[] = [
       '점령전 로그를 바탕으로 덱·전적을 검색하고, 시즌·길드 단위로 전투를 살펴볼 수 있습니다.',
     links: [
       { label: '점령전', href: '/siege' },
-      { label: '대시보드', href: '/siege/dashboard' },
       { label: '최근 점령전', href: '/recent-siege' },
     ],
   },

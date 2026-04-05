@@ -121,7 +121,7 @@ function aggregateDailyTiers(
 
 const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
 
-export default function RtaDashboardClient() {
+export default function RtaDashboardClient({ embedded = false }: { embedded?: boolean }) {
   const theme = useTheme();
   const isWide = useMediaQuery('(min-width:480px)');
   const [daysBack, setDaysBack] = useState(0);
@@ -183,8 +183,21 @@ export default function RtaDashboardClient() {
   };
 
   return (
-    <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: { xs: 2, md: 4 } }}>
-      <PageHeader title="RTA 대시보드" />
+    <Box
+      sx={{
+        maxWidth: 1100,
+        mx: 'auto',
+        px: embedded ? 0 : { xs: 2, sm: 3 },
+        py: embedded ? 0 : { xs: 2, md: 4 },
+      }}
+    >
+      {embedded ? (
+        <Typography variant="h5" component="h2" fontWeight={800} sx={{ mb: 2 }}>
+          RTA 티어 분포·랭크 컷
+        </Typography>
+      ) : (
+        <PageHeader title="RTA 대시보드" />
+      )}
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
         <FormControl size="small" sx={{ minWidth: 220 }}>

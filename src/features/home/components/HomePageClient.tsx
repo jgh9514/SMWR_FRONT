@@ -9,7 +9,6 @@ import HistoryIcon from '@mui/icons-material/History';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import SearchIcon from '@mui/icons-material/Search';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import ForumIcon from '@mui/icons-material/Forum';
@@ -20,6 +19,7 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import { Chip } from '@mui/material';
 import { logger } from '@/shared/lib/logger';
 import { SITE_TITLE_DEFAULT } from '@/shared/lib/seo';
+import RtaDashboardClient from '@/features/rta/components/RtaDashboardClient';
 import {
   useAutoLogin,
   useCancelMyGuildJoinApplication,
@@ -265,13 +265,6 @@ export default function HomePageClient() {
           color: '#e91e63',
         },
         {
-          title: 'RTA 대시보드',
-          description: '티어별 소환사 분포와 기간 필터를 확인하세요',
-          icon: <DashboardIcon />,
-          path: '/rta/dashboard',
-          color: '#00897b',
-        },
-        {
           title: 'RTA 소환사 랭킹',
           description: '수집 리플레이 기준 최신 점수 순위를 확인하세요',
           icon: <EmojiEventsIcon />,
@@ -464,6 +457,12 @@ export default function HomePageClient() {
               display: 'block',
             }}
           />
+        </Box>
+      </Container>
+
+      <Container maxWidth="lg" sx={{ pb: { xs: 2, md: 3 }, pt: 0 }}>
+        <Box component="section" aria-label="RTA 티어 분포 및 랭크 컷">
+          <RtaDashboardClient embedded />
         </Box>
       </Container>
 

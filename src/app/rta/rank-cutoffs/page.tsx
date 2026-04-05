@@ -22,7 +22,6 @@ export default function RtaRankCutoffsPage() {
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: '홈', path: '/' },
     { name: 'RTA 분석', path: '/rta' },
-    { name: 'RTA 대시보드', path: '/rta/dashboard' },
     { name: '랭크 컷 기록', path: '/rta/rank-cutoffs' },
   ]);
 
