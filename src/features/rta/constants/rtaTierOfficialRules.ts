@@ -1,5 +1,5 @@
 /**
- * RTA 공식 티어별 최소 조건 (승점·랭킹) — 참고용.
+ * RTA 티어별 최소 조건 (승점·랭킹) — 코드/주석 참고용. 화면에는 노출하지 않음.
  * 수집 리플레이의 rating_id·점수와 숫자가 1:1로 대응하지 않을 수 있습니다.
  */
 export interface RtaTierOfficialRuleRow {
@@ -13,7 +13,7 @@ export interface RtaTierOfficialRuleRow {
   rankRule: string;
 }
 
-/** 도전자·승부사·정복자·심판자·수호자·레전드 (공지 기준, rating_id 구간과 병기) */
+/** 도전자·승부사·정복자·심판자·수호자·레전드 (참고, rating_id 구간과 병기) */
 export const RTA_TIER_OFFICIAL_RULES: readonly RtaTierOfficialRuleRow[] = [
   { tierKey: 'Ch1', nameKo: '도전자1 (1000번대)', minWinPoints: 0, rankRule: '랭킹 ~100%' },
   { tierKey: 'Ch2', nameKo: '도전자2', minWinPoints: 1000, rankRule: '랭킹 ~90%' },
@@ -24,9 +24,9 @@ export const RTA_TIER_OFFICIAL_RULES: readonly RtaTierOfficialRuleRow[] = [
   { tierKey: 'C1', nameKo: '정복자1 (3000번대)', minWinPoints: 1100, rankRule: '랭킹 ~40%' },
   { tierKey: 'C2', nameKo: '정복자2', minWinPoints: 1100, rankRule: '랭킹 ~30%' },
   { tierKey: 'C3', nameKo: '정복자3', minWinPoints: 1100, rankRule: '랭킹 ~20%' },
-  { tierKey: 'P1', nameKo: '심판자1 (3500번대)', minWinPoints: null, rankRule: '별도 공지 참고' },
-  { tierKey: 'P2', nameKo: '심판자2', minWinPoints: null, rankRule: '별도 공지 참고' },
-  { tierKey: 'P3', nameKo: '심판자3', minWinPoints: null, rankRule: '별도 공지 참고' },
+  { tierKey: 'P1', nameKo: '심판자1 (3500번대)', minWinPoints: 1150, rankRule: '랭킹 ~15%' },
+  { tierKey: 'P2', nameKo: '심판자2', minWinPoints: 1150, rankRule: '랭킹 ~10%' },
+  { tierKey: 'P3', nameKo: '심판자3', minWinPoints: 1150, rankRule: '랭킹 ~6%' },
   { tierKey: 'G1', nameKo: '수호자1 (4000번대)', minWinPoints: 1200, rankRule: '랭킹 ~3%' },
   { tierKey: 'G2', nameKo: '수호자2', minWinPoints: 1200, rankRule: '랭킹 ~1%' },
   { tierKey: 'G3', nameKo: '수호자3', minWinPoints: 1200, rankRule: '랭킹 100위' },
@@ -34,6 +34,3 @@ export const RTA_TIER_OFFICIAL_RULES: readonly RtaTierOfficialRuleRow[] = [
   { tierKey: 'L2', nameKo: '레전드2', minWinPoints: 1200, rankRule: '랭킹 상위' },
   { tierKey: 'L3', nameKo: '레전드3', minWinPoints: 1200, rankRule: '랭킹 1위' },
 ] as const;
-
-export const RTA_TIER_OFFICIAL_RULES_NOTE_P_TIER =
-  '심판자(P)·레전드(L) 티어의 공식 최소 승점·랭킹은 시즌 공지를 참고하세요.';

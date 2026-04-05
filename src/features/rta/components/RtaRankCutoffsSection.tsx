@@ -20,9 +20,13 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { getRtaTierKeyStarIconPath } from '@/shared/utils';
 import type { RtaRankCutoffAnchorRow } from '@/features/rta/types/rta';
+import { formatRtaCutoffScore, isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 
-/** 컷 스냅샷 tier_key (골드3 → 플래3, 6열) */
-const CUT_KEYS = ['G3', 'G2', 'G1', 'P3', 'P2', 'P1'] as const;
+/** 컷 스냅샷 tier_key (낮은 티어 → 높은 티어: P1 ~ G3 — 표·집계 순서) */
+const CUT_KEYS = ['P1', 'P2', 'P3', 'G1', 'G2', 'G3'] as const;
+
+/** 상단 카드만: 윗줄 G → 아랫줄 P (2행×3열) */
+const CUT_KEYS_CARD_GRID = ['G1', 'G2', 'G3', 'P1', 'P2', 'P3'] as const;
 
 /** 표시 순서·라벨 (서버 anchor_key 와 동일) */
 const ANCHOR_ROWS: { key: string; label: string }[] = [
@@ -33,7 +37,7 @@ const ANCHOR_ROWS: { key: string; label: string }[] = [
   { key: '7d', label: '7일 전' },
 ];
 
-const TIER_COLOR_P = '#43a047';
+const TIER_COLOR_P = '#00897b';
 const TIER_COLOR_G = '#e53935';
 const TIER_COLOR_L = '#ffc107';
 
@@ -128,6 +132,8 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
         const o = next ? next[k] : undefined;
         if (o === undefined || c === undefined) {
           deltas[k] = null;
+        } else if (isRtaCutoffMissing(c) || isRtaCutoffMissing(o)) {
+          deltas[k] = null;
         } else {
           deltas[k] = c - o;
         }
@@ -146,7 +152,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
   }, [rankCutoffAnchors]);
 
   const hasAny =
-    CUT_KEYS.some((k) => (latest[k] ?? 0) > 0) || (rankCutoffAnchors?.length ?? 0) > 0;
+    CUT_KEYS.some((k) => !isRtaCutoffMissing(latest[k])) || (rankCutoffAnchors?.length ?? 0) > 0;
 
   if (!hasAny) {
     return (
@@ -166,7 +172,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
           <Typography sx={{ fontWeight: 600 }}>랭크 컷</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary">
-          G3~P1 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
+          P1~G3 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
         </Typography>
       </Card>
     );
@@ -211,8 +217,16 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
         각 행은 서버 시각 기준 해당 시점이 속한 <strong>날짜</strong>에서, 그 시각 <strong>이전</strong>까지 수집된 리플레이만으로 티어별 최저점을 봅니다.
       </Typography>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' }, gap: 1.5, mb: 2 }}>
-        {CUT_KEYS.map((k) => (
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          gridTemplateRows: 'repeat(2, auto)',
+          gap: 1.5,
+          mb: 2,
+        }}
+      >
+        {CUT_KEYS_CARD_GRID.map((k) => (
           <Paper
             key={k}
             variant="outlined"
@@ -232,7 +246,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
               <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: tierAccent(k) }}>{k}</Typography>
             </Box>
             <Typography sx={{ fontSize: '1.25rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: tierAccent(k) }}>
-              {latest[k] ? Math.round(latest[k]).toLocaleString() : '—'}
+              {formatRtaCutoffScore(latest[k])}
             </Typography>
           </Paper>
         ))}
@@ -280,7 +294,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
                               fontSize: '0.85rem',
                             }}
                           >
-                            {sc != null && sc > 0 ? Math.round(sc).toLocaleString() : '—'}
+                            {formatRtaCutoffScore(sc)}
                           </Typography>
                           {d != null && (
                             <Typography
@@ -306,7 +320,7 @@ export default function RtaRankCutoffsSection({ rankCutoffAnchors }: RtaRankCuto
       </Paper>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, lineHeight: 1.5 }}>
-        티어별 <strong>최저 점수</strong>로 추정한 값입니다. 공식 컷과 다를 수 있으며, 하단 ±는 바로 아래 행(더 과거 앵커) 대비 차이입니다.
+        티어별 <strong>최저 점수</strong>로 추정한 값입니다. 공식 최소 승점·랭킹과는 별개이며, 리플레이로 최저점을 잡지 못하면 &quot;—&quot;로 둡니다(과거 임시값 1000도 동일).
       </Typography>
     </Card>
   );

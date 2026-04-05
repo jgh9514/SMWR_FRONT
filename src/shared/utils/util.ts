@@ -76,7 +76,10 @@ export const getRatingStars = (rating: number | string | undefined): number => {
   if (rating === undefined || rating === null) return 0;
   const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
   if (isNaN(ratingNum)) return 0;
-  
+
+  /** 레전드 1위 전용 배지(rating_id 5001) — 별 3개가 아니라 단일 아이콘 1개만 */
+  if (ratingNum === 5001) return 1;
+
   const onesDigit = ratingNum % 10;
   return Math.min(Math.max(onesDigit, 0), 3); // 0~3 범위로 제한
 };
@@ -105,11 +108,14 @@ export function getRtaTierShortLabel(rating: number | string | undefined): strin
   return `${head}${sub}`;
 }
 
+/** RTA 레전드 랭킹 1위 전용 rating_id (legend_star.png 단일 배지) */
+export const RATING_ID_LEGEND_RANK_1 = 5001;
+
 export function getRatingStarIconPath(rating: number | string | undefined): string | null {
   if (rating === undefined || rating === null) return null;
   const ratingNum = typeof rating === 'string' ? parseInt(rating, 10) : Math.floor(rating);
   if (isNaN(ratingNum)) return null;
-  if (ratingNum >= 5000) return '/icons/legend_star.png';
+  if (ratingNum === RATING_ID_LEGEND_RANK_1) return '/icons/legend_star.png';
   if (ratingNum >= 4000) return '/icons/guardian_star.png';
   if (ratingNum >= 3500) return '/icons/punisher_star.png';
   if (ratingNum >= 3000) return '/icons/conqueror_star.png';
@@ -117,14 +123,15 @@ export function getRatingStarIconPath(rating: number | string | undefined): stri
   return '/icons/challenger_star.png';
 }
 
-/** 티어 키(Ch1, F2, C3, P1, G2, L3 …) → public/icons 별 PNG */
+/** 티어 키(Ch1, F2, C3, P1, G2, L3 …) → public/icons 별 PNG (L1만 전설 1위 배지, L2·L3는 가디언 별) */
 export function getRtaTierKeyStarIconPath(tierKey: string): string {
   if (tierKey.startsWith('Ch')) return '/icons/challenger_star.png';
   if (tierKey.startsWith('F')) return '/icons/fighter_star.png';
   if (tierKey.startsWith('C')) return '/icons/conqueror_star.png';
   if (tierKey.startsWith('P')) return '/icons/punisher_star.png';
   if (tierKey.startsWith('G')) return '/icons/guardian_star.png';
-  if (tierKey.startsWith('L')) return '/icons/legend_star.png';
+  if (tierKey === 'L1') return '/icons/legend_star.png';
+  if (tierKey.startsWith('L')) return '/icons/guardian_star.png';
   return '/icons/challenger_star.png';
 }
 

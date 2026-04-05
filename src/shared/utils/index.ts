@@ -10,6 +10,7 @@ export * from './auth';
 
 // Rating 관련 유틸리티 (명시적 export)
 export {
+  RATING_ID_LEGEND_RANK_1,
   getRatingColor,
   getRatingStars,
   getRatingStarIconPath,

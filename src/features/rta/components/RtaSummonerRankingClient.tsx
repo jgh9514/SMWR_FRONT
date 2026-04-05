@@ -43,28 +43,28 @@ import { useRtaDashboard, useRtaSeasons, useRtaSummonerRanking } from '@/feature
 import { getRtaTierKeyStarIconPath, getRtaTierShortLabel, getRatingColor } from '@/shared/utils';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaRankCutoffAnchorRow, RtaSummonerRankingRow, RtaTierDailyRow } from '@/features/rta/types/rta';
+import { formatRtaCutoffScore, isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 
 const PAGE_SIZE = 50;
 /** WAS `RtaServiceImpl.RTA_SUMMONER_RANKING_MAX_ROWS`와 동일 — 노출·분포 샘플 상한 */
 const SUMMONER_RANKING_MAX = 500;
 const DIST_SAMPLE = SUMMONER_RANKING_MAX;
 
-/** 컷 카드·차트 표시 순서 (낮은 티어 → 높은 티어: 심판자~레전드) */
-/** 티어 컷 카드·차트: 골드3 ~ 플래3 (6단계) */
-const CUT_TIER_ORDER = ['G3', 'G2', 'G1', 'P3', 'P2', 'P1'] as const;
+/** 티어 컷 차트·데이터 순서 (낮은 티어 → 높은 티어: P1 ~ G3) */
+const CUT_TIER_ORDER = ['P1', 'P2', 'P3', 'G1', 'G2', 'G3'] as const;
 
-/** 앵커 컷 추이 Y축: G3(상한)·P1(하한) 점수 기준 ±이만큼 (0~전체 구간 대비 확대) */
+/** 티어 컷 카드 그리드만: 윗줄 G → 아랫줄 P (2행×3열) */
+const CUT_TIER_CARD_GRID_ORDER = ['G1', 'G2', 'G3', 'P1', 'P2', 'P3'] as const;
+
+/** 앵커 컷 추이 Y축: P1·G3 끝점 점수 우선으로 범위 산출, 없으면 전 티어 폴백 */
 const CUT_CHART_Y_MARGIN = 100;
 
 /** X축: 좌=과거(앵커가 더 옛날) → 우=현재에 가까움 */
 const ANCHOR_CHART_KEYS = ['7d', '3d', '12h', '6h', '3h'] as const;
 
-/** WAS `rta.xml` 랭크 컷 COALESCE 마지막 값과 동일 — 실측 없을 때만 들어가므로 Δ 계산에서 제외 */
-const RTA_CUTOFF_FALLBACK_SCORE = 1000;
-
-/** P(플래티넘): 녹색 계열 — 차트·카드 라벨 공통 */
-const TIER_COLOR_P = '#43a047';
-/** G(골드): 빨간색 계열 */
+/** P(플래): 옥색(청록) — 차트·카드 라벨 공통 */
+const TIER_COLOR_P = '#00897b';
+/** G(골드): 빨강 */
 const TIER_COLOR_G = '#e53935';
 const TIER_COLOR_L = '#ffc107';
 
@@ -107,15 +107,9 @@ function pickRow<T>(row: unknown, snake: string, camel: string): T | undefined {
   return undefined;
 }
 
-/**
- * 3h vs 3d 대비 점수차. 한쪽만 기본값(1000)이면 실측 대비가 아니므로 Δ 없음.
- * 둘 다 1000만 있으면 역시 의미 없음.
- */
+/** 3h vs 3d 대비 점수차. 한쪽이라도 추정 불가(0·과거 1000)면 Δ 없음. */
 function cutDelta3hVs3d(score3h: number, score3d: number): number | null {
-  if (score3h <= 0 || score3d <= 0) return null;
-  const S = RTA_CUTOFF_FALLBACK_SCORE;
-  if ((score3d === S && score3h !== S) || (score3h === S && score3d !== S)) return null;
-  if (score3h === S && score3d === S) return null;
+  if (isRtaCutoffMissing(score3h) || isRtaCutoffMissing(score3d)) return null;
   return score3h - score3d;
 }
 
@@ -158,13 +152,13 @@ function buildCutChartRows(byAnchor: Map<string, Record<string, number>>) {
     const row: Record<string, string | number | null> = { anchor: ak };
     for (const tk of CUT_TIER_ORDER) {
       const v = rec[tk];
-      row[tk] = v != null && v > 0 ? v : null;
+      row[tk] = v != null && !isRtaCutoffMissing(v) ? v : null;
     }
     return row;
   });
 }
 
-/** G3·P1만으로 Y 범위 산출(없으면 전 티어 값으로 폴백). Recharts domain [min, max] */
+/** P1·G3 끝점으로 Y 범위 우선 산출(없으면 전 티어 폴백). Recharts domain [min, max] */
 function computeCutChartYDomain(
   chartRows: Record<string, string | number | null>[],
 ): [number, number] | undefined {
@@ -173,12 +167,14 @@ function computeCutChartYDomain(
     for (const row of chartRows) {
       for (const k of keys) {
         const v = row[k];
-        if (typeof v === 'number' && Number.isFinite(v) && v > 0) nums.push(v);
+        if (typeof v === 'number' && Number.isFinite(v) && !isRtaCutoffMissing(v)) nums.push(v);
       }
     }
     return nums;
   };
-  let nums = collect(['G3', 'P1']);
+  const loKey = CUT_TIER_ORDER[0];
+  const hiKey = CUT_TIER_ORDER[CUT_TIER_ORDER.length - 1];
+  let nums = collect([loKey, hiKey]);
   if (nums.length === 0) {
     nums = collect([...CUT_TIER_ORDER]);
   }
@@ -452,7 +448,7 @@ export default function RtaSummonerRankingClient() {
     [rankingsForCountry],
   );
 
-  const hasCutData = CUT_TIER_ORDER.some((tk) => (byAnchor.get('3h')?.[tk] ?? 0) > 0);
+  const hasCutData = CUT_TIER_ORDER.some((tk) => !isRtaCutoffMissing(byAnchor.get('3h')?.[tk]));
 
   const rows = useMemo(() => {
     return rankings.map((row: RtaSummonerRankingRow) => {
@@ -588,13 +584,13 @@ export default function RtaSummonerRankingClient() {
             <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
             <Typography fontWeight={700}>티어 컷 라인</Typography>
             <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-              G3 ~ P1 · 점수는 티어 내 최저점 추정
+              P1 ~ G3 · 점수는 티어 내 최저점 추정
             </Typography>
           </Box>
 
           {!hasCutData ? (
             <Typography variant="body2" color="text.secondary">
-              리플레이·점수가 쌓이면 G3~P1 구간 컷과 추이가 표시됩니다.
+              리플레이·점수가 쌓이면 P1~G3 구간 컷과 추이가 표시됩니다.
             </Typography>
           ) : (
             <Box
@@ -608,11 +604,15 @@ export default function RtaSummonerRankingClient() {
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+                  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                  gridTemplateRows: 'repeat(2, auto)',
                   gap: 1.25,
                 }}
               >
-                {cutCards.map((c) => (
+                {CUT_TIER_CARD_GRID_ORDER.map((tk) => {
+                  const c = cutCards.find((x) => x.tierKey === tk);
+                  if (!c) return null;
+                  return (
                   <Paper
                     key={c.tierKey}
                     variant="outlined"
@@ -644,7 +644,7 @@ export default function RtaSummonerRankingClient() {
                         color: tierAccent(c.tierKey),
                       }}
                     >
-                      {c.score > 0 ? Math.round(c.score).toLocaleString() : '—'}
+                      {formatRtaCutoffScore(c.score)}
                     </Typography>
                     <Box
                       sx={{
@@ -679,7 +679,8 @@ export default function RtaSummonerRankingClient() {
                       </Typography>
                     </Box>
                   </Paper>
-                ))}
+                  );
+                })}
               </Box>
 
               <Box sx={{ minHeight: 260 }}>

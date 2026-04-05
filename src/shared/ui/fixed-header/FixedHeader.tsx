@@ -185,11 +185,20 @@ function getNavGroups(
     .filter((g) => g.items.length > 0);
 }
 
+/**
+ * 메뉴 항목 활성 여부.
+ * `/rta`, `/siege` 처럼 하위에 전용 페이지(/rta/dashboard 등)가 있는 루트는
+ * `startsWith('/rta/')` 를 쓰면 모든 RTA 화면에서 해당 항목이 항상 액티브가 되므로 **경로 일치만** 본다.
+ */
+function isNavLeafActive(itemPath: string, pathname: string): boolean {
+  if (itemPath === '/') return pathname === '/';
+  if (pathname === itemPath) return true;
+  if (itemPath === '/rta' || itemPath === '/siege') return false;
+  return pathname.startsWith(`${itemPath}/`);
+}
+
 function isNavGroupActive(group: NavGroup, pathname: string): boolean {
-  return group.items.some((item) => {
-    if (item.path === '/') return pathname === '/';
-    return pathname === item.path || pathname.startsWith(`${item.path}/`);
-  });
+  return group.items.some((item) => isNavLeafActive(item.path, pathname));
 }
 
 function navGroupTitle(group: NavGroup): string {
@@ -676,10 +685,7 @@ export default function FixedHeader() {
                       }}
                     >
                       {group.items.map((item) => {
-                        const subActive =
-                          item.path === '/'
-                            ? pathname === '/'
-                            : pathname === item.path || pathname.startsWith(`${item.path}/`);
+                        const subActive = isNavLeafActive(item.path, pathname);
                         return (
                           <MenuItem
                             key={item.path}
@@ -1050,10 +1056,7 @@ export default function FixedHeader() {
                 )}
               </ListSubheader>
               {group.items.map((item) => {
-                const itemActive =
-                  item.path === '/'
-                    ? pathname === '/'
-                    : pathname === item.path || pathname.startsWith(`${item.path}/`);
+                const itemActive = isNavLeafActive(item.path, pathname);
                 return (
                   <ListItem key={`${group.id}-${item.path}`} disablePadding sx={{ px: 1, mb: 0.25 }}>
                     <ListItemButton

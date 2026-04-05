@@ -21,7 +21,6 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
-import RtaTierOfficialRulesSection from '@/features/rta/components/RtaTierOfficialRulesSection';
 import { useRtaDashboard, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
 import type { RtaTierBucket, RtaTierDailyRow } from '@/features/rta/types/rta';
 
@@ -41,18 +40,16 @@ const TIER_ORDER = [
   'G1',
   'G2',
   'G3',
-  'L1',
-  'L2',
-  'L3',
 ] as const;
 
+/** C 컨커: 금색 · P 플래: 옥색(청록) · G 골드: 빨강 */
 const TIER_BAR_COLORS: Record<string, string> = {
   Ch: 'rgb(139, 69, 19)',
   F: 'rgb(192, 192, 192)',
-  C: 'rgb(0, 186, 173)',
-  P: 'rgb(229, 57, 53)',
-  G: 'rgb(155, 89, 182)',
-  L: 'rgb(255, 193, 7)',
+  C: '#d4af37',
+  P: '#00897b',
+  G: '#e53935',
+  L: '#ffc107',
 };
 
 function tierColor(tierKey: string): string {
@@ -299,7 +296,6 @@ export default function RtaDashboardClient() {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
               {rows.map((row) => {
                 const pct = maxCount > 0 ? (row.player_count / maxCount) * 100 : 0;
-                const isTopLegend = row.tier_key === 'L3';
                 return (
                   <Box key={row.tier_key}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -309,7 +305,7 @@ export default function RtaDashboardClient() {
                           width: 28,
                           fontSize: '10px',
                           fontWeight: 600,
-                          color: isTopLegend ? '#ffc107' : 'text.secondary',
+                          color: 'text.secondary',
                         }}
                       >
                         {row.tier_key}
@@ -359,7 +355,6 @@ export default function RtaDashboardClient() {
               {rows.map((row) => {
                 const pct = maxCount > 0 ? row.player_count / maxCount : 0;
                 const barH = Math.max(4, pct * 160);
-                const isTopLegend = row.tier_key === 'L3';
                 return (
                   <Box
                     key={row.tier_key}
@@ -399,7 +394,7 @@ export default function RtaDashboardClient() {
                       sx={{
                         fontSize: '0.75rem',
                         fontWeight: 600,
-                        color: isTopLegend ? '#ffc107' : 'text.secondary',
+                        color: 'text.secondary',
                       }}
                     >
                       {row.tier_key}
@@ -418,7 +413,6 @@ export default function RtaDashboardClient() {
           </Typography>
         </Card>
         {data ? <RtaRankCutoffsSection rankCutoffAnchors={data.rank_cutoff_anchors} /> : null}
-        <RtaTierOfficialRulesSection />
         </>
       )}
     </Box>
