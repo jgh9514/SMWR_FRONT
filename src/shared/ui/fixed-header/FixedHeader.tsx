@@ -61,6 +61,7 @@ import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 import { SITE_NAME_DISPLAY } from '@/shared/lib/seo';
+import RtaSummonerSearchHeader from '@/features/rta/components/RtaSummonerSearchHeader';
 
 interface NavLeaf {
   title: string;
@@ -742,6 +743,10 @@ export default function FixedHeader() {
                 </Badge>
               </IconButton>
             )}
+
+            <Box sx={{ minWidth: 0, flexShrink: 1 }}>
+              <RtaSummonerSearchHeader />
+            </Box>
 
             <IconButton
               color="inherit"

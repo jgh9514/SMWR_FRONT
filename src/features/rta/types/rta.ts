@@ -308,6 +308,27 @@ export interface RtaSummonerRankingResponse {
   total: number;
   rankings: RtaSummonerRankingRow[];
   seasonCode?: string | null;
+  /** 서버가 적용한 국가 필터(있을 때만) */
+  countryFilter?: string | null;
+}
+
+/** POST /rta/summoner-search */
+export interface RtaSummonerSearchHit {
+  rank_position?: number;
+  rankPosition?: number;
+  wizard_id?: string;
+  wizardId?: string;
+  wizard_name?: string;
+  wizardName?: string;
+  country?: string;
+  score?: number;
+  rating_id?: number;
+  ratingId?: number;
+}
+
+export interface RtaSummonerSearchResponse {
+  results: RtaSummonerSearchHit[];
+  seasonCode?: string | null;
 }
 
 /** POST /rta/player/:wizardId/summary — MyBatis·JSON camelCase 병행 */
@@ -323,6 +344,9 @@ export interface RtaPlayerSummary {
   channel_uid?: string | number | null;
   channelUid?: string | number | null;
   score?: number;
+  /** 시즌 구간 내 최고 점수(집계 테이블). 없으면 score와 동일하게 취급 가능 */
+  max_season_score?: number | null;
+  maxSeasonScore?: number | null;
   rating_id?: number | null;
   ratingId?: number | null;
   match_count?: number;

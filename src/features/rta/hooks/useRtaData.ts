@@ -16,6 +16,7 @@ import type {
   RtaSeasonRow,
   RtaSeasonsResponse,
   RtaSummonerRankingResponse,
+  RtaSummonerSearchResponse,
 } from '@/features/rta/types/rta';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { apiClient } from '@/shared/lib/api/client';
@@ -148,24 +149,57 @@ export const useRtaSeasons = () => {
 };
 
 /**
+ * RTA 소환사 검색 (집계 랭킹 기준)
+ * 백엔드: POST /api/v1/rta/summoner-search — seasonCode 생략 시 서버 기본 시즌
+ */
+export const useRtaSummonerSearch = (
+  q: string,
+  seasonCode: string | null | undefined,
+  options?: Omit<UseQueryOptions<RtaSummonerSearchResponse, Error>, 'queryKey' | 'queryFn'> & {
+    enabled?: boolean;
+  },
+) => {
+  const { enabled: enabledOpt, ...queryOptions } = options ?? {};
+  const trimmed = q.trim();
+  const body: Record<string, unknown> = { q: trimmed, ...seasonBody(seasonCode) };
+  const enabled = (enabledOpt !== false) && trimmed.length >= 1;
+  return useApiPostQuery<RtaSummonerSearchResponse>('/rta/summoner-search', body, {
+    enabled,
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+    ...queryOptions,
+  });
+};
+
+/**
  * RTA 소환사 랭킹
  * 백엔드: POST /api/v1/rta/summoner-ranking
+ * @param country 국가 코드(2자) 또는 미상 `—`; 생략 시 전체
  */
+
 export const useRtaSummonerRanking = (
   limit: number = 50,
   offset: number = 0,
   seasonCode?: string | null,
-  options?: Omit<UseQueryOptions<RtaSummonerRankingResponse, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<RtaSummonerRankingResponse, Error>, 'queryKey' | 'queryFn'> & {
+    country?: string | null;
+  },
 ) => {
+  const { country, ...queryOptions } = options ?? {};
+  const body: Record<string, unknown> = { limit, offset, ...seasonBody(seasonCode) };
+  const c = country?.trim();
+  if (c !== undefined && c !== null && c !== '') {
+    body.country = c;
+  }
   return useApiPostQuery<RtaSummonerRankingResponse>(
     '/rta/summoner-ranking',
-    { limit, offset, ...seasonBody(seasonCode) },
+    body,
     {
       enabled: true,
       staleTime: 0,
       gcTime: 0,
       refetchOnWindowFocus: true,
-      ...options,
+      ...queryOptions,
     },
   );
 };

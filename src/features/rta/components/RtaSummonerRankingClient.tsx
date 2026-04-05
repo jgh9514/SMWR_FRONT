@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   Box,
+  Button,
   Card,
   CircularProgress,
   Container,
@@ -372,26 +373,51 @@ export default function RtaSummonerRankingClient() {
   const offset = (page - 1) * PAGE_SIZE;
   const isFirstPage = page === 1;
 
-  /** 1페이지: 상위 500건 한 번만 요청해 테이블(50)·국가 분포에 공유 — 예전 50+500 이중 호출 제거 */
+  const [countryFilter, setCountryFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCountryFilter(null);
+    setPage(1);
+  }, [seasonSelectValue]);
+
+  /** 국가 필터 시·2페이지 이상: 테이블은 페이지 단위만. 국가 분포 칩은 항상 상위 500명 전역 샘플 */
+  const needsGlobalDistOnly = countryFilter != null || !isFirstPage;
+  const tableLimit = needsGlobalDistOnly ? PAGE_SIZE : DIST_SAMPLE;
+  const tableOffset = needsGlobalDistOnly ? offset : 0;
+
   const { data: pageData, isLoading: loadingPage, error: errPage } = useRtaSummonerRanking(
-    isFirstPage ? DIST_SAMPLE : PAGE_SIZE,
-    isFirstPage ? 0 : offset,
+    tableLimit,
+    tableOffset,
     seasonSelectValue,
+    { country: countryFilter ?? undefined },
   );
-  const { data: distOnlyData, isError: distSampleError } = useRtaSummonerRanking(DIST_SAMPLE, 0, seasonSelectValue, {
-    enabled: !isFirstPage,
+  const { data: globalDistData, isError: distSampleError } = useRtaSummonerRanking(DIST_SAMPLE, 0, seasonSelectValue, {
+    enabled: needsGlobalDistOnly,
   });
   const { data: dashData, isLoading: dashLoading } = useRtaDashboard(seasonSelectValue);
 
   const total = toNum(pageData?.total);
-  const rankings = isFirstPage
-    ? (pageData?.rankings ?? []).slice(0, PAGE_SIZE)
-    : (pageData?.rankings ?? []);
-  const rankingsForCountry = isFirstPage ? (pageData?.rankings ?? []) : (distOnlyData?.rankings ?? []);
-  const countrySampleLoading = isFirstPage
-    ? loadingPage && !pageData
-    : !isFirstPage && !distOnlyData && !distSampleError;
+  const rankings = useMemo(() => {
+    const raw = pageData?.rankings ?? [];
+    if (countryFilter != null) return raw;
+    if (isFirstPage) return raw.slice(0, PAGE_SIZE);
+    return raw;
+  }, [pageData, countryFilter, isFirstPage]);
+
+  const rankingsForCountry = useMemo(() => {
+    if (needsGlobalDistOnly) return globalDistData?.rankings ?? [];
+    return pageData?.rankings ?? [];
+  }, [needsGlobalDistOnly, globalDistData, pageData]);
+
+  const countrySampleLoading = needsGlobalDistOnly
+    ? !globalDistData && !distSampleError
+    : loadingPage && !pageData;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const handleCountryChipClick = (code: string) => {
+    setCountryFilter((prev) => (prev === code ? null : code));
+    setPage(1);
+  };
 
   const anchorRows = dashData?.rank_cutoff_anchors;
   const dailyTiers = dashData?.daily_tiers;
@@ -488,15 +514,29 @@ export default function RtaSummonerRankingClient() {
           </FormControl>
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
-              국가 비율 (상위 {DIST_SAMPLE}명 샘플)
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 0.75 }}>
+              <Typography variant="caption" color="text.secondary">
+                국가 비율 (상위 {DIST_SAMPLE}명 샘플) · 칩을 누르면 해당 국가만 표시
+              </Typography>
+              {countryFilter != null ? (
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => {
+                    setCountryFilter(null);
+                    setPage(1);
+                  }}
+                >
+                  국가 필터 해제
+                </Button>
+              ) : null}
+            </Box>
             <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
               {countryChips.length === 0 && countrySampleLoading ? (
                 <Typography variant="caption" color="text.disabled">
                   불러오는 중…
                 </Typography>
-              ) : countryChips.length === 0 && !isFirstPage && distSampleError ? (
+              ) : countryChips.length === 0 && needsGlobalDistOnly && distSampleError ? (
                 <Typography variant="caption" color="text.disabled">
                   국가 분포를 불러오지 못했습니다.
                 </Typography>
@@ -505,36 +545,51 @@ export default function RtaSummonerRankingClient() {
                   국가 코드가 없는 데이터입니다.
                 </Typography>
               ) : (
-                countryChips.map(({ code, pct }) => (
-                  <Paper
-                    key={code}
-                    variant="outlined"
-                    sx={{
-                      px: 1.25,
-                      py: 0.5,
-                      borderRadius: 999,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.75,
-                      borderColor: 'divider',
-                      bgcolor: 'action.hover',
-                    }}
-                  >
-                    {code !== '—' && code.length === 2 ? (
-                      <Box
-                        component="img"
-                        src={`https://flagcdn.com/w20/${code.toLowerCase()}.png`}
-                        alt=""
-                        sx={{ width: 18, height: 12, objectFit: 'cover', borderRadius: 0.25 }}
-                      />
-                    ) : (
-                      <Box sx={{ width: 18, height: 12, borderRadius: 0.25, bgcolor: 'action.selected' }} />
-                    )}
-                    <Typography variant="caption" fontWeight={700} sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {code} {pct.toFixed(0)}%
-                    </Typography>
-                  </Paper>
-                ))
+                countryChips.map(({ code, pct }) => {
+                  const selected = countryFilter === code;
+                  return (
+                    <Paper
+                      key={code}
+                      component="button"
+                      type="button"
+                      variant="outlined"
+                      onClick={() => handleCountryChipClick(code)}
+                      aria-pressed={selected}
+                      sx={{
+                        px: 1.25,
+                        py: 0.5,
+                        borderRadius: 999,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 0.75,
+                        borderColor: selected ? 'primary.main' : 'divider',
+                        bgcolor: selected ? 'action.selected' : 'action.hover',
+                        cursor: 'pointer',
+                        font: 'inherit',
+                        color: 'inherit',
+                        textAlign: 'left',
+                        '&:hover': {
+                          borderColor: 'primary.light',
+                          bgcolor: 'action.selected',
+                        },
+                      }}
+                    >
+                      {code !== '—' && code.length === 2 ? (
+                        <Box
+                          component="img"
+                          src={`https://flagcdn.com/w20/${code.toLowerCase()}.png`}
+                          alt=""
+                          sx={{ width: 18, height: 12, objectFit: 'cover', borderRadius: 0.25 }}
+                        />
+                      ) : (
+                        <Box sx={{ width: 18, height: 12, borderRadius: 0.25, bgcolor: 'action.selected' }} />
+                      )}
+                      <Typography variant="caption" fontWeight={700} sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {code} {pct.toFixed(0)}%
+                      </Typography>
+                    </Paper>
+                  );
+                })
               )}
             </Stack>
           </Box>
@@ -922,6 +977,7 @@ export default function RtaSummonerRankingClient() {
 
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
             총 {total.toLocaleString()}명 · 페이지당 {PAGE_SIZE}명
+            {countryFilter != null ? ` · 국가 필터: ${countryFilter}` : ''}
           </Typography>
         </>
       )}

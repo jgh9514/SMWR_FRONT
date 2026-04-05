@@ -23,8 +23,6 @@ import TimelineIcon from '@mui/icons-material/Timeline';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import {
   Area,
   AreaChart,
@@ -120,26 +118,6 @@ function winRateHeatColor(wins: number, total: number): string {
   return HEATMAP_COLORS.high;
 }
 
-/** 최근 N일 구간에서 점수 변화 (경기 점수 기준) */
-function scoreDeltaInDays(
-  chronological: { date: string; myScore: number }[],
-  days: number,
-): number | null {
-  if (chronological.length === 0) return null;
-  const now = startOfLocalDay(new Date());
-  const cutoff = new Date(now);
-  cutoff.setDate(cutoff.getDate() - days);
-  const inWindow = chronological.filter((m) => startOfLocalDay(parseMatchDate(m.date)) >= cutoff);
-  if (inWindow.length === 0) return null;
-  if (inWindow.length === 1) {
-    const firstBefore = chronological.filter((m) => startOfLocalDay(parseMatchDate(m.date)) < cutoff);
-    const prev = firstBefore[firstBefore.length - 1];
-    if (prev) return inWindow[0].myScore - prev.myScore;
-    return 0;
-  }
-  return inWindow[inWindow.length - 1].myScore - inWindow[0].myScore;
-}
-
 type ChartMode = 'daily' | 'match';
 
 export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string }) {
@@ -190,24 +168,9 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const matchCount = num(summary?.matchCount ?? summary?.match_count);
   const lossCount = Math.max(0, matchCount - winCount);
   const summaryScore = num(summary?.score);
-
-  const maxScore = useMemo(() => {
-    let m = 0;
-    for (const c of chronological) {
-      if (c.myScore > m) m = c.myScore;
-    }
-    if (m > 0) return m;
-    return summaryScore > 0 ? summaryScore : 0;
-  }, [chronological, summaryScore]);
-
-  const delta3 = scoreDeltaInDays(
-    chronological.map((c) => ({ date: c.date, myScore: c.myScore })),
-    3,
-  );
-  const delta7 = scoreDeltaInDays(
-    chronological.map((c) => ({ date: c.date, myScore: c.myScore })),
-    7,
-  );
+  const maxSeasonScoreAgg = num(summary?.maxSeasonScore ?? summary?.max_season_score);
+  const maxScoreDisplay =
+    maxSeasonScoreAgg > 0 ? maxSeasonScoreAgg : summaryScore > 0 ? summaryScore : 0;
 
   const heatmapWeeks = useMemo(() => {
     const today = startOfLocalDay(new Date());
@@ -326,49 +289,9 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                 최고 점수
               </Typography>
               <Typography variant="body2" fontWeight={600}>
-                {maxScore > 0 ? Math.round(maxScore).toLocaleString() : '—'}
+                {maxScoreDisplay > 0 ? Math.round(maxScoreDisplay).toLocaleString() : '—'}
               </Typography>
             </Stack>
-            <Box sx={{ pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
-              <Stack spacing={1}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    최근 3일
-                  </Typography>
-                  {delta3 != null ? (
-                    <Stack direction="row" alignItems="center" gap={0.5} color={delta3 >= 0 ? 'success.main' : 'error.main'}>
-                      {delta3 >= 0 ? <TrendingUpIcon sx={{ fontSize: 16 }} /> : <TrendingDownIcon sx={{ fontSize: 16 }} />}
-                      <Typography variant="body2" fontWeight={600}>
-                        {delta3 >= 0 ? '+' : ''}
-                        {Math.round(delta3)}
-                      </Typography>
-                    </Stack>
-                  ) : (
-                    <Typography variant="body2" color="text.disabled">
-                      —
-                    </Typography>
-                  )}
-                </Stack>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" color="text.secondary">
-                    최근 7일
-                  </Typography>
-                  {delta7 != null ? (
-                    <Stack direction="row" alignItems="center" gap={0.5} color={delta7 >= 0 ? 'success.main' : 'error.main'}>
-                      {delta7 >= 0 ? <TrendingUpIcon sx={{ fontSize: 16 }} /> : <TrendingDownIcon sx={{ fontSize: 16 }} />}
-                      <Typography variant="body2" fontWeight={600}>
-                        {delta7 >= 0 ? '+' : ''}
-                        {Math.round(delta7)}
-                      </Typography>
-                    </Stack>
-                  ) : (
-                    <Typography variant="body2" color="text.disabled">
-                      —
-                    </Typography>
-                  )}
-                </Stack>
-              </Stack>
-            </Box>
           </Stack>
         </Card>
 
