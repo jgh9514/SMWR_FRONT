@@ -51,13 +51,14 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Type check
-        run: yarn type-check
-
+      # next-env.d.ts / tsc가 참조하는 `.next/types/routes.d.ts`는 `next build`로 생성됨
       - name: Build Next.js app
         run: yarn build
         env:
           NODE_ENV: production
+
+      - name: Type check
+        run: yarn type-check
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
