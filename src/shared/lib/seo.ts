@@ -1,11 +1,16 @@
 import type { Metadata } from 'next';
 import { getSiteUrl } from '@/shared/lib/env';
+import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 
-const SITE_NAME = '전투 로그 분석 시스템';
+/** OG·canonical 등에 쓰는 도메인(소문자) */
+export const SITE_NAME = 'skyarena.gg';
+/** 로고 옆·탭 접미사·PWA 등에 쓰는 도메인 표기(대문자) */
+export const SITE_NAME_DISPLAY = SITE_NAME.toUpperCase();
+/** 브라우저 탭 기본 타이틀·홈 메타·JSON-LD WebSite 이름 */
+export const SITE_TITLE_DEFAULT = `${SITE_NAME_DISPLAY} - Sky Arena Summoner Search and Monster Statistics.`;
 const DEFAULT_DESCRIPTION =
   '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼';
 const DEFAULT_KEYWORDS = ['서머너즈워', '점령전', '실레나', 'RTA', '몬스터 검색', '전투 로그'];
-const DEFAULT_OG_IMAGE = '/icons/ci_active.png';
 
 interface BuildMetadataOptions {
   title: string;
@@ -57,7 +62,7 @@ export function buildPublicMetadata({
   authors,
 }: BuildMetadataOptions): Metadata {
   const mergedKeywords = [...DEFAULT_KEYWORDS, ...keywords];
-  const metaImage = image || DEFAULT_OG_IMAGE;
+  const metaImage = image || `/icons/ci_active.png${getPwaIconCacheQuery()}`;
   const imageDescriptor = [
     {
       url: metaImage,
@@ -68,7 +73,7 @@ export function buildPublicMetadata({
     title,
     description,
     url: path,
-    siteName: SITE_NAME,
+    siteName: SITE_NAME_DISPLAY,
     locale: 'ko_KR' as const,
     images: imageDescriptor,
   };

@@ -8,10 +8,11 @@ import BattleHistoryListClient from '@/features/battle-history/components/Battle
 import BattleHistorySeasonFilter from '@/features/battle-history/components/BattleHistorySeasonFilter';
 import BattleHistoryPersonSearch from '@/features/battle-history/components/BattleHistoryPersonSearch';
 import type { SeasonItem, UserItem } from '@/features/battle-history/types/battle-history';
+import GuildRequiredGate from '@/features/guild/components/GuildRequiredGate';
 
 type Props = { initialSeasonList?: SeasonItem[] };
 
-export default function BattleHistoryPageClient({ initialSeasonList = [] }: Props) {
+function BattleHistoryInner({ initialSeasonList = [] }: Props) {
   const [seasonNo, setSeasonNo] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
   const params = {
@@ -49,5 +50,13 @@ export default function BattleHistoryPageClient({ initialSeasonList = [] }: Prop
         <BattleHistoryPersonSearch value={searchKeyword} onChange={setSearchKeyword} />
       </Box>
     </BattleHistoryListClient>
+  );
+}
+
+export default function BattleHistoryPageClient(props: Props) {
+  return (
+    <GuildRequiredGate title="전적 조회는 길드 가입이 필요합니다">
+      <BattleHistoryInner {...props} />
+    </GuildRequiredGate>
   );
 }

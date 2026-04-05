@@ -18,6 +18,7 @@ import AnnouncementIcon from '@mui/icons-material/Announcement';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import { Chip } from '@mui/material';
 import { logger } from '@/shared/lib/logger';
+import { SITE_TITLE_DEFAULT } from '@/shared/lib/seo';
 import {
   useAutoLogin,
   useCancelMyGuildJoinApplication,
@@ -424,7 +425,7 @@ export default function HomePageClient() {
               fontSize: { xs: '28px', md: '40px' },
             }}
           >
-            전투 로그 분석 시스템
+            {SITE_TITLE_DEFAULT}
           </Typography>
           <Typography
             variant="body1"

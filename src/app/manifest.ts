@@ -1,11 +1,12 @@
 import type { MetadataRoute } from 'next';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
+import { SITE_NAME_DISPLAY, SITE_TITLE_DEFAULT } from '@/shared/lib/seo';
 
 export default function manifest(): MetadataRoute.Manifest {
   const q = getPwaIconCacheQuery();
   return {
-    name: '전투 로그 분석 시스템',
-    short_name: 'SMWR',
+    name: SITE_TITLE_DEFAULT,
+    short_name: SITE_NAME_DISPLAY,
     description:
       '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
     start_url: '/',

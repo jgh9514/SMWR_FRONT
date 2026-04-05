@@ -4,7 +4,7 @@ import './globals.css';
 import AppProviders from '@/shared/providers/AppProviders';
 import ErrorBoundary from '@/shared/ui/error-boundary/ErrorBoundary';
 import { getSiteUrl } from '@/shared/lib/env';
-import { getAbsoluteUrl } from '@/shared/lib/seo';
+import { getAbsoluteUrl, SITE_NAME_DISPLAY, SITE_TITLE_DEFAULT } from '@/shared/lib/seo';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 
 const iconQ = getPwaIconCacheQuery();
@@ -16,8 +16,8 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
   title: {
-    default: '전투 로그 분석 시스템',
-    template: '%s | 전투 로그 분석 시스템',
+    default: SITE_TITLE_DEFAULT,
+    template: `%s | ${SITE_NAME_DISPLAY}`,
   },
   description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
   keywords: ['서머너즈워', '점령전', '실레나', 'RTA', '몬스터 검색', '전투 로그'],
@@ -29,8 +29,12 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'SMWR',
+    title: SITE_NAME_DISPLAY,
   },
+  /**
+   * 파비콘은 `src/app/icon.png` + `apple-icon.png` 파일 규칙으로도 제공됨(운영에서 안정적).
+   * 여기서는 OG/공유용 큰 아이콘과 캐시 무효화 쿼리만 유지.
+   */
   icons: {
     icon: [
       { url: `/icons/192.png${iconQ}`, sizes: '192x192', type: 'image/png' },
@@ -39,22 +43,22 @@ export const metadata: Metadata = {
     apple: { url: `/icons/192.png${iconQ}`, sizes: '192x192', type: 'image/png' },
   },
   openGraph: {
-    title: '전투 로그 분석 시스템',
+    title: SITE_TITLE_DEFAULT,
     description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
     url: '/',
-    siteName: '전투 로그 분석 시스템',
+    siteName: SITE_NAME_DISPLAY,
     locale: 'ko_KR',
     type: 'website',
     images: [
       {
         url: getAbsoluteUrl(`/icons/512.png${iconQ}`),
-        alt: '전투 로그 분석 시스템',
+        alt: SITE_TITLE_DEFAULT,
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: '전투 로그 분석 시스템',
+    title: SITE_TITLE_DEFAULT,
     description: '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
     images: [getAbsoluteUrl(`/icons/512.png${iconQ}`)],
   },

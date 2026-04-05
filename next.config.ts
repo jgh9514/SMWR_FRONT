@@ -4,6 +4,13 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
 
+/** 로고·파비콘·PWA 아이콘 캐시 무효화 (서버/클라이언트 동일). 아이콘만 갈아끼울 땐 NEXT_PUBLIC_APP_ICON_VERSION 올리면 됨. */
+const iconCacheVersion =
+  process.env.NEXT_PUBLIC_APP_ICON_VERSION ||
+  process.env.VERCEL_GIT_COMMIT_SHA ||
+  process.env.npm_package_version ||
+  '1';
+
 const withPWA = withPWAInit({
   dest: "public",
   /** 기본: 항상 PWA 활성. 로컬에서만 SW 끄려면 DISABLE_PWA=true */
@@ -26,6 +33,25 @@ const withPWA = withPWAInit({
     clientsClaim: true,
     disableDevLogs: true,
     runtimeCaching: [
+      /**
+       * 기본 규칙의 `*.png` StaleWhileRevalidate(최대 30일) 때문에 배포 후에도 로고/아이콘이 안 바뀌는 현상 방지.
+       */
+      {
+        urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
+          sameOrigin !== false && url.pathname.startsWith("/icons/"),
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "icons-network-only",
+        },
+      },
+      {
+        urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
+          sameOrigin !== false && url.pathname === "/favicon.ico",
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "favicon-network-only",
+        },
+      },
       {
         urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
           sameOrigin !== false && url.pathname.startsWith("/api/"),
@@ -58,6 +84,9 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_ICON_CACHE_VERSION: iconCacheVersion,
+  },
   /* config options here */
   reactCompiler: true,
   turbopack: {
@@ -73,6 +102,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/icons/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }],
+      },
+      {
+        source: '/favicon.ico',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' }],
       },
     ];

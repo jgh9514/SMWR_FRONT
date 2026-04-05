@@ -2,7 +2,13 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import NoticeDetailClient from '@/features/community/components/NoticeDetailClient';
 import { getNoticeDetailData, getNoticeStaticListData } from '@/shared/lib/api/server';
-import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl, sanitizeMetaDescription } from '@/shared/lib/seo';
+import {
+  buildBreadcrumbJsonLd,
+  buildPublicMetadata,
+  getAbsoluteUrl,
+  sanitizeMetaDescription,
+  SITE_NAME_DISPLAY,
+} from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
 export const revalidate = 300;
@@ -117,7 +123,7 @@ export default async function NoticeDetailPage({
     },
     publisher: {
       '@type': 'Organization',
-      name: '전투 로그 분석 시스템',
+      name: SITE_NAME_DISPLAY,
     },
   };
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([

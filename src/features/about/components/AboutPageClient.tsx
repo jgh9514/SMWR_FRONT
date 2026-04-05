@@ -17,6 +17,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LayersIcon from '@mui/icons-material/Layers';
 import HubIcon from '@mui/icons-material/Hub';
 import ExtensionIcon from '@mui/icons-material/Extension';
+import { SITE_TITLE_DEFAULT } from '@/shared/lib/seo';
 
 const TECH_FRONT = [
   'Next.js 16 (App Router)',
@@ -72,7 +73,7 @@ export default function AboutPageClient() {
             Portfolio · Project overview
           </Typography>
           <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mt: 0.5, mb: 1 }}>
-            전투 로그 분석 시스템
+            {SITE_TITLE_DEFAULT}
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640 }}>
             서머너즈워 점령전·실레나(RTA) 전투 데이터를 수집·분석하고, 길드·커뮤니티 기능과 함께 제공하는

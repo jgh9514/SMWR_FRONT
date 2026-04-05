@@ -15,18 +15,20 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  ListSubheader,
   Avatar,
   Divider,
   Badge,
   ListItemAvatar,
   Button,
+  Container,
+  Link as MuiLink,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import CastleIcon from '@mui/icons-material/Castle';
 import HistoryIcon from '@mui/icons-material/History';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import DashboardIcon from '@mui/icons-material/Dashboard';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import SearchIcon from '@mui/icons-material/Search';
@@ -41,7 +43,10 @@ import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import CircleIcon from '@mui/icons-material/Circle';
-import { useState, useEffect, useMemo, useSyncExternalStore } from 'react';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
 import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
@@ -54,183 +59,142 @@ import {
 import type { NotificationItem } from '@/features/notification/types/notification';
 import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
+import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
+import { SITE_NAME_DISPLAY } from '@/shared/lib/seo';
 
-interface MenuItem {
+interface NavLeaf {
   title: string;
   path: string;
   icon: React.ReactNode;
   requiresGuild?: boolean;
   requiresLeaderOrManager?: boolean;
   requiresAdmin?: boolean;
-  category?: string;
+  requiresLogin?: boolean;
+  /** 길드 없을 때만 노출 (예: 길드 가입 신청) */
+  requiresNoGuild?: boolean;
 }
 
-interface MenuCategory {
-  title: string;
-  items: MenuItem[];
-  divider?: boolean;
+export interface NavGroup {
+  id: 'rta' | 'siege' | 'community' | 'guide';
+  /** 대분류 라벨 (예: RTA, Siege) */
+  label: string;
+  /** 괄호 안 부제 (예: 실레나, 점령전) */
+  hint?: string;
+  items: NavLeaf[];
+  /** 데스크톱 대메뉴(대분류) 클릭 시 이동할 경로 (RTA·점령전 대시보드 등) */
+  dashboardPath?: string;
 }
 
-const getMenuCategories = (
+function isNavLeafVisible(item: NavLeaf, ctx: { hasGuild: boolean; isGuildLeaderOrManager: boolean; isAdmin: boolean; isLoggedIn: boolean }): boolean {
+  if (item.requiresLogin && !ctx.isLoggedIn) return false;
+  if (item.requiresNoGuild && ctx.hasGuild) return false;
+  if (item.requiresGuild && !ctx.hasGuild) return false;
+  if (item.requiresLeaderOrManager && !ctx.isGuildLeaderOrManager) return false;
+  if (item.requiresAdmin && !ctx.isAdmin) return false;
+  return true;
+}
+
+function getNavGroups(
   isAdmin: boolean,
   hasGuild: boolean,
   isGuildLeaderOrManager: boolean,
   isLoggedIn: boolean,
-): MenuCategory[] => {
-  const categories: MenuCategory[] = [];
+): NavGroup[] {
+  const ctx = { hasGuild, isGuildLeaderOrManager, isAdmin, isLoggedIn };
 
-  const mainItems: MenuItem[] = [
-    {
-      title: '홈',
-      path: '/',
-      icon: <HomeIcon />,
-      category: 'main',
-    },
-    {
-      title: 'RTA 분석',
-      path: '/rta',
-      icon: <SportsEsportsIcon />,
-      category: 'main',
-    },
-    {
-      title: 'RTA 몬스터별 통계',
-      path: '/rta/monster-stats',
-      icon: <BarChartIcon />,
-      category: 'main',
-    },
-    {
-      title: 'RTA 대시보드',
-      path: '/rta/dashboard',
-      icon: <DashboardIcon />,
-      category: 'main',
-    },
-    {
-      title: 'RTA 소환사 랭킹',
-      path: '/rta/summoner-ranking',
-      icon: <EmojiEventsIcon />,
-      category: 'main',
-    },
-  ];
+  const rta: NavGroup = {
+    id: 'rta',
+    label: 'RTA',
+    hint: '실레나',
+    dashboardPath: '/rta/dashboard',
+    items: [
+      { title: 'RTA 분석', path: '/rta', icon: <SportsEsportsIcon /> },
+      { title: 'RTA 몬스터 통계', path: '/rta/monster-stats', icon: <BarChartIcon /> },
+      { title: 'RTA 소환사 랭킹', path: '/rta/summoner-ranking', icon: <EmojiEventsIcon /> },
+      { title: 'RTA 랭크 컷', path: '/rta/rank-cutoffs', icon: <TrendingUpIcon /> },
+    ],
+  };
 
-  if (hasGuild) {
-    mainItems.push(
+  const siege: NavGroup = {
+    id: 'siege',
+    label: 'Siege',
+    hint: '점령전',
+    dashboardPath: '/siege/dashboard',
+    items: [
+      { title: '전체 점령전', path: '/siege', icon: <CastleIcon /> },
+      { title: '최근 점령전', path: '/recent-siege', icon: <HistoryIcon />, requiresGuild: true },
+      { title: '전적 조회', path: '/battle-history', icon: <BarChartIcon />, requiresGuild: true },
+    ],
+  };
+
+  const community: NavGroup = {
+    id: 'community',
+    label: '커뮤니티',
+    items: [
+      { title: '공지사항', path: '/notice', icon: <AnnouncementIcon /> },
+      { title: '길드원 모집', path: '/guild-recruitment', icon: <GroupIcon /> },
+      { title: '1대1 문의', path: '/inquiry', icon: <QuestionAnswerIcon /> },
       {
-        title: '전체 점령전',
-        path: '/siege',
-        icon: <CastleIcon />,
-        requiresGuild: true,
-        category: 'main',
+        title: '길드 가입 신청',
+        path: '/guild-application',
+        icon: <GroupIcon />,
+        requiresLogin: true,
+        requiresNoGuild: true,
       },
       {
-        title: '최근 점령전',
-        path: '/recent-siege',
-        icon: <HistoryIcon />,
+        title: '길드 관리',
+        path: '/guild-management',
+        icon: <GroupIcon />,
         requiresGuild: true,
-        category: 'main',
+        requiresLeaderOrManager: true,
       },
-      {
-        title: '전적 조회',
-        path: '/battle-history',
-        icon: <BarChartIcon />,
-        requiresGuild: true,
-        category: 'main',
-      }
-    );
-  }
+    ],
+  };
 
-  if (mainItems.length > 0) {
-    categories.push({
-      title: '메인',
-      items: mainItems,
-    });
-  }
-
-  const toolItems: MenuItem[] = [
-    {
-      title: '몬스터 검색',
-      path: '/monster-search',
-      icon: <SearchIcon />,
-      category: 'tool',
-    },
+  const guideItemsFinal: NavLeaf[] = [
+    { title: '홈', path: '/', icon: <HomeIcon /> },
+    { title: '서비스 소개', path: '/about', icon: <MenuBookIcon /> },
+    { title: '몬스터 검색', path: '/monster-search', icon: <SearchIcon /> },
   ];
-
   if (isLoggedIn) {
-    toolItems.push({
-      title: '계정 요약',
-      path: '/account-summary',
-      icon: <AccountCircleIcon />,
-      category: 'tool',
-    });
+    guideItemsFinal.push({ title: '계정 요약', path: '/account-summary', icon: <AccountCircleIcon />, requiresLogin: true });
   }
-
   if (isAdmin || isGuildLeaderOrManager) {
-    toolItems.push({
+    guideItemsFinal.push({
       title: '로그 업로드',
       path: '/log-upload',
       icon: <UploadFileIcon />,
       requiresAdmin: isAdmin,
-      category: 'tool',
+      requiresGuild: !isAdmin && isGuildLeaderOrManager,
+      requiresLeaderOrManager: !isAdmin && isGuildLeaderOrManager,
     });
   }
-
-  if (toolItems.length > 0) {
-    categories.push({
-      title: '도구',
-      items: toolItems,
-      divider: true,
-    });
+  if (isLoggedIn) {
+    guideItemsFinal.push({ title: '설정', path: '/settings', icon: <SettingsIcon />, requiresLogin: true });
   }
 
-  categories.push({
-    title: '커뮤니티',
-    items: [
-      {
-        title: '공지사항',
-        path: '/notice',
-        icon: <AnnouncementIcon />,
-        category: 'community',
-      },
-      {
-        title: '1대1 문의',
-        path: '/inquiry',
-        icon: <QuestionAnswerIcon />,
-        category: 'community',
-      },
-    ],
-    divider: true,
+  const guideGroup: NavGroup = { id: 'guide', label: '가이드', items: guideItemsFinal };
+
+  const groups: NavGroup[] = [rta, siege, community, guideGroup];
+
+  return groups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((item) => isNavLeafVisible(item, ctx)),
+    }))
+    .filter((g) => g.items.length > 0);
+}
+
+function isNavGroupActive(group: NavGroup, pathname: string): boolean {
+  return group.items.some((item) => {
+    if (item.path === '/') return pathname === '/';
+    return pathname === item.path || pathname.startsWith(`${item.path}/`);
   });
+}
 
-  if (hasGuild && isGuildLeaderOrManager) {
-    categories.push({
-      title: '길드',
-      items: [
-        {
-          title: '길드 관리',
-          path: '/guild-management',
-          icon: <GroupIcon />,
-          requiresGuild: true,
-          requiresLeaderOrManager: true,
-          category: 'guild',
-        },
-      ],
-      divider: true,
-    });
-  }
-
-  categories.push({
-    title: '설정',
-    items: [
-      {
-        title: '설정',
-        path: '/settings',
-        icon: <SettingsIcon />,
-        category: 'settings',
-      },
-    ],
-  });
-
-  return categories;
-};
+function navGroupTitle(group: NavGroup): string {
+  return group.hint ? `${group.label} (${group.hint})` : group.label;
+}
 
 export default function FixedHeader() {
   const router = useRouter();
@@ -454,12 +418,55 @@ export default function FixedHeader() {
 
   const isLoggedIn = isClient && isAuthenticated();
 
-  const menuCategories = useMemo(() => {
-    return getMenuCategories(isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn);
-  }, [isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn]);
+  const navGroups = useMemo(
+    () => getNavGroups(isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn),
+    [isAdmin, hasGuild, isGuildLeaderOrManager, isLoggedIn],
+  );
 
-  /** /images/* 는 백엔드 프록시 — 로고는 Next public /icons 만 사용 */
-  const logoUrl = '/icons/ci_active.png';
+  /** 데스크톱: 대분류 호버 시 하위 메뉴 앵커 */
+  const [navHover, setNavHover] = useState<{ groupId: NavGroup['id']; anchor: HTMLElement } | null>(null);
+
+  const closeNavHoverMenu = () => {
+    setNavHover(null);
+  };
+
+  /**
+   * 열린 하위 메뉴(MUI Paper)가 옆 대메뉴 버튼 위까지 가로로 넓어져,
+   * 옆 그룹 onMouseEnter가 막히는 문제를 피하려고 버튼 rect만 좌표로 판별한다.
+   */
+  const handleNavMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isClient) return;
+      const { clientX, clientY } = e;
+      for (const group of navGroups) {
+        const btn = document.getElementById(`nav-group-${group.id}`);
+        if (!(btn instanceof HTMLElement)) continue;
+        const r = btn.getBoundingClientRect();
+        if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+          setNavHover((prev) => {
+            const next = { groupId: group.id, anchor: btn };
+            if (prev?.groupId === next.groupId && prev?.anchor === next.anchor) return prev;
+            return next;
+          });
+          return;
+        }
+      }
+      const el = document.elementFromPoint(clientX, clientY);
+      if (el?.closest('[role="menu"]')) {
+        return;
+      }
+    },
+    [isClient, navGroups],
+  );
+
+  const iconQ = getPwaIconCacheQuery();
+  const logoIconUrl = `/icons/192.png${iconQ}`;
+  const wordmarkBase = SITE_NAME_DISPLAY.includes('.')
+    ? SITE_NAME_DISPLAY.slice(0, SITE_NAME_DISPLAY.lastIndexOf('.'))
+    : SITE_NAME_DISPLAY;
+  const wordmarkSuffix = SITE_NAME_DISPLAY.includes('.')
+    ? SITE_NAME_DISPLAY.slice(SITE_NAME_DISPLAY.lastIndexOf('.'))
+    : '';
 
   return (
     <>
@@ -467,63 +474,242 @@ export default function FixedHeader() {
         position="fixed"
         component="div"
         sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1,
+          zIndex: (t) => t.zIndex.drawer + 1,
           bgcolor: '#2c3e50',
           boxShadow: 2,
         }}
       >
-        <Toolbar
-          component="div"
-          sx={{
-            px: { xs: 1, md: 2 },
-            minHeight: { xs: 56, md: 64 },
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <IconButton
-            color="inherit"
-            aria-label="menu"
-            edge="start"
-            onClick={isClient ? handleDrawerToggle : undefined}
-            disabled={!isClient}
+        <Container maxWidth="xl" disableGutters sx={{ px: { xs: 1.5, sm: 2 } }}>
+          <Toolbar
+            component="div"
+            disableGutters
             sx={{
-              flexShrink: 0,
-              marginLeft: 0,
-              padding: '12px',
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
-
-          <Box
-            onClick={isClient ? handleHome : undefined}
-            sx={{
-              flexGrow: 1,
+              minHeight: 56,
+              maxHeight: 56,
               display: 'flex',
-              justifyContent: 'center',
               alignItems: 'center',
-              minWidth: 0,
-              cursor: isClient ? 'pointer' : 'default',
+              gap: { xs: 1, sm: 1.5 },
             }}
           >
-            <Box
-              component="img"
-              src={logoUrl}
-              alt="로고"
+            <IconButton
+              color="inherit"
+              aria-label="메뉴 열기"
+              edge="start"
+              onClick={isClient ? handleDrawerToggle : undefined}
+              disabled={!isClient}
               sx={{
-                height: { xs: 32, md: 40 },
-                width: 'auto',
-                maxWidth: '100%',
+                display: { xs: 'inline-flex', lg: 'none' },
+                flexShrink: 0,
+                ml: -0.5,
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+
+            <MuiLink
+              component="button"
+              type="button"
+              onClick={isClient ? handleHome : undefined}
+              underline="none"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.25,
+                mr: { xs: 1, sm: 1.5 },
+                minWidth: 0,
+                flexShrink: 0,
                 cursor: isClient ? 'pointer' : 'default',
-                objectFit: 'contain',
-                display: 'block',
+                color: 'inherit',
+                textAlign: 'left',
+                border: 'none',
+                background: 'none',
+                p: 0,
+                font: 'inherit',
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'relative',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 2,
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                  boxShadow: '0 0 0 1px rgba(255,255,255,0.12)',
+                  bgcolor: 'rgba(255,255,255,0.06)',
+                }}
+              >
+                <Box
+                  component="img"
+                  src={logoIconUrl}
+                  alt=""
+                  sx={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                  }}
+                />
+              </Box>
+              <Typography
+                component="span"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: '1.125rem',
+                  letterSpacing: '-0.02em',
+                  display: { xs: 'none', sm: 'inline' },
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {wordmarkBase}
+                <Box component="span" sx={{ color: 'primary.main' }}>
+                  {wordmarkSuffix}
+                </Box>
+              </Typography>
+            </MuiLink>
+
+            <Divider
+              orientation="vertical"
+              flexItem
+              sx={{
+                display: { xs: 'none', lg: 'block' },
+                borderColor: 'rgba(255,255,255,0.12)',
+                height: 24,
+                alignSelf: 'center',
+                mr: 1,
               }}
             />
-          </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 1 } }}>
+            <Box
+              component="nav"
+              aria-label="주요 메뉴"
+              onMouseMove={handleNavMouseMove}
+              onMouseLeave={(e) => {
+                if (!isClient) return;
+                // 대메뉴 간 이동 시에는 닫지 않음(자식 → 자식은 relatedTarget이 아직 nav 안).
+                // nav 영역 밖으로 나갈 때만 하위 메뉴 닫기.
+                const next = e.relatedTarget;
+                if (next instanceof Node && e.currentTarget.contains(next)) return;
+                closeNavHoverMenu();
+              }}
+              sx={{
+                display: { xs: 'none', lg: 'flex' },
+                flex: 1,
+                alignItems: 'center',
+                gap: 0.5,
+                minWidth: 0,
+                overflow: 'hidden',
+              }}
+            >
+              {navGroups.map((group) => {
+                const active = isNavGroupActive(group, pathname);
+                const menuOpen = isClient && navHover?.groupId === group.id && Boolean(navHover?.anchor);
+                return (
+                  <Box
+                    key={group.id}
+                    sx={{
+                      display: 'inline-flex',
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      position: 'relative',
+                    }}
+                  >
+                    <Button
+                      id={`nav-group-${group.id}`}
+                      color="inherit"
+                      size="small"
+                      endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18, opacity: 0.85 }} />}
+                      onClick={() => {
+                        if (!isClient) return;
+                        if (group.dashboardPath) {
+                          handleNavigate(group.dashboardPath);
+                          closeNavHoverMenu();
+                          return;
+                        }
+                        const btn = document.getElementById(`nav-group-${group.id}`);
+                        if (btn instanceof HTMLElement) {
+                          setNavHover({ groupId: group.id, anchor: btn });
+                        }
+                      }}
+                      sx={{
+                        px: 1.25,
+                        py: 0.5,
+                        minWidth: 0,
+                        borderRadius: 2,
+                        fontSize: '0.875rem',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        color: active ? 'primary.light' : 'rgba(255,255,255,0.85)',
+                        bgcolor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        '&:hover': {
+                          bgcolor: 'rgba(255,255,255,0.08)',
+                        },
+                      }}
+                    >
+                      {navGroupTitle(group)}
+                    </Button>
+                    <Menu
+                      anchorEl={menuOpen ? navHover?.anchor ?? null : null}
+                      open={menuOpen}
+                      onClose={closeNavHoverMenu}
+                      disablePortal
+                      disableScrollLock
+                      disableAutoFocus
+                      anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                      transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                      slotProps={{
+                        paper: {
+                          sx: {
+                            mt: 0.5,
+                            minWidth: 240,
+                            maxWidth: 320,
+                            borderRadius: 2,
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            bgcolor: 'rgba(30, 41, 59, 0.98)',
+                            backdropFilter: 'blur(12px)',
+                          },
+                        },
+                      }}
+                    >
+                      {group.items.map((item) => {
+                        const subActive =
+                          item.path === '/'
+                            ? pathname === '/'
+                            : pathname === item.path || pathname.startsWith(`${item.path}/`);
+                        return (
+                          <MenuItem
+                            key={item.path}
+                            onClick={() => {
+                              if (isClient) {
+                                handleNavigate(item.path);
+                                closeNavHoverMenu();
+                              }
+                            }}
+                            sx={{
+                              py: 1.25,
+                              gap: 1.5,
+                              color: subActive ? 'primary.light' : 'rgba(255,255,255,0.9)',
+                              bgcolor: subActive ? 'rgba(255,255,255,0.06)' : 'transparent',
+                            }}
+                          >
+                            <Box sx={{ display: 'flex', color: 'text.secondary', '& svg': { fontSize: 20 } }}>
+                              {item.icon}
+                            </Box>
+                            <Typography variant="body2" sx={{ fontWeight: subActive ? 600 : 400 }}>
+                              {item.title}
+                            </Typography>
+                          </MenuItem>
+                        );
+                      })}
+                    </Menu>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            <Box sx={{ flexGrow: { xs: 1, lg: 0 } }} />
+
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 1 }, flexShrink: 0 }}>
             {showNotification && (
               <IconButton
                 color="inherit"
@@ -762,6 +948,7 @@ export default function FixedHeader() {
             )}
           </Menu>
         </Toolbar>
+        </Container>
       </AppBar>
 
       <Drawer
@@ -775,52 +962,112 @@ export default function FixedHeader() {
           },
         }}
       >
-        <Toolbar
+        <Box
           sx={{
+            px: 2,
+            py: 1.75,
             bgcolor: '#2c3e50',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: 64,
+            gap: 1.5,
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            메뉴
-          </Typography>
-        </Toolbar>
-        <Divider />
-        <List>
-          {menuCategories.map((category, categoryIndex) => {
-            const filteredItems = category.items.filter((item) => {
-              if (item.requiresGuild && !hasGuild) return false;
-              if (item.requiresLeaderOrManager && !isGuildLeaderOrManager) return false;
-              if (item.requiresAdmin && !isAdmin) return false;
-              return true;
-            });
-
-            if (filteredItems.length === 0) return null;
-
-            return (
-              <Box key={category.title}>
-                {categoryIndex > 0 && category.divider && <Divider sx={{ my: 1 }} />}
-                {filteredItems.map((item) => (
-                  <ListItem key={item.path} disablePadding>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: 2,
+              overflow: 'hidden',
+              flexShrink: 0,
+              boxShadow: '0 0 0 1px rgba(255,255,255,0.12)',
+              bgcolor: 'rgba(255,255,255,0.06)',
+            }}
+          >
+            <Box
+              component="img"
+              src={logoIconUrl}
+              alt=""
+              sx={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            />
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              {wordmarkBase}
+              <Box component="span" sx={{ color: 'primary.light' }}>
+                {wordmarkSuffix}
+              </Box>
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.75, display: 'block' }}>
+              메뉴
+            </Typography>
+          </Box>
+        </Box>
+        <List dense disablePadding sx={{ py: 1 }}>
+          {navGroups.map((group, groupIndex) => (
+            <Box key={group.id}>
+              {groupIndex > 0 && <Divider sx={{ my: 1.5, mx: 2 }} />}
+              <ListSubheader
+                disableSticky
+                sx={{
+                  bgcolor: 'background.paper',
+                  lineHeight: 1.3,
+                  py: 1.25,
+                  fontSize: '0.8125rem',
+                  fontWeight: 700,
+                  color: 'text.primary',
+                }}
+              >
+                {group.dashboardPath ? (
+                  <Box
+                    component="button"
+                    type="button"
+                    onClick={() => handleNavigate(group.dashboardPath!)}
+                    sx={{
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      p: 0,
+                      m: 0,
+                      font: 'inherit',
+                      fontWeight: 700,
+                      fontSize: 'inherit',
+                      color: 'primary.main',
+                      textAlign: 'left',
+                      width: '100%',
+                      display: 'block',
+                    }}
+                  >
+                    {navGroupTitle(group)}
+                  </Box>
+                ) : (
+                  navGroupTitle(group)
+                )}
+              </ListSubheader>
+              {group.items.map((item) => {
+                const itemActive =
+                  item.path === '/'
+                    ? pathname === '/'
+                    : pathname === item.path || pathname.startsWith(`${item.path}/`);
+                return (
+                  <ListItem key={`${group.id}-${item.path}`} disablePadding sx={{ px: 1, mb: 0.25 }}>
                     <ListItemButton
-                      selected={pathname === item.path}
+                      selected={itemActive}
                       onClick={() => handleNavigate(item.path)}
                       sx={{
+                        borderRadius: 2,
+                        py: 1,
                         '&.Mui-selected': {
                           bgcolor: 'action.selected',
-                          '&:hover': {
-                            bgcolor: 'action.selected',
-                          },
+                          '&:hover': { bgcolor: 'action.selected' },
                         },
+                        '&:hover': { bgcolor: 'action.hover' },
                       }}
                     >
                       <ListItemIcon
                         sx={{
-                          color: pathname === item.path ? 'primary.main' : 'inherit',
+                          color: itemActive ? 'primary.main' : 'text.secondary',
                           minWidth: 40,
                         }}
                       >
@@ -830,14 +1077,15 @@ export default function FixedHeader() {
                         primary={item.title}
                         primaryTypographyProps={{
                           fontSize: '0.9375rem',
+                          fontWeight: itemActive ? 600 : 400,
                         }}
                       />
                     </ListItemButton>
                   </ListItem>
-                ))}
-              </Box>
-            );
-          })}
+                );
+              })}
+            </Box>
+          ))}
         </List>
       </Drawer>
     </>
