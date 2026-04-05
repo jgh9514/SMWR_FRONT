@@ -4,6 +4,9 @@ export type RtaPlayerMatchPerspective = {
   won: boolean;
   myRating: number;
   oppRating: number;
+  /** 해당 경기 기준 점수(스냅샷 p1/p2_score) */
+  myScore: number;
+  oppScore: number;
   myName: string;
   oppName: string;
   myId: string;
@@ -46,6 +49,8 @@ export function getMatchPerspective(match: MatchItem, wizardId: string): RtaPlay
       won,
       myRating: match.p1Rating,
       oppRating: match.p2Rating,
+      myScore: match.p1Score,
+      oppScore: match.p2Score,
       myName: match.p1Name,
       oppName: match.p2Name,
       myId: match.p1Id,
@@ -65,6 +70,8 @@ export function getMatchPerspective(match: MatchItem, wizardId: string): RtaPlay
     won,
     myRating: match.p2Rating,
     oppRating: match.p1Rating,
+    myScore: match.p2Score,
+    oppScore: match.p1Score,
     myName: match.p2Name,
     oppName: match.p1Name,
     myId: match.p2Id,

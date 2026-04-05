@@ -39,6 +39,7 @@ import { useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
 import { useRtaPlayerSeasonCode } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
 import { getMatchPerspective } from '@/features/rta/utils/rtaPlayerPerspective';
+import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 
 const HEATMAP_COLORS = {
@@ -73,15 +74,40 @@ function startOfLocalDay(d: Date): Date {
   return x;
 }
 
-function relativeKo(iso: string): string {
+/** 전투 일자 (로컬) */
+function formatMatchDateOnly(iso: string): string {
   const d = parseMatchDate(iso);
-  const diff = Date.now() - d.getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days <= 0) return '오늘';
-  if (days === 1) return '하루 전';
-  if (days < 7) return `${days}일 전`;
-  if (days < 30) return `${Math.floor(days / 7)}주 전`;
-  return `${Math.floor(days / 30)}개월 전`;
+  if (d.getTime() === 0) return '—';
+  return d.toLocaleDateString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+/** 전투 시각 (로컬) — 일자 아래 줄용 */
+function formatMatchTimeOnly(iso: string): string {
+  const d = parseMatchDate(iso);
+  if (d.getTime() === 0) return '—';
+  return d.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/** 차트 툴팁 등 한 줄 일시 */
+function formatMatchDateTime(iso: string): string {
+  const d = parseMatchDate(iso);
+  if (d.getTime() === 0) return '—';
+  return d.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
 }
 
 function winRateHeatColor(wins: number, total: number): string {
@@ -94,9 +120,9 @@ function winRateHeatColor(wins: number, total: number): string {
   return HEATMAP_COLORS.high;
 }
 
-/** 최근 N일 구간에서 레이팅 변화 (첫 경기 → 마지막 경기 myRating 차이) */
-function ratingDeltaInDays(
-  chronological: { date: string; myRating: number }[],
+/** 최근 N일 구간에서 점수 변화 (경기 점수 기준) */
+function scoreDeltaInDays(
+  chronological: { date: string; myScore: number }[],
   days: number,
 ): number | null {
   if (chronological.length === 0) return null;
@@ -108,10 +134,10 @@ function ratingDeltaInDays(
   if (inWindow.length === 1) {
     const firstBefore = chronological.filter((m) => startOfLocalDay(parseMatchDate(m.date)) < cutoff);
     const prev = firstBefore[firstBefore.length - 1];
-    if (prev) return inWindow[0].myRating - prev.myRating;
+    if (prev) return inWindow[0].myScore - prev.myScore;
     return 0;
   }
-  return inWindow[inWindow.length - 1].myRating - inWindow[0].myRating;
+  return inWindow[inWindow.length - 1].myScore - inWindow[0].myScore;
 }
 
 type ChartMode = 'daily' | 'match';
@@ -153,7 +179,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       .sort((a, b) => parseMatchDate(a.match.date).getTime() - parseMatchDate(b.match.date).getTime())
       .map((x) => ({
         date: x.match.date,
-        myRating: x.p.myRating,
+        myScore: x.p.myScore,
         won: x.p.won,
         match: x.match,
         p: x.p,
@@ -165,20 +191,21 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const lossCount = Math.max(0, matchCount - winCount);
   const summaryScore = num(summary?.score);
 
-  const maxRating = useMemo(() => {
-    let m = summaryScore;
+  const maxScore = useMemo(() => {
+    let m = 0;
     for (const c of chronological) {
-      if (c.myRating > m) m = c.myRating;
+      if (c.myScore > m) m = c.myScore;
     }
-    return m > 0 ? m : summaryScore;
+    if (m > 0) return m;
+    return summaryScore > 0 ? summaryScore : 0;
   }, [chronological, summaryScore]);
 
-  const delta3 = ratingDeltaInDays(
-    chronological.map((c) => ({ date: c.date, myRating: c.myRating })),
+  const delta3 = scoreDeltaInDays(
+    chronological.map((c) => ({ date: c.date, myScore: c.myScore })),
     3,
   );
-  const delta7 = ratingDeltaInDays(
-    chronological.map((c) => ({ date: c.date, myRating: c.myRating })),
+  const delta7 = scoreDeltaInDays(
+    chronological.map((c) => ({ date: c.date, myScore: c.myScore })),
     7,
   );
 
@@ -228,7 +255,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       return chronological.map((c, i) => ({
         x: i + 1,
         label: `${i + 1}`,
-        rating: c.myRating,
+        score: c.myScore,
         t: c.date,
       }));
     }
@@ -237,24 +264,24 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       const k = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
       const cur = byDay.get(k);
       if (!cur || parseMatchDate(c.date) >= parseMatchDate(cur.date)) {
-        byDay.set(k, { last: c.myRating, date: c.date });
+        byDay.set(k, { last: c.myScore, date: c.date });
       }
     }
     const keys = [...byDay.keys()].sort();
     return keys.map((k, i) => ({
       x: i + 1,
       label: k.slice(5).replace('-', '/'),
-      rating: byDay.get(k)!.last,
+      score: byDay.get(k)!.last,
       t: byDay.get(k)!.date,
     }));
   }, [chronological, chartMode]);
 
   const chartDomain = useMemo(() => {
-    const ratings = chartData.map((d) => d.rating).filter((n) => Number.isFinite(n));
-    if (ratings.length === 0) return [1100, 1600] as [number, number];
-    const min = Math.min(...ratings);
-    const max = Math.max(...ratings);
-    const pad = Math.max(20, (max - min) * 0.1);
+    const scores = chartData.map((d) => d.score).filter((n) => Number.isFinite(n));
+    if (scores.length === 0) return [0, 2000] as [number, number];
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const pad = Math.max(5, (max - min) * 0.12 || 1);
     return [Math.floor(min - pad), Math.ceil(max + pad)] as [number, number];
   }, [chartData]);
 
@@ -299,7 +326,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                 최고 점수
               </Typography>
               <Typography variant="body2" fontWeight={600}>
-                {maxRating > 0 ? Math.round(maxRating) : '—'}
+                {maxScore > 0 ? Math.round(maxScore).toLocaleString() : '—'}
               </Typography>
             </Stack>
             <Box sx={{ pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
@@ -518,14 +545,17 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                       <RechartsTooltip
                         formatter={(value) => {
                           const n = typeof value === 'number' ? value : Number(value);
-                          return [Number.isFinite(n) ? Math.round(n) : '—', '레이팅'];
+                          return [
+                            Number.isFinite(n) ? Math.round(n).toLocaleString() : '—',
+                            '점수',
+                          ];
                         }}
                         labelFormatter={(_, payload) => {
                           const p = payload?.[0]?.payload as { t?: string } | undefined;
-                          return p?.t ? new Date(p.t).toLocaleString('ko-KR') : '';
+                          return p?.t ? formatMatchDateTime(p.t) : '';
                         }}
                       />
-                      <Area type="monotone" dataKey="rating" stroke={accent} strokeWidth={2} fill="url(#rtaScoreGrad)" dot={{ r: 3 }} />
+                      <Area type="monotone" dataKey="score" stroke={accent} strokeWidth={2} fill="url(#rtaScoreGrad)" dot={{ r: 3 }} />
                     </AreaChart>
                   </ResponsiveContainer>
                 )}
@@ -646,26 +676,35 @@ function MatchRow({
           <Typography fontWeight={900} color={won ? 'success.main' : 'error.main'}>
             {won ? '승리' : '패배'}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {relativeKo(match.date)}
+          <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35 }}>
+            {formatMatchDateOnly(match.date)}
+          </Typography>
+          <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ lineHeight: 1.35, fontSize: 11 }}>
+            {formatMatchTimeOnly(match.date)}
           </Typography>
         </Stack>
 
         <Stack flex={1} spacing={1.5}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-            <Stack direction="row" alignItems="center" gap={1}>
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
               <Avatar src={getSwexPlayerImageUrl(p.myChannelUid ?? p.myId)} sx={{ width: 32, height: 32 }} />
               <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 120 }}>
                 {p.myName}
               </Typography>
-              <Typography variant="body2" fontWeight={700} color="success.main">
-                {Math.round(p.myRating)}
-              </Typography>
+              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                {p.myRating > 0 ? (
+                  <RtaRatingStarIcons rating={p.myRating} size={16} gap={1} />
+                ) : (
+                  <Typography variant="caption" color="text.disabled">
+                    —
+                  </Typography>
+                )}
+                <Typography variant="body2" fontWeight={700} color="text.primary" component="span">
+                  {Math.round(p.myScore).toLocaleString()}
+                </Typography>
+              </Stack>
             </Stack>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Typography variant="body2" fontWeight={700} color="text.secondary">
-                {Math.round(p.oppRating)}
-              </Typography>
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
               <Typography
                 component={Link}
                 href={oppHref}
@@ -676,6 +715,18 @@ function MatchRow({
               >
                 {p.oppName}
               </Typography>
+              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                {p.oppRating > 0 ? (
+                  <RtaRatingStarIcons rating={p.oppRating} size={16} gap={1} />
+                ) : (
+                  <Typography variant="caption" color="text.disabled">
+                    —
+                  </Typography>
+                )}
+                <Typography variant="body2" fontWeight={700} color="text.primary" component="span">
+                  {Math.round(p.oppScore).toLocaleString()}
+                </Typography>
+              </Stack>
               <Avatar component={Link} href={oppHref} src={getSwexPlayerImageUrl(p.oppChannelUid ?? p.oppId)} sx={{ width: 32, height: 32 }} />
             </Stack>
           </Stack>
