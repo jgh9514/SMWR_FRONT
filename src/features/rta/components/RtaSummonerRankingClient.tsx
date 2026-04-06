@@ -341,7 +341,7 @@ function MostMonstersCell({ row }: { row: RtaSummonerRankingRow }) {
   );
 }
 
-const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
+const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
 
 export default function RtaSummonerRankingClient() {
   const theme = useTheme();

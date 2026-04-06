@@ -35,7 +35,7 @@ import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { showToast } from '@/shared/lib/notification';
 
 const SEASON_FALLBACK = [
-  { value: 's36-sl', label: 'S36 SL', active: true },
+  { value: 'S36_SPECIAL', label: '36시즌 스페셜리그', active: true },
   { value: 's35-sl', label: 'S35 SL', active: false },
 ];
 

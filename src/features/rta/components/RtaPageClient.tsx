@@ -27,7 +27,7 @@ import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image'
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
 
-const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
+const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
 
 /** /rta 매치 목록: 최신순 기준 앞쪽(최근) 페이지만 최대 N페이지까지 노출 */
 const MAX_RTA_LIST_PAGES = 10;

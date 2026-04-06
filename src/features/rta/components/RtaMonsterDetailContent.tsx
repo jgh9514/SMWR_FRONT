@@ -17,7 +17,7 @@ import {
 } from '@mui/material';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import { getRenderableImageUrl } from '@/shared/utils/image';
-import type { MonsterDetail } from '@/features/rta/types/rta';
+import type { CounterMatchupRow, MonsterDetail } from '@/features/rta/types/rta';
 
 interface RtaMonsterDetailContentProps {
   data: MonsterDetail;
@@ -36,6 +36,19 @@ export default function RtaMonsterDetailContent({
   });
 
   const recentMatches = data.recent_matches || [];
+  const counterRows: CounterMatchupRow[] = data.counter_matchups ?? [];
+
+  const comboLabel = (r: CounterMatchupRow) =>
+    String(r.opponentLabel ?? r.opponent_label ?? r.opponentComboKey ?? r.opponent_combo_key ?? '—');
+  const winRate = (r: CounterMatchupRow) => {
+    const v = r.winRate ?? r.win_rate;
+    return v != null && Number.isFinite(Number(v)) ? Number(v) : null;
+  };
+  const totalGames = (r: CounterMatchupRow) => {
+    const w = Number(r.winCnt ?? r.win_cnt ?? 0);
+    const l = Number(r.loseCnt ?? r.lose_cnt ?? 0);
+    return w + l;
+  };
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
@@ -219,6 +232,63 @@ export default function RtaMonsterDetailContent({
                           <TableCell align="right">
                             <Typography variant="body2" color="text.secondary">
                               {combo.match_count}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  데이터가 없습니다.
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+        </Box>
+
+        <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
+          <Card>
+            <CardContent>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                카운터 매치업
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                상대 팀 조합 대비 승·패 집계입니다. 카운터 집계 배치가 돌아간 뒤에 채워집니다.
+              </Typography>
+              {counterRows.length ? (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>상대 조합</TableCell>
+                        <TableCell align="right">승률</TableCell>
+                        <TableCell align="right">승 / 패</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {counterRows.slice(0, 20).map((r, index) => (
+                        <TableRow key={`${comboLabel(r)}-${index}`}>
+                          <TableCell>
+                            <Typography variant="body2">{comboLabel(r)}</Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 600,
+                                color:
+                                  (winRate(r) ?? 0) >= 50 ? 'success.main' : 'error.main',
+                              }}
+                            >
+                              {winRate(r) != null ? formatPercentage(winRate(r)!) : '—'}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" color="text.secondary">
+                              {r.winCnt ?? r.win_cnt ?? 0} / {r.loseCnt ?? r.lose_cnt ?? 0}
+                              {totalGames(r) > 0 ? ` (${totalGames(r)})` : ''}
                             </Typography>
                           </TableCell>
                         </TableRow>

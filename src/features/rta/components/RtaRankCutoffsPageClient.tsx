@@ -7,7 +7,7 @@ import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
 import { useRtaDashboard, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
 
-const SEASON_FALLBACK = [{ value: 's36-sl', label: '시즌 36 스페셜 리그' }];
+const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
 
 export default function RtaRankCutoffsPageClient() {
   const { data: seasonsData } = useRtaSeasons();

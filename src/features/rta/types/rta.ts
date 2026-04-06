@@ -209,6 +209,24 @@ export interface MonsterDetail {
       monster_image?: string;
     }>;
   }>;
+  /** rta_agg_counter_matchup (시즌·rating_id=0) */
+  counter_matchups?: CounterMatchupRow[];
+}
+
+/** 카운터 매치업 (상대 조합 대비 승패) */
+export interface CounterMatchupRow {
+  opponent_combo_key?: string;
+  opponentComboKey?: string;
+  opponent_combo_size?: number;
+  opponentComboSize?: number;
+  win_cnt?: number;
+  winCnt?: number;
+  lose_cnt?: number;
+  loseCnt?: number;
+  win_rate?: number | null;
+  winRate?: number | null;
+  opponent_label?: string | null;
+  opponentLabel?: string | null;
 }
 
 /** RTA 대시보드 티어 분포 (rating_id 기반) */
@@ -234,6 +252,22 @@ export interface RtaRankCutoffAnchorRow {
   cutoff_score: number;
 }
 
+/** 배치 적재 시 rta_snapshot_rank_cut 최신 스냅샷 행 */
+export interface RtaSnapshotRankCutRow {
+  snapshot_at?: string;
+  snapshotAt?: string;
+  rating_id?: number;
+  ratingId?: number;
+  tier_key?: string;
+  tierKey?: string;
+  grade_name?: string;
+  gradeName?: string;
+  grade_abbr?: string;
+  gradeAbbr?: string;
+  cutoff_score?: number;
+  cutoffScore?: number;
+}
+
 export interface RtaDashboardResponse {
   daily_tiers: RtaTierDailyRow[];
   date_range?: {
@@ -241,6 +275,8 @@ export interface RtaDashboardResponse {
     max_date?: string;
   };
   rank_cutoff_anchors?: RtaRankCutoffAnchorRow[];
+  /** DB 스냅샷 컷 (rta_snapshot_rank_cut, 배치 적재 후) */
+  snapshot_rank_cut?: RtaSnapshotRankCutRow[];
   /** 적용된 시즌 코드 (요청 미지정 시 서버 기본) */
   seasonCode?: string | null;
 }
