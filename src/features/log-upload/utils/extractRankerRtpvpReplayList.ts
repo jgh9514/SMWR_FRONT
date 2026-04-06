@@ -1,5 +1,6 @@
 /**
  * 실레나 프록시/캡처 로그에서 RTA 리플레이 목록 응답 추출
+ * (아래 키명은 게임 API JSON 필드명이며 DB 테이블명과 무관)
  * - getRankerRtpvpReplayList → ranker_replay_list
  * - getRtpvpRatingReplayList → replay_list (실제 로그 대부분이 이쪽)
  * - 줄 단위 NDJSON
