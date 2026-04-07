@@ -22,10 +22,13 @@ export interface RawMatchItem {
   updated_at?: string;
   p1_unit_names?: string[];
   p1_unit_images?: string[];
+  /** pick_slot_no 순서와 동일한 길이의 벤 여부 (백엔드 getRtaMatches) */
+  p1_unit_banned?: boolean[] | (boolean | string | number)[];
   p1_banned_unit?: number;
   p1_leader_unit?: number;
   p2_unit_names?: string[];
   p2_unit_images?: string[];
+  p2_unit_banned?: boolean[] | (boolean | string | number)[];
   p2_banned_unit?: number;
   p2_leader_unit?: number;
   p1_pick_order?: number[];

@@ -12,20 +12,36 @@ function normalizeWinnerPosition(raw: unknown): '1' | '2' {
   return '1';
 }
 
+function isTruthyBanFlag(v: unknown): boolean {
+  return v === true || v === 'true' || v === 't' || v === 1 || v === '1';
+}
+
+/** SQL boolean[]·직렬화 편차를 boolean[] 으로 정규화 */
+function normalizeUnitBannedFlags(raw: unknown): boolean[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map((v) => isTruthyBanFlag(v));
+}
+
 function createUnits(
   unitNames?: string[],
   unitImages?: string[],
   bannedUnit?: number,
   leaderUnit?: number,
+  unitBannedFlags?: boolean[] | (boolean | string | number)[],
 ) {
   if (!Array.isArray(unitNames) || !Array.isArray(unitImages) || unitNames.length === 0) {
     return [];
   }
 
+  const flags = normalizeUnitBannedFlags(unitBannedFlags);
+
   return unitNames.map((name, i) => ({
     name: name || `Unit ${i + 1}`,
     image: unitImages[i] || getMonsterImageUrl('/images/default-unit.png'),
-    banned: bannedUnit === i + 1,
+    banned:
+      flags != null && i < flags.length
+        ? flags[i] === true
+        : bannedUnit === i + 1,
     leader: leaderUnit === i + 1,
   }));
 }
@@ -56,12 +72,14 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p1_unit_images,
       match.p1_banned_unit,
       match.p1_leader_unit,
+      match.p1_unit_banned,
     ),
     p2Units: createUnits(
       match.p2_unit_names,
       match.p2_unit_images,
       match.p2_banned_unit,
       match.p2_leader_unit,
+      match.p2_unit_banned,
     ),
     p1Id: String(match.p1_wizard_id ?? ''),
     p2Id: String(match.p2_wizard_id ?? ''),
