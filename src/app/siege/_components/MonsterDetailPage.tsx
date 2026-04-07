@@ -124,11 +124,15 @@ export default function MonsterDetailPage() {
         matchId: null as string | null,
       };
     }
-    const [monsterKey, matchIdPart] = detailParam.split('_');
+    // match_id에 '_'가 여러 번 있을 수 있어 첫 '_'만 키/매치 분리 (이전: split('_')는 매치 id가 잘림)
+    const usIdx = detailParam.indexOf('_');
+    const monsterKey = usIdx >= 0 ? detailParam.slice(0, usIdx) : detailParam;
+    const matchIdRaw = usIdx >= 0 ? detailParam.slice(usIdx + 1) : '';
+    const matchIdPart = matchIdRaw.length > 0 ? matchIdRaw : null;
     const [dm1, dm2, dm3] = monsterKey.split('-');
     return {
       schData: { dm1, dm2, dm3 },
-      matchId: matchIdPart ?? null,
+      matchId: matchIdPart,
     };
   }, [detailParam]);
   const schData = parsedDetail.schData;
@@ -140,10 +144,15 @@ export default function MonsterDetailPage() {
   const recommendedLimit = 5;
 
   const baseParams = useMemo<MonsterDetailParams | null>(() => {
-    const hasMonsterData = schData.dm1 || schData.dm2 || schData.dm3;
-    if (!hasMonsterData) return null;
+    const dm1 = schData.dm1?.trim();
+    const dm2 = schData.dm2?.trim();
+    const dm3 = schData.dm3?.trim();
+    // WAS 상세 SQL은 dm1~dm3·dm*_list가 모두 필요함. 하나라도 없으면 IN () 오류 방지
+    if (!dm1 || !dm2 || !dm3) return null;
     return {
-      ...schData,
+      dm1,
+      dm2,
+      dm3,
       ...(matchId && { match_id: matchId }),
       ...siegeGuildViewParams,
     };
@@ -247,6 +256,30 @@ export default function MonsterDetailPage() {
         <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <CircularProgress />
         </Box>
+      </Container>
+    );
+  }
+
+  if (!baseParams) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 8 }}>
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 8 }}>
+            <Typography variant="h6" color="text.secondary" sx={{ mb: 1 }}>
+              상세 주소 형식이 올바르지 않습니다
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              방덱 상세는{' '}
+              <Typography component="span" variant="body2" sx={{ fontFamily: 'monospace' }}>
+                몬스터ID-몬스터ID-몬스터ID
+              </Typography>
+              형식(필요 시 뒤에 <Typography component="span" variant="body2" sx={{ fontFamily: 'monospace' }}>_match_id</Typography>)이어야 합니다.
+            </Typography>
+            <Button variant="outlined" onClick={goBack} startIcon={<ArrowBackIcon />}>
+              뒤로가기
+            </Button>
+          </CardContent>
+        </Card>
       </Container>
     );
   }
