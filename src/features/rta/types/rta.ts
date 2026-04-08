@@ -76,13 +76,10 @@ export interface MatchItem {
 }
 
 export interface RtaStatsResponse {
+  /** 시즌 전체 매치 수는 COUNT 부하로 /stats 에서 제외 */
   todayMatches?: number;
   weeklyMatches?: number;
   [key: string]: unknown;
-}
-
-export interface RtaMatchCountResponse {
-  count: number;
 }
 
 export interface RtaMatchesResponse {
@@ -90,18 +87,68 @@ export interface RtaMatchesResponse {
   [key: string]: unknown;
 }
 
+/** POST /api/v1/rta/page — stats.hasMore + 매치 목록 (전체 건수 COUNT 없음) */
+export interface RtaListPageResponse {
+  stats: RtaStatsResponse & { hasMore?: boolean; has_more?: boolean };
+  matches?: RawMatchItem[];
+  [key: string]: unknown;
+}
+
 export interface RtaData {
   stats: RtaStatsResponse;
-  totalMatches: number;
+  /** 전체 건수 미조회 — 페이지네이션은 hasMore·상한으로만 추정 */
+  totalMatches?: number;
   matches: MatchItem[];
   totalPages: number;
 }
+
+/** 세부 티어 키 (레전드 제외) — 서버·getRtaTierShortLabel 과 동일 */
+export type RtaTierKey =
+  | 'Ch1'
+  | 'Ch2'
+  | 'Ch3'
+  | 'F1'
+  | 'F2'
+  | 'F3'
+  | 'C1'
+  | 'C2'
+  | 'C3'
+  | 'P1'
+  | 'P2'
+  | 'P3'
+  | 'G1'
+  | 'G2'
+  | 'G3';
+
+/** 드롭다운 표시: G3 → Ch1 내림차순, 마지막에 전체. 별 개수는 rating_id 일의 자리와 동일 */
+export const DEFAULT_RTA_LIST_TIER_KEY: RtaTierKey = 'G3';
+
+export const RTA_TIER_KEY_FILTER_ITEMS: { value: '' | RtaTierKey; previewRating?: number }[] = [
+  { value: 'G3', previewRating: 4033 },
+  { value: 'G2', previewRating: 4022 },
+  { value: 'G1', previewRating: 4011 },
+  { value: 'P3', previewRating: 3533 },
+  { value: 'P2', previewRating: 3522 },
+  { value: 'P1', previewRating: 3511 },
+  { value: 'C3', previewRating: 3033 },
+  { value: 'C2', previewRating: 3022 },
+  { value: 'C1', previewRating: 3011 },
+  { value: 'F3', previewRating: 2033 },
+  { value: 'F2', previewRating: 2022 },
+  { value: 'F1', previewRating: 2011 },
+  { value: 'Ch3', previewRating: 1033 },
+  { value: 'Ch2', previewRating: 1022 },
+  { value: 'Ch1', previewRating: 1011 },
+  { value: '' },
+];
 
 export interface RtaMatchListParams {
   limit: number;
   offset: number;
   /** rta_season.season_code — 없으면 서버가 금일 기준 기본 시즌 사용 */
   seasonCode?: string | null;
+  /** Ch1~G3 — 해당 세부 티어 플레이어가 한 명이라도 있는 매치만 */
+  tierKey?: '' | RtaTierKey | null;
 }
 
 // 몬스터별 통계 타입

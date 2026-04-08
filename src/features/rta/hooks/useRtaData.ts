@@ -7,7 +7,18 @@
 
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
-import { RtaStatsResponse, RtaMatchCountResponse, RtaMatchesResponse, RtaMatchListParams } from '@/types';
+import {
+  RtaStatsResponse,
+  RtaMatchesResponse,
+  RtaMatchListParams,
+  RtaListPageResponse,
+} from '@/types';
+
+function tierKeyBody(tierKey?: string | null | undefined): Record<string, string> {
+  const t = tierKey?.trim();
+  if (!t) return {};
+  return { tierKey: t };
+}
 import type {
   MonsterDetail,
   RtaDashboardResponse,
@@ -61,25 +72,16 @@ function normalizeRtaSeasonsResponse(raw: unknown): RtaSeasonsResponse {
  * RTA 통계 조회
  * 백엔드: POST /api/v1/rta/stats
  */
+/** /rta 등 조회 위주 — 서버 rtaListRead 캐시와 맞춰 클라이언트도 짧게 재사용 */
+const RTA_READ_STALE_MS = 2 * 60 * 1000;
+const RTA_READ_GC_MS = 15 * 60 * 1000;
+
 export const useRtaStats = (seasonCode?: string | null) => {
   return useApiPostQuery<RtaStatsResponse>('/rta/stats', seasonBody(seasonCode), {
     enabled: true,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnWindowFocus: true,
-  });
-};
-
-/**
- * RTA 매치 수 조회
- * 백엔드: POST /api/v1/rta/matches/count
- */
-export const useRtaMatchCount = (seasonCode?: string | null) => {
-  return useApiPostQuery<RtaMatchCountResponse>('/rta/matches/count', seasonBody(seasonCode), {
-    enabled: true,
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: RTA_READ_STALE_MS,
+    gcTime: RTA_READ_GC_MS,
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -88,15 +90,30 @@ export const useRtaMatchCount = (seasonCode?: string | null) => {
  * 백엔드: POST /api/v1/rta/matches
  */
 export const useRtaMatchList = (params: RtaMatchListParams) => {
-  const { limit, offset, seasonCode } = params;
+  const { limit, offset, seasonCode, tierKey } = params;
   return useApiPostQuery<RtaMatchesResponse>(
     '/rta/matches',
-    { limit, offset, ...seasonBody(seasonCode) },
+    { limit, offset, ...seasonBody(seasonCode), ...tierKeyBody(tierKey) },
     {
       enabled: true,
-      staleTime: 0,
-      gcTime: 0,
-      refetchOnWindowFocus: true,
+      staleTime: RTA_READ_STALE_MS,
+      gcTime: RTA_READ_GC_MS,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
+/** /rta 목록 화면 권장: 통계 + 매치 목록 HTTP 1회 — POST /api/v1/rta/page */
+export const useRtaListPage = (params: RtaMatchListParams) => {
+  const { limit, offset, seasonCode, tierKey } = params;
+  return useApiPostQuery<RtaListPageResponse>(
+    '/rta/page',
+    { limit, offset, ...seasonBody(seasonCode), ...tierKeyBody(tierKey) },
+    {
+      enabled: true,
+      staleTime: RTA_READ_STALE_MS,
+      gcTime: RTA_READ_GC_MS,
+      refetchOnWindowFocus: false,
     },
   );
 };

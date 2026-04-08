@@ -18,25 +18,53 @@ import {
   Select,
   useMediaQuery,
   useTheme,
+  Chip,
 } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useRtaSeasons, useRtaStats, useRtaMatchCount, useRtaMatchList } from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasons, useRtaListPage } from '@/features/rta/hooks/useRtaData';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
+import {
+  RTA_TIER_KEY_FILTER_ITEMS,
+  DEFAULT_RTA_LIST_TIER_KEY,
+  type RtaTierKey,
+} from '@/features/rta/types/rta';
 
 const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
 
 /** /rta 매치 목록: 최신순 기준 앞쪽(최근) 페이지만 최대 N페이지까지 노출 */
 const MAX_RTA_LIST_PAGES = 10;
 
+/** 승자 열 — 에메랄드 계열 그라데이션 */
+function rtaSideBgWin(theme: Theme) {
+  const d = theme.palette.mode === 'dark';
+  return d
+    ? `linear-gradient(160deg, ${alpha('#34d399', 0.28)} 0%, ${alpha('#059669', 0.42)} 55%, ${alpha('#064e3b', 0.55)} 100%)`
+    : `linear-gradient(160deg, ${alpha('#ecfdf5', 1)} 0%, ${alpha('#6ee7b7', 0.35)} 50%, ${alpha('#a7f3d0', 0.55)} 100%)`;
+}
+
+/** 패자 열 — 슬레이트 + 은은한 로즈 */
+function rtaSideBgLose(theme: Theme) {
+  const d = theme.palette.mode === 'dark';
+  return d
+    ? `linear-gradient(160deg, ${alpha('#475569', 0.4)} 0%, ${alpha('#7f1d1d', 0.22)} 100%)`
+    : `linear-gradient(160deg, ${alpha('#f8fafc', 1)} 0%, ${alpha('#fecdd3', 0.42)} 70%, ${alpha('#fda4af', 0.28)} 100%)`;
+}
+
+const RTA_BADGE_WIN = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+const RTA_BADGE_LOSE = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)';
+
 export default function RtaPageClient() {
   const theme = useTheme();
   const rtaStarSize = useMediaQuery(theme.breakpoints.up('md')) ? 12 : 10;
   const [expandedMatches, setExpandedMatches] = useState<{ [key: number]: boolean }>({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [tierKey, setTierKey] = useState<'' | RtaTierKey>(DEFAULT_RTA_LIST_TIER_KEY);
 
   const { data: seasonsData } = useRtaSeasons();
   const seasonOptions = useMemo(() => {
@@ -67,36 +95,44 @@ export default function RtaPageClient() {
     setCurrentPage(1);
   }, [seasonSelectValue]);
 
-  const { data: statsResponse } = useRtaStats(seasonSelectValue);
-  const { data: countResponse } = useRtaMatchCount(seasonSelectValue);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [tierKey]);
+
   const {
-    data: matchesResponse,
-    isLoading: isLoadingMatches,
-    error: matchesError,
-    refetch: refetchMatches,
-  } = useRtaMatchList({
+    data: pageResponse,
+    isLoading: isLoadingPage,
+    error: pageError,
+    refetch: refetchPage,
+  } = useRtaListPage({
     limit: DEFAULT_PAGE_SIZE,
     offset: (currentPage - 1) * DEFAULT_PAGE_SIZE,
     seasonCode: seasonSelectValue,
+    tierKey: tierKey === '' ? undefined : tierKey,
   });
 
   const rtaData = useMemo<RtaData | null>(() => {
-    if (!statsResponse || !countResponse || !matchesResponse) return null;
+    if (!pageResponse) return null;
+    const statsResponse = pageResponse.stats;
+    if (!statsResponse) return null;
 
-    const totalMatches = countResponse.count || 0;
-    const rawMatches = matchesResponse.matches || matchesResponse || [];
+    const hasMore = Boolean(statsResponse.hasMore ?? statsResponse.has_more);
+    const rawMatches = pageResponse.matches ?? [];
     const processedMatches = Array.isArray(rawMatches)
       ? rawMatches.map((m: RawMatchItem) => processRawMatchToMatchItem(m))
       : [];
 
-    const fullPages = Math.ceil(totalMatches / DEFAULT_PAGE_SIZE);
+    /** 전체 COUNT 없음 — 다음 페이지가 있으면 최소 currentPage+1페이지까지 존재로 간주(최대 10) */
+    const totalPages = Math.min(
+      MAX_RTA_LIST_PAGES,
+      hasMore ? Math.max(currentPage + 1, 1) : Math.max(currentPage, 1),
+    );
     return {
       stats: statsResponse,
-      totalMatches,
       matches: processedMatches,
-      totalPages: Math.min(fullPages, MAX_RTA_LIST_PAGES),
+      totalPages,
     };
-  }, [statsResponse, countResponse, matchesResponse]);
+  }, [pageResponse, currentPage]);
 
   const paginatedMatches = rtaData?.matches || [];
 
@@ -125,26 +161,58 @@ export default function RtaPageClient() {
     setCurrentPage(page);
   };
 
-  if (isLoadingMatches) {
+  const pageBg = (t: Theme) =>
+    t.palette.mode === 'dark'
+      ? `linear-gradient(180deg, ${alpha('#0f172a', 1)} 0%, ${alpha('#1e293b', 1)} 40%, ${alpha('#0f172a', 1)} 100%)`
+      : `linear-gradient(180deg, ${alpha('#f0fdfa', 1)} 0%, ${alpha('#ecfeff', 0.9)} 35%, ${alpha('#f8fafc', 1)} 100%)`;
+
+  if (isLoadingPage) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+      <Box
+        sx={(theme) => ({
+          minHeight: '50vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: pageBg(theme),
+        })}
+      >
         <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={64} />
-          <Typography sx={{ mt: 2 }}>데이터를 불러오는 중...</Typography>
+          <CircularProgress size={56} thickness={4} sx={{ color: 'primary.main' }} />
+          <Typography sx={{ mt: 2, color: 'text.secondary', fontWeight: 500 }}>매치 데이터를 불러오는 중…</Typography>
         </Box>
       </Box>
     );
   }
 
-  if (matchesError) {
+  if (pageError) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <Card>
+      <Box
+        sx={(theme) => ({
+          minHeight: '50vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: pageBg(theme),
+          px: 2,
+        })}
+      >
+        <Card
+          elevation={0}
+          sx={(theme) => ({
+            maxWidth: 420,
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: alpha(theme.palette.error.main, 0.25),
+            background: alpha(theme.palette.background.paper, 0.85),
+            backdropFilter: 'blur(12px)',
+          })}
+        >
           <CardContent sx={{ textAlign: 'center', py: 4 }}>
-            <Typography color="error" sx={{ mb: 2 }}>
-              {matchesError.message || '데이터를 불러오는데 실패했습니다.'}
+            <Typography color="error" sx={{ mb: 2, fontWeight: 600 }}>
+              {pageError.message || '데이터를 불러오는데 실패했습니다.'}
             </Typography>
-            <Button variant="contained" onClick={() => refetchMatches()} sx={{ mt: 2 }}>
+            <Button variant="contained" onClick={() => refetchPage()} sx={{ mt: 1, borderRadius: 2, px: 3 }}>
               다시 시도
             </Button>
           </CardContent>
@@ -157,10 +225,30 @@ export default function RtaPageClient() {
 
   if (hasNoData) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
-        <Card>
-          <CardContent sx={{ textAlign: 'center', py: 4 }}>
-            <Typography color="text.secondary">데이터가 없습니다</Typography>
+      <Box
+        sx={(theme) => ({
+          minHeight: '50vh',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          background: pageBg(theme),
+          px: 2,
+        })}
+      >
+        <Card
+          elevation={0}
+          sx={(theme) => ({
+            borderRadius: 3,
+            border: '1px solid',
+            borderColor: alpha(theme.palette.divider, 0.2),
+            background: alpha(theme.palette.background.paper, 0.9),
+            backdropFilter: 'blur(10px)',
+          })}
+        >
+          <CardContent sx={{ textAlign: 'center', py: 5, px: 4 }}>
+            <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
+              표시할 매치가 없습니다
+            </Typography>
           </CardContent>
         </Card>
       </Box>
@@ -168,247 +256,412 @@ export default function RtaPageClient() {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-      <Card>
-        <CardContent sx={{ p: { xs: 2, md: 3 } }}>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 3 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
-              RTA 매치 목록
-            </Typography>
-            <FormControl size="small" sx={{ minWidth: 220 }}>
-              <InputLabel id="rta-list-season-label">시즌</InputLabel>
-              <Select
-                labelId="rta-list-season-label"
-                label="시즌"
-                value={seasonSelectValue}
-                onChange={(e) => setSeason(String(e.target.value))}
-              >
-                {seasonOptions.map((o) => (
-                  <MenuItem key={o.value} value={o.value}>
-                    {o.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+    <Box
+      sx={(theme) => ({
+        minHeight: '100%',
+        background: pageBg(theme),
+        pb: { xs: 3, md: 5 },
+      })}
+    >
+      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+        <Card
+          elevation={0}
+          sx={(theme) => ({
+            borderRadius: 4,
+            overflow: 'hidden',
+            border: '1px solid',
+            borderColor: alpha(theme.palette.divider, 0.12),
+            background:
+              theme.palette.mode === 'dark'
+                ? alpha(theme.palette.background.paper, 0.55)
+                : alpha('#ffffff', 0.72),
+            backdropFilter: 'blur(16px)',
+            boxShadow: theme.palette.mode === 'dark' ? '0 24px 80px rgba(0,0,0,0.35)' : '0 20px 60px rgba(15,23,42,0.08)',
+          })}
+        >
+          <Box
+            sx={(theme) => ({
+              px: { xs: 2, md: 3 },
+              pt: { xs: 2.5, md: 3 },
+              pb: 2,
+              borderBottom: '1px solid',
+              borderColor: alpha(theme.palette.divider, 0.15),
+              background:
+                theme.palette.mode === 'dark'
+                  ? `linear-gradient(135deg, ${alpha('#10b981', 0.12)} 0%, transparent 55%)`
+                  : `linear-gradient(135deg, ${alpha('#ccfbf1', 0.9)} 0%, ${alpha('#ffffff', 0)} 50%)`,
+            })}
+          >
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 2,
+                mb: 2,
+              }}
+            >
+              <Box>
+                <Typography
+                  variant="overline"
+                  sx={{ letterSpacing: '0.2em', color: 'text.secondary', fontWeight: 600, display: 'block', mb: 0.5 }}
+                >
+                  REAL-TIME ARENA
+                </Typography>
+                <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.15 }}>
+                  RTA 매치
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel id="rta-list-season-label">시즌</InputLabel>
+                  <Select
+                    labelId="rta-list-season-label"
+                    label="시즌"
+                    value={seasonSelectValue}
+                    onChange={(e) => setSeason(String(e.target.value))}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    {seasonOptions.map((o) => (
+                      <MenuItem key={o.value} value={o.value}>
+                        {o.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 140 }}>
+                  <InputLabel id="rta-list-tier-label">티어</InputLabel>
+                  <Select
+                    labelId="rta-list-tier-label"
+                    label="티어"
+                    value={tierKey}
+                    onChange={(e) => setTierKey(e.target.value === '' ? '' : (e.target.value as RtaTierKey))}
+                    sx={{ borderRadius: 2 }}
+                    MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
+                    renderValue={(selected) => {
+                      if (selected === '' || selected == null) {
+                        return (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
+                            전체
+                          </Typography>
+                        );
+                      }
+                      const pr = RTA_TIER_KEY_FILTER_ITEMS.find((x) => x.value === selected)?.previewRating;
+                      if (pr == null) return null;
+                      return (
+                        <Box sx={{ display: 'inline-flex', alignItems: 'center', py: 0.25 }}>
+                          <RtaRatingStarIcons rating={pr} size={20} gap={2} />
+                        </Box>
+                      );
+                    }}
+                  >
+                    {RTA_TIER_KEY_FILTER_ITEMS.map((o) => (
+                      <MenuItem
+                        key={o.value || 'all'}
+                        value={o.value}
+                        sx={{ minHeight: 44, justifyContent: 'center' }}
+                        aria-label={o.value === '' ? '티어 전체' : `티어 ${o.value}`}
+                      >
+                        {o.value === '' ? (
+                          <Typography variant="body2" color="text.secondary">
+                            전체
+                          </Typography>
+                        ) : o.previewRating != null ? (
+                          <Box
+                            component="span"
+                            aria-hidden
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '100%',
+                              py: 0.5,
+                            }}
+                          >
+                            <RtaRatingStarIcons rating={o.previewRating} size={22} gap={2} />
+                          </Box>
+                        ) : null}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+            </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <CardContent sx={{ p: { xs: 2, md: 2.5 }, pt: { xs: 2, md: 2.5 } }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
             {paginatedMatches.map((match: MatchItem, index: number) => {
               const isExpanded = expandedMatches[index] !== false;
+              const p1Wins = match.winnerPosition === '1';
               return (
                 <Card
                   key={`${match.p1Id}-${match.p2Id}-${match.date}-${index}`}
-                  sx={{
+                  elevation={0}
+                  sx={(theme) => ({
                     cursor: 'pointer',
-                    transition: 'all 0.3s',
+                    transition: 'transform 0.25s ease, box-shadow 0.25s ease',
+                    borderRadius: 3,
+                    overflow: 'hidden',
                     border: '1px solid',
-                    borderColor: 'divider',
+                    borderColor: alpha(theme.palette.divider, 0.14),
+                    boxShadow: theme.palette.mode === 'dark' ? '0 8px 32px rgba(0,0,0,0.25)' : '0 12px 40px rgba(15,23,42,0.07)',
                     '&:hover': {
-                      boxShadow: 4,
-                      transform: 'translateY(-2px)',
+                      transform: 'translateY(-3px)',
+                      boxShadow:
+                        theme.palette.mode === 'dark' ? '0 12px 48px rgba(0,0,0,0.35)' : '0 16px 48px rgba(15,23,42,0.1)',
                     },
-                  }}
+                  })}
                   onClick={() => toggleMatch(index)}
                 >
-                  <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', sm: 'row' },
+                      alignItems: 'stretch',
+                      minHeight: { sm: 120 },
+                    }}
+                  >
                     <Box
-                      sx={{
+                      sx={(theme) => ({
+                        flex: 1,
+                        background: p1Wins ? rtaSideBgWin(theme) : rtaSideBgLose(theme),
+                        px: { xs: 2, md: 2.5 },
+                        py: { xs: 2, md: 2.25 },
                         display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: { xs: 1, md: 2 },
-                        mb: isExpanded ? 2 : 0,
-                        flexWrap: { xs: 'nowrap', sm: 'nowrap' },
-                      }}
+                        flexDirection: 'column',
+                        alignItems: 'flex-start',
+                        gap: 0.75,
+                        minWidth: 0,
+                        position: 'relative',
+                      })}
                     >
-                      <Box
+                      <Chip
+                        size="small"
+                        label={p1Wins ? 'WIN' : 'LOSE'}
                         sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-start',
-                          gap: 0.5,
-                          flex: 1,
-                          minWidth: 0,
+                          height: 22,
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.06em',
+                          color: '#fff',
+                          background: p1Wins ? RTA_BADGE_WIN : RTA_BADGE_LOSE,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          '& .MuiChip-label': { px: 1 },
                         }}
-                      >
-                        <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                          <Avatar
-                            src={getSwexPlayerImageUrl(match.p1ChannelUid || match.p1Id)}
-                            sx={{ width: { xs: 40, md: 50 }, height: { xs: 40, md: 50 } }}
-                          />
-                        </Box>
-                        <Box
+                      />
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, width: '100%' }}>
+                        <Avatar
+                          src={getSwexPlayerImageUrl(match.p1ChannelUid || match.p1Id)}
                           sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            flexWrap: 'wrap',
-                            justifyContent: 'flex-start',
-                          }}
-                        >
-                          {match.p1Country && (
-                            <Box
-                              component="img"
-                              src={`https://flagcdn.com/w40/${match.p1Country.toLowerCase()}.png`}
-                              alt={match.p1Country}
-                              sx={{ width: { xs: 16, md: 20 }, height: { xs: 12, md: 15 }, flexShrink: 0 }}
-                            />
-                          )}
-                          <Typography
-                            variant="body2"
-                            fontWeight={600}
-                            sx={{
-                              fontSize: { xs: '0.75rem', md: '0.875rem' },
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {match.p1Name || 'Player'}
-                          </Typography>
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            flexWrap: 'wrap',
-                            justifyContent: 'flex-start',
-                          }}
-                        >
-                          <RtaRatingStarIcons rating={match.p1Rating} size={rtaStarSize} />
-                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                            {match.p1Score}
-                          </Typography>
-                        </Box>
-                      </Box>
-
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: 0.5,
-                          flexShrink: 0,
-                          minWidth: { xs: 60, md: 80 },
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                          {(() => {
-                            if (!match.date) return null;
-                            try {
-                              const date = new Date(match.date);
-                              const year = date.getFullYear();
-                              const month = String(date.getMonth() + 1).padStart(2, '0');
-                              const day = String(date.getDate()).padStart(2, '0');
-                              const hours = String(date.getHours()).padStart(2, '0');
-                              const minutes = String(date.getMinutes()).padStart(2, '0');
-                              return (
-                                <>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ fontSize: { xs: '0.65rem', md: '0.75rem' }, textAlign: 'center', lineHeight: 1 }}
-                                  >
-                                    {`${year}-${month}-${day}`}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ fontSize: { xs: '0.65rem', md: '0.75rem' }, textAlign: 'center', lineHeight: 1 }}
-                                  >
-                                    {`${hours}:${minutes}`}
-                                  </Typography>
-                                </>
-                              );
-                            } catch {
-                              return (
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{ fontSize: { xs: '0.65rem', md: '0.75rem' }, textAlign: 'center' }}
-                                >
-                                  {match.date}
-                                </Typography>
-                              );
-                            }
-                          })()}
-                        </Box>
-                        <ExpandMoreIcon
-                          sx={{
-                            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.3s',
-                            color: '#999',
-                            fontSize: { xs: 20, md: 24 },
+                            width: { xs: 44, md: 52 },
+                            height: { xs: 44, md: 52 },
+                            boxShadow: p1Wins ? `0 0 0 3px ${alpha('#10b981', 0.65)}` : '0 2px 12px rgba(0,0,0,0.12)',
                           }}
                         />
-                      </Box>
-
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'flex-end',
-                          gap: 0.5,
-                          flex: 1,
-                          minWidth: 0,
-                        }}
-                      >
-                        <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                          <Avatar
-                            src={getSwexPlayerImageUrl(match.p2ChannelUid || match.p2Id)}
-                            sx={{ width: { xs: 40, md: 50 }, height: { xs: 40, md: 50 } }}
-                          />
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            flexWrap: 'wrap',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <Typography
-                            variant="body2"
-                            fontWeight={600}
+                        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 0.65 }}>
+                          <Box
                             sx={{
-                              fontSize: { xs: '0.75rem', md: '0.875rem' },
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              flexWrap: 'wrap',
+                              justifyContent: 'flex-start',
                             }}
                           >
-                            {match.p2Name || 'Opponent'}
-                          </Typography>
-                          {match.p2Country && (
-                            <Box
-                              component="img"
-                              src={`https://flagcdn.com/w40/${match.p2Country.toLowerCase()}.png`}
-                              alt={match.p2Country}
-                              sx={{ width: { xs: 16, md: 20 }, height: { xs: 12, md: 15 }, flexShrink: 0 }}
-                            />
-                          )}
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                            flexWrap: 'wrap',
-                            justifyContent: 'flex-end',
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                            {match.p2Score}
-                          </Typography>
-                          <RtaRatingStarIcons rating={match.p2Rating} size={rtaStarSize} />
+                            {match.p1Country && (
+                              <Box
+                                component="img"
+                                src={`https://flagcdn.com/w40/${match.p1Country.toLowerCase()}.png`}
+                                alt={match.p1Country}
+                                sx={{ width: { xs: 16, md: 20 }, height: { xs: 12, md: 15 }, flexShrink: 0 }}
+                              />
+                            )}
+                            <Typography
+                              variant="body2"
+                              fontWeight={700}
+                              sx={{
+                                fontSize: { xs: '0.8rem', md: '0.9rem' },
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {match.p1Name || 'Player'}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                            <RtaRatingStarIcons rating={match.p1Rating} size={rtaStarSize} />
+                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
+                              {match.p1Score}
+                            </Typography>
+                          </Box>
                         </Box>
                       </Box>
                     </Box>
 
+                    <Box
+                      sx={(theme) => ({
+                        flexShrink: 0,
+                        width: { xs: '100%', sm: 92 },
+                        py: { xs: 1.25, sm: 0 },
+                        px: { xs: 2, sm: 0.5 },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 0.75,
+                        borderTop: { xs: `1px solid ${alpha(theme.palette.divider, 0.2)}`, sm: 'none' },
+                        borderLeft: { sm: `1px solid ${alpha(theme.palette.divider, 0.18)}` },
+                        borderRight: { sm: `1px solid ${alpha(theme.palette.divider, 0.18)}` },
+                        background: alpha(theme.palette.background.paper, 0.25),
+                      })}
+                    >
+                      <Typography
+                        variant="overline"
+                        sx={{
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.18em',
+                          color: 'text.secondary',
+                          lineHeight: 1,
+                        }}
+                      >
+                        VS
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+                        {(() => {
+                          if (!match.date) return null;
+                          try {
+                            const date = new Date(match.date);
+                            const year = date.getFullYear();
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const hours = String(date.getHours()).padStart(2, '0');
+                            const minutes = String(date.getMinutes()).padStart(2, '0');
+                            return (
+                              <>
+                                <Typography variant="caption" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' }, fontWeight: 600, textAlign: 'center' }}>
+                                  {`${year}-${month}-${day}`}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', md: '0.7rem' }, textAlign: 'center' }}>
+                                  {`${hours}:${minutes}`}
+                                </Typography>
+                              </>
+                            );
+                          } catch {
+                            return (
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', textAlign: 'center' }}>
+                                {match.date}
+                              </Typography>
+                            );
+                          }
+                        })()}
+                      </Box>
+                      <ExpandMoreIcon
+                        sx={(theme) => ({
+                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.3s',
+                          color: theme.palette.text.secondary,
+                          fontSize: { xs: 22, md: 26 },
+                        })}
+                      />
+                    </Box>
+
+                    <Box
+                      sx={(theme) => ({
+                        flex: 1,
+                        background: !p1Wins ? rtaSideBgWin(theme) : rtaSideBgLose(theme),
+                        px: { xs: 2, md: 2.5 },
+                        py: { xs: 2, md: 2.25 },
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        gap: 0.75,
+                        minWidth: 0,
+                      })}
+                    >
+                      <Chip
+                        size="small"
+                        label={!p1Wins ? 'WIN' : 'LOSE'}
+                        sx={{
+                          height: 22,
+                          fontSize: '0.7rem',
+                          fontWeight: 800,
+                          letterSpacing: '0.06em',
+                          color: '#fff',
+                          background: !p1Wins ? RTA_BADGE_WIN : RTA_BADGE_LOSE,
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                          '& .MuiChip-label': { px: 1 },
+                        }}
+                      />
+                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, width: '100%', flexDirection: 'row-reverse' }}>
+                        <Avatar
+                          src={getSwexPlayerImageUrl(match.p2ChannelUid || match.p2Id)}
+                          sx={{
+                            width: { xs: 44, md: 52 },
+                            height: { xs: 44, md: 52 },
+                            boxShadow: !p1Wins ? `0 0 0 3px ${alpha('#10b981', 0.65)}` : '0 2px 12px rgba(0,0,0,0.12)',
+                          }}
+                        />
+                        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 0.65, alignItems: 'flex-end' }}>
+                          <Box
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              flexWrap: 'wrap',
+                              justifyContent: 'flex-end',
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              fontWeight={700}
+                              sx={{
+                                fontSize: { xs: '0.8rem', md: '0.9rem' },
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                textAlign: 'right',
+                              }}
+                            >
+                              {match.p2Name || 'Opponent'}
+                            </Typography>
+                            {match.p2Country && (
+                              <Box
+                                component="img"
+                                src={`https://flagcdn.com/w40/${match.p2Country.toLowerCase()}.png`}
+                                alt={match.p2Country}
+                                sx={{ width: { xs: 16, md: 20 }, height: { xs: 12, md: 15 }, flexShrink: 0 }}
+                              />
+                            )}
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
+                              {match.p2Score}
+                            </Typography>
+                            <RtaRatingStarIcons rating={match.p2Rating} size={rtaStarSize} />
+                          </Box>
+                        </Box>
+                      </Box>
+                    </Box>
+                  </Box>
+
                     <Collapse in={isExpanded}>
-                      <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                      <Box
+                        sx={(theme) => ({
+                          mt: 0,
+                          pt: 2,
+                          pb: 1.5,
+                          px: { xs: 1.5, sm: 2 },
+                          borderTop: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                          background:
+                            theme.palette.mode === 'dark'
+                              ? alpha(theme.palette.background.default, 0.35)
+                              : alpha(theme.palette.grey[50], 0.85),
+                        })}
+                      >
                         <Box
                           sx={{
                             display: 'flex',
@@ -430,20 +683,21 @@ export default function RtaPageClient() {
                               <Box
                                 sx={{
                                   width: '100%',
-                                  backgroundColor: match.winnerPosition === '1' ? '#4caf50' : '#f44336',
+                                  background: match.winnerPosition === '1' ? RTA_BADGE_WIN : RTA_BADGE_LOSE,
                                   clipPath: 'polygon(0% 0%, 80% 0%, 100% 100%, 0% 100%)',
                                   px: { xs: 1, md: 1.5 },
-                                  py: { xs: 0.25, md: 0.3 },
-                                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                                  py: { xs: 0.35, md: 0.45 },
+                                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18)',
                                 }}
                               >
                                 <Typography
                                   sx={{
                                     color: '#fff',
-                                    fontSize: { xs: '0.65rem', md: '0.7rem' },
-                                    fontWeight: 'bold',
+                                    fontSize: { xs: '0.65rem', md: '0.72rem' },
+                                    fontWeight: 800,
+                                    letterSpacing: '0.08em',
                                     lineHeight: 1,
-                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.35)',
                                     textAlign: 'left',
                                   }}
                                 >
@@ -552,12 +806,13 @@ export default function RtaPageClient() {
                           </Box>
 
                           <Typography
-                            variant="h6"
+                            variant="overline"
                             sx={{
                               alignSelf: 'center',
-                              fontSize: { xs: '0.875rem', md: '1rem' },
-                              fontWeight: 700,
-                              color: 'primary.main',
+                              fontSize: { xs: '0.7rem', md: '0.75rem' },
+                              fontWeight: 800,
+                              letterSpacing: '0.2em',
+                              color: 'text.secondary',
                               px: { xs: 0.5, md: 1 },
                             }}
                           >
@@ -577,20 +832,21 @@ export default function RtaPageClient() {
                               <Box
                                 sx={{
                                   width: '100%',
-                                  backgroundColor: match.winnerPosition === '2' ? '#4caf50' : '#f44336',
+                                  background: match.winnerPosition === '2' ? RTA_BADGE_WIN : RTA_BADGE_LOSE,
                                   clipPath: 'polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%)',
                                   px: { xs: 1, md: 1.5 },
-                                  py: { xs: 0.25, md: 0.3 },
-                                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
+                                  py: { xs: 0.35, md: 0.45 },
+                                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.18)',
                                 }}
                               >
                                 <Typography
                                   sx={{
                                     color: '#fff',
-                                    fontSize: { xs: '0.65rem', md: '0.7rem' },
-                                    fontWeight: 'bold',
+                                    fontSize: { xs: '0.65rem', md: '0.72rem' },
+                                    fontWeight: 800,
+                                    letterSpacing: '0.08em',
                                     lineHeight: 1,
-                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)',
+                                    textShadow: '0 1px 2px rgba(0, 0, 0, 0.35)',
                                     textAlign: 'right',
                                   }}
                                 >
@@ -702,30 +958,36 @@ export default function RtaPageClient() {
                         </Box>
                       </Box>
                     </Collapse>
-                  </CardContent>
                 </Card>
               );
             })}
           </Box>
 
           {rtaData.totalPages > 1 && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 1 }}>
               <Pagination
                 count={rtaData.totalPages}
                 page={currentPage}
                 onChange={(_, page) => changePage(page)}
                 color="primary"
-                size="small"
-                sx={{
+                size="medium"
+                sx={(theme) => ({
                   '& .MuiPaginationItem-root': {
-                    fontSize: { xs: '0.875rem', md: '1rem' },
+                    fontSize: { xs: '0.875rem', md: '0.95rem' },
+                    borderRadius: 2,
                   },
-                }}
+                  '& .Mui-selected': {
+                    fontWeight: 700,
+                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.95)} 0%, ${alpha(theme.palette.primary.dark, 0.85)} 100%)`,
+                    color: theme.palette.primary.contrastText,
+                  },
+                })}
               />
             </Box>
           )}
         </CardContent>
       </Card>
-    </Container>
+      </Container>
+    </Box>
   );
 }
