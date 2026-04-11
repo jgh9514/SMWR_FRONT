@@ -45,23 +45,37 @@ export const confirm = (title: string, content?: string): Promise<boolean> => {
       (t) =>
         React.createElement(
           'div',
-          { style: { display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '280px' } },
-          React.createElement('div', { style: { whiteSpace: 'pre-line', lineHeight: '1.5' } }, displayMessage),
+          {
+            style: {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              minWidth: '280px',
+              color: '#212121',
+            },
+          },
+          React.createElement(
+            'div',
+            { style: { whiteSpace: 'pre-line', lineHeight: '1.5', color: '#212121' } },
+            displayMessage
+          ),
           React.createElement(
             'div',
             { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
             React.createElement(
               'button',
               {
+                type: 'button',
                 onClick: () => {
                   toast.dismiss(t.id);
                   resolve(false);
                 },
                 style: {
                   padding: '8px 16px',
-                  border: '1px solid #d0d0d0',
+                  border: '1px solid #bdbdbd',
                   borderRadius: '4px',
-                  background: 'white',
+                  background: '#ffffff',
+                  color: '#212121',
                   cursor: 'pointer',
                   fontSize: '14px',
                   fontWeight: 500,
@@ -72,6 +86,7 @@ export const confirm = (title: string, content?: string): Promise<boolean> => {
             React.createElement(
               'button',
               {
+                type: 'button',
                 onClick: () => {
                   toast.dismiss(t.id);
                   resolve(true);
@@ -81,7 +96,7 @@ export const confirm = (title: string, content?: string): Promise<boolean> => {
                   border: 'none',
                   borderRadius: '4px',
                   background: '#1976d2',
-                  color: 'white',
+                  color: '#ffffff',
                   cursor: 'pointer',
                   fontSize: '14px',
                   fontWeight: 500,
@@ -96,6 +111,9 @@ export const confirm = (title: string, content?: string): Promise<boolean> => {
         position: 'top-center',
         style: {
           padding: '16px',
+          background: '#ffffff',
+          color: '#212121',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
         },
       }
     );

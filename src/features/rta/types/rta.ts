@@ -201,8 +201,28 @@ export interface RtaMonsterStatsResponse {
   duo_stats?: DuoComboStat[];
   trio_stats?: TrioComboStat[];
   total_matches: number;
+  /** 솔로(표본≥100) 전체 행 수 */
+  stats_total?: number;
+  /** 듀오 조합 전체 행 수 */
+  duo_total?: number;
+  /** 트리오 조합 전체 행 수 */
+  trio_total?: number;
+  /** 페이지 크기(기본 20) */
+  limit?: number;
+  stats_offset?: number;
+  duo_offset?: number;
+  trio_offset?: number;
   has_more?: boolean; // 더 불러올 데이터가 있는지
   seasonCode?: string | null;
+  /** 적용된 티어 필터 — null/미포함이면 전체(합산) */
+  tierKey?: string | null;
+}
+
+/** GET /rta/rating-grade-rules — 티어 선택 UI용 */
+export interface RtaRatingGradeRule {
+  ratingId: number;
+  tierKey: string;
+  gradeName?: string;
 }
 
 // 몬스터 상세 정보 타입
@@ -259,7 +279,7 @@ export interface MonsterDetail {
       monster_image?: string;
     }>;
   }>;
-  /** rta_agg_counter_matchup (시즌·rating_id=0) */
+  /** rta_agg_counter_matchup (시즌·몬스터·상대 조합) */
   counter_matchups?: CounterMatchupRow[];
 }
 
@@ -337,7 +357,9 @@ export interface RtaSeasonRow {
   seasonNo: number;
   leagueType: string;
   seasonName: string;
+  /** KST 달력 첫 버킷일(서버 startYmdKst 우선) */
   startAt: string;
+  /** 집계 가능한 마지막 포함일(KST). DB end_at 배타 상한의 전날 — 티어 일별과 동일 */
   endAt: string;
   isActive: boolean;
   sortOrder: number;

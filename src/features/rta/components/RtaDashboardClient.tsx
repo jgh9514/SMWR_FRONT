@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Box,
@@ -21,9 +21,9 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
-import RtaSnapshotRankCutSection from '@/features/rta/components/RtaSnapshotRankCutSection';
 import { useRtaDashboard, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
 import type { RtaTierBucket, RtaTierDailyRow } from '@/features/rta/types/rta';
+import { toYmdKst } from '@/features/rta/utils/ymdKst';
 
 const TIER_ORDER = [
   'Ch1',
@@ -73,46 +73,65 @@ function formatCompact(n: number): string {
   return String(Math.round(n));
 }
 
-function formatDateLabel(raw: unknown): string {
-  if (raw == null || raw === '') return '—';
-  const s = String(raw);
-  if (s.length >= 10) {
-    const d = new Date(s);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-  }
-  return s;
-}
-
 function normalizeBucketDate(raw: unknown): string {
   if (raw == null) return '';
   const s = String(raw);
   return s.length >= 10 ? s.slice(0, 10) : s;
 }
 
-/** 데이터 최신일(max) 기준 최근 daysBack일 구간만 포함 (YYYY-MM-DD 문자열 비교) */
-function getCutoffDateStr(maxDateStr: string | undefined, daysBack: number): string | null {
-  if (!maxDateStr || daysBack <= 0) return null;
-  const base = new Date(maxDateStr.slice(0, 10) + 'T12:00:00');
-  if (Number.isNaN(base.getTime())) return null;
-  base.setDate(base.getDate() - daysBack);
-  const y = base.getFullYear();
-  const m = String(base.getMonth() + 1).padStart(2, '0');
-  const d = String(base.getDate()).padStart(2, '0');
+function ymdOnly(raw: unknown): string | null {
+  if (raw == null || raw === '') return null;
+  const s = String(raw);
+  return s.length >= 10 ? s.slice(0, 10) : null;
+}
+
+function minYmd(...vals: (string | null | undefined)[]): string | null {
+  const xs = vals.filter((x): x is string => x != null && /^\d{4}-\d{2}-\d{2}$/.test(x));
+  if (xs.length === 0) return null;
+  return xs.reduce((a, b) => (a <= b ? a : b));
+}
+
+/** 달력 기준 startYmd~endYmd 사이 일수(말일 포함 시 차이). 잘못된 날짜면 0 */
+function calendarDaysBetweenStartAndEnd(startYmd: string, endYmd: string): number {
+  const a = new Date(startYmd + 'T12:00:00');
+  const b = new Date(endYmd + 'T12:00:00');
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
+  return Math.max(0, Math.floor((b.getTime() - a.getTime()) / 86400000));
+}
+
+/** 시작일·끝일 포함 일수 */
+function inclusiveDayCount(startYmd: string, endYmd: string): number {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startYmd) || !/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) return 0;
+  if (startYmd > endYmd) return 0;
+  return calendarDaysBetweenStartAndEnd(startYmd, endYmd) + 1;
+}
+
+function addCalendarDaysYmd(startYmd: string, deltaDays: number): string {
+  const d = new Date(startYmd + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return startYmd;
+  d.setDate(d.getDate() + deltaDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function todayYmdLocal(): string {
+  const n = new Date();
+  const y = n.getFullYear();
+  const m = String(n.getMonth() + 1).padStart(2, '0');
+  const d = String(n.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 
-function aggregateDailyTiers(
+/** 특정 일(bucket_date)의 티어별 인원 합산 */
+function tierCountsForSingleDay(
   daily: RtaTierDailyRow[] | undefined,
-  maxDateStr: string | undefined,
-  daysBack: number,
+  targetYmd: string,
 ): Map<string, number> {
   const sums = new Map<string, number>();
-  const cutoff = getCutoffDateStr(maxDateStr, daysBack);
   for (const row of daily ?? []) {
-    const bd = normalizeBucketDate(row.bucket_date);
-    if (cutoff && bd < cutoff) continue;
+    if (normalizeBucketDate(row.bucket_date) !== targetYmd) continue;
     const k = row.tier_key;
     if (!k) continue;
     sums.set(k, (sums.get(k) ?? 0) + toNum(row.player_count));
@@ -125,7 +144,10 @@ const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리�
 export default function RtaDashboardClient({ embedded = false }: { embedded?: boolean }) {
   const theme = useTheme();
   const isWide = useMediaQuery('(min-width:480px)');
-  const [daysBack, setDaysBack] = useState(0);
+  /** 시즌 첫날=0, 하루씩 증가 */
+  const [dayOffset, setDayOffset] = useState(0);
+  const lastSeasonForSlider = useRef<string | null>(null);
+  const prevMaxDayIndex = useRef<number>(-1);
 
   const { data: seasonsData } = useRtaSeasons();
   const seasonOptions = useMemo(() => {
@@ -154,33 +176,87 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
 
   const { data, isLoading, error } = useRtaDashboard(seasonSelectValue);
 
+  const selectedSeason = useMemo(() => {
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return null;
+    return rows.find((r) => r.seasonCode === seasonSelectValue) ?? null;
+  }, [seasonsData?.seasons, seasonSelectValue]);
+
+  const seasonStartYmd = toYmdKst(selectedSeason?.startAt) ?? ymdOnly(selectedSeason?.startAt);
+  /** 서버 기준 시즌 마지막 포함일(집계 가능 마지막 날 = 화면 우측 시즌 종료일) */
+  const seasonLastInclusiveYmd = toYmdKst(selectedSeason?.endAt) ?? ymdOnly(selectedSeason?.endAt);
+
+  /**
+   * 슬라이더로 선택 가능한 마지막 날: 시즌 끝까지.
+   * 단, 오늘이 시즌 시작~종료 사이에 있으면 오늘까지만 넘기지 못하게 캡.
+   */
+  const selectableEndYmd = useMemo(() => {
+    if (!seasonStartYmd || !seasonLastInclusiveYmd) return null;
+    const today = todayYmdLocal();
+    if (today < seasonStartYmd) {
+      return seasonStartYmd;
+    }
+    if (today > seasonLastInclusiveYmd) {
+      return seasonLastInclusiveYmd;
+    }
+    return today;
+  }, [seasonStartYmd, seasonLastInclusiveYmd]);
+
+  const maxDayIndex = useMemo(() => {
+    if (!seasonStartYmd || !selectableEndYmd) return 0;
+    return Math.max(0, inclusiveDayCount(seasonStartYmd, selectableEndYmd) - 1);
+  }, [seasonStartYmd, selectableEndYmd]);
+
+  useEffect(() => {
+    const seasonChanged = lastSeasonForSlider.current !== seasonSelectValue;
+    if (seasonChanged) {
+      lastSeasonForSlider.current = seasonSelectValue;
+    }
+    const maxGrewFromZero =
+      prevMaxDayIndex.current <= 0 && maxDayIndex > 0 && !seasonChanged;
+    prevMaxDayIndex.current = maxDayIndex;
+
+    if (seasonChanged) {
+      setDayOffset(maxDayIndex);
+      return;
+    }
+    if (maxGrewFromZero) {
+      setDayOffset(maxDayIndex);
+      return;
+    }
+    setDayOffset((d) => Math.min(d, maxDayIndex));
+  }, [seasonSelectValue, maxDayIndex]);
+
+  const selectedYmd = useMemo(() => {
+    if (!seasonStartYmd) return null;
+    return addCalendarDaysYmd(seasonStartYmd, dayOffset);
+  }, [seasonStartYmd, dayOffset]);
+
   const rows = useMemo(() => {
-    const maxDate = data?.date_range?.max_date;
-    const maxStr = typeof maxDate === 'string' ? maxDate : undefined;
-    const sums = aggregateDailyTiers(data?.daily_tiers, maxStr, daysBack);
+    if (!selectedYmd) {
+      return TIER_ORDER.map((key) => ({ tier_key: key, player_count: 0 })) as RtaTierBucket[];
+    }
+    const sums = tierCountsForSingleDay(data?.daily_tiers, selectedYmd);
     return TIER_ORDER.map((key) => ({
       tier_key: key,
       player_count: sums.get(key) ?? 0,
     })) as RtaTierBucket[];
-  }, [data?.daily_tiers, data?.date_range?.max_date, daysBack]);
+  }, [data?.daily_tiers, selectedYmd]);
 
   const maxCount = useMemo(() => Math.max(1, ...rows.map((r) => r.player_count)), [rows]);
 
   const totalPlayers = useMemo(() => rows.reduce((acc, r) => acc + r.player_count, 0), [rows]);
 
-  const minDate = data?.date_range?.min_date;
-  const maxDate = data?.date_range?.max_date;
-
-  const labelStart = useMemo(() => {
-    if (daysBack > 0) {
-      const c = getCutoffDateStr(typeof maxDate === 'string' ? maxDate : undefined, daysBack);
-      return c ?? minDate;
-    }
-    return minDate;
-  }, [daysBack, maxDate, minDate]);
+  const sliderValueLabelFormat = useCallback(
+    (v: number) => {
+      if (!seasonStartYmd) return '—';
+      return addCalendarDaysYmd(seasonStartYmd, v);
+    },
+    [seasonStartYmd],
+  );
 
   const handlePlay = () => {
-    setDaysBack((prev) => (prev >= 90 ? 0 : Math.min(90, (prev || 30) + 15)));
+    setDayOffset((prev) => (prev >= maxDayIndex ? 0 : prev + 1));
   };
 
   return (
@@ -219,7 +295,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
       </Box>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        수집된 실레나 리플레이 전체를 한 번 불러온 뒤, 슬라이더는 이 기기에서만 합산합니다.{' '}
+        시즌 일별 티어 집계를 불러온 뒤, 슬라이더로 날짜를 고르면 그날의 분포만 표시합니다.{' '}
         <Link href="/rta" style={{ color: theme.palette.primary.main }}>
           매치 목록
         </Link>
@@ -259,24 +335,24 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
           <Box sx={{ mb: 2, px: 0.5 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography variant="caption" color="text.secondary">
-                {formatDateLabel(labelStart)}
+                {seasonStartYmd ?? '—'}
               </Typography>
               <Chip
                 size="small"
-                label={daysBack === 0 ? '전체' : '필터'}
-                color={daysBack === 0 ? 'default' : 'primary'}
-                variant={daysBack === 0 ? 'outlined' : 'filled'}
+                label={selectedYmd ?? '—'}
+                color="primary"
+                variant="filled"
                 sx={{ height: 22, fontSize: '0.7rem' }}
               />
               <Typography variant="caption" color="text.secondary">
-                {formatDateLabel(maxDate)}
+                {seasonLastInclusiveYmd ?? '—'}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <IconButton
                 size="small"
                 onClick={handlePlay}
-                title="기간 프리셋"
+                title="하루씩 (끝에서 다시 처음)"
                 sx={{
                   width: 28,
                   height: 28,
@@ -288,12 +364,12 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
               </IconButton>
               <Slider
                 size="small"
-                value={daysBack}
+                value={dayOffset}
                 min={0}
-                max={90}
-                onChange={(_, v) => setDaysBack(v as number)}
+                max={Math.max(0, maxDayIndex)}
+                onChange={(_, v) => setDayOffset(v as number)}
                 valueLabelDisplay="auto"
-                valueLabelFormat={(v) => (v === 0 ? '전체' : `최근 ${v}일`)}
+                valueLabelFormat={sliderValueLabelFormat}
                 sx={{
                   flex: 1,
                   color: 'primary.main',
@@ -302,7 +378,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
               />
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              0 = 전체 기간 · 1~90 = 데이터 최신일 기준 최근 N일만 합산 (추가 요청 없음)
+              좌=시즌 시작일 · 우=시즌 종료일 · 슬라이더=해당 일 티어 분포(오늘이 시즌 안이면 오늘 이후로는 이동 불가)
             </Typography>
           </Box>
 
@@ -423,11 +499,10 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
             <Typography component="span" fontWeight={700} color="text.primary">
               {totalPlayers.toLocaleString()}
             </Typography>{' '}
-            소환사 (매치당 2명 집계)
+            소환사 (선택한 일자·매치당 2명 집계)
           </Typography>
         </Card>
         {data ? <RtaRankCutoffsSection rankCutoffAnchors={data.rank_cutoff_anchors} /> : null}
-        {data ? <RtaSnapshotRankCutSection rows={data.snapshot_rank_cut} /> : null}
         </>
       )}
     </Box>

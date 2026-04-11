@@ -25,7 +25,7 @@ function buildRtaMonsterDescription(data: Awaited<ReturnType<typeof getRtaMonste
 }
 
 export async function generateStaticParams() {
-  const data = await getRtaMonsterStatsData(100, 0).catch(() => ({ stats: [] }));
+  const data = await getRtaMonsterStatsData({ limit: 500, statsOffset: 0 }).catch(() => ({ stats: [] }));
   return (data.stats ?? [])
     .filter((monster) => !!monster.monster_id)
     .map((monster) => ({ monsterId: String(monster.monster_id) }));

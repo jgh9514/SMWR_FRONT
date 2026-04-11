@@ -93,7 +93,9 @@ export default function BatchManagementPage() {
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
 
   // 배치 실행 이력 조회
-  const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory({});
+  const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory({
+    limit: 10,
+  });
   const filteredBatchHistory = useMemo(() => {
     if (historyFilter !== 'failed') {
       return batchHistory;

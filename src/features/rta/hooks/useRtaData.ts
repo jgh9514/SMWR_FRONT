@@ -24,6 +24,7 @@ import type {
   RtaDashboardResponse,
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
+  RtaRatingGradeRule,
   RtaSeasonRow,
   RtaSeasonsResponse,
   RtaSummonerRankingResponse,
@@ -31,6 +32,7 @@ import type {
 } from '@/features/rta/types/rta';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { apiClient } from '@/shared/lib/api/client';
+import { toYmdKst } from '@/features/rta/utils/ymdKst';
 
 function seasonBody(seasonCode: string | null | undefined): Record<string, string> {
   const c = seasonCode?.trim();
@@ -55,8 +57,12 @@ function normalizeRtaSeasonsResponse(raw: unknown): RtaSeasonsResponse {
       seasonNo: Number(r.seasonNo ?? r.season_no ?? 0),
       leagueType: String(r.leagueType ?? r.league_type ?? ''),
       seasonName: sn != null ? String(sn) : '',
-      startAt: String(r.startAt ?? r.start_at ?? ''),
-      endAt: String(r.endAt ?? r.end_at ?? ''),
+      startAt:
+        String(r.startYmdKst ?? r.start_ymd_kst ?? toYmdKst(r.startAt ?? r.start_at) ?? ''),
+      /** 서버 lastInclusiveYmdKst = bucket_date < end 배타상한의 전날(KST). 티어 집계와 동일 */
+      endAt: String(
+        r.lastInclusiveYmdKst ?? r.last_inclusive_ymd_kst ?? toYmdKst(r.endAt ?? r.end_at) ?? '',
+      ),
       isActive: Boolean(r.isActive ?? r.is_active),
       sortOrder: Number(r.sortOrder ?? r.sort_order ?? 0),
     };
@@ -118,14 +124,71 @@ export const useRtaListPage = (params: RtaMatchListParams) => {
   );
 };
 
+export type RtaMonsterStatsQueryParams = {
+  limit?: number;
+  statsOffset?: number;
+  duoOffset?: number;
+  trioOffset?: number;
+  seasonCode?: string | null;
+  /** null/빈값=전체 합산, CH_ALL·F_ALL·C_ALL·P_ALL·G_ALL, 또는 tier_key(Ch1, F3…) */
+  tierKey?: string | null;
+};
+
+function normalizeRtaRatingGradeRules(raw: unknown): RtaRatingGradeRule[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      const r = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+      const id = r.ratingId ?? r.rating_id;
+      const tk = r.tierKey ?? r.tier_key;
+      const ratingId = Number(id);
+      return {
+        ratingId,
+        tierKey: tk != null ? String(tk).trim() : '',
+        gradeName:
+          r.gradeName != null
+            ? String(r.gradeName)
+            : r.grade_name != null
+              ? String(r.grade_name)
+              : undefined,
+      };
+    })
+    .filter((x) => x.tierKey !== '' && Number.isFinite(x.ratingId));
+}
+
+/**
+ * RTA 공식 등급 규칙 (티어 키·rating_id) — 몬스터 통계 티어 필터 등
+ * 백엔드: GET /api/v1/rta/rating-grade-rules
+ */
+export const useRtaRatingGradeRules = () => {
+  return useApiQuery<RtaRatingGradeRule[]>({
+    queryKey: ['rta', 'rating-grade-rules'],
+    queryFn: async () => {
+      const raw = await apiClient.get<unknown>('/rta/rating-grade-rules');
+      return normalizeRtaRatingGradeRules(raw);
+    },
+    staleTime: 60 * 60 * 1000,
+    gcTime: 24 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
 /**
  * RTA 몬스터별 통계 조회
- * 백엔드: POST /api/v1/rta/monster-stats
+ * 백엔드: POST /api/v1/rta/monster-stats — limit=페이지 크기, stats_offset·duo_offset·trio_offset, tierKey
  */
-export const useRtaMonsterStats = (limit: number = 20, offset: number = 0, seasonCode?: string | null) => {
+export const useRtaMonsterStats = (params: RtaMonsterStatsQueryParams = {}) => {
+  const { limit = 20, statsOffset = 0, duoOffset = 0, trioOffset = 0, seasonCode, tierKey } = params;
   return useApiPostQuery<RtaMonsterStatsResponse>(
     '/rta/monster-stats',
-    { limit, offset, ...seasonBody(seasonCode) },
+    {
+      limit,
+      stats_offset: statsOffset,
+      duo_offset: duoOffset,
+      trio_offset: trioOffset,
+      ...seasonBody(seasonCode),
+      ...tierKeyBody(tierKey),
+    },
     {
       enabled: true,
       staleTime: 0,

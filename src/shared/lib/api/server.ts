@@ -176,14 +176,30 @@ export async function getDevilmonImageUrlForSearch(): Promise<string> {
   return getMonsterImageUrl('/images/default-monster.png');
 }
 
+export type GetRtaMonsterStatsParams = {
+  /** 페이지 크기(기본 20, 최대 500) */
+  limit?: number;
+  statsOffset?: number;
+  duoOffset?: number;
+  trioOffset?: number;
+  seasonCode?: string | null;
+  tierKey?: string | null;
+};
+
 export async function getRtaMonsterStatsData(
-  limit: number = 100,
-  offset: number = 0,
-  seasonCode?: string | null,
+  params: GetRtaMonsterStatsParams = {},
 ): Promise<RtaMonsterStatsResponse> {
-  const body: Record<string, unknown> = { limit, offset };
+  const { limit = 20, statsOffset = 0, duoOffset = 0, trioOffset = 0, seasonCode, tierKey } = params;
+  const body: Record<string, unknown> = {
+    limit,
+    stats_offset: statsOffset,
+    duo_offset: duoOffset,
+    trio_offset: trioOffset,
+  };
   const c = seasonCode?.trim();
   if (c) body.seasonCode = c;
+  const t = tierKey?.trim();
+  if (t) body.tierKey = t;
   return serverApiPost<RtaMonsterStatsResponse>(
     '/rta/monster-stats',
     body,
