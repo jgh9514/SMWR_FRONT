@@ -336,10 +336,10 @@ export default function RtaPageClient() {
                     labelId="rta-list-tier-label"
                     label="티어"
                     value={tierKey}
-                    onChange={(e) => setTierKey(e.target.value === '' ? '' : (e.target.value as RtaTierKey))}
+                    onChange={(e) => setTierKey(e.target.value as '' | RtaTierKey)}
                     sx={{ borderRadius: 2 }}
                     MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
-                    renderValue={(selected) => {
+                    renderValue={(selected: '' | RtaTierKey) => {
                       if (selected === '' || selected == null) {
                         return (
                           <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
