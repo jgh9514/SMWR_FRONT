@@ -20,6 +20,7 @@ import { Chip } from '@mui/material';
 import { logger } from '@/shared/lib/logger';
 import { SITE_TITLE_DEFAULT } from '@/shared/lib/seo';
 import RtaDashboardClient from '@/features/rta/components/RtaDashboardClient';
+import { RtaSeasonsProvider } from '@/features/rta/context/RtaSeasonsContext';
 import {
   useAutoLogin,
   useCancelMyGuildJoinApplication,
@@ -462,7 +463,9 @@ export default function HomePageClient() {
 
       <Container maxWidth="lg" sx={{ pb: { xs: 2, md: 3 }, pt: 0 }}>
         <Box component="section" aria-label="RTA 티어 분포 및 랭크 컷">
-          <RtaDashboardClient embedded />
+          <RtaSeasonsProvider>
+            <RtaDashboardClient embedded />
+          </RtaSeasonsProvider>
         </Box>
       </Container>
 

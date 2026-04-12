@@ -33,7 +33,7 @@ import {
 } from 'recharts';
 import type { MatchItem } from '@/types';
 import { useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
-import { useRtaPlayerSeasonCode } from '@/features/rta/context/RtaPlayerSeasonContext';
+import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
 import { getMatchPerspective } from '@/features/rta/utils/rtaPlayerPerspective';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
@@ -147,15 +147,15 @@ type ChartMode = 'daily' | 'match';
 
 export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string }) {
   const theme = useTheme();
-  const seasonCode = useRtaPlayerSeasonCode();
-  const { data: summary } = useRtaPlayerSummary(wizardId, undefined, seasonCode);
+  const { seasonCode, seasonId } = useRtaPlayerSeason();
+  const { data: summary } = useRtaPlayerSummary(wizardId, undefined, seasonCode, { seasonId });
   const {
     data: infinite,
     isLoading,
     isFetchingNextPage,
     fetchNextPage,
     hasNextPage,
-  } = useRtaPlayerMatchesInfinite(wizardId, true, seasonCode);
+  } = useRtaPlayerMatchesInfinite(wizardId, true, seasonCode, seasonId);
 
   const [chartOpen, setChartOpen] = useState(true);
   const [chartMode, setChartMode] = useState<ChartMode>('daily');

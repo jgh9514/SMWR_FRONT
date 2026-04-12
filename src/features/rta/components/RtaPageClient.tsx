@@ -23,7 +23,8 @@ import {
 import type { Theme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useRtaSeasons, useRtaListPage } from '@/features/rta/hooks/useRtaData';
+import { useRtaListPage, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
@@ -66,7 +67,7 @@ export default function RtaPageClient() {
   const [currentPage, setCurrentPage] = useState(1);
   const [tierKey, setTierKey] = useState<'' | RtaTierKey>(DEFAULT_RTA_LIST_TIER_KEY);
 
-  const { data: seasonsData } = useRtaSeasons();
+  const { data: seasonsData } = useRtaSeasonsContext();
   const seasonOptions = useMemo(() => {
     const rows = seasonsData?.seasons;
     if (!rows?.length) return SEASON_FALLBACK;
@@ -91,6 +92,11 @@ export default function RtaPageClient() {
 
   const seasonSelectValue = season ?? resolvedDefaultSeason;
 
+  const seasonIdForApi = useMemo(
+    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
+    [seasonsData?.seasons, seasonSelectValue],
+  );
+
   useEffect(() => {
     setCurrentPage(1);
   }, [seasonSelectValue]);
@@ -108,6 +114,7 @@ export default function RtaPageClient() {
     limit: DEFAULT_PAGE_SIZE,
     offset: (currentPage - 1) * DEFAULT_PAGE_SIZE,
     seasonCode: seasonSelectValue,
+    seasonId: seasonIdForApi,
     tierKey: tierKey === '' ? undefined : tierKey,
   });
 

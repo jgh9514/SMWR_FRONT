@@ -21,7 +21,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
-import { useRtaDashboard, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
+import { useRtaDashboard, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import type { RtaTierBucket, RtaTierDailyRow } from '@/features/rta/types/rta';
 import { toYmdKst } from '@/features/rta/utils/ymdKst';
 
@@ -149,7 +150,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
   const lastSeasonForSlider = useRef<string | null>(null);
   const prevMaxDayIndex = useRef<number>(-1);
 
-  const { data: seasonsData } = useRtaSeasons();
+  const { data: seasonsData } = useRtaSeasonsContext();
   const seasonOptions = useMemo(() => {
     const rows = seasonsData?.seasons;
     if (!rows?.length) return SEASON_FALLBACK;
@@ -174,7 +175,12 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
 
   const seasonSelectValue = season ?? resolvedDefaultSeason;
 
-  const { data, isLoading, error } = useRtaDashboard(seasonSelectValue);
+  const seasonIdForApi = useMemo(
+    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
+    [seasonsData?.seasons, seasonSelectValue],
+  );
+
+  const { data, isLoading, error } = useRtaDashboard(seasonSelectValue, seasonIdForApi);
 
   const selectedSeason = useMemo(() => {
     const rows = seasonsData?.seasons;

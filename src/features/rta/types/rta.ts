@@ -145,8 +145,10 @@ export const RTA_TIER_KEY_FILTER_ITEMS: { value: '' | RtaTierKey; previewRating?
 export interface RtaMatchListParams {
   limit: number;
   offset: number;
-  /** rta_season.season_code — 없으면 서버가 금일 기준 기본 시즌 사용 */
+  /** rta_season.season_code — seasonId가 있으면 요청에서는 생략 가능 */
   seasonCode?: string | null;
+  /** rta_season.season_id (우선). 시즌 목록에서 받은 PK를 넘기면 서버가 코드 조회를 생략 */
+  seasonId?: number | null;
   /** Ch1~G3 — 해당 세부 티어 플레이어가 한 명이라도 있는 매치만 */
   tierKey?: '' | RtaTierKey | null;
 }
@@ -353,6 +355,8 @@ export interface RtaDashboardResponse {
 
 /** DB rta_season (GET /api/v1/rta/seasons) */
 export interface RtaSeasonRow {
+  /** rta_season.season_id — API 필터에 권장 */
+  seasonId: number;
   seasonCode: string;
   seasonNo: number;
   leagueType: string;

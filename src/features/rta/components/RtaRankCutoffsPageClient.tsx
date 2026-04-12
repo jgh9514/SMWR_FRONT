@@ -5,12 +5,13 @@ import { Box, CircularProgress, FormControl, InputLabel, MenuItem, Select, Typog
 import Link from 'next/link';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
-import { useRtaDashboard, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
+import { useRtaDashboard, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 
 const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
 
 export default function RtaRankCutoffsPageClient() {
-  const { data: seasonsData } = useRtaSeasons();
+  const { data: seasonsData } = useRtaSeasonsContext();
   const seasonOptions = useMemo(() => {
     const rows = seasonsData?.seasons;
     if (!rows?.length) return SEASON_FALLBACK;
@@ -35,7 +36,12 @@ export default function RtaRankCutoffsPageClient() {
 
   const seasonSelectValue = season ?? resolvedDefaultSeason;
 
-  const { data, isLoading, error } = useRtaDashboard(seasonSelectValue);
+  const seasonIdForApi = useMemo(
+    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
+    [seasonsData?.seasons, seasonSelectValue],
+  );
+
+  const { data, isLoading, error } = useRtaDashboard(seasonSelectValue, seasonIdForApi);
 
   return (
     <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 }, py: { xs: 2, md: 4 } }}>

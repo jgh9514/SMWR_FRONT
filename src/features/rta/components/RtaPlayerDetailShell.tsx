@@ -26,7 +26,8 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import { useRtaPlayerSummary, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
+import { useRtaPlayerSummary, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { RtaPlayerSeasonContext } from '@/features/rta/context/RtaPlayerSeasonContext';
 import type { RtaPlayerSummary } from '@/features/rta/types/rta';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
@@ -82,7 +83,7 @@ export default function RtaPlayerDetailShell({
 }) {
   const pathname = usePathname();
 
-  const { data: seasonsData } = useRtaSeasons();
+  const { data: seasonsData } = useRtaSeasonsContext();
   const seasonOptions = useMemo(() => {
     const rows = seasonsData?.seasons;
     if (!rows?.length) return SEASON_FALLBACK;
@@ -111,10 +112,16 @@ export default function RtaPlayerDetailShell({
 
   const seasonSelectValue = season ?? resolvedDefaultSeason;
 
+  const seasonIdForApi = useMemo(
+    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
+    [seasonsData?.seasons, seasonSelectValue],
+  );
+
   const { data: summary, refetch, isFetching } = useRtaPlayerSummary(
     wizardId,
     initialSummary,
     seasonSelectValue,
+    { seasonId: seasonIdForApi },
   );
 
   const displayName = useMemo(() => {
@@ -428,7 +435,11 @@ export default function RtaPlayerDetailShell({
       </Box>
 
       <Box sx={{ px: { xs: 2, sm: 3 }, pb: 4 }}>
-        <RtaPlayerSeasonContext.Provider value={seasonSelectValue}>{children}</RtaPlayerSeasonContext.Provider>
+        <RtaPlayerSeasonContext.Provider
+          value={{ seasonCode: seasonSelectValue, seasonId: seasonIdForApi }}
+        >
+          {children}
+        </RtaPlayerSeasonContext.Provider>
       </Box>
     </Container>
   );
