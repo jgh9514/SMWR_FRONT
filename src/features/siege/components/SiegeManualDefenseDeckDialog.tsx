@@ -61,7 +61,7 @@ export function SiegeManualDefenseDeckDialog({ open, onClose }: SiegeManualDefen
 
   useEffect(() => {
     if (!open) return;
-    setSelectedMonsterList([]);
+    queueMicrotask(() => setSelectedMonsterList([]));
   }, [open]);
 
   const handleImageError = useCallback((event: SyntheticEvent<HTMLElement, Event>) => {

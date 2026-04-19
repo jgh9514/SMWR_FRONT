@@ -30,7 +30,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { TooltipValueType } from 'recharts';
-import { getRtaTierKeyStarIconPath, RTA_LEGEND_STAR_WIDTH_RATIO } from '@/shared/utils';
+import { getRtaShortLabelStarIconPath, RTA_LEGEND_STAR_WIDTH_RATIO } from '@/shared/utils';
 import type { RtaRankCutoffAnchorRow } from '@/features/rta/types/rta';
 import { formatRtaCutoffScore, isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 import {
@@ -40,9 +40,6 @@ import {
   CUT_TIER_ORDER,
   pivotRankCutoffAnchors,
 } from '@/features/rta/utils/rtaRankCutoffChart';
-
-/** 상단 카드만: 윗줄 G → 아랫줄 P (2행×3열) */
-const CUT_KEYS_CARD_GRID = ['G1', 'G2', 'G3', 'P1', 'P2', 'P3'] as const;
 
 /** 표시 순서·라벨 (서버 anchor_key 와 동일) */
 const ANCHOR_ROWS: { key: string; label: string }[] = [
@@ -57,15 +54,15 @@ const TIER_COLOR_P = '#00897b';
 const TIER_COLOR_G = '#e53935';
 const TIER_COLOR_L = '#ffc107';
 
-function tierAccent(tierKey: string): string {
-  if (tierKey.startsWith('L')) return TIER_COLOR_L;
-  if (tierKey.startsWith('G')) return TIER_COLOR_G;
-  if (tierKey.startsWith('P')) return TIER_COLOR_P;
+function tierAccent(shortLabel: string): string {
+  if (shortLabel.startsWith('L')) return TIER_COLOR_L;
+  if (shortLabel.startsWith('G')) return TIER_COLOR_G;
+  if (shortLabel.startsWith('P')) return TIER_COLOR_P;
   return '#999';
 }
 
-function tierStarCount(tierKey: string): number {
-  const last = tierKey.slice(-1);
+function tierStarCount(shortLabel: string): number {
+  const last = shortLabel.slice(-1);
   const n = parseInt(last, 10);
   return Number.isFinite(n) && n >= 1 && n <= 3 ? n : 2;
 }
@@ -75,9 +72,9 @@ const TIER_STAR_PX = 12;
 const TIER_STAR_GAP_PX = 2;
 const TIER_STAR_TRIPLE_WIDTH = 3 * TIER_STAR_PX + 2 * TIER_STAR_GAP_PX;
 
-function TierStars({ tierKey }: { tierKey: string }) {
-  const src = getRtaTierKeyStarIconPath(tierKey);
-  if (tierKey === 'L1') {
+function TierStars({ shortLabel }: { shortLabel: string }) {
+  const src = getRtaShortLabelStarIconPath(shortLabel);
+  if (shortLabel === 'L1') {
     const legendW = TIER_STAR_PX * RTA_LEGEND_STAR_WIDTH_RATIO;
     return (
       <Box
@@ -106,7 +103,7 @@ function TierStars({ tierKey }: { tierKey: string }) {
       </Box>
     );
   }
-  const n = tierStarCount(tierKey);
+  const n = tierStarCount(shortLabel);
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
       {Array.from({ length: n }).map((_, i) => (
@@ -116,12 +113,14 @@ function TierStars({ tierKey }: { tierKey: string }) {
   );
 }
 
-function TierHeaderCell({ tierKey }: { tierKey: string }) {
+function TierHeaderCell({ shortLabel }: { shortLabel: string }) {
   return (
     <TableCell align="center" sx={{ px: 1, py: 1.5, borderColor: 'divider' }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-        <TierStars tierKey={tierKey} />
-        <Typography sx={{ fontSize: '10px', fontWeight: 800, color: tierAccent(tierKey) }}>{tierKey}</Typography>
+      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+        <TierStars shortLabel={shortLabel} />
+        <Typography sx={{ fontSize: '10px', fontWeight: 800, color: tierAccent(shortLabel), whiteSpace: 'nowrap' }}>
+          {shortLabel}
+        </Typography>
       </Box>
     </TableCell>
   );
@@ -131,11 +130,20 @@ export interface RtaRankCutoffsSectionProps {
   rankCutoffAnchors: RtaRankCutoffAnchorRow[] | undefined;
   /** `/rta/rank-cutoffs` 전용: 앵커별 컷 추이 라인 차트 표시 */
   showTrendChart?: boolean;
+  /**
+   * 대시보드 `lg+` 2열 그리드 우측열: 카드 상단 마진 제거(그리드 gap으로 간격).
+   * 단일 열(모바일)에서는 false 유지.
+   */
+  denseTop?: boolean;
+  /** `lg+` 2열에서 좌측 티어 카드와 동일 높이 — 내부 스크롤 */
+  fillHeight?: boolean;
 }
 
 export default function RtaRankCutoffsSection({
   rankCutoffAnchors,
   showTrendChart = false,
+  denseTop = false,
+  fillHeight = false,
 }: RtaRankCutoffsSectionProps) {
   const theme = useTheme();
 
@@ -200,17 +208,35 @@ export default function RtaRankCutoffsSection({
   const hasAny =
     CUT_TIER_ORDER.some((k) => !isRtaCutoffMissing(latest[k])) || (rankCutoffAnchors?.length ?? 0) > 0;
 
+  const cardTopSx = denseTop ? { mt: 0 } : { mt: 3 };
+
+  const cardFillSx = fillHeight
+    ? {
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column' as const,
+        overflow: 'hidden',
+        minHeight: 0,
+      }
+    : {};
+
+  const scrollBodySx = fillHeight
+    ? { flex: 1, minHeight: 0, overflowY: 'auto' as const }
+    : { display: 'contents' as const };
+
   if (!hasAny) {
     return (
       <Card
         elevation={0}
         sx={{
-          mt: 3,
+          ...cardTopSx,
+          ...cardFillSx,
           borderRadius: 3,
           border: '1px solid',
           borderColor: 'divider',
           bgcolor: 'background.paper',
           p: { xs: 2, sm: 3 },
+          ...(fillHeight ? { justifyContent: 'center' } : {}),
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -218,7 +244,7 @@ export default function RtaRankCutoffsSection({
           <Typography sx={{ fontWeight: 600 }}>랭크 컷</Typography>
         </Box>
         <Typography variant="body2" color="text.secondary">
-          P1~G3 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
+          P2~G3 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
         </Typography>
       </Card>
     );
@@ -228,7 +254,8 @@ export default function RtaRankCutoffsSection({
     <Card
       elevation={0}
       sx={{
-        mt: 3,
+        ...cardTopSx,
+        ...cardFillSx,
         borderRadius: 3,
         border: '1px solid',
         borderColor: 'divider',
@@ -236,6 +263,7 @@ export default function RtaRankCutoffsSection({
         p: { xs: 2, sm: 3 },
       }}
     >
+      <Box sx={scrollBodySx}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
@@ -321,33 +349,49 @@ export default function RtaRankCutoffsSection({
 
       <Box
         sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-          gridTemplateRows: 'repeat(2, auto)',
-          gap: 1.5,
+          display: 'flex',
+          flexDirection: 'row',
+          flexWrap: 'nowrap',
+          gap: { xs: 1, sm: 1.5 },
           mb: 2,
+          width: '100%',
+          overflowX: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          pb: 0.25,
         }}
       >
-        {CUT_KEYS_CARD_GRID.map((k) => (
+        {CUT_TIER_ORDER.map((k) => (
           <Paper
             key={k}
             variant="outlined"
             sx={{
-              p: 1.5,
+              flex: '1 1 0',
+              minWidth: { xs: 72, sm: 0 },
+              p: { xs: 1, sm: 1.5 },
               borderRadius: 2,
               bgcolor: 'action.hover',
               borderColor: 'divider',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 1,
+              gap: 0.75,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <TierStars tierKey={k} />
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: tierAccent(k) }}>{k}</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
+              <TierStars shortLabel={k} />
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: tierAccent(k), whiteSpace: 'nowrap' }}>
+                {k}
+              </Typography>
             </Box>
-            <Typography sx={{ fontSize: '1.25rem', fontWeight: 900, fontVariantNumeric: 'tabular-nums', color: tierAccent(k) }}>
+            <Typography
+              sx={{
+                fontSize: { xs: '1.05rem', sm: '1.25rem' },
+                fontWeight: 900,
+                fontVariantNumeric: 'tabular-nums',
+                color: tierAccent(k),
+                lineHeight: 1.2,
+              }}
+            >
               {formatRtaCutoffScore(latest[k])}
             </Typography>
           </Paper>
@@ -366,7 +410,7 @@ export default function RtaRankCutoffsSection({
               <TableRow sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
                 <TableCell sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600, py: 1.5 }}>기준</TableCell>
                 {CUT_TIER_ORDER.map((k) => (
-                  <TierHeaderCell key={k} tierKey={k} />
+                  <TierHeaderCell key={k} shortLabel={k} />
                 ))}
               </TableRow>
             </TableHead>
@@ -386,9 +430,10 @@ export default function RtaRankCutoffsSection({
                     const sc = row.scores[k];
                     const d = row.deltas[k];
                     return (
-                      <TableCell key={k} align="center" sx={{ py: 1.25 }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <TableCell key={k} align="center" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
+                        <Box sx={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
                           <Typography
+                            component="span"
                             sx={{
                               fontWeight: 800,
                               fontVariantNumeric: 'tabular-nums',
@@ -400,14 +445,15 @@ export default function RtaRankCutoffsSection({
                           </Typography>
                           {d != null && (
                             <Typography
+                              component="span"
                               sx={{
                                 fontSize: '0.65rem',
                                 fontVariantNumeric: 'tabular-nums',
                                 color: d >= 0 ? 'success.light' : 'error.light',
                               }}
                             >
-                              {d >= 0 ? '+' : ''}
-                              {Math.round(d)}
+                              ({d >= 0 ? '+' : ''}
+                              {Math.round(d)})
                             </Typography>
                           )}
                         </Box>
@@ -424,6 +470,7 @@ export default function RtaRankCutoffsSection({
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, lineHeight: 1.5 }}>
         티어별 <strong>최저 점수</strong>로 추정한 값입니다. 공식 최소 승점·랭킹과는 별개이며, 리플레이로 최저점을 잡지 못하면 &quot;—&quot;로 둡니다(과거 임시값 1000도 동일).
       </Typography>
+      </Box>
     </Card>
   );
 }

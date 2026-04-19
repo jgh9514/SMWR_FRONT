@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import type { MonsterStats, RtaMonsterStatsResponse } from '@/features/rta/types/rta';
 import { getRtaMonsterStatsData } from '@/shared/lib/api/server';
 import { buildSitemapUrl } from '@/shared/lib/sitemap';
 
@@ -7,14 +8,14 @@ const TOP_MONSTERS_LIMIT = 500;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const data = await getRtaMonsterStatsData({ limit: TOP_MONSTERS_LIMIT, statsOffset: 0 }).catch(() => ({
-    stats: [],
-  }));
+  const data = await getRtaMonsterStatsData({ limit: TOP_MONSTERS_LIMIT, statsOffset: 0 }).catch(
+    (): RtaMonsterStatsResponse => ({ rows: [], has_more: false, type: 'solo' }),
+  );
 
-  return (data.stats ?? [])
-    .filter((monster) => !!monster.monster_id)
+  return (data.rows ?? [])
+    .filter((row): row is MonsterStats => 'monster_id' in row && !!row.monster_id)
     .map((monster) => ({
-      url: buildSitemapUrl(`/rta/monster-stats/${monster.monster_id}`),
+      url: buildSitemapUrl(`/monster-detail/${monster.monster_id}`),
       lastModified: now,
       changeFrequency: 'daily' as const,
       priority: 0.75,

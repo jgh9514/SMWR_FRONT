@@ -15,7 +15,7 @@ export {
   getRatingColor,
   getRatingStars,
   getRatingStarIconPath,
-  getRtaTierKeyStarIconPath,
+  getRtaShortLabelStarIconPath,
   getRtaTierShortLabel,
 } from './util';
 

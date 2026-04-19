@@ -1,7 +1,25 @@
 'use client';
 
-import { RtaSeasonsProvider } from '@/features/rta/context/RtaSeasonsContext';
+import { CircularProgress, Box } from '@mui/material';
+import { RtaSeasonsProvider, useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
+import type { ReactNode } from 'react';
 
-export default function RtaSeasonsLayoutClient({ children }: { children: React.ReactNode }) {
-  return <RtaSeasonsProvider>{children}</RtaSeasonsProvider>;
+function SeasonsGate({ children }: { children: ReactNode }) {
+  const { data: seasonsData, isLoading } = useRtaSeasonsContext();
+  if (isLoading || !seasonsData) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+        <CircularProgress />
+      </Box>
+    );
+  }
+  return <>{children}</>;
+}
+
+export default function RtaSeasonsLayoutClient({ children }: { children: ReactNode }) {
+  return (
+    <RtaSeasonsProvider>
+      <SeasonsGate>{children}</SeasonsGate>
+    </RtaSeasonsProvider>
+  );
 }

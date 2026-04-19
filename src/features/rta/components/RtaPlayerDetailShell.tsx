@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -26,7 +26,7 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import { useRtaPlayerSummary, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { useRtaPlayerSummary, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { RtaPlayerSeasonContext } from '@/features/rta/context/RtaPlayerSeasonContext';
 import type { RtaPlayerSummary } from '@/features/rta/types/rta';
@@ -35,10 +35,6 @@ import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { showToast } from '@/shared/lib/notification';
 
-const SEASON_FALLBACK = [
-  { value: 'S36_SPECIAL', label: '36시즌 스페셜리그', active: true },
-  { value: 's35-sl', label: 'S35 SL', active: false },
-];
 
 type NavItem = {
   href: string;
@@ -84,38 +80,18 @@ export default function RtaPlayerDetailShell({
   const pathname = usePathname();
 
   const { data: seasonsData } = useRtaSeasonsContext();
+  const { seasonSelectValue, seasonIdForApi, setSeason } = useRtaSeasonSelect(seasonsData);
+
+  // active 표시를 위해 seasons 목록에 isActive 필드를 추가한 옵션
   const seasonOptions = useMemo(() => {
     const rows = seasonsData?.seasons;
-    if (!rows?.length) return SEASON_FALLBACK;
+    if (!rows?.length) return [];
     return rows.map((r) => ({
       value: r.seasonCode,
       label: r.seasonName.length > 24 ? `${r.seasonName.slice(0, 22)}…` : r.seasonName,
       active: r.isActive,
     }));
   }, [seasonsData]);
-
-  const resolvedDefaultSeason = useMemo(() => {
-    const def = seasonsData?.defaultSeasonCode;
-    const rows = seasonsData?.seasons;
-    if (def && rows?.some((r) => r.seasonCode === def)) return def;
-    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
-  }, [seasonsData]);
-
-  const [season, setSeason] = useState<string | null>(null);
-  useEffect(() => {
-    if (seasonOptions.length === 0) return;
-    setSeason((prev) => {
-      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
-      return resolvedDefaultSeason;
-    });
-  }, [seasonOptions, resolvedDefaultSeason]);
-
-  const seasonSelectValue = season ?? resolvedDefaultSeason;
-
-  const seasonIdForApi = useMemo(
-    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
-    [seasonsData?.seasons, seasonSelectValue],
-  );
 
   const { data: summary, refetch, isFetching } = useRtaPlayerSummary(
     wizardId,
@@ -126,27 +102,27 @@ export default function RtaPlayerDetailShell({
 
   const displayName = useMemo(() => {
     if (summary?.found) {
-      const n = (summary.wizardName ?? summary.wizard_name)?.trim();
+      const n = summary.wizard_name?.trim();
       if (n) return n;
     }
     return `소환사 ${wizardId}`;
   }, [summary, wizardId]);
 
-  const channelUid = summary?.channelUid ?? summary?.channel_uid;
+  const channelUid = summary?.channel_uid;
   const profileSrc = getSwexPlayerImageUrl(channelUid ?? wizardId);
 
   const score = num(summary?.score);
-  const rank = num(summary?.rankPosition ?? summary?.rank_position);
-  const rating = num(summary?.ratingId ?? summary?.rating_id);
-  const winRate = num(summary?.winRatePct ?? summary?.win_rate_pct);
-  const matchCount = num(summary?.matchCount ?? summary?.match_count);
-  const winCount = num(summary?.winCount ?? summary?.win_count);
+  const rank = num(summary?.rank_position);
+  const rating = num(summary?.rating_id);
+  const winRate = num(summary?.win_rate_pct);
+  const matchCount = num(summary?.match_count);
+  const winCount = num(summary?.win_count);
 
   const countryLabel = (summary?.country || '').trim() || '—';
   const countryFlag = countryFlagSrc(summary?.country);
 
   const lastMatchLabel = useMemo(() => {
-    const raw = summary?.lastMatchAt ?? summary?.last_match_at;
+    const raw = summary?.last_match_at;
     if (!raw) return null;
     const d = new Date(raw);
     if (Number.isNaN(d.getTime())) return null;

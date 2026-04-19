@@ -183,13 +183,14 @@ export type GetRtaMonsterStatsParams = {
   duoOffset?: number;
   trioOffset?: number;
   seasonCode?: string | null;
-  tierKey?: string | null;
+  ratingId?: number | null;
+  ratingIds?: number[] | null;
 };
 
 export async function getRtaMonsterStatsData(
   params: GetRtaMonsterStatsParams = {},
 ): Promise<RtaMonsterStatsResponse> {
-  const { limit = 20, statsOffset = 0, duoOffset = 0, trioOffset = 0, seasonCode, tierKey } = params;
+  const { limit = 20, statsOffset = 0, duoOffset = 0, trioOffset = 0, seasonCode, ratingId, ratingIds } = params;
   const body: Record<string, unknown> = {
     limit,
     stats_offset: statsOffset,
@@ -198,8 +199,8 @@ export async function getRtaMonsterStatsData(
   };
   const c = seasonCode?.trim();
   if (c) body.seasonCode = c;
-  const t = tierKey?.trim();
-  if (t) body.tierKey = t;
+  if (ratingId != null && ratingId > 0) body.ratingId = ratingId;
+  if (ratingIds != null && ratingIds.length > 0) body.ratingIds = ratingIds;
   return serverApiPost<RtaMonsterStatsResponse>(
     '/rta/monster-stats',
     body,

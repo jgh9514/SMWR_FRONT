@@ -32,6 +32,8 @@ export type MonsterOption = {
   family_id?: number;
   /** monster-list 응답 — 획득 불가 제외용(캐시/구버전 대비) */
   obtainable?: boolean;
+  /** RTA 통계 집계 키(콜라보는 원본 monster_id, 비콜라보는 monster_id와 동일) — WAS `rta_stats_monster_id` */
+  rta_stats_monster_id?: string;
 };
 
 const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v13';

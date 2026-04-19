@@ -21,10 +21,21 @@ import type { CounterMatchupRow, MonsterDetail } from '@/features/rta/types/rta'
 
 interface RtaMonsterDetailContentProps {
   data: MonsterDetail;
+  /**
+   * true: `/monster-detail` 본문에 삽입 — 상단 PageHeader·대형 히어로 생략, 섹션 제목만 표시.
+   * false(기본): 단독 RTA 상세(리다이렉트 전 URL 등)용.
+   */
+  embedded?: boolean;
+  /**
+   * embedded일 때만 적용. `full`: 요약 지표 + 전체 테이블(기본). `tables`: 강한 상대·콤비·카운터 등 상성 테이블만.
+   */
+  embeddedPart?: 'full' | 'tables';
 }
 
 export default function RtaMonsterDetailContent({
   data,
+  embedded = false,
+  embeddedPart = 'full',
 }: RtaMonsterDetailContentProps) {
   const formatPercentage = (value: number) => `${value.toFixed(2)}%`;
   const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
@@ -38,90 +49,119 @@ export default function RtaMonsterDetailContent({
   const recentMatches = data.recent_matches || [];
   const counterRows: CounterMatchupRow[] = data.counter_matchups ?? [];
 
-  const comboLabel = (r: CounterMatchupRow) =>
-    String(r.opponentLabel ?? r.opponent_label ?? r.opponentComboKey ?? r.opponent_combo_key ?? '—');
+  const comboLabel = (r: CounterMatchupRow) => String(r.opponentLabel ?? r.opponentComboKey ?? '—');
   const winRate = (r: CounterMatchupRow) => {
-    const v = r.winRate ?? r.win_rate;
+    const v = r.winRate;
     return v != null && Number.isFinite(Number(v)) ? Number(v) : null;
   };
   const totalGames = (r: CounterMatchupRow) => {
-    const w = Number(r.winCnt ?? r.win_cnt ?? 0);
-    const l = Number(r.loseCnt ?? r.lose_cnt ?? 0);
+    const w = Number(r.winCnt ?? 0);
+    const l = Number(r.loseCnt ?? 0);
     return w + l;
   };
 
-  return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <PageHeader title={data.monster_name} backPath="/rta/monster-stats" />
+  const statsGrid = (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+        gap: 2,
+      }}
+    >
+      <Box>
+        <Typography variant="caption" color="text.secondary">
+          픽횟수
+        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          {data.pick_count.toLocaleString()}
+        </Typography>
+      </Box>
+      <Box>
+        <Typography variant="caption" color="text.secondary">
+          픽률
+        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          {formatPercentage(data.pick_rate)}
+        </Typography>
+      </Box>
+      <Box>
+        <Typography variant="caption" color="text.secondary">
+          승률
+        </Typography>
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 600, color: data.win_rate >= 50 ? 'success.main' : 'error.main' }}
+        >
+          {formatPercentage(data.win_rate)}
+        </Typography>
+      </Box>
+      <Box>
+        <Typography variant="caption" color="text.secondary">
+          벤율
+        </Typography>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          {formatPercentage(data.ban_rate)}
+        </Typography>
+      </Box>
+    </Box>
+  );
 
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
-            <Avatar
-              src={getRenderableImageUrl(data.monster_image)}
-              alt={data.monster_name}
-              sx={{
-                width: { xs: 100, md: 150 },
-                height: { xs: 100, md: 150 },
-                boxShadow: 2,
-                border: '2px solid',
-                borderColor: 'divider',
-              }}
-              variant="rounded"
-            >
-              {data.monster_name.charAt(0)}
-            </Avatar>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
-                {data.monster_name}
-              </Typography>
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-                  gap: 2,
-                }}
-              >
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    픽횟수
+  return (
+    <Container
+      maxWidth={embedded ? false : 'xl'}
+      disableGutters={embedded}
+      component={embedded ? 'section' : 'div'}
+      sx={embedded ? { py: 0, px: 0 } : { py: 4 }}
+    >
+      {!embedded && (
+        <>
+          <PageHeader title={data.monster_name} backPath="/rta/monster-stats/solo" />
+
+          <Card sx={{ mb: 3 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
+                <Avatar
+                  src={getRenderableImageUrl(data.monster_image)}
+                  alt={data.monster_name}
+                  sx={{
+                    width: { xs: 100, md: 150 },
+                    height: { xs: 100, md: 150 },
+                    boxShadow: 2,
+                    border: '2px solid',
+                    borderColor: 'divider',
+                  }}
+                  variant="rounded"
+                >
+                  {data.monster_name.charAt(0)}
+                </Avatar>
+                <Box sx={{ flex: 1 }}>
+                  <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
+                    {data.monster_name}
                   </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    {data.pick_count.toLocaleString()}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    픽률
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    {formatPercentage(data.pick_rate)}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    승률
-                  </Typography>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 600, color: data.win_rate >= 50 ? 'success.main' : 'error.main' }}
-                  >
-                    {formatPercentage(data.win_rate)}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    벤율
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                    {formatPercentage(data.ban_rate)}
-                  </Typography>
+                  {statsGrid}
                 </Box>
               </Box>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {embedded && embeddedPart === 'full' && (
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 800 }}>
+            RTA 실시간 통계
+          </Typography>
+          <Card variant="outlined">
+            <CardContent>{statsGrid}</CardContent>
+          </Card>
+        </Box>
+      )}
+
+      {embedded && embeddedPart === 'tables' && (
+        <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 800 }}>
+          RTA 상성
+        </Typography>
+      )}
 
       <Box
         sx={{
@@ -287,7 +327,7 @@ export default function RtaMonsterDetailContent({
                           </TableCell>
                           <TableCell align="right">
                             <Typography variant="body2" color="text.secondary">
-                              {r.winCnt ?? r.win_cnt ?? 0} / {r.loseCnt ?? r.lose_cnt ?? 0}
+                              {r.winCnt ?? 0} / {r.loseCnt ?? 0}
                               {totalGames(r) > 0 ? ` (${totalGames(r)})` : ''}
                             </Typography>
                           </TableCell>

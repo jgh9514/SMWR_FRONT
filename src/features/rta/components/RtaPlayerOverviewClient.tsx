@@ -189,11 +189,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       }));
   }, [perspectives]);
 
-  const winCount = num(summary?.winCount ?? summary?.win_count);
-  const matchCount = num(summary?.matchCount ?? summary?.match_count);
+  const winCount = num(summary?.win_count);
+  const matchCount = num(summary?.match_count);
   const lossCount = Math.max(0, matchCount - winCount);
   const summaryScore = num(summary?.score);
-  const maxSeasonScoreAgg = num(summary?.maxSeasonScore ?? summary?.max_season_score);
+  const maxSeasonScoreAgg = num(summary?.max_season_score);
   const maxScoreDisplay =
     maxSeasonScoreAgg > 0 ? maxSeasonScoreAgg : summaryScore > 0 ? summaryScore : 0;
 

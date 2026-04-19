@@ -6,7 +6,6 @@ import {
   Box,
   Card,
   Chip,
-  CircularProgress,
   FormControl,
   IconButton,
   InputLabel,
@@ -21,28 +20,12 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
-import { useRtaDashboard, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { RtaRankCutoffSectionSkeleton, RtaTierDistributionSkeleton } from '@/features/rta/components/RtaDashboardSkeletons';
+import { useRtaDashboardRankCutoff, useRtaDashboardTierDistribution, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
-import type { RtaTierBucket, RtaTierDailyRow } from '@/features/rta/types/rta';
+import { RTA_DASHBOARD_TIER_RATING_IDS, type RtaTierBucket, type RtaTierDailyRow } from '@/features/rta/types/rta';
 import { toYmdKst } from '@/features/rta/utils/ymdKst';
-
-const TIER_ORDER = [
-  'Ch1',
-  'Ch2',
-  'Ch3',
-  'F1',
-  'F2',
-  'F3',
-  'C1',
-  'C2',
-  'C3',
-  'P1',
-  'P2',
-  'P3',
-  'G1',
-  'G2',
-  'G3',
-] as const;
+import { getRtaTierShortLabel } from '@/shared/utils/util';
 
 /** C 컨커: 금색 · P 플래: 옥색(청록) · G 골드: 빨강 */
 const TIER_BAR_COLORS: Record<string, string> = {
@@ -54,9 +37,9 @@ const TIER_BAR_COLORS: Record<string, string> = {
   L: '#ffc107',
 };
 
-function tierColor(tierKey: string): string {
-  if (tierKey.startsWith('Ch')) return TIER_BAR_COLORS.Ch;
-  const head = tierKey[0];
+function tierColor(shortLabel: string): string {
+  if (shortLabel.startsWith('Ch')) return TIER_BAR_COLORS.Ch;
+  const head = shortLabel[0];
   if (head === 'F' || head === 'C' || head === 'P' || head === 'G' || head === 'L') {
     return TIER_BAR_COLORS[head];
   }
@@ -84,12 +67,6 @@ function ymdOnly(raw: unknown): string | null {
   if (raw == null || raw === '') return null;
   const s = String(raw);
   return s.length >= 10 ? s.slice(0, 10) : null;
-}
-
-function minYmd(...vals: (string | null | undefined)[]): string | null {
-  const xs = vals.filter((x): x is string => x != null && /^\d{4}-\d{2}-\d{2}$/.test(x));
-  if (xs.length === 0) return null;
-  return xs.reduce((a, b) => (a <= b ? a : b));
 }
 
 /** 달력 기준 startYmd~endYmd 사이 일수(말일 포함 시 차이). 잘못된 날짜면 0 */
@@ -125,7 +102,7 @@ function todayYmdLocal(): string {
   return `${y}-${m}-${d}`;
 }
 
-/** 특정 일(bucket_date)의 티어별 인원 합산 */
+/** 특정 일(bucket_date)의 티어별 인원 합산 — 슬롯 문자열 키(getRtaTierShortLabel 과 동일) */
 function tierCountsForSingleDay(
   daily: RtaTierDailyRow[] | undefined,
   targetYmd: string,
@@ -133,54 +110,44 @@ function tierCountsForSingleDay(
   const sums = new Map<string, number>();
   for (const row of daily ?? []) {
     if (normalizeBucketDate(row.bucket_date) !== targetYmd) continue;
-    const k = row.tier_key;
-    if (!k) continue;
-    sums.set(k, (sums.get(k) ?? 0) + toNum(row.player_count));
+    const gs = row.gradeSlot?.trim();
+    const fromMaster = row.ratingId;
+    const slot =
+      gs && gs.length > 0
+        ? gs
+        : fromMaster != null
+          ? getRtaTierShortLabel(Number(fromMaster))
+          : '';
+    if (!slot || slot === '—') continue;
+    sums.set(slot, (sums.get(slot) ?? 0) + toNum(row.player_count));
   }
   return sums;
 }
 
-const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
-
 export default function RtaDashboardClient({ embedded = false }: { embedded?: boolean }) {
   const theme = useTheme();
   const isWide = useMediaQuery('(min-width:480px)');
+  /** `lg`(≥1200px): 티어·랭크 컷 2열, 상단 maxWidth 확장 */
+  const isLgUp = useMediaQuery(theme.breakpoints.up('lg'));
   /** 시즌 첫날=0, 하루씩 증가 */
   const [dayOffset, setDayOffset] = useState(0);
   const lastSeasonForSlider = useRef<string | null>(null);
   const prevMaxDayIndex = useRef<number>(-1);
 
   const { data: seasonsData } = useRtaSeasonsContext();
-  const seasonOptions = useMemo(() => {
-    const rows = seasonsData?.seasons;
-    if (!rows?.length) return SEASON_FALLBACK;
-    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
-  }, [seasonsData]);
+  const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
-  const resolvedDefaultSeason = useMemo(() => {
-    const def = seasonsData?.defaultSeasonCode;
-    const rows = seasonsData?.seasons;
-    if (def && rows?.some((r) => r.seasonCode === def)) return def;
-    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
-  }, [seasonsData]);
+  const {
+    data: tierData,
+    isPending: isTierPending,
+    error: tierError,
+  } = useRtaDashboardTierDistribution(seasonSelectValue, seasonIdForApi);
 
-  const [season, setSeason] = useState<string | null>(null);
-  useEffect(() => {
-    if (seasonOptions.length === 0) return;
-    setSeason((prev) => {
-      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
-      return resolvedDefaultSeason;
-    });
-  }, [seasonOptions, resolvedDefaultSeason]);
-
-  const seasonSelectValue = season ?? resolvedDefaultSeason;
-
-  const seasonIdForApi = useMemo(
-    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
-    [seasonsData?.seasons, seasonSelectValue],
-  );
-
-  const { data, isLoading, error } = useRtaDashboard(seasonSelectValue, seasonIdForApi);
+  const {
+    data: rankData,
+    isPending: isRankPending,
+    error: rankError,
+  } = useRtaDashboardRankCutoff(seasonSelectValue, seasonIdForApi);
 
   const selectedSeason = useMemo(() => {
     const rows = seasonsData?.seasons;
@@ -222,15 +189,17 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
       prevMaxDayIndex.current <= 0 && maxDayIndex > 0 && !seasonChanged;
     prevMaxDayIndex.current = maxDayIndex;
 
-    if (seasonChanged) {
-      setDayOffset(maxDayIndex);
-      return;
-    }
-    if (maxGrewFromZero) {
-      setDayOffset(maxDayIndex);
-      return;
-    }
-    setDayOffset((d) => Math.min(d, maxDayIndex));
+    queueMicrotask(() => {
+      if (seasonChanged) {
+        setDayOffset(maxDayIndex);
+        return;
+      }
+      if (maxGrewFromZero) {
+        setDayOffset(maxDayIndex);
+        return;
+      }
+      setDayOffset((d) => Math.min(d, maxDayIndex));
+    });
   }, [seasonSelectValue, maxDayIndex]);
 
   const selectedYmd = useMemo(() => {
@@ -240,14 +209,17 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
 
   const rows = useMemo(() => {
     if (!selectedYmd) {
-      return TIER_ORDER.map((key) => ({ tier_key: key, player_count: 0 })) as RtaTierBucket[];
+      return RTA_DASHBOARD_TIER_RATING_IDS.map((ratingId) => ({
+        ratingId,
+        player_count: 0,
+      })) as RtaTierBucket[];
     }
-    const sums = tierCountsForSingleDay(data?.daily_tiers, selectedYmd);
-    return TIER_ORDER.map((key) => ({
-      tier_key: key,
-      player_count: sums.get(key) ?? 0,
+    const sums = tierCountsForSingleDay(tierData?.daily_tiers, selectedYmd);
+    return RTA_DASHBOARD_TIER_RATING_IDS.map((ratingId) => ({
+      ratingId,
+      player_count: sums.get(getRtaTierShortLabel(ratingId)) ?? 0,
     })) as RtaTierBucket[];
-  }, [data?.daily_tiers, selectedYmd]);
+  }, [tierData?.daily_tiers, selectedYmd]);
 
   const maxCount = useMemo(() => Math.max(1, ...rows.map((r) => r.player_count)), [rows]);
 
@@ -268,7 +240,11 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
   return (
     <Box
       sx={{
-        maxWidth: 1100,
+        width: '100%',
+        maxWidth: { xs: '100%', md: 1100 },
+        [theme.breakpoints.up('lg')]: {
+          maxWidth: '100%',
+        },
         mx: 'auto',
         px: embedded ? 0 : { xs: 2, sm: 3 },
         py: embedded ? 0 : { xs: 2, md: 4 },
@@ -282,63 +258,85 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
         <PageHeader title="RTA 대시보드" />
       )}
 
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel id="rta-dash-season-label">시즌</InputLabel>
-          <Select
-            labelId="rta-dash-season-label"
-            label="시즌"
-            value={seasonSelectValue}
-            onChange={(e) => setSeason(String(e.target.value))}
-          >
-            {seasonOptions.map((o) => (
-              <MenuItem key={o.value} value={o.value}>
-                {o.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        시즌 일별 티어 집계를 불러온 뒤, 슬라이더로 날짜를 고르면 그날의 분포만 표시합니다.{' '}
-        <Link href="/rta" style={{ color: theme.palette.primary.main }}>
-          매치 목록
-        </Link>
-        {' · '}
-        <Link href="/rta/monster-stats" style={{ color: theme.palette.primary.main }}>
-          몬스터 통계
-        </Link>
-      </Typography>
-
-      {isLoading && !data ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
+          columnGap: { xs: 0, lg: 3 },
+          rowGap: { xs: 0, lg: 0 },
+          alignItems: { xs: 'start', lg: 'stretch' },
+          width: '100%',
+        }}
+      >
+      <Card
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+          p: { xs: 2, sm: 3 },
+          height: { lg: '100%' },
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+          <Typography component="span" sx={{ fontWeight: 600, fontSize: '1rem' }}>
+            소환사 티어별 분포
+          </Typography>
         </Box>
-      ) : error ? (
-        <Typography color="error" sx={{ py: 4 }}>
-          {error.message || '불러오기에 실패했습니다.'}
+
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, mb: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 220 }}>
+            <InputLabel id="rta-dash-season-label">시즌</InputLabel>
+            <Select
+              labelId="rta-dash-season-label"
+              label="시즌"
+              value={seasonSelectValue}
+              onChange={(e) => setSeason(String(e.target.value))}
+            >
+              {seasonOptions.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, flexShrink: 0 }}>
+          시즌 일별 티어 누적 집계를 불러온 뒤, 슬라이더로 날짜를 고르면 그 시점까지의 누적 분포를 표시합니다.{' '}
+          <Link href="/rta" style={{ color: theme.palette.primary.main }}>
+            매치 목록
+          </Link>
+          {' · '}
+          <Link href="/rta/monster-stats" style={{ color: theme.palette.primary.main }}>
+            몬스터 통계
+          </Link>
         </Typography>
-      ) : (
-        <>
-        <Card
-          elevation={0}
+
+        <Box
           sx={{
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-            p: { xs: 2, sm: 3 },
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-            <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-            <Typography component="span" sx={{ fontWeight: 600, fontSize: '1rem' }}>
-              소환사 티어별 분포
-            </Typography>
+        {tierError ? (
+          <Typography color="error" sx={{ py: 2 }}>
+            {tierError.message || '티어 분포를 불러오지 못했습니다.'}
+          </Typography>
+        ) : isTierPending && !tierData ? (
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <RtaTierDistributionSkeleton />
           </Box>
-
-          <Box sx={{ mb: 2, px: 0.5 }}>
+        ) : (
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Box sx={{ mb: 2, px: 0.5, flexShrink: 0 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
               <Typography variant="caption" color="text.secondary">
                 {seasonStartYmd ?? '—'}
@@ -384,16 +382,17 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
               />
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              좌=시즌 시작일 · 우=시즌 종료일 · 슬라이더=해당 일 티어 분포(오늘이 시즌 안이면 오늘 이후로는 이동 불가)
+              좌=시즌 시작일 · 우=시즌 종료일 · 슬라이더=해당 일까지 누적 티어 분포(오늘이 시즌 안이면 오늘 이후로는 이동 불가)
             </Typography>
           </Box>
 
           {!isWide ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
               {rows.map((row) => {
+                const shortLabel = getRtaTierShortLabel(row.ratingId);
                 const pct = maxCount > 0 ? (row.player_count / maxCount) * 100 : 0;
                 return (
-                  <Box key={row.tier_key}>
+                  <Box key={row.ratingId}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Typography
                         variant="caption"
@@ -404,7 +403,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
                           color: 'text.secondary',
                         }}
                       >
-                        {row.tier_key}
+                        {shortLabel}
                       </Typography>
                       <Box
                         sx={{
@@ -420,7 +419,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
                             height: '100%',
                             width: `${pct}%`,
                             borderRadius: 0.5,
-                            bgcolor: tierColor(row.tier_key),
+                            bgcolor: tierColor(shortLabel),
                             transition: 'width 0.35s ease',
                           }}
                         />
@@ -444,20 +443,23 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
                 alignItems: 'flex-end',
                 justifyContent: 'space-between',
                 gap: 0.75,
-                height: 180,
+                flex: { lg: 1 },
+                minHeight: { xs: 180, lg: 200 },
+                maxHeight: { lg: 360 },
                 px: 0.5,
               }}
             >
               {rows.map((row) => {
+                const shortLabel = getRtaTierShortLabel(row.ratingId);
                 const pct = maxCount > 0 ? row.player_count / maxCount : 0;
-                const barH = Math.max(4, pct * 160);
+                const barH = Math.max(4, pct * (isLgUp ? 200 : 160));
                 return (
                   <Box
-                    key={row.tier_key}
+                    key={row.ratingId}
                     sx={{
                       flex: 1,
                       minWidth: 0,
-                      maxWidth: 48,
+                      maxWidth: { xs: 48, lg: 56, xl: 64 },
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -474,12 +476,12 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
                       {formatCompact(row.player_count)}
                     </Typography>
                     <Box
-                      title={`${row.tier_key}: ${row.player_count.toLocaleString()}`}
+                      title={`${shortLabel}: ${row.player_count.toLocaleString()}`}
                       sx={{
                         width: '100%',
                         height: barH,
                         borderRadius: '4px 4px 0 0',
-                        bgcolor: tierColor(row.tier_key),
+                        bgcolor: tierColor(shortLabel),
                         transition: 'height 0.35s ease',
                         cursor: 'default',
                         '&:hover': { opacity: 0.88 },
@@ -493,7 +495,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
                         color: 'text.secondary',
                       }}
                     >
-                      {row.tier_key}
+                      {shortLabel}
                     </Typography>
                   </Box>
                 );
@@ -501,16 +503,51 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
             </Box>
           )}
 
-          <Typography align="center" sx={{ mt: 2, color: 'text.secondary', fontSize: '0.9rem' }}>
+          <Typography
+            align="center"
+            sx={{
+              mt: { xs: 2, lg: 'auto' },
+              pt: { lg: 2 },
+              color: 'text.secondary',
+              fontSize: '0.9rem',
+              flexShrink: 0,
+            }}
+          >
             <Typography component="span" fontWeight={700} color="text.primary">
               {totalPlayers.toLocaleString()}
             </Typography>{' '}
             소환사 (선택한 일자·매치당 2명 집계)
           </Typography>
-        </Card>
-        {data ? <RtaRankCutoffsSection rankCutoffAnchors={data.rank_cutoff_anchors} /> : null}
-        </>
-      )}
+          </Box>
+        )}
+        </Box>
+      </Card>
+
+      <Box
+        sx={{
+          minWidth: 0,
+          width: '100%',
+          height: { lg: '100%' },
+          display: 'flex',
+          flexDirection: 'column',
+          alignSelf: { lg: 'stretch' },
+        }}
+      >
+        {rankError ? (
+          <Typography color="error" sx={{ mt: { xs: 2, lg: 0 } }}>
+            {rankError.message || '랭크 컷을 불러오지 못했습니다.'}
+          </Typography>
+        ) : isRankPending && !rankData ? (
+          <RtaRankCutoffSectionSkeleton fillHeight={isLgUp} noTopMargin={isLgUp} />
+        ) : (
+          <RtaRankCutoffsSection
+            rankCutoffAnchors={rankData?.rank_cutoff_anchors}
+            denseTop={isLgUp}
+            fillHeight={isLgUp}
+          />
+        )}
+      </Box>
+      </Box>
     </Box>
   );
 }

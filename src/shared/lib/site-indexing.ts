@@ -1,5 +1,6 @@
 export const PUBLIC_SITEMAP_STATIC_ROUTES = [
   { path: '', name: '홈', changeFrequency: 'daily' as const, priority: 1 },
+  { path: '/dashboard', name: 'RTA 대시보드', changeFrequency: 'daily' as const, priority: 0.95 },
   { path: '/monster-search', name: '몬스터 검색', changeFrequency: 'weekly' as const, priority: 0.8 },
   { path: '/rta', name: 'RTA 분석', changeFrequency: 'daily' as const, priority: 0.9 },
   { path: '/rta/monster-stats', name: 'RTA 몬스터 통계', changeFrequency: 'daily' as const, priority: 0.9 },

@@ -7,7 +7,7 @@ import JsonLd from '@/shared/ui/seo/JsonLd';
 
 function displayNameFromSummary(summary: RtaPlayerSummary | null, wizardId: string): string {
   if (summary?.found) {
-    const n = (summary.wizardName ?? summary.wizard_name)?.trim();
+    const n = summary.wizard_name?.trim();
     if (n) return n;
   }
   return `소환사 ${wizardId}`;
@@ -22,7 +22,7 @@ export async function generateMetadata({
   const summary = await getRtaPlayerSummaryData(wizardId);
   const name = displayNameFromSummary(summary, wizardId);
   const desc =
-    summary?.found && (summary.score != null || summary.rankPosition != null || summary.rank_position != null)
+    summary?.found && (summary.score != null || summary.rank_position != null)
       ? `${name}의 RTA 점수·순위·승률(수집 리플레이 기준)을 확인합니다.`
       : `${name}의 RTA 픽·통계·기록을 확인합니다.`;
 

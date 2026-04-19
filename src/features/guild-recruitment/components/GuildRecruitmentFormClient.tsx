@@ -46,10 +46,12 @@ export default function GuildRecruitmentFormClient({ postId }: Props) {
   useEffect(() => {
     const d = detailQuery.data;
     if (!d || !isEdit) return;
-    setGuildName(d.guild_name ?? '');
-    setServerName(d.server_name ?? '');
-    setLastSeasonGrade(d.last_season_grade ?? '');
-    setContent(d.content ?? '');
+    queueMicrotask(() => {
+      setGuildName(d.guild_name ?? '');
+      setServerName(d.server_name ?? '');
+      setLastSeasonGrade(d.last_season_grade ?? '');
+      setContent(d.content ?? '');
+    });
   }, [detailQuery.data, isEdit]);
 
   const saveMutation = useSaveGuildRecruitment({

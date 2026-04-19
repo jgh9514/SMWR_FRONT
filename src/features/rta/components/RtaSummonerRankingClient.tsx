@@ -24,8 +24,9 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
-import { useRtaSummonerRanking, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import { useRtaSummonerRanking, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaSummonerRankingRow } from '@/features/rta/types/rta';
@@ -39,15 +40,6 @@ const SUMMONER_RANKING_MAX = 500;
 function toNum(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-/** MyBatis mapUnderscoreToCamelCase → API JSON 키가 camelCase일 수 있음 */
-function pickRow<T>(row: unknown, snake: string, camel: string): T | undefined {
-  if (row == null || typeof row !== 'object') return undefined;
-  const r = row as Record<string, unknown>;
-  if (Object.prototype.hasOwnProperty.call(r, snake)) return r[snake] as T;
-  if (Object.prototype.hasOwnProperty.call(r, camel)) return r[camel] as T;
-  return undefined;
 }
 
 function countrySharesFromRankings(rows: RtaSummonerRankingRow[]): { code: string; pct: number }[] {
@@ -106,45 +98,14 @@ function WinRateBar({ wins, total }: { wins: number; total: number }) {
   );
 }
 
-const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
-
 export default function RtaSummonerRankingClient() {
   const [page, setPage] = useState(1);
   const { data: seasonsData } = useRtaSeasonsContext();
-  const seasonOptions = useMemo(() => {
-    const rows = seasonsData?.seasons;
-    if (!rows?.length) return SEASON_FALLBACK;
-    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
-  }, [seasonsData]);
-
-  const resolvedDefaultSeason = useMemo(() => {
-    const def = seasonsData?.defaultSeasonCode;
-    const rows = seasonsData?.seasons;
-    if (def && rows?.some((r) => r.seasonCode === def)) return def;
-    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
-  }, [seasonsData]);
-
-  const [season, setSeason] = useState<string | null>(null);
-  useEffect(() => {
-    if (seasonOptions.length === 0) return;
-    setSeason((prev) => {
-      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
-      return resolvedDefaultSeason;
-    });
-  }, [seasonOptions, resolvedDefaultSeason]);
-
-  const seasonSelectValue = season ?? resolvedDefaultSeason;
-
-  const seasonIdForApi = useMemo(
-    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
-    [seasonsData?.seasons, seasonSelectValue],
-  );
+  const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
   const offset = (page - 1) * PAGE_SIZE;
 
   const [countryFilter, setCountryFilter] = useState<string | null>(null);
-
-  const queryEnabled = Boolean(seasonSelectValue && seasonIdForApi != null);
 
   /** 페이지·국가 필터는 서버 집계 — 이동할 때마다 POST. 이전 페이지 데이터를 유지해 로딩 중 total=0 → pageCount=1 로 떨어지며 1페이지로 리셋되는 현상 방지 */
   const {
@@ -155,20 +116,19 @@ export default function RtaSummonerRankingClient() {
   } = useRtaSummonerRanking(PAGE_SIZE, offset, seasonSelectValue, {
     country: countryFilter ?? undefined,
     seasonId: seasonIdForApi,
-    enabled: queryEnabled,
     placeholderData: keepPreviousData,
   });
 
   /** 첫 로드만 전체 스피너 — 이후 페이지 이동은 테이블 상단 프로그레스 */
-  const tableInitialLoading = queryEnabled && loadingPage && !pageData;
-  const tablePageFetching = queryEnabled && fetchingPage && pageData != null;
+  const tableInitialLoading = loadingPage && !pageData;
+  const tablePageFetching = fetchingPage && pageData != null;
 
   /** 국가 칩: 상위 N명 풀 전체 분포(필터 없음) — 페이지 쿼리와 분리 */
   const { data: distSampleData, error: errDistSample } = useRtaSummonerRanking(
     SUMMONER_RANKING_MAX,
     0,
     seasonSelectValue,
-    { seasonId: seasonIdForApi, enabled: queryEnabled },
+    { seasonId: seasonIdForApi },
   );
 
   const total = toNum(pageData?.total);
@@ -178,13 +138,13 @@ export default function RtaSummonerRankingClient() {
     if (tableInitialLoading) return;
     if (total <= 0) return;
     if (page > pageCount) {
-      setPage(pageCount);
+      queueMicrotask(() => setPage(pageCount));
     }
   }, [page, pageCount, total, tableInitialLoading]);
 
   const rankings = useMemo(() => pageData?.rankings ?? [], [pageData]);
 
-  const countrySampleLoading = queryEnabled && !distSampleData && !errDistSample;
+  const countrySampleLoading = !distSampleData && !errDistSample;
 
   const handleCountryChipClick = (code: string) => {
     setCountryFilter((prev) => (prev === code ? null : code));
@@ -198,23 +158,20 @@ export default function RtaSummonerRankingClient() {
 
   const rows = useMemo(() => {
     return rankings.map((row: RtaSummonerRankingRow) => {
-      const rankRaw = pickRow<unknown>(row, 'rank_position', 'rankPosition');
-      const wid = pickRow<string | number>(row, 'wizard_id', 'wizardId');
-      const cuid = pickRow<string | number>(row, 'channel_uid', 'channelUid');
-      const wname = pickRow<string>(row, 'wizard_name', 'wizardName');
-      const winc = pickRow<unknown>(row, 'win_count', 'winCount');
-      const mcnt = pickRow<unknown>(row, 'match_count', 'matchCount');
-
+      const wid = row.wizard_id;
+      const cuid = row.channel_uid;
+      const wname = row.wizard_name;
       return {
-        rank: toNum(rankRaw),
+        rank: toNum(row.rank_position),
         wizardId: wid != null && String(wid).trim() !== '' ? String(wid) : '',
         channelUid:
           cuid != null && String(cuid).trim() !== '' ? String(cuid) : undefined,
         name: (typeof wname === 'string' ? wname.trim() : '') || '—',
         country: (typeof row.country === 'string' ? row.country.trim() : '') || '',
         score: toNum(row.score),
-        winCount: toNum(winc),
-        matchCount: toNum(mcnt),
+        ratingId: row.rating_id != null ? Number(row.rating_id) : undefined,
+        winCount: toNum(row.win_count),
+        matchCount: toNum(row.match_count),
       };
     });
   }, [rankings]);
@@ -496,7 +453,10 @@ export default function RtaSummonerRankingClient() {
                             fontVariantNumeric: 'tabular-nums',
                           }}
                         >
-                          {r.score.toLocaleString()}
+                          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            <RtaRatingStarIcons rating={r.ratingId} size={13} />
+                            {r.score.toLocaleString()}
+                          </Box>
                         </TableCell>
                         <TableCell
                           sx={{ verticalAlign: 'middle', py: 1.25, fontVariantNumeric: 'tabular-nums' }}

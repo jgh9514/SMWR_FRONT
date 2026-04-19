@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   AppBar,
@@ -46,6 +47,9 @@ import CircleIcon from '@mui/icons-material/Circle';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PersonIcon from '@mui/icons-material/Person';
+import Diversity3Icon from '@mui/icons-material/Diversity3';
+import GroupsIcon from '@mui/icons-material/Groups';
 import { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
@@ -71,8 +75,8 @@ interface NavLeaf {
   requiresLeaderOrManager?: boolean;
   requiresAdmin?: boolean;
   requiresLogin?: boolean;
-  /** 길드 없을 때만 노출 (예: 길드 가입 신청) */
   requiresNoGuild?: boolean;
+  children?: NavLeaf[];
 }
 
 export interface NavGroup {
@@ -110,7 +114,14 @@ function getNavGroups(
     dashboardPath: '/',
     items: [
       { title: 'RTA 분석', path: '/rta', icon: <SportsEsportsIcon /> },
-      { title: 'RTA 몬스터 통계', path: '/rta/monster-stats', icon: <BarChartIcon /> },
+      {
+        title: 'RTA 몬스터 통계', path: '/rta/monster-stats/solo', icon: <BarChartIcon />,
+        children: [
+          { title: '솔로 (1마리)', path: '/rta/monster-stats/solo', icon: <PersonIcon /> },
+          { title: '듀오 (2마리)', path: '/rta/monster-stats/duo', icon: <Diversity3Icon /> },
+          { title: '트리오 (3마리)', path: '/rta/monster-stats/trio', icon: <GroupsIcon /> },
+        ],
+      },
       { title: 'RTA 소환사 랭킹', path: '/rta/summoner-ranking', icon: <EmojiEventsIcon /> },
       { title: 'RTA 랭크 컷', path: '/rta/rank-cutoffs', icon: <TrendingUpIcon /> },
     ],
@@ -685,6 +696,30 @@ export default function FixedHeader() {
                       }}
                     >
                       {group.items.map((item) => {
+                        if (item.children) {
+                          return (
+                            <Box key={item.path}>
+                              <Typography variant="caption" sx={{ px: 2, pt: 1, pb: 0.5, display: 'block', color: 'rgba(255,255,255,0.45)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                {item.title}
+                              </Typography>
+                              {item.children.map((child) => {
+                                const childActive = isNavLeafActive(child.path, pathname);
+                                return (
+                                  <MenuItem
+                                    key={child.path}
+                                    component={Link}
+                                    href={child.path}
+                                    onClick={closeNavHoverMenu}
+                                    sx={{ py: 1, pl: 3, gap: 1.5, color: childActive ? 'primary.light' : 'rgba(255,255,255,0.9)', bgcolor: childActive ? 'rgba(255,255,255,0.06)' : 'transparent', textDecoration: 'none' }}
+                                  >
+                                    <Box sx={{ display: 'flex', color: 'text.secondary', '& svg': { fontSize: 18 } }}>{child.icon}</Box>
+                                    <Typography variant="body2" sx={{ fontWeight: childActive ? 600 : 400 }}>{child.title}</Typography>
+                                  </MenuItem>
+                                );
+                              })}
+                            </Box>
+                          );
+                        }
                         const subActive = isNavLeafActive(item.path, pathname);
                         return (
                           <MenuItem
@@ -1060,6 +1095,27 @@ export default function FixedHeader() {
                 )}
               </ListSubheader>
               {group.items.map((item) => {
+                if (item.children) {
+                  return (
+                    <Box key={`${group.id}-${item.path}-group`}>
+                      <Typography variant="caption" sx={{ px: 2, pt: 0.5, pb: 0.25, display: 'block', color: 'text.disabled', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        {item.title}
+                      </Typography>
+                      {item.children.map((child) => {
+                        const childActive = isNavLeafActive(child.path, pathname);
+                        return (
+                          <ListItem key={`${group.id}-${child.path}`} disablePadding sx={{ px: 1, mb: 0.25 }}>
+                            <ListItemButton component={Link} href={child.path} selected={childActive}
+                              sx={{ borderRadius: 2, py: 0.75, pl: 3, '&.Mui-selected': { bgcolor: 'action.selected', '&:hover': { bgcolor: 'action.selected' } }, '&:hover': { bgcolor: 'action.hover' } }}>
+                              <ListItemIcon sx={{ color: childActive ? 'primary.main' : 'text.secondary', minWidth: 36 }}>{child.icon}</ListItemIcon>
+                              <ListItemText primary={child.title} primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: childActive ? 600 : 400 }} />
+                            </ListItemButton>
+                          </ListItem>
+                        );
+                      })}
+                    </Box>
+                  );
+                }
                 const itemActive = isNavLeafActive(item.path, pathname);
                 return (
                   <ListItem key={`${group.id}-${item.path}`} disablePadding sx={{ px: 1, mb: 0.25 }}>
@@ -1076,20 +1132,12 @@ export default function FixedHeader() {
                         '&:hover': { bgcolor: 'action.hover' },
                       }}
                     >
-                      <ListItemIcon
-                        sx={{
-                          color: itemActive ? 'primary.main' : 'text.secondary',
-                          minWidth: 40,
-                        }}
-                      >
+                      <ListItemIcon sx={{ color: itemActive ? 'primary.main' : 'text.secondary', minWidth: 40 }}>
                         {item.icon}
                       </ListItemIcon>
                       <ListItemText
                         primary={item.title}
-                        primaryTypographyProps={{
-                          fontSize: '0.9375rem',
-                          fontWeight: itemActive ? 600 : 400,
-                        }}
+                        primaryTypographyProps={{ fontSize: '0.9375rem', fontWeight: itemActive ? 600 : 400 }}
                       />
                     </ListItemButton>
                   </ListItem>

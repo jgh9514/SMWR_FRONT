@@ -23,20 +23,19 @@ import {
 import type { Theme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useRtaListPage, resolveRtaSeasonIdForApi } from '@/features/rta/hooks/useRtaData';
+import {
+  useRtaListPage,
+  useRtaRatingGradeRules,
+  useRtaSeasonSelect,
+  buildMonsterStatsTierBody,
+} from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
+import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import type { MatchItem, RtaData, RawMatchItem } from '@/types';
-import {
-  RTA_TIER_KEY_FILTER_ITEMS,
-  DEFAULT_RTA_LIST_TIER_KEY,
-  type RtaTierKey,
-} from '@/features/rta/types/rta';
-
-const SEASON_FALLBACK = [{ value: 'S36_SPECIAL', label: '36시즌 스페셜리그' }];
 
 /** /rta 매치 목록: 최신순 기준 앞쪽(최근) 페이지만 최대 N페이지까지 노출 */
 const MAX_RTA_LIST_PAGES = 10;
@@ -65,45 +64,31 @@ export default function RtaPageClient() {
   const rtaStarSize = useMediaQuery(theme.breakpoints.up('md')) ? 12 : 10;
   const [expandedMatches, setExpandedMatches] = useState<{ [key: number]: boolean }>({});
   const [currentPage, setCurrentPage] = useState(1);
-  const [tierKey, setTierKey] = useState<'' | RtaTierKey>(DEFAULT_RTA_LIST_TIER_KEY);
+  const [tierSelection, setTierSelection] = useState('');
 
   const { data: seasonsData } = useRtaSeasonsContext();
-  const seasonOptions = useMemo(() => {
-    const rows = seasonsData?.seasons;
-    if (!rows?.length) return SEASON_FALLBACK;
-    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
-  }, [seasonsData]);
-
-  const resolvedDefaultSeason = useMemo(() => {
-    const def = seasonsData?.defaultSeasonCode;
-    const rows = seasonsData?.seasons;
-    if (def && rows?.some((r) => r.seasonCode === def)) return def;
-    return rows?.[0]?.seasonCode ?? SEASON_FALLBACK[0].value;
-  }, [seasonsData]);
-
-  const [season, setSeason] = useState<string | null>(null);
-  useEffect(() => {
-    if (seasonOptions.length === 0) return;
-    setSeason((prev) => {
-      if (prev !== null && seasonOptions.some((o) => o.value === prev)) return prev;
-      return resolvedDefaultSeason;
-    });
-  }, [seasonOptions, resolvedDefaultSeason]);
-
-  const seasonSelectValue = season ?? resolvedDefaultSeason;
-
-  const seasonIdForApi = useMemo(
-    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
-    [seasonsData?.seasons, seasonSelectValue],
-  );
+  const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
   useEffect(() => {
-    setCurrentPage(1);
+    queueMicrotask(() => setCurrentPage(1));
   }, [seasonSelectValue]);
 
+  const { data: gradeRules = [] } = useRtaRatingGradeRules();
+
+  const tierApi = useMemo(() => {
+    const b = buildMonsterStatsTierBody(tierSelection, gradeRules);
+    if ('ratingId' in b && b.ratingId != null && b.ratingId > 0) {
+      return { ratingId: b.ratingId, ratingIds: null as number[] | null };
+    }
+    if ('ratingIds' in b && b.ratingIds != null && b.ratingIds.length > 0) {
+      return { ratingId: null as number | null, ratingIds: b.ratingIds };
+    }
+    return { ratingId: null as number | null, ratingIds: null as number[] | null };
+  }, [tierSelection, gradeRules]);
+
   useEffect(() => {
-    setCurrentPage(1);
-  }, [tierKey]);
+    queueMicrotask(() => setCurrentPage(1));
+  }, [tierSelection]);
 
   const {
     data: pageResponse,
@@ -115,7 +100,8 @@ export default function RtaPageClient() {
     offset: (currentPage - 1) * DEFAULT_PAGE_SIZE,
     seasonCode: seasonSelectValue,
     seasonId: seasonIdForApi,
-    tierKey: tierKey === '' ? undefined : tierKey,
+    ratingId: tierApi.ratingId,
+    ratingIds: tierApi.ratingIds,
   });
 
   const rtaData = useMemo<RtaData | null>(() => {
@@ -123,7 +109,7 @@ export default function RtaPageClient() {
     const statsResponse = pageResponse.stats;
     if (!statsResponse) return null;
 
-    const hasMore = Boolean(statsResponse.hasMore ?? statsResponse.has_more);
+    const hasMore = Boolean(statsResponse.hasMore);
     const rawMatches = pageResponse.matches ?? [];
     const processedMatches = Array.isArray(rawMatches)
       ? rawMatches.map((m: RawMatchItem) => processRawMatchToMatchItem(m))
@@ -147,13 +133,13 @@ export default function RtaPageClient() {
   useEffect(() => {
     const tp = rtaData?.totalPages ?? 0;
     if (tp >= 1 && currentPage > tp) {
-      setCurrentPage(tp);
+      queueMicrotask(() => setCurrentPage(tp));
     }
   }, [rtaData?.totalPages, currentPage]);
 
   /** 페이지 바뀌면 접기 상태 초기화(기본은 전부 펼침) */
   useEffect(() => {
-    setExpandedMatches({});
+    queueMicrotask(() => setExpandedMatches({}));
   }, [currentPage]);
 
   /** 기본 펼침: 명시적으로 false일 때만 접힘 */
@@ -173,94 +159,7 @@ export default function RtaPageClient() {
       ? `linear-gradient(180deg, ${alpha('#0f172a', 1)} 0%, ${alpha('#1e293b', 1)} 40%, ${alpha('#0f172a', 1)} 100%)`
       : `linear-gradient(180deg, ${alpha('#f0fdfa', 1)} 0%, ${alpha('#ecfeff', 0.9)} 35%, ${alpha('#f8fafc', 1)} 100%)`;
 
-  if (isLoadingPage) {
-    return (
-      <Box
-        sx={(theme) => ({
-          minHeight: '50vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: pageBg(theme),
-        })}
-      >
-        <Box sx={{ textAlign: 'center' }}>
-          <CircularProgress size={56} thickness={4} sx={{ color: 'primary.main' }} />
-          <Typography sx={{ mt: 2, color: 'text.secondary', fontWeight: 500 }}>매치 데이터를 불러오는 중…</Typography>
-        </Box>
-      </Box>
-    );
-  }
-
-  if (pageError) {
-    return (
-      <Box
-        sx={(theme) => ({
-          minHeight: '50vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: pageBg(theme),
-          px: 2,
-        })}
-      >
-        <Card
-          elevation={0}
-          sx={(theme) => ({
-            maxWidth: 420,
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: alpha(theme.palette.error.main, 0.25),
-            background: alpha(theme.palette.background.paper, 0.85),
-            backdropFilter: 'blur(12px)',
-          })}
-        >
-          <CardContent sx={{ textAlign: 'center', py: 4 }}>
-            <Typography color="error" sx={{ mb: 2, fontWeight: 600 }}>
-              {pageError.message || '데이터를 불러오는데 실패했습니다.'}
-            </Typography>
-            <Button variant="contained" onClick={() => refetchPage()} sx={{ mt: 1, borderRadius: 2, px: 3 }}>
-              다시 시도
-            </Button>
-          </CardContent>
-        </Card>
-      </Box>
-    );
-  }
-
   const hasNoData = !rtaData || paginatedMatches.length === 0;
-
-  if (hasNoData) {
-    return (
-      <Box
-        sx={(theme) => ({
-          minHeight: '50vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          background: pageBg(theme),
-          px: 2,
-        })}
-      >
-        <Card
-          elevation={0}
-          sx={(theme) => ({
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: alpha(theme.palette.divider, 0.2),
-            background: alpha(theme.palette.background.paper, 0.9),
-            backdropFilter: 'blur(10px)',
-          })}
-        >
-          <CardContent sx={{ textAlign: 'center', py: 5, px: 4 }}>
-            <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
-              표시할 매치가 없습니다
-            </Typography>
-          </CardContent>
-        </Card>
-      </Box>
-    );
-  }
 
   return (
     <Box
@@ -337,69 +236,39 @@ export default function RtaPageClient() {
                     ))}
                   </Select>
                 </FormControl>
-                <FormControl size="small" sx={{ minWidth: 140 }}>
-                  <InputLabel id="rta-list-tier-label">티어</InputLabel>
-                  <Select
-                    labelId="rta-list-tier-label"
-                    label="티어"
-                    value={tierKey}
-                    onChange={(e) => setTierKey(e.target.value as '' | RtaTierKey)}
-                    sx={{ borderRadius: 2 }}
-                    MenuProps={{ PaperProps: { sx: { maxHeight: 320 } } }}
-                    renderValue={(selected: '' | RtaTierKey) => {
-                      if (selected === '' || selected == null) {
-                        return (
-                          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
-                            전체
-                          </Typography>
-                        );
-                      }
-                      const pr = RTA_TIER_KEY_FILTER_ITEMS.find((x) => x.value === selected)?.previewRating;
-                      if (pr == null) return null;
-                      return (
-                        <Box sx={{ display: 'inline-flex', alignItems: 'center', py: 0.25 }}>
-                          <RtaRatingStarIcons rating={pr} size={20} gap={2} />
-                        </Box>
-                      );
-                    }}
-                  >
-                    {RTA_TIER_KEY_FILTER_ITEMS.map((o) => (
-                      <MenuItem
-                        key={o.value || 'all'}
-                        value={o.value}
-                        sx={{ minHeight: 44, justifyContent: 'center' }}
-                        aria-label={o.value === '' ? '티어 전체' : `티어 ${o.value}`}
-                      >
-                        {o.value === '' ? (
-                          <Typography variant="body2" color="text.secondary">
-                            전체
-                          </Typography>
-                        ) : o.previewRating != null ? (
-                          <Box
-                            component="span"
-                            aria-hidden
-                            sx={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              width: '100%',
-                              py: 0.5,
-                            }}
-                          >
-                            <RtaRatingStarIcons rating={o.previewRating} size={22} gap={2} />
-                          </Box>
-                        ) : null}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                <RtaTierFilterMenu value={tierSelection} onChange={setTierSelection} rules={gradeRules} />
               </Box>
             </Box>
           </Box>
 
           <CardContent sx={{ p: { xs: 2, md: 2.5 }, pt: { xs: 2, md: 2.5 } }}>
+            {isLoadingPage && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+                <Box sx={{ textAlign: 'center' }}>
+                  <CircularProgress size={48} thickness={4} sx={{ color: 'primary.main' }} />
+                  <Typography sx={{ mt: 2, color: 'text.secondary', fontWeight: 500 }}>매치 데이터를 불러오는 중…</Typography>
+                </Box>
+              </Box>
+            )}
+            {!isLoadingPage && pageError && (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <Typography color="error" sx={{ mb: 2, fontWeight: 600 }}>
+                  {pageError.message || '데이터를 불러오는데 실패했습니다.'}
+                </Typography>
+                <Button variant="contained" onClick={() => refetchPage()} sx={{ borderRadius: 2, px: 3 }}>
+                  다시 시도
+                </Button>
+              </Box>
+            )}
+            {!isLoadingPage && !pageError && hasNoData && (
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
+                  표시할 매치가 없습니다
+                </Typography>
+              </Box>
+            )}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
-            {paginatedMatches.map((match: MatchItem, index: number) => {
+            {!isLoadingPage && !pageError && !hasNoData && paginatedMatches.map((match: MatchItem, index: number) => {
               const isExpanded = expandedMatches[index] !== false;
               const p1Wins = match.winnerPosition === '1';
               return (
@@ -500,9 +369,11 @@ export default function RtaPageClient() {
                           </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
                             <RtaRatingStarIcons rating={match.p1Rating} size={rtaStarSize} />
-                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
-                              {match.p1Score}
-                            </Typography>
+                            {match.p1Score > 0 && (
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
+                                {match.p1Score}
+                              </Typography>
+                            )}
                           </Box>
                         </Box>
                       </Box>
@@ -645,9 +516,11 @@ export default function RtaPageClient() {
                             )}
                           </Box>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                            <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
-                              {match.p2Score}
-                            </Typography>
+                            {match.p2Score > 0 && (
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
+                                {match.p2Score}
+                              </Typography>
+                            )}
                             <RtaRatingStarIcons rating={match.p2Rating} size={rtaStarSize} />
                           </Box>
                         </Box>
@@ -970,10 +843,10 @@ export default function RtaPageClient() {
             })}
           </Box>
 
-          {rtaData.totalPages > 1 && (
+          {(rtaData?.totalPages ?? 0) > 1 && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 1 }}>
               <Pagination
-                count={rtaData.totalPages}
+                count={rtaData!.totalPages}
                 page={currentPage}
                 onChange={(_, page) => changePage(page)}
                 color="primary"

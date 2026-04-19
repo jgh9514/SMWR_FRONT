@@ -48,25 +48,9 @@ function createUnits(
 
 export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
   return {
-    p1Name:
-      match.p1_name ||
-      match.p1Name ||
-      match.p1_player_name ||
-      match.p1PlayerName ||
-      'Player',
-    p2Name:
-      match.p2_name ||
-      match.p2Name ||
-      match.p2_player_name ||
-      match.p2PlayerName ||
-      'Opponent',
-    date:
-      match.date_add ||
-      match.dateAdd ||
-      match.date ||
-      match.created_at ||
-      match.updated_at ||
-      (typeof window !== 'undefined' ? new Date().toISOString() : ''),
+    p1Name: match.p1_name || 'Player',
+    p2Name: match.p2_name || 'Opponent',
+    date: match.date_add || (typeof window !== 'undefined' ? new Date().toISOString() : ''),
     p1Units: createUnits(
       match.p1_unit_names,
       match.p1_unit_images,
@@ -91,13 +75,13 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p2_channel_uid != null && match.p2_channel_uid !== ''
         ? String(match.p2_channel_uid)
         : undefined,
-    winnerPosition: normalizeWinnerPosition(match.winner_position ?? match.winnerPosition),
+    winnerPosition: normalizeWinnerPosition(match.winner_position),
     p1Country: match.p1_country,
     p2Country: match.p2_country,
-    p1Score: Number(match.p1_score || match.p1Score || 0),
-    p2Score: Number(match.p2_score || match.p2Score || 0),
-    p1Rating: Number(match.p1_rating || match.p1Rating || 0),
-    p2Rating: Number(match.p2_rating || match.p2Rating || 0),
+    p1Score: Number(match.p1_score || 0),
+    p2Score: Number(match.p2_score || 0),
+    p1Rating: Number(match.p1_rating || 0),
+    p2Rating: Number(match.p2_rating || 0),
     p1FirstPick: match.p1_first_pick || '0',
     p2FirstPick: match.p2_first_pick || '0',
   };

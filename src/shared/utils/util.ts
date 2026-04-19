@@ -85,7 +85,7 @@ export const getRatingStars = (rating: number | string | undefined): number => {
 };
 
 /**
- * RTA rating_id → 티어 문자열 (Ch / F / C / P / G / L). 대시보드 SQL tier_key 규칙과 동일.
+ * RTA rating_id → 티어 문자열 (Ch / F / C / P / G / L). 집계·대시보드 SQL 의 슬롯 문자열 규칙과 동일.
  */
 export function getRtaTierShortLabel(rating: number | string | undefined): string {
   if (rating === undefined || rating === null) return '—';
@@ -126,15 +126,15 @@ export function getRatingStarIconPath(rating: number | string | undefined): stri
   return '/icons/challenger_star.png';
 }
 
-/** 티어 키(Ch1, F2, C3, P1, G2, L3 …) → public/icons 별 PNG (L1만 전설 1위 배지, L2·L3는 가디언 별) */
-export function getRtaTierKeyStarIconPath(tierKey: string): string {
-  if (tierKey.startsWith('Ch')) return '/icons/challenger_star.png';
-  if (tierKey.startsWith('F')) return '/icons/fighter_star.png';
-  if (tierKey.startsWith('C')) return '/icons/conqueror_star.png';
-  if (tierKey.startsWith('P')) return '/icons/punisher_star.png';
-  if (tierKey.startsWith('G')) return '/icons/guardian_star.png';
-  if (tierKey === 'L1') return '/icons/legend_star.png';
-  if (tierKey.startsWith('L')) return '/icons/guardian_star.png';
+/** getRtaTierShortLabel 결과 문자열(Ch1, F2 …) → public/icons 별 PNG (L1만 전설 1위 배지, L2·L3는 가디언 별) */
+export function getRtaShortLabelStarIconPath(shortLabel: string): string {
+  if (shortLabel.startsWith('Ch')) return '/icons/challenger_star.png';
+  if (shortLabel.startsWith('F')) return '/icons/fighter_star.png';
+  if (shortLabel.startsWith('C')) return '/icons/conqueror_star.png';
+  if (shortLabel.startsWith('P')) return '/icons/punisher_star.png';
+  if (shortLabel.startsWith('G')) return '/icons/guardian_star.png';
+  if (shortLabel === 'L1') return '/icons/legend_star.png';
+  if (shortLabel.startsWith('L')) return '/icons/guardian_star.png';
   return '/icons/challenger_star.png';
 }
 

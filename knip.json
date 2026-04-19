@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "exclude": ["exports", "types", "nsExports", "nsTypes"],
+  "ignore": [
+    "public/smarteditor2/**",
+    "public/fallback-development.js"
+  ],
+  "ignoreDependencies": [
+    "baseline-browser-mapping",
+    "@emotion/cache",
+    "@mui/system",
+    "smarteditor2"
+  ]
+}

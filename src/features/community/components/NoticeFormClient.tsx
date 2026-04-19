@@ -59,7 +59,7 @@ export default function NoticeFormClient({ mode, noticeId, initialNotice }: Noti
   const [userInfo] = useState<UserInfo | null>(() => getStoredUserInfo());
 
   useEffect(() => {
-    setEditorReady(false);
+    queueMicrotask(() => setEditorReady(false));
   }, [mode, noticeId]);
   const [title, setTitle] = useState(initialNotice?.title ?? '');
   const [isImportant, setIsImportant] = useState(initialNotice?.is_important ?? false);

@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useRtaMonsterDetail } from '@/features/rta/hooks/useRtaData';
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -9,12 +11,14 @@ import {
   Container,
   LinearProgress,
   Paper,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
   Typography,
   Chip,
   Grid,
@@ -34,6 +38,10 @@ import type {
 } from '@/features/siege/hooks/useMonsterInfo';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import type { AttributeType } from '@/features/siege/types/monster';
+import type { MonsterDetail } from '@/features/rta/types/rta';
+import RtaMonsterDetailContent from '@/features/rta/components/RtaMonsterDetailContent';
+import MonsterDetailRtaOverviewTab from '@/features/rta/components/MonsterDetailRtaOverviewTab';
+import MonsterDetailHeroTxtWrap from '@/features/siege/components/MonsterDetailHeroTxtWrap';
 import { monsterAwakenStepDigit } from '@/features/siege/lib/monsterIdEvolution';
 
 /** skill_master.slot(스킬 슬롯) 우선 — 없으면 monster_skill_link.skill_order 보조 */
@@ -138,6 +146,10 @@ function detailContextFrom(info: MonsterInfoResponse): MonsterDetailContextPaylo
 interface MonsterDetailContentProps {
   monsterInfo: MonsterInfoResponse;
   devilmonImageUrl: string;
+  /** 있으면 하단에 RTA 통계·상성·최근 경기 블록 표시 */
+  rtaDetail?: MonsterDetail | null;
+  /** 몬스터 메타 갱신 시각(ISO) — 있으면 상단 "최근 업데이트" 표시 */
+  infoUpdatedAt?: string | null;
 }
 
 function EvolutionStage({ label, monster }: { label: string; monster?: MonsterOption }) {
@@ -236,7 +248,12 @@ function sumSkillUps(skills: MonsterSkill[] | undefined): number {
   }, 0);
 }
 
-export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: MonsterDetailContentProps) {
+export default function MonsterDetailContent({
+  monsterInfo,
+  devilmonImageUrl,
+  rtaDetail = null,
+  infoUpdatedAt = null,
+}: MonsterDetailContentProps) {
   const {
     monster_id,
     kr_name,
@@ -483,6 +500,34 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
     accuracy,
   ]);
 
+  const [detailTab, setDetailTab] = useState(0);
+
+  const rtaMonsterNumericId = useMemo(() => {
+    const n = Number.parseInt(String(monster_id), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [monster_id]);
+
+  const {
+    data: rtaFromClient,
+    isLoading: rtaClientLoading,
+    isFetching: rtaClientFetching,
+    isError: rtaClientError,
+  } = useRtaMonsterDetail(rtaMonsterNumericId, undefined, undefined, {
+    initialData: rtaDetail ?? undefined,
+  });
+
+  const rtaDetailEffective = rtaFromClient ?? rtaDetail ?? null;
+  const rtaOverviewPending =
+    rtaMonsterNumericId != null &&
+    rtaDetailEffective == null &&
+    (rtaClientLoading || rtaClientFetching);
+  const rtaOverviewFailed =
+    rtaMonsterNumericId != null &&
+    rtaDetailEffective == null &&
+    rtaClientError &&
+    !rtaClientLoading &&
+    !rtaClientFetching;
+
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
       <Button
@@ -496,6 +541,87 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
         몬스터 검색
       </Button>
 
+      <MonsterDetailHeroTxtWrap
+        imageUrl={image_url}
+        krName={kr_name}
+        attr={attr}
+        monsterElemental={monster_elemental}
+        archetype={archetype}
+        naturalStarCount={naturalStarCount}
+        infoUpdatedAt={infoUpdatedAt}
+      />
+
+      {siblingElements.length > 0 ? (
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, color: 'text.secondary' }}>
+            같은 몬스터 · 다른 속성
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
+            {siblingElements.map(({ attr: sAttr, monster: sm }) => (
+              <Link
+                key={sAttr}
+                href={`/monster-detail/${sm.monster_id}`}
+                style={{ textDecoration: 'none' }}
+                title={sm.kr_name}
+              >
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: 72,
+                    height: 72,
+                    borderRadius: 1.5,
+                    border: '2px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                    backgroundImage: `url(${getRenderableImageUrl(sm.image_url)})`,
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    transition: 'transform 0.15s',
+                    '&:hover': { transform: 'scale(1.05)' },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      bottom: 4,
+                      right: 4,
+                      lineHeight: 0,
+                      filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))',
+                    }}
+                  >
+                    <AttributeElementIcon attribute={sAttr} size={22} />
+                  </Box>
+                </Box>
+              </Link>
+            ))}
+          </Box>
+        </Box>
+      ) : null}
+
+      <Tabs
+        value={detailTab}
+        onChange={(_, v) => setDetailTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
+      >
+        <Tab label="개요" />
+        <Tab label="스탯" />
+        <Tab label="상성" />
+        <Tab label="상위 플레이어" />
+      </Tabs>
+
+      {detailTab === 0 ? (
+        <MonsterDetailRtaOverviewTab
+          rtaDetail={rtaDetailEffective}
+          rtaOverviewPending={rtaOverviewPending}
+          rtaOverviewFailed={rtaOverviewFailed}
+        />
+      ) : null}
+
+      {detailTab === 1 ? (
+        <>
       <Paper elevation={0} sx={{ overflow: 'hidden', borderRadius: 2, mb: 2 }}>
         <Box
           sx={{
@@ -549,54 +675,6 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
           </Box>
         </Box>
       </Paper>
-
-      {siblingElements.length > 0 ? (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, color: 'text.secondary' }}>
-            같은 몬스터 · 다른 속성
-          </Typography>
-          <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-            {siblingElements.map(({ attr: sAttr, monster: sm }) => (
-              <Link
-                key={sAttr}
-                href={`/monster-detail/${sm.monster_id}`}
-                style={{ textDecoration: 'none' }}
-                title={sm.kr_name}
-              >
-                <Box
-                  sx={{
-                    position: 'relative',
-                    width: 72,
-                    height: 72,
-                    borderRadius: 1.5,
-                    border: '2px solid',
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper',
-                    backgroundImage: `url(${getRenderableImageUrl(sm.image_url)})`,
-                    backgroundSize: 'contain',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    transition: 'transform 0.15s',
-                    '&:hover': { transform: 'scale(1.05)' },
-                  }}
-                >
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      bottom: 4,
-                      right: 4,
-                      lineHeight: 0,
-                      filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))',
-                    }}
-                  >
-                    <AttributeElementIcon attribute={sAttr} size={22} />
-                  </Box>
-                </Box>
-              </Link>
-            ))}
-          </Box>
-        </Box>
-      ) : null}
 
       <Box
         sx={{
@@ -988,6 +1066,35 @@ export default function MonsterDetailContent({ monsterInfo, devilmonImageUrl }: 
           </Card>
         </Box>
       </Box>
+        </>
+      ) : null}
+
+      {detailTab === 2 ? (
+        rtaDetailEffective ? (
+          <RtaMonsterDetailContent data={rtaDetailEffective} embedded embeddedPart="tables" />
+        ) : rtaOverviewPending ? (
+          <LinearProgress sx={{ my: 2 }} />
+        ) : rtaOverviewFailed ? (
+          <Alert severity="warning">
+            RTA 집계를 불러오지 못했습니다. API 주소(NEXT_PUBLIC_API_BASE_URL)와 서버 상태를 확인해 주세요.
+          </Alert>
+        ) : (
+          <Alert severity="info">RTA 집계 데이터가 아직 없습니다.</Alert>
+        )
+      ) : null}
+
+      {detailTab === 3 ? (
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+              상위 플레이어
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              해당 몬스터를 활용한 랭커 상위 목록은 API 연동 후 제공됩니다.
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : null}
     </Container>
   );
 }

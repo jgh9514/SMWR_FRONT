@@ -1,8 +1,9 @@
 import type { RtaRankCutoffAnchorRow } from '@/features/rta/types/rta';
 import { isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
+import { getRtaTierShortLabel } from '@/shared/utils/util';
 
-/** 티어 컷 차트·데이터 순서 (낮은 티어 → 높은 티어: P1 ~ G3) */
-export const CUT_TIER_ORDER = ['P1', 'P2', 'P3', 'G1', 'G2', 'G3'] as const;
+/** 티어 컷 차트·데이터 순서 (낮은 티어 → 높은 티어: P2 ~ G3, P1 제외·정규 시즌 하한 컷 없음) */
+export const CUT_TIER_ORDER = ['P2', 'P3', 'G1', 'G2', 'G3'] as const;
 
 /** X축: 좌=과거(앵커가 더 옛날) → 우=현재에 가까움 */
 export const ANCHOR_CHART_KEYS = ['7d', '3d', '12h', '6h', '3h'] as const;
@@ -31,7 +32,11 @@ export function pivotRankCutoffAnchors(
   for (const row of rows ?? []) {
     const ak = String(row.anchor_key ?? '').trim();
     if (!ak) continue;
-    const tk = row.tier_key;
+    const ridRaw = row.ratingId;
+    const tk =
+      ridRaw != null && String(ridRaw).trim() !== ''
+        ? getRtaTierShortLabel(Number(ridRaw))
+        : '';
     if (!tk || !tierSet.has(tk)) continue;
     if (!byAnchor.has(ak)) byAnchor.set(ak, {});
     const rec = byAnchor.get(ak)!;
@@ -52,7 +57,7 @@ export function buildCutChartRows(byAnchor: Map<string, Record<string, number>>)
   });
 }
 
-/** P1·G3 끝점으로 Y 범위 우선 산출(없으면 전 티어 폴백). Recharts domain [min, max] */
+/** P2·G3 끝점으로 Y 범위 우선 산출(없으면 전 티어 폴백). Recharts domain [min, max] */
 export function computeCutChartYDomain(
   chartRows: Record<string, string | number | null>[],
 ): [number, number] | undefined {

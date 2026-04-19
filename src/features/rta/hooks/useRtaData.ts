@@ -5,6 +5,7 @@
  * 시즌: body에 seasonId(우선, rta_season.season_id) 또는 seasonCode — 둘 다 없으면 서버 기본 시즌
  */
 
+import { useEffect, useMemo, useState } from 'react';
 import type { UseQueryOptions } from '@tanstack/react-query';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import {
@@ -14,14 +15,21 @@ import {
   RtaListPageResponse,
 } from '@/types';
 
-function tierKeyBody(tierKey?: string | null | undefined): Record<string, string> {
-  const t = tierKey?.trim();
-  if (!t) return {};
-  return { tierKey: t };
+function ratingIdBody(ratingId?: number | null): Record<string, number> {
+  if (ratingId == null || ratingId <= 0) return {};
+  return { ratingId };
+}
+
+/** 매치 목록/페이지 API — 몬스터 통계와 동일: ratingId 단일 우선, 없으면 ratingIds */
+function matchListTierBody(ratingId?: number | null, ratingIds?: number[] | null): Record<string, number | number[]> {
+  if (ratingId != null && ratingId > 0) return { ratingId };
+  if (ratingIds != null && ratingIds.length > 0) return { ratingIds };
+  return {};
 }
 import type {
   MonsterDetail,
-  RtaDashboardResponse,
+  RtaDashboardRankCutoffResponse,
+  RtaDashboardTierDistributionResponse,
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
   RtaRatingGradeRule,
@@ -32,7 +40,84 @@ import type {
 } from '@/features/rta/types/rta';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { apiClient } from '@/shared/lib/api/client';
-import { toYmdKst } from '@/features/rta/utils/ymdKst';
+import { getRtaTierShortLabel } from '@/shared/utils/util';
+
+const MONSTER_TIER_BULK_PRED: Record<string, (short: string) => boolean> = {
+  CH_ALL: (s) => s.startsWith('Ch'),
+  F_ALL: (s) => /^F[123]$/.test(s),
+  C_ALL: (s) => /^C[123]$/.test(s),
+  P_ALL: (s) => /^P[123]$/.test(s),
+  G_ALL: (s) => /^G[123]$/.test(s),
+};
+
+/**
+ * 몬스터 통계 API body — 세부 슬롯·구간 전체(CH_ALL 등)를 rating_id 로 변환.
+ */
+export function buildMonsterStatsTierBody(
+  selection: string,
+  rules: RtaRatingGradeRule[],
+): { ratingId?: number; ratingIds?: number[] } {
+  const t = selection.trim();
+  if (!t) return {};
+  const pred = MONSTER_TIER_BULK_PRED[t];
+  if (pred) {
+    const ids = rules
+      .filter((r) => pred(getRtaTierShortLabel(r.ratingId)))
+      .map((r) => r.ratingId)
+      .filter((id) => Number.isFinite(id) && id > 0);
+    return ids.length ? { ratingIds: ids } : {};
+  }
+  const rule = rules.find((r) => getRtaTierShortLabel(r.ratingId) === t);
+  if (rule) return { ratingId: rule.ratingId };
+  return {};
+}
+
+function monsterStatsTierBody(
+  ratingId?: number | null,
+  ratingIds?: number[] | null,
+): Record<string, number | number[]> {
+  const o: Record<string, number | number[]> = {};
+  if (ratingId != null && ratingId > 0) o.ratingId = ratingId;
+  if (ratingIds != null && ratingIds.length > 0) o.ratingIds = ratingIds;
+  return o;
+}
+
+/** 시즌 API 응답 전 렌더링용 빈 목록 — 로딩 중에는 옵션을 표시하지 않는다. */
+export const RTA_SEASON_FALLBACK: { value: string; label: string }[] = [];
+
+/**
+ * 시즌 기본 seasonCode — `listRtaSeasons` 행만으로 결정(WAS `selectDefaultSeasonIdForNow` 와 동일 규칙).
+ * 1) is_active=true 인 행 중 sort_order ASC → season_no DESC → season_code ASC
+ * 2) 없으면 전체 중 season_no DESC → season_id DESC (폴백 1건 시즌)
+ */
+export function resolveDefaultRtaSeasonCode(
+  seasonsData: RtaSeasonsResponse | undefined,
+  fallback: string,
+): string {
+  const rows = seasonsData?.seasons;
+  if (!rows?.length) return fallback;
+
+  const active = rows.filter((r) => r.isActive);
+  if (active.length > 0) {
+    active.sort((a, b) => {
+      const so = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      if (so !== 0) return so;
+      const sn = (b.seasonNo ?? 0) - (a.seasonNo ?? 0);
+      if (sn !== 0) return sn;
+      return (a.seasonCode ?? '').localeCompare(b.seasonCode ?? '');
+    });
+    const c = active[0]?.seasonCode?.trim();
+    if (c) return c;
+  }
+
+  const sorted = [...rows].sort((a, b) => {
+    const sn = (b.seasonNo ?? 0) - (a.seasonNo ?? 0);
+    if (sn !== 0) return sn;
+    return (b.seasonId ?? 0) - (a.seasonId ?? 0);
+  });
+  const c = sorted[0]?.seasonCode?.trim();
+  return c || fallback;
+}
 
 /** 시즌 목록 행에서 선택 코드에 해당하는 season_id — API에 PK로 넘길 때 사용 */
 export function resolveRtaSeasonIdForApi(
@@ -60,41 +145,29 @@ export function seasonBody(
   return { seasonCode: c };
 }
 
-/**
- * MyBatis resultType=map → JSON 키가 snake_case(season_code)인 경우가 많아
- * 화면에서 쓰는 camelCase RtaSeasonRow로 통일한다.
- */
+/** WAS `listRtaSeasons` — 컬럼별 camelCase 별칭만 사용 */
 function normalizeRtaSeasonsResponse(raw: unknown): RtaSeasonsResponse {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const rawList = o.seasons;
   const list = Array.isArray(rawList) ? rawList : [];
   const seasons: RtaSeasonRow[] = list.map((item) => {
     const r = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
-    const sc = r.seasonCode ?? r.season_code;
-    const sn = r.seasonName ?? r.season_name;
-    const rawSid = r.seasonId ?? r.season_id;
+    const rawSid = r.seasonId;
     const sidNum = rawSid != null && String(rawSid).trim() !== '' ? Number(rawSid) : NaN;
     return {
       seasonId: Number.isFinite(sidNum) ? sidNum : 0,
-      seasonCode: sc != null ? String(sc) : '',
-      seasonNo: Number(r.seasonNo ?? r.season_no ?? 0),
-      leagueType: String(r.leagueType ?? r.league_type ?? ''),
-      seasonName: sn != null ? String(sn) : '',
-      startAt:
-        String(r.startYmdKst ?? r.start_ymd_kst ?? toYmdKst(r.startAt ?? r.start_at) ?? ''),
-      /** 서버 lastInclusiveYmdKst = bucket_date < end 배타상한의 전날(KST). 티어 집계와 동일 */
-      endAt: String(
-        r.lastInclusiveYmdKst ?? r.last_inclusive_ymd_kst ?? toYmdKst(r.endAt ?? r.end_at) ?? '',
-      ),
-      isActive: Boolean(r.isActive ?? r.is_active),
-      sortOrder: Number(r.sortOrder ?? r.sort_order ?? 0),
+      seasonCode: r.seasonCode != null ? String(r.seasonCode) : '',
+      seasonNo: Number(r.seasonNo ?? 0),
+      leagueType: String(r.leagueType ?? ''),
+      seasonName: r.seasonName != null ? String(r.seasonName) : '',
+      startAt: String(r.startYmdKst ?? ''),
+      /** lastInclusiveYmdKst = end 배타 상한 전날(KST) */
+      endAt: String(r.lastInclusiveYmdKst ?? ''),
+      isActive: Boolean(r.isActive),
+      sortOrder: Number(r.sortOrder ?? 0),
     };
   });
-  const def = o.defaultSeasonCode ?? o.default_season_code;
-  return {
-    seasons,
-    defaultSeasonCode: def != null && String(def).trim() !== '' ? String(def).trim() : null,
-  };
+  return { seasons };
 }
 
 /**
@@ -119,12 +192,12 @@ export const useRtaStats = (seasonCode?: string | null, seasonId?: number | null
  * 백엔드: POST /api/v1/rta/matches
  */
 export const useRtaMatchList = (params: RtaMatchListParams) => {
-  const { limit, offset, seasonCode, seasonId, tierKey } = params;
+  const { limit, offset, seasonCode, seasonId, ratingId, ratingIds, enabled = true } = params;
   return useApiPostQuery<RtaMatchesResponse>(
     '/rta/matches',
-    { limit, offset, ...seasonBody(seasonCode, seasonId), ...tierKeyBody(tierKey) },
+    { limit, offset, ...seasonBody(seasonCode, seasonId), ...matchListTierBody(ratingId, ratingIds) },
     {
-      enabled: true,
+      enabled,
       staleTime: RTA_READ_STALE_MS,
       gcTime: RTA_READ_GC_MS,
       refetchOnWindowFocus: false,
@@ -134,12 +207,12 @@ export const useRtaMatchList = (params: RtaMatchListParams) => {
 
 /** /rta 목록 화면 권장: 통계 + 매치 목록 HTTP 1회 — POST /api/v1/rta/page */
 export const useRtaListPage = (params: RtaMatchListParams) => {
-  const { limit, offset, seasonCode, seasonId, tierKey } = params;
+  const { limit, offset, seasonCode, seasonId, ratingId, ratingIds, enabled = true } = params;
   return useApiPostQuery<RtaListPageResponse>(
     '/rta/page',
-    { limit, offset, ...seasonBody(seasonCode, seasonId), ...tierKeyBody(tierKey) },
+    { limit, offset, ...seasonBody(seasonCode, seasonId), ...matchListTierBody(ratingId, ratingIds) },
     {
-      enabled: true,
+      enabled,
       staleTime: RTA_READ_STALE_MS,
       gcTime: RTA_READ_GC_MS,
       refetchOnWindowFocus: false,
@@ -149,13 +222,15 @@ export const useRtaListPage = (params: RtaMatchListParams) => {
 
 export type RtaMonsterStatsQueryParams = {
   limit?: number;
-  statsOffset?: number;
-  duoOffset?: number;
-  trioOffset?: number;
+  offset?: number;
+  type?: 'solo' | 'duo' | 'trio';
   seasonCode?: string | null;
   seasonId?: number | null;
-  /** null/빈값=전체 합산, CH_ALL·F_ALL·C_ALL·P_ALL·G_ALL, 또는 tier_key(Ch1, F3…) */
-  tierKey?: string | null;
+  /** 단일 rta_rating_grade.rating_id — ratingIds 와 동시에 쓰지 않음 */
+  ratingId?: number | null;
+  /** 복수 rating_id (구간 합산) */
+  ratingIds?: number[] | null;
+  enabled?: boolean;
 };
 
 function normalizeRtaRatingGradeRules(raw: unknown): RtaRatingGradeRule[] {
@@ -163,21 +238,13 @@ function normalizeRtaRatingGradeRules(raw: unknown): RtaRatingGradeRule[] {
   return raw
     .map((item) => {
       const r = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
-      const id = r.ratingId ?? r.rating_id;
-      const tk = r.tierKey ?? r.tier_key;
-      const ratingId = Number(id);
+      const ratingId = Number(r.ratingId);
       return {
         ratingId,
-        tierKey: tk != null ? String(tk).trim() : '',
-        gradeName:
-          r.gradeName != null
-            ? String(r.gradeName)
-            : r.grade_name != null
-              ? String(r.grade_name)
-              : undefined,
+        gradeName: r.gradeName != null ? String(r.gradeName) : undefined,
       };
     })
-    .filter((x) => x.tierKey !== '' && Number.isFinite(x.ratingId));
+    .filter((x) => Number.isFinite(x.ratingId) && x.ratingId > 0);
 }
 
 /**
@@ -198,46 +265,112 @@ export const useRtaRatingGradeRules = () => {
 };
 
 /**
- * RTA 몬스터별 통계 조회
- * 백엔드: POST /api/v1/rta/monster-stats — limit=페이지 크기, stats_offset·duo_offset·trio_offset, tierKey
+ * RTA 몬스터별 통계 조회 (type별 독립 호출)
+ * 백엔드: POST /api/v1/rta/monster-stats — type: solo|duo|trio
  */
 export const useRtaMonsterStats = (params: RtaMonsterStatsQueryParams = {}) => {
-  const { limit = 20, statsOffset = 0, duoOffset = 0, trioOffset = 0, seasonCode, seasonId, tierKey } = params;
+  const { limit = 20, offset = 0, type = 'solo', seasonCode, seasonId, ratingId, ratingIds, enabled = true } =
+    params;
   return useApiPostQuery<RtaMonsterStatsResponse>(
     '/rta/monster-stats',
     {
       limit,
-      stats_offset: statsOffset,
-      duo_offset: duoOffset,
-      trio_offset: trioOffset,
+      offset,
+      type,
       ...seasonBody(seasonCode, seasonId),
-      ...tierKeyBody(tierKey),
+      ...monsterStatsTierBody(ratingId, ratingIds),
     },
     {
-      enabled: true,
-      staleTime: 0,
-      gcTime: 0,
-      refetchOnWindowFocus: true,
+      enabled,
+      staleTime: RTA_READ_STALE_MS,
+      gcTime: RTA_READ_GC_MS,
+      refetchOnWindowFocus: false,
     },
   );
 };
 
 /**
- * RTA 대시보드 (일별×티어 전체 — 기간은 클라이언트에서 합산)
- * 백엔드: POST /api/v1/rta/dashboard
+ * RTA 대시보드 — 소환사 티어별 분포 (일별×티어)
+ * 백엔드: POST /api/v1/rta/dashboard/tier-distribution
  */
-export const useRtaDashboard = (seasonCode?: string | null, seasonId?: number | null) => {
-  return useApiPostQuery<RtaDashboardResponse>(
-    '/rta/dashboard',
+export const useRtaDashboardTierDistribution = (seasonCode?: string | null, seasonId?: number | null) => {
+  return useApiPostQuery<RtaDashboardTierDistributionResponse>(
+    '/rta/dashboard/tier-distribution',
     seasonBody(seasonCode, seasonId),
     {
       enabled: true,
-      staleTime: 0,
-      gcTime: 0,
-      refetchOnWindowFocus: true,
+      staleTime: RTA_READ_STALE_MS,
+      gcTime: RTA_READ_GC_MS,
+      refetchOnWindowFocus: false,
     },
   );
 };
+
+/**
+ * RTA 대시보드 — 랭크 컷 (앵커·스냅샷)
+ * 백엔드: POST /api/v1/rta/dashboard/rank-cutoff
+ */
+export const useRtaDashboardRankCutoff = (seasonCode?: string | null, seasonId?: number | null) => {
+  return useApiPostQuery<RtaDashboardRankCutoffResponse>(
+    '/rta/dashboard/rank-cutoff',
+    seasonBody(seasonCode, seasonId),
+    {
+      enabled: true,
+      staleTime: RTA_READ_STALE_MS,
+      gcTime: RTA_READ_GC_MS,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
+/**
+ * 시즌 선택 UI 공통 훅 — 5개 RTA 페이지 컴포넌트의 반복 로직을 하나로 묶는다.
+ *
+ * - seasonsData 로드 전에는 기본값을 state에 확정하지 않는다(fallback 값이 굳는 버그 방지).
+ * - 실제 데이터 로드 후: 목록의 is_active·sort_order 로 기본 시즌 선택(resolveDefaultRtaSeasonCode).
+ * - 사용자가 이미 유효한 시즌을 선택했으면 변경하지 않는다.
+ */
+export function useRtaSeasonSelect(seasonsData: RtaSeasonsResponse | undefined): {
+  /** Select에 바인딩할 현재 선택 값 (로딩 중에는 fallback 코드) */
+  seasonSelectValue: string;
+  /** API 호출에 쓸 season_id (목록에 없으면 null) */
+  seasonIdForApi: number | null;
+  /** 선택 변경 핸들러 */
+  setSeason: (code: string) => void;
+  /** Select <MenuItem> 목록 */
+  seasonOptions: { value: string; label: string }[];
+} {
+  const resolvedDefaultSeason = useMemo(
+    () => resolveDefaultRtaSeasonCode(seasonsData, ''),
+    [seasonsData],
+  );
+
+  const seasonOptions = useMemo(() => {
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return RTA_SEASON_FALLBACK;
+    return rows.map((r) => ({ value: r.seasonCode, label: r.seasonName }));
+  }, [seasonsData]);
+
+  const [season, setSeason] = useState<string | null>(null);
+  useEffect(() => {
+    if (!seasonsData) return;
+    queueMicrotask(() => {
+      setSeason((prev) => {
+        if (prev !== null && seasonsData.seasons.some((r) => r.seasonCode === prev)) return prev;
+        return resolvedDefaultSeason;
+      });
+    });
+  }, [seasonsData, resolvedDefaultSeason]);
+
+  const seasonSelectValue = season ?? resolvedDefaultSeason;
+
+  const seasonIdForApi = useMemo(
+    () => resolveRtaSeasonIdForApi(seasonsData?.seasons, seasonSelectValue),
+    [seasonsData?.seasons, seasonSelectValue],
+  );
+
+  return { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions };
+}
 
 /** RTA 시즌 목록 (DB) — GET /api/v1/rta/seasons. /rta 레이아웃에서 Provider로 한 번만 마운트 권장 */
 export const useRtaSeasons = () => {
@@ -342,6 +475,8 @@ export const useRtaMonsterDetail = (
   monsterId: number | null,
   seasonCode?: string | null,
   seasonId?: number | null,
+  /** 서버에서 prefetch한 값 — 클라이언트 첫 페인트에 사용 */
+  queryOptions?: Omit<UseQueryOptions<MonsterDetail, Error>, 'queryKey' | 'queryFn'>,
 ) => {
   const isValidId = monsterId !== null && !isNaN(monsterId) && monsterId > 0;
   return useApiPostQuery<MonsterDetail>(
@@ -354,6 +489,7 @@ export const useRtaMonsterDetail = (
       refetchOnWindowFocus: true,
       refetchOnReconnect: false,
       retry: false,
+      ...queryOptions,
     },
   );
 };

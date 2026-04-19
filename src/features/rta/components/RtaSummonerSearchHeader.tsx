@@ -9,16 +9,16 @@ import type { RtaSummonerSearchHit } from '@/features/rta/types/rta';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 
 function pickWizardId(row: RtaSummonerSearchHit): string {
-  const w = row.wizardId ?? row.wizard_id;
+  const w = row.wizard_id;
   return w != null ? String(w).trim() : '';
 }
 
 function pickWizardName(row: RtaSummonerSearchHit): string {
-  return String(row.wizardName ?? row.wizard_name ?? '').trim() || '—';
+  return String(row.wizard_name ?? '').trim() || '—';
 }
 
 function pickChannelUid(row: RtaSummonerSearchHit): string | undefined {
-  const u = row.channelUid ?? row.channel_uid;
+  const u = row.channel_uid;
   if (u == null || u === '') return undefined;
   return String(u).trim();
 }

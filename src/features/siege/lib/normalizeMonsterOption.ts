@@ -36,8 +36,14 @@ export function normalizeMonsterOption(row: Record<string, unknown>): MonsterOpt
   if (obRaw === true || obRaw === 'true' || obRaw === 1) obtainable = true;
   else if (obRaw === false || obRaw === 'false' || obRaw === 0) obtainable = false;
 
+  const mid = String(row.monster_id ?? row.monsterId ?? '');
+  const rtaStatsRaw = row.rta_stats_monster_id ?? row.rtaStatsMonsterId;
+  const rtaStats =
+    rtaStatsRaw != null && String(rtaStatsRaw).trim() !== '' ? String(rtaStatsRaw).trim() : mid;
+
   return {
-    monster_id: String(row.monster_id ?? row.monsterId ?? ''),
+    monster_id: mid,
+    rta_stats_monster_id: rtaStats,
     kr_name: String(row.kr_name ?? row.krName ?? ''),
     un_name: String(row.un_name ?? row.unName ?? ''),
     image_url: String(row.image_url ?? row.imageUrl ?? ''),
