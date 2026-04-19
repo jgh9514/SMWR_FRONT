@@ -1,6 +1,5 @@
 'use client';
 
-import { keepPreviousData } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
@@ -12,7 +11,6 @@ import {
   InputLabel,
   LinearProgress,
   MenuItem,
-  Pagination,
   Paper,
   Select,
   Stack,
@@ -31,9 +29,7 @@ import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaSummonerRankingRow } from '@/features/rta/types/rta';
 
-const PAGE_SIZE = 50;
-/** WAS `RtaServiceImpl.RTA_SUMMONER_RANKING_MAX_PAGES` — 상위 풀 500명 기준 최대 페이지 수 */
-const MAX_PAGES = 10;
+const PAGE_SIZE = 10;
 /** WAS `RtaServiceImpl.RTA_SUMMONER_RANKING_MAX_ROWS` — 국가 칩 비율용 샘플만 별도 요청 */
 const SUMMONER_RANKING_MAX = 500;
 
@@ -56,58 +52,131 @@ function countrySharesFromRankings(rows: RtaSummonerRankingRow[]): { code: strin
 }
 
 function WinRateBar({ wins, total }: { wins: number; total: number }) {
-  if (total <= 0) {
-    return (
-      <Typography variant="body2" color="text.disabled" sx={{ fontSize: '0.75rem' }}>
-        —
-      </Typography>
-    );
-  }
   const losses = Math.max(0, total - wins);
-  const pct = (wins / total) * 100;
+  const pct = total > 0 ? (wins / total) * 100 : 0;
+  const winPct = total > 0 ? wins / total : 0;
+  const lossPct = total > 0 ? losses / total : 0;
+  /** 텍스트를 표시할 최소 비율 (너무 좁으면 생략) */
+  const MIN_LABEL_PCT = 0.18;
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0, flexWrap: 'nowrap' }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+      <Typography
+        sx={{
+          fontSize: '0.72rem',
+          fontWeight: 800,
+          fontVariantNumeric: 'tabular-nums',
+          color: total <= 0 ? 'text.disabled' : pct >= 50 ? 'primary.main' : 'error.light',
+          flexShrink: 0,
+          minWidth: 40,
+        }}
+      >
+        {total <= 0 ? '0%' : `${pct.toFixed(1)}%`}
+      </Typography>
       <Box
         sx={{
           flex: 1,
-          minWidth: 72,
-          maxWidth: 140,
-          height: 10,
+          height: 26,
           borderRadius: 1,
           overflow: 'hidden',
-          display: 'flex',
           bgcolor: 'action.hover',
+          '@keyframes slideInBar': {
+            from: { transform: 'translateX(-100%)' },
+            to: { transform: 'translateX(0)' },
+          },
         }}
       >
-        <Box sx={{ flex: wins, bgcolor: 'success.main', minWidth: wins > 0 ? 2 : 0 }} />
-        <Box sx={{ flex: losses, bgcolor: 'error.dark', minWidth: losses > 0 ? 2 : 0 }} />
+        {total <= 0 ? (
+          <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
+              0승 · 0패
+            </Typography>
+          </Box>
+        ) : (
+          <Box
+            sx={{
+              display: 'flex',
+              width: '100%',
+              height: '100%',
+              animation: 'slideInBar 0.55s cubic-bezier(0.22, 1, 0.36, 1)',
+            }}
+          >
+            {wins > 0 && (
+              <Box
+                sx={{
+                  flex: wins,
+                  bgcolor: 'primary.main',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {winPct >= MIN_LABEL_PCT && (
+                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums', px: 0.5, whiteSpace: 'nowrap' }}>
+                    {wins}승
+                  </Typography>
+                )}
+              </Box>
+            )}
+            {losses > 0 && (
+              <Box
+                sx={{
+                  flex: losses,
+                  bgcolor: 'error.dark',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                }}
+              >
+                {lossPct >= MIN_LABEL_PCT && (
+                  <Typography sx={{ fontSize: '0.68rem', fontWeight: 800, color: '#fff', lineHeight: 1, fontVariantNumeric: 'tabular-nums', px: 0.5, whiteSpace: 'nowrap' }}>
+                    {losses}패
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Box>
+        )}
       </Box>
-      <Typography
-        variant="body2"
-        sx={{
-          fontSize: '0.75rem',
-          fontWeight: 800,
-          fontVariantNumeric: 'tabular-nums',
-          color: pct >= 50 ? 'success.main' : 'error.light',
-          flexShrink: 0,
-        }}
-      >
-        {pct.toFixed(1)}%
-      </Typography>
     </Box>
   );
 }
 
+function buildRow(row: RtaSummonerRankingRow) {
+  const wid = row.wizard_id;
+  const cuid = row.channel_uid;
+  const wname = row.wizard_name;
+  return {
+    rank: toNum(row.rank_position),
+    wizardId: wid != null && String(wid).trim() !== '' ? String(wid) : '',
+    channelUid: cuid != null && String(cuid).trim() !== '' ? String(cuid) : undefined,
+    name: (typeof wname === 'string' ? wname.trim() : '') || '—',
+    country: (typeof row.country === 'string' ? row.country.trim() : '') || '',
+    score: toNum(row.score),
+    ratingId: row.rating_id != null ? Number(row.rating_id) : undefined,
+    winCount: toNum(row.win_count),
+    matchCount: toNum(row.match_count),
+  };
+}
+
 export default function RtaSummonerRankingClient() {
-  const [page, setPage] = useState(1);
   const { data: seasonsData } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
-  const offset = (page - 1) * PAGE_SIZE;
-
+  const [offset, setOffset] = useState(0);
+  const [allRows, setAllRows] = useState<ReturnType<typeof buildRow>[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [countryFilter, setCountryFilter] = useState<string | null>(null);
 
-  /** 페이지·국가 필터는 서버 집계 — 이동할 때마다 POST. 이전 페이지 데이터를 유지해 로딩 중 total=0 → pageCount=1 로 떨어지며 1페이지로 리셋되는 현상 방지 */
+  /** 시즌·국가 필터가 바뀌면 목록 초기화 */
+  useEffect(() => {
+    setOffset(0);
+    setAllRows([]);
+    setHasMore(false);
+  }, [seasonSelectValue, countryFilter]);
+
   const {
     data: pageData,
     isLoading: loadingPage,
@@ -116,12 +185,27 @@ export default function RtaSummonerRankingClient() {
   } = useRtaSummonerRanking(PAGE_SIZE, offset, seasonSelectValue, {
     country: countryFilter ?? undefined,
     seasonId: seasonIdForApi,
-    placeholderData: keepPreviousData,
   });
 
-  /** 첫 로드만 전체 스피너 — 이후 페이지 이동은 테이블 상단 프로그레스 */
-  const tableInitialLoading = loadingPage && !pageData;
-  const tablePageFetching = fetchingPage && pageData != null;
+  /** 첫 로드만 전체 스피너, 더보기는 테이블 상단 프로그레스 */
+  const tableInitialLoading = loadingPage && allRows.length === 0;
+  const tableLoadingMore = fetchingPage && offset > 0;
+
+  /** 새 데이터 도착 시 누적 */
+  useEffect(() => {
+    if (!pageData) return;
+    const newRows = (pageData.rankings ?? []).map((row: RtaSummonerRankingRow) => buildRow(row));
+    const total = toNum(pageData.total);
+    if (offset === 0) {
+      setAllRows(newRows);
+    } else {
+      setAllRows((prev) => [...prev, ...newRows]);
+    }
+    setHasMore(offset + PAGE_SIZE < total);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageData]);
+
+  const total = toNum(pageData?.total);
 
   /** 국가 칩: 상위 N명 풀 전체 분포(필터 없음) — 페이지 쿼리와 분리 */
   const { data: distSampleData, error: errDistSample } = useRtaSummonerRanking(
@@ -131,50 +215,16 @@ export default function RtaSummonerRankingClient() {
     { seasonId: seasonIdForApi },
   );
 
-  const total = toNum(pageData?.total);
-  const pageCount = Math.min(MAX_PAGES, Math.max(1, Math.ceil(total / PAGE_SIZE)));
-
-  useEffect(() => {
-    if (tableInitialLoading) return;
-    if (total <= 0) return;
-    if (page > pageCount) {
-      queueMicrotask(() => setPage(pageCount));
-    }
-  }, [page, pageCount, total, tableInitialLoading]);
-
-  const rankings = useMemo(() => pageData?.rankings ?? [], [pageData]);
-
   const countrySampleLoading = !distSampleData && !errDistSample;
 
   const handleCountryChipClick = (code: string) => {
     setCountryFilter((prev) => (prev === code ? null : code));
-    setPage(1);
   };
 
   const countryChips = useMemo(
     () => countrySharesFromRankings(distSampleData?.rankings ?? []),
     [distSampleData?.rankings],
   );
-
-  const rows = useMemo(() => {
-    return rankings.map((row: RtaSummonerRankingRow) => {
-      const wid = row.wizard_id;
-      const cuid = row.channel_uid;
-      const wname = row.wizard_name;
-      return {
-        rank: toNum(row.rank_position),
-        wizardId: wid != null && String(wid).trim() !== '' ? String(wid) : '',
-        channelUid:
-          cuid != null && String(cuid).trim() !== '' ? String(cuid) : undefined,
-        name: (typeof wname === 'string' ? wname.trim() : '') || '—',
-        country: (typeof row.country === 'string' ? row.country.trim() : '') || '',
-        score: toNum(row.score),
-        ratingId: row.rating_id != null ? Number(row.rating_id) : undefined,
-        winCount: toNum(row.win_count),
-        matchCount: toNum(row.match_count),
-      };
-    });
-  }, [rankings]);
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
@@ -196,7 +246,6 @@ export default function RtaSummonerRankingClient() {
               onChange={(e) => {
                 setSeason(String(e.target.value));
                 setCountryFilter(null);
-                setPage(1);
               }}
             >
               {seasonOptions.map((o) => (
@@ -218,7 +267,6 @@ export default function RtaSummonerRankingClient() {
                   variant="text"
                   onClick={() => {
                     setCountryFilter(null);
-                    setPage(1);
                   }}
                 >
                   국가 필터 해제
@@ -299,7 +347,7 @@ export default function RtaSummonerRankingClient() {
       ) : (
         <>
           <Box sx={{ position: 'relative', mb: 2 }}>
-            {tablePageFetching ? (
+            {tableLoadingMore ? (
               <LinearProgress
                 sx={{
                   position: 'absolute',
@@ -314,11 +362,11 @@ export default function RtaSummonerRankingClient() {
             <TableContainer
               component={Paper}
               variant="outlined"
-              aria-busy={tablePageFetching}
+              aria-busy={tableLoadingMore}
               sx={{
                 borderRadius: 2,
                 overflowX: 'auto',
-                ...(tablePageFetching ? { opacity: 0.72, transition: 'opacity 0.2s' } : {}),
+                ...(tableLoadingMore ? { opacity: 0.72, transition: 'opacity 0.2s' } : {}),
               }}
             >
             <Table size="small" sx={{ minWidth: 640, tableLayout: 'fixed', width: '100%' }} stickyHeader>
@@ -336,25 +384,22 @@ export default function RtaSummonerRankingClient() {
                   <TableCell width="14%" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary' }}>
                     점수
                   </TableCell>
-                  <TableCell width="10%" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary' }}>
-                    게임
-                  </TableCell>
-                  <TableCell width="26%" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary' }}>
+                  <TableCell width="36%" sx={{ py: 1.5, fontSize: '0.75rem', fontWeight: 700, color: 'text.secondary' }}>
                     승률
                   </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {rows.length === 0 ? (
+                {allRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={5}>
                       <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
                         표시할 랭킹 데이터가 없습니다.
                       </Typography>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  rows.map((r) => {
+                  allRows.map((r) => {
                     const profileHref =
                       r.wizardId !== '' ? `/rta/player/${encodeURIComponent(r.wizardId)}` : null;
                     const serverLabel = r.country ? r.country.toUpperCase() : '—';
@@ -458,11 +503,6 @@ export default function RtaSummonerRankingClient() {
                             {r.score.toLocaleString()}
                           </Box>
                         </TableCell>
-                        <TableCell
-                          sx={{ verticalAlign: 'middle', py: 1.25, fontVariantNumeric: 'tabular-nums' }}
-                        >
-                          {r.matchCount.toLocaleString()}
-                        </TableCell>
                         <TableCell sx={{ verticalAlign: 'middle', py: 1.25 }}>
                           <WinRateBar wins={r.winCount} total={r.matchCount} />
                         </TableCell>
@@ -475,24 +515,27 @@ export default function RtaSummonerRankingClient() {
           </TableContainer>
           </Box>
 
-          {pageCount > 1 ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
-              <Pagination
-                count={pageCount}
-                page={Math.min(page, pageCount)}
-                onChange={(_, p) => setPage(p)}
-                color="primary"
-                size="small"
-                showFirstButton
-                showLastButton
-              />
+          {(hasMore || tableLoadingMore) && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                disabled={fetchingPage}
+                startIcon={tableLoadingMore ? <CircularProgress size={16} thickness={4} /> : undefined}
+                sx={(theme) => ({
+                  borderRadius: 2,
+                  px: 5,
+                  py: 1,
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  borderColor: `${theme.palette.primary.main}80`,
+                  '&:hover': { borderColor: theme.palette.primary.main },
+                })}
+              >
+                {tableLoadingMore ? '불러오는 중…' : '더보기'}
+              </Button>
             </Box>
-          ) : null}
-
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-            총 {total.toLocaleString()}명 (상위 {SUMMONER_RANKING_MAX}명 풀 내) · 페이지당 {PAGE_SIZE}명 · 최대 {MAX_PAGES}페이지
-            {countryFilter != null ? ` · 국가 필터: ${countryFilter}` : ''}
-          </Typography>
+          )}
         </>
       )}
     </Container>

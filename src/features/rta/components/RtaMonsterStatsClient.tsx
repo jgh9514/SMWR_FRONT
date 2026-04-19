@@ -506,34 +506,37 @@ const SoloSortableTh = memo(function SoloSortableTh({
   );
 });
 
-// ─── StatsPagination ──────────────────────────────────────────────────────────
+// ─── LoadMoreButton ───────────────────────────────────────────────────────────
 
-const StatsPagination = memo(function StatsPagination({
-  page,
+const LoadMoreButton = memo(function LoadMoreButton({
   hasMore,
-  onChange,
-  ariaLabel,
+  isFetching,
+  onLoadMore,
   isNarrow,
 }: {
-  page: number;
   hasMore: boolean;
-  onChange: (page: number) => void;
-  ariaLabel: string;
+  isFetching: boolean;
+  onLoadMore: () => void;
   isNarrow: boolean;
 }) {
-  if (page <= 1 && !hasMore) return null;
+  if (!hasMore && !isFetching) return null;
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, pt: 2 }}>
-      <Button variant="outlined" size={isNarrow ? 'small' : 'medium'} disabled={page <= 1}
-        onClick={() => onChange(page - 1)} aria-label={`${ariaLabel} 이전 페이지`}>
-        이전
-      </Button>
-      <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, whiteSpace: 'nowrap', fontWeight: 600 }}>
-        {page}페이지
-      </Typography>
-      <Button variant="outlined" size={isNarrow ? 'small' : 'medium'} disabled={!hasMore}
-        onClick={() => onChange(page + 1)} aria-label={`${ariaLabel} 다음 페이지`}>
-        다음
+    <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
+      <Button
+        variant="outlined"
+        size={isNarrow ? 'small' : 'medium'}
+        onClick={onLoadMore}
+        disabled={isFetching}
+        startIcon={isFetching ? <CircularProgress size={16} thickness={4} /> : undefined}
+        sx={(theme) => ({
+          px: 5,
+          borderRadius: 2,
+          fontWeight: 700,
+          borderColor: `${theme.palette.primary.main}80`,
+          '&:hover': { borderColor: theme.palette.primary.main },
+        })}
+      >
+        {isFetching ? '불러오는 중…' : '더보기'}
       </Button>
     </Box>
   );
@@ -552,10 +555,20 @@ export default function RtaMonsterStatsClient() {
   const { data: seasonsData } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
-  // Pagination
-  const [statsPage, setStatsPage] = useState(1);
-  const [duoPage, setDuoPage] = useState(1);
-  const [trioPage, setTrioPage] = useState(1);
+  // Load-more offsets
+  const [statsOffset, setStatsOffset] = useState(0);
+  const [duoOffset, setDuoOffset] = useState(0);
+  const [trioOffset, setTrioOffset] = useState(0);
+
+  // Accumulated rows
+  const [allSoloStats, setAllSoloStats] = useState<MonsterStats[]>([]);
+  const [allDuoStats, setAllDuoStats] = useState<DuoComboStat[]>([]);
+  const [allTrioStats, setAllTrioStats] = useState<TrioComboStat[]>([]);
+
+  // Persisted hasMore (prevents button flash during fetch)
+  const [statsHasMore, setStatsHasMore] = useState(false);
+  const [duoHasMore, setDuoHasMore] = useState(false);
+  const [trioHasMore, setTrioHasMore] = useState(false);
 
   // Filters
   const [tierSelection, setTierSelection] = useState('');
@@ -572,17 +585,17 @@ export default function RtaMonsterStatsClient() {
   const [trioSortField, setTrioSortField] = useState<ComboSortField>('match_count');
   const [trioSortOrder, setTrioSortOrder] = useState<SortOrder>('desc');
 
-  const statsOffset = (statsPage - 1) * PAGE_SIZE;
-  const duoOffset  = (duoPage  - 1) * PAGE_SIZE;
-  const trioOffset = (trioPage - 1) * PAGE_SIZE;
-
-  // Reset pages when filters change
+  // Reset all on filter change
   useEffect(() => {
-    queueMicrotask(() => {
-      setStatsPage(1);
-      setDuoPage(1);
-      setTrioPage(1);
-    });
+    setStatsOffset(0);
+    setDuoOffset(0);
+    setTrioOffset(0);
+    setAllSoloStats([]);
+    setAllDuoStats([]);
+    setAllTrioStats([]);
+    setStatsHasMore(false);
+    setDuoHasMore(false);
+    setTrioHasMore(false);
   }, [tierSelection, seasonSelectValue]);
 
   // Data
@@ -619,26 +632,56 @@ export default function RtaMonsterStatsClient() {
   const isFetching = tab === 0 ? soloFetching : tab === 1 ? duoFetching : trioFetching;
   const error = soloError;
 
-  // Normalized data
-  const stats = useMemo(() => (soloData?.rows as MonsterStats[] ?? []).map(normalizeMonsterStat), [soloData?.rows]);
-  const duoStats  = useMemo(() => (duoData?.rows  as DuoComboStat[]  ?? []).map(normalizeComboStat), [duoData?.rows]);
-  const trioStats = useMemo(() => (trioData?.rows as TrioComboStat[] ?? []).map(normalizeComboStat), [trioData?.rows]);
+  // Accumulate solo data
+  useEffect(() => {
+    if (!soloData) return;
+    const newRows = (soloData.rows as MonsterStats[] ?? []).map(normalizeMonsterStat);
+    if (statsOffset === 0) {
+      setAllSoloStats(newRows);
+    } else {
+      setAllSoloStats((prev) => [...prev, ...newRows]);
+    }
+    setStatsHasMore(Boolean(soloData.has_more));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soloData]);
 
-  const statsHasMore = soloData?.has_more  ?? false;
-  const duoHasMore   = duoData?.has_more   ?? false;
-  const trioHasMore  = trioData?.has_more  ?? false;
+  // Accumulate duo data
+  useEffect(() => {
+    if (!duoData) return;
+    const newRows = (duoData.rows as DuoComboStat[] ?? []).map(normalizeComboStat);
+    if (duoOffset === 0) {
+      setAllDuoStats(newRows);
+    } else {
+      setAllDuoStats((prev) => [...prev, ...newRows]);
+    }
+    setDuoHasMore(Boolean(duoData.has_more));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duoData]);
+
+  // Accumulate trio data
+  useEffect(() => {
+    if (!trioData) return;
+    const newRows = (trioData.rows as TrioComboStat[] ?? []).map(normalizeComboStat);
+    if (trioOffset === 0) {
+      setAllTrioStats(newRows);
+    } else {
+      setAllTrioStats((prev) => [...prev, ...newRows]);
+    }
+    setTrioHasMore(Boolean(trioData.has_more));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trioData]);
 
   // Sorted data
   const sortedStats = useMemo(() => {
-    if (stats.length === 0) return [];
+    if (allSoloStats.length === 0) return [];
     const mul = sortOrder === 'asc' ? 1 : -1;
-    return [...stats].sort((a, b) => {
+    return [...allSoloStats].sort((a, b) => {
       if (sortField === 'monster_name') return mul * a.monster_name.localeCompare(b.monster_name);
       const aVal = (a as unknown as Record<string, number>)[sortField] ?? 0;
       const bVal = (b as unknown as Record<string, number>)[sortField] ?? 0;
       return mul * (aVal - bVal);
     });
-  }, [stats, sortField, sortOrder]);
+  }, [allSoloStats, sortField, sortOrder]);
 
   /** 전체 몬스터 마스터(노말·각성·2각 등 전 행) — 검색·속성만 목록용 (테이블과 무관). 표시는 역순. */
   const soloCatalogFiltered = useMemo(() => {
@@ -652,8 +695,8 @@ export default function RtaMonsterStatsClient() {
     return rows.slice().reverse();
   }, [monsterCatalog, soloSearch, elementFilter]);
 
-  const sortedDuo  = useMemo(() => sortCombo(duoStats,  duoSortField,  duoSortOrder),  [duoStats,  duoSortField,  duoSortOrder]);
-  const sortedTrio = useMemo(() => sortCombo(trioStats, trioSortField, trioSortOrder), [trioStats, trioSortField, trioSortOrder]);
+  const sortedDuo  = useMemo(() => sortCombo(allDuoStats,  duoSortField,  duoSortOrder),  [allDuoStats,  duoSortField,  duoSortOrder]);
+  const sortedTrio = useMemo(() => sortCombo(allTrioStats, trioSortField, trioSortOrder), [allTrioStats, trioSortField, trioSortOrder]);
 
   // Handlers
   const handleSort = useCallback((field: SortField) => {
@@ -986,9 +1029,8 @@ export default function RtaMonsterStatsClient() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {sortedStats.map((stat) => {
-                      const idx = sortedStats.indexOf(stat);
-                      const rank = statsOffset + idx + 1;
+                    {sortedStats.map((stat, idx) => {
+                      const rank = idx + 1;
                       return (
                         <TableRow key={stat.monster_id ?? stat.monster_name} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
                           <TableCell align="center" sx={{ ...NUMERIC_CELL_SX, color: 'text.secondary', fontWeight: 700, fontSize: '0.8rem' }}>
@@ -1014,11 +1056,10 @@ export default function RtaMonsterStatsClient() {
               </TableContainer>
             )}
 
-            <StatsPagination
+            <LoadMoreButton
               hasMore={statsHasMore}
-              page={statsPage}
-              onChange={setStatsPage}
-              ariaLabel="솔로 통계 페이지"
+              isFetching={soloFetching}
+              onLoadMore={() => setStatsOffset((prev) => prev + PAGE_SIZE)}
               isNarrow={isNarrow}
             />
           </Box>
@@ -1056,7 +1097,7 @@ export default function RtaMonsterStatsClient() {
               {sortedDuo.map((row, i) => (
                 <ComboStatRow
                   key={`${row.monster_id_1}-${row.monster_id_2}-${i}`}
-                  rank={duoOffset + i + 1}
+                  rank={i + 1}
                   matchCount={row.match_count}
                   winRate={row.win_rate}
                 >
@@ -1094,7 +1135,12 @@ export default function RtaMonsterStatsClient() {
             </Stack>
           )}
 
-          <StatsPagination hasMore={duoHasMore} page={duoPage} onChange={setDuoPage} ariaLabel="듀오 통계 페이지" isNarrow={isNarrow} />
+          <LoadMoreButton
+              hasMore={duoHasMore}
+              isFetching={duoFetching}
+              onLoadMore={() => setDuoOffset((prev) => prev + PAGE_SIZE)}
+              isNarrow={isNarrow}
+            />
         </>
       )}
 
@@ -1129,7 +1175,7 @@ export default function RtaMonsterStatsClient() {
               {sortedTrio.map((row, i) => (
                 <ComboStatRow
                   key={`${row.monster_id_1}-${row.monster_id_2}-${row.monster_id_3}-${i}`}
-                  rank={trioOffset + i + 1}
+                  rank={i + 1}
                   matchCount={row.match_count}
                   winRate={row.win_rate}
                 >
@@ -1165,7 +1211,12 @@ export default function RtaMonsterStatsClient() {
             </Stack>
           )}
 
-          <StatsPagination hasMore={trioHasMore} page={trioPage} onChange={setTrioPage} ariaLabel="트리오 통계 페이지" isNarrow={isNarrow} />
+          <LoadMoreButton
+              hasMore={trioHasMore}
+              isFetching={trioFetching}
+              onLoadMore={() => setTrioOffset((prev) => prev + PAGE_SIZE)}
+              isNarrow={isNarrow}
+            />
         </>
       )}
     </Container>

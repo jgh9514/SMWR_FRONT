@@ -294,7 +294,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
     };
   }, [pathname]);
 
-  const shouldShowFooter = !isAdminPath;
+  const shouldShowFooter = !isAdminPath && !isPublicPath;
 
   // 로그인 검증(bootstrap)이 끝날 때까지는 화면을 아예 렌더하지 않음
   // - public/admin 페이지는 즉시 렌더

@@ -8,7 +8,6 @@ import {
   CircularProgress,
   Typography,
   Avatar,
-  Pagination,
   Collapse,
   Button,
   Container,
@@ -35,10 +34,7 @@ import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
-import type { MatchItem, RtaData, RawMatchItem } from '@/types';
-
-/** /rta 매치 목록: 최신순 기준 앞쪽(최근) 페이지만 최대 N페이지까지 노출 */
-const MAX_RTA_LIST_PAGES = 10;
+import type { MatchItem, RawMatchItem } from '@/types';
 
 /** 승자 열 — 에메랄드 계열 그라데이션 */
 function rtaSideBgWin(theme: Theme) {
@@ -63,15 +59,13 @@ export default function RtaPageClient() {
   const theme = useTheme();
   const rtaStarSize = useMediaQuery(theme.breakpoints.up('md')) ? 12 : 10;
   const [expandedMatches, setExpandedMatches] = useState<{ [key: number]: boolean }>({});
-  const [currentPage, setCurrentPage] = useState(1);
+  const [offset, setOffset] = useState(0);
+  const [allMatches, setAllMatches] = useState<MatchItem[]>([]);
+  const [hasMore, setHasMore] = useState(false);
   const [tierSelection, setTierSelection] = useState('');
 
   const { data: seasonsData } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
-
-  useEffect(() => {
-    queueMicrotask(() => setCurrentPage(1));
-  }, [seasonSelectValue]);
 
   const { data: gradeRules = [] } = useRtaRatingGradeRules();
 
@@ -86,61 +80,48 @@ export default function RtaPageClient() {
     return { ratingId: null as number | null, ratingIds: null as number[] | null };
   }, [tierSelection, gradeRules]);
 
+  /** 시즌·티어 필터가 바뀌면 목록 초기화 */
   useEffect(() => {
-    queueMicrotask(() => setCurrentPage(1));
-  }, [tierSelection]);
+    setOffset(0);
+    setAllMatches([]);
+    setHasMore(false);
+    setExpandedMatches({});
+  }, [seasonSelectValue, tierSelection]);
 
   const {
     data: pageResponse,
     isLoading: isLoadingPage,
+    isFetching,
     error: pageError,
     refetch: refetchPage,
   } = useRtaListPage({
     limit: DEFAULT_PAGE_SIZE,
-    offset: (currentPage - 1) * DEFAULT_PAGE_SIZE,
+    offset,
     seasonCode: seasonSelectValue,
     seasonId: seasonIdForApi,
     ratingId: tierApi.ratingId,
     ratingIds: tierApi.ratingIds,
   });
 
-  const rtaData = useMemo<RtaData | null>(() => {
-    if (!pageResponse) return null;
-    const statsResponse = pageResponse.stats;
-    if (!statsResponse) return null;
-
-    const hasMore = Boolean(statsResponse.hasMore);
+  /** 새 데이터 도착 시 누적 */
+  useEffect(() => {
+    if (!pageResponse) return;
     const rawMatches = pageResponse.matches ?? [];
-    const processedMatches = Array.isArray(rawMatches)
+    const newMatches = Array.isArray(rawMatches)
       ? rawMatches.map((m: RawMatchItem) => processRawMatchToMatchItem(m))
       : [];
-
-    /** 전체 COUNT 없음 — 다음 페이지가 있으면 최소 currentPage+1페이지까지 존재로 간주(최대 10) */
-    const totalPages = Math.min(
-      MAX_RTA_LIST_PAGES,
-      hasMore ? Math.max(currentPage + 1, 1) : Math.max(currentPage, 1),
-    );
-    return {
-      stats: statsResponse,
-      matches: processedMatches,
-      totalPages,
-    };
-  }, [pageResponse, currentPage]);
-
-  const paginatedMatches = rtaData?.matches || [];
-
-  /** 총 페이지가 줄었을 때(시즌 변경·상한 적용) 현재 페이지 보정 */
-  useEffect(() => {
-    const tp = rtaData?.totalPages ?? 0;
-    if (tp >= 1 && currentPage > tp) {
-      queueMicrotask(() => setCurrentPage(tp));
+    if (offset === 0) {
+      setAllMatches(newMatches);
+    } else {
+      setAllMatches((prev) => [...prev, ...newMatches]);
     }
-  }, [rtaData?.totalPages, currentPage]);
+    setHasMore(Boolean(pageResponse.stats?.hasMore));
+  // offset이 바뀌어야만 재실행 — pageResponse 의존성은 offset 변경 후 도착하는 응답이 처리됨
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageResponse]);
 
-  /** 페이지 바뀌면 접기 상태 초기화(기본은 전부 펼침) */
-  useEffect(() => {
-    queueMicrotask(() => setExpandedMatches({}));
-  }, [currentPage]);
+  const isLoadingMore = isFetching && offset > 0;
+  const isInitialLoading = isLoadingPage && offset === 0;
 
   /** 기본 펼침: 명시적으로 false일 때만 접힘 */
   const toggleMatch = useCallback((index: number) => {
@@ -150,8 +131,8 @@ export default function RtaPageClient() {
     });
   }, []);
 
-  const changePage = (page: number) => {
-    setCurrentPage(page);
+  const loadMore = () => {
+    setOffset((prev) => prev + DEFAULT_PAGE_SIZE);
   };
 
   const pageBg = (t: Theme) =>
@@ -159,7 +140,7 @@ export default function RtaPageClient() {
       ? `linear-gradient(180deg, ${alpha('#0f172a', 1)} 0%, ${alpha('#1e293b', 1)} 40%, ${alpha('#0f172a', 1)} 100%)`
       : `linear-gradient(180deg, ${alpha('#f0fdfa', 1)} 0%, ${alpha('#ecfeff', 0.9)} 35%, ${alpha('#f8fafc', 1)} 100%)`;
 
-  const hasNoData = !rtaData || paginatedMatches.length === 0;
+  const hasNoData = allMatches.length === 0;
 
   return (
     <Box
@@ -242,7 +223,7 @@ export default function RtaPageClient() {
           </Box>
 
           <CardContent sx={{ p: { xs: 2, md: 2.5 }, pt: { xs: 2, md: 2.5 } }}>
-            {isLoadingPage && (
+            {isInitialLoading && (
               <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
                 <Box sx={{ textAlign: 'center' }}>
                   <CircularProgress size={48} thickness={4} sx={{ color: 'primary.main' }} />
@@ -250,7 +231,7 @@ export default function RtaPageClient() {
                 </Box>
               </Box>
             )}
-            {!isLoadingPage && pageError && (
+            {!isInitialLoading && pageError && (
               <Box sx={{ textAlign: 'center', py: 6 }}>
                 <Typography color="error" sx={{ mb: 2, fontWeight: 600 }}>
                   {pageError.message || '데이터를 불러오는데 실패했습니다.'}
@@ -260,7 +241,7 @@ export default function RtaPageClient() {
                 </Button>
               </Box>
             )}
-            {!isLoadingPage && !pageError && hasNoData && (
+            {!isInitialLoading && !pageError && hasNoData && (
               <Box sx={{ textAlign: 'center', py: 6 }}>
                 <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
                   표시할 매치가 없습니다
@@ -268,7 +249,7 @@ export default function RtaPageClient() {
               </Box>
             )}
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.25 }}>
-            {!isLoadingPage && !pageError && !hasNoData && paginatedMatches.map((match: MatchItem, index: number) => {
+            {!isInitialLoading && !pageError && !hasNoData && allMatches.map((match: MatchItem, index: number) => {
               const isExpanded = expandedMatches[index] !== false;
               const p1Wins = match.winnerPosition === '1';
               return (
@@ -843,26 +824,25 @@ export default function RtaPageClient() {
             })}
           </Box>
 
-          {(rtaData?.totalPages ?? 0) > 1 && (
+          {(hasMore || isLoadingMore) && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, mb: 1 }}>
-              <Pagination
-                count={rtaData!.totalPages}
-                page={currentPage}
-                onChange={(_, page) => changePage(page)}
-                color="primary"
-                size="medium"
+              <Button
+                variant="outlined"
+                onClick={loadMore}
+                disabled={isFetching}
+                startIcon={isLoadingMore ? <CircularProgress size={16} thickness={4} /> : undefined}
                 sx={(theme) => ({
-                  '& .MuiPaginationItem-root': {
-                    fontSize: { xs: '0.875rem', md: '0.95rem' },
-                    borderRadius: 2,
-                  },
-                  '& .Mui-selected': {
-                    fontWeight: 700,
-                    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.95)} 0%, ${alpha(theme.palette.primary.dark, 0.85)} 100%)`,
-                    color: theme.palette.primary.contrastText,
-                  },
+                  borderRadius: 2,
+                  px: 5,
+                  py: 1,
+                  fontWeight: 700,
+                  fontSize: '0.9rem',
+                  borderColor: alpha(theme.palette.primary.main, 0.5),
+                  '&:hover': { borderColor: theme.palette.primary.main },
                 })}
-              />
+              >
+                {isLoadingMore ? '불러오는 중…' : '더보기'}
+              </Button>
             </Box>
           )}
         </CardContent>

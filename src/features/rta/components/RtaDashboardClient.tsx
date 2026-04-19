@@ -381,9 +381,6 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
                 }}
               />
             </Box>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-              좌=시즌 시작일 · 우=시즌 종료일 · 슬라이더=해당 일까지 누적 티어 분포(오늘이 시즌 안이면 오늘 이후로는 이동 불가)
-            </Typography>
           </Box>
 
           {!isWide ? (
@@ -516,7 +513,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
             <Typography component="span" fontWeight={700} color="text.primary">
               {totalPlayers.toLocaleString()}
             </Typography>{' '}
-            소환사 (선택한 일자·매치당 2명 집계)
+            소환사
           </Typography>
           </Box>
         )}
