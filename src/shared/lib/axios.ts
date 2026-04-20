@@ -52,14 +52,12 @@ async function tryReauthOnce() {
 
 // 환경별 API 서버 설정
 const getBaseURL = () => {
-  // 환경 변수가 있으면 우선 사용
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
-    logger.debug('[Axios] 환경 변수 사용', { baseURL: process.env.NEXT_PUBLIC_API_BASE_URL });
-    return process.env.NEXT_PUBLIC_API_BASE_URL;
-  }
-
   // 개발 환경 기본값
   if (process.env.NODE_ENV === 'development') {
+    if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+      logger.debug('[Axios] 개발 환경 변수 사용', { baseURL: process.env.NEXT_PUBLIC_API_BASE_URL });
+      return process.env.NEXT_PUBLIC_API_BASE_URL;
+    }
     logger.debug('[Axios] 환경 변수 없음, 기본값 사용', { baseURL: 'http://localhost:8080/api/v1' });
     return 'http://localhost:8080/api/v1';
   }
@@ -69,6 +67,12 @@ const getBaseURL = () => {
   if (typeof window !== 'undefined') {
     // 프로덕션 환경: Next.js API Route를 통해 프록시 (쿠키 전달 보장)
     return '/api/v1';
+  }
+
+  // 서버 사이드에서는 내부 서비스 주소를 직접 사용 가능
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    logger.debug('[Axios] 서버 환경 변수 사용', { baseURL: process.env.NEXT_PUBLIC_API_BASE_URL });
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
   }
 
   // 서버 사이드 기본값

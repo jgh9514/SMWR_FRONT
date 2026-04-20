@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
@@ -162,6 +162,7 @@ function buildRow(row: RtaSummonerRankingRow) {
 }
 
 export default function RtaSummonerRankingClient() {
+  const router = useRouter();
   const { data: seasonsData } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
@@ -404,7 +405,35 @@ export default function RtaSummonerRankingClient() {
                       r.wizardId !== '' ? `/rta/player/${encodeURIComponent(r.wizardId)}` : null;
                     const serverLabel = r.country ? r.country.toUpperCase() : '—';
                     return (
-                      <TableRow key={r.wizardId || `${r.rank}-${r.name}`} hover>
+                      <TableRow
+                        key={r.wizardId || `${r.rank}-${r.name}`}
+                        hover
+                        onClick={profileHref ? () => router.push(profileHref) : undefined}
+                        onKeyDown={
+                          profileHref
+                            ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  router.push(profileHref);
+                                }
+                              }
+                            : undefined
+                        }
+                        tabIndex={profileHref ? 0 : -1}
+                        role={profileHref ? 'link' : undefined}
+                        sx={
+                          profileHref
+                            ? {
+                                cursor: 'pointer',
+                                '&:focus-visible': {
+                                  outline: '2px solid',
+                                  outlineColor: 'primary.main',
+                                  outlineOffset: '-2px',
+                                },
+                              }
+                            : undefined
+                        }
+                      >
                         <TableCell
                           sx={{
                             fontWeight: 800,
@@ -424,33 +453,27 @@ export default function RtaSummonerRankingClient() {
                           title={r.wizardId ? `${r.name} (${r.wizardId})` : r.name}
                         >
                           {profileHref ? (
-                            <Link
-                              href={profileHref}
-                              prefetch={false}
-                              style={{ textDecoration: 'none', color: 'inherit' }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
-                                <Box
-                                  component="img"
-                                  src={getSwexPlayerImageUrl(r.channelUid || r.wizardId)}
-                                  alt=""
-                                  loading="lazy"
-                                  sx={{
-                                    width: 40,
-                                    height: 40,
-                                    borderRadius: '50%',
-                                    objectFit: 'cover',
-                                    flexShrink: 0,
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    bgcolor: 'action.hover',
-                                  }}
-                                />
-                                <Typography variant="body2" fontWeight={700} noWrap sx={{ minWidth: 0 }}>
-                                  {r.name}
-                                </Typography>
-                              </Box>
-                            </Link>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
+                              <Box
+                                component="img"
+                                src={getSwexPlayerImageUrl(r.channelUid || r.wizardId)}
+                                alt=""
+                                loading="lazy"
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: '50%',
+                                  objectFit: 'cover',
+                                  flexShrink: 0,
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  bgcolor: 'action.hover',
+                                }}
+                              />
+                              <Typography variant="body2" fontWeight={700} noWrap sx={{ minWidth: 0 }}>
+                                {r.name}
+                              </Typography>
+                            </Box>
                           ) : (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
                               <Box
