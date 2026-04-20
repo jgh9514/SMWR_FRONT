@@ -311,7 +311,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
     }
 
     const bootstrap = async () => {
-      const BOOTSTRAP_TIMEOUT_MS = 3000;
+      const BOOTSTRAP_TIMEOUT_MS = 10000;
       try {
         const authed = isAuthenticated();
         if (!authed) {
@@ -335,13 +335,8 @@ export default function AppProviders({ children }: AppProvidersProps) {
           localStorage.removeItem('isLoggedIn');
         }
       } catch {
-        // 검증 실패/타임아웃이어도 화면은 렌더(미로그인으로 동작하도록 클라이언트 표시 정보는 비움)
-        try {
-          localStorage.removeItem('userInfo');
-          localStorage.removeItem('isLoggedIn');
-        } catch {
-          // no-op
-        }
+        // 일시적인 네트워크 지연/서버 부하로 login-check 가 늦어질 수 있다.
+        // 이 경우 클라이언트 로그인 표시 정보를 지우면 "로그인이 풀린 것처럼" 보이므로 유지한다.
       } finally {
         authBootstrappedRef.current = true;
         setAuthBootstrapped(true);
