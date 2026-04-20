@@ -2,15 +2,27 @@
 
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
+import LocalFireDepartmentRoundedIcon from '@mui/icons-material/LocalFireDepartmentRounded';
+import WaterDropRoundedIcon from '@mui/icons-material/WaterDropRounded';
+import AirRoundedIcon from '@mui/icons-material/AirRounded';
+import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import type { AttributeType } from '@/features/siege/types/monster';
-import { getRenderableImageUrl } from '@/shared/utils/image';
 
-const ELEMENT_IMAGE_SRC: Record<AttributeType, string> = {
-  fire: '/images/Fire_Icon.png',
-  water: '/images/Water_Icon.png',
-  wind: '/images/Wind_Icon.png',
-  light: '/images/Light_Icon.png',
-  dark: '/images/Dark_Icon.png',
+const ELEMENT_ICON_COMPONENT: Record<AttributeType, typeof LocalFireDepartmentRoundedIcon> = {
+  fire: LocalFireDepartmentRoundedIcon,
+  water: WaterDropRoundedIcon,
+  wind: AirRoundedIcon,
+  light: LightModeRoundedIcon,
+  dark: DarkModeRoundedIcon,
+};
+
+const ELEMENT_ICON_COLOR: Record<AttributeType, string> = {
+  fire: '#ef4444',
+  water: '#3b82f6',
+  wind: '#22c55e',
+  light: '#f59e0b',
+  dark: '#8b5cf6',
 };
 
 export type AttributeElementIconProps = {
@@ -22,29 +34,26 @@ export type AttributeElementIconProps = {
   titleAccess?: string;
 };
 
-/**
- * `public/images/*_Icon.png` — `/images` 라우트가 백엔드 실패 시 public으로 폴백합니다.
- */
 export default function AttributeElementIcon({
   attribute,
   size = 22,
   sx,
   titleAccess,
 }: AttributeElementIconProps) {
-  const src = getRenderableImageUrl(ELEMENT_IMAGE_SRC[attribute]);
+  const IconComponent = ELEMENT_ICON_COMPONENT[attribute];
   return (
     <Box
-      component="img"
-      src={src}
-      alt={titleAccess ?? ''}
+      component={IconComponent}
+      aria-label={titleAccess}
+      role={titleAccess ? 'img' : undefined}
       title={titleAccess}
       sx={{
         width: size,
         height: size,
-        objectFit: 'contain',
         verticalAlign: 'middle',
         flexShrink: 0,
         display: 'inline-block',
+        color: ELEMENT_ICON_COLOR[attribute],
         ...sx,
       }}
     />
