@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
@@ -187,6 +187,37 @@ export default function RtaSummonerRankingClient() {
     country: countryFilter ?? undefined,
     seasonId: seasonIdForApi,
   });
+
+  const navigateToProfile = (href: string, openInNewTab = false) => {
+    if (openInNewTab && typeof window !== 'undefined') {
+      window.open(href, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    router.push(href);
+  };
+
+  const handleRowClick = (e: ReactMouseEvent<HTMLTableRowElement>, href: string) => {
+    if (e.defaultPrevented) return;
+    if (e.metaKey || e.ctrlKey) {
+      navigateToProfile(href, true);
+      return;
+    }
+    router.push(href);
+  };
+
+  const handleRowAuxClick = (e: ReactMouseEvent<HTMLTableRowElement>, href: string) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      navigateToProfile(href, true);
+    }
+  };
+
+  const handleRowKeyDown = (e: ReactKeyboardEvent<HTMLTableRowElement>, href: string) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigateToProfile(href, e.metaKey || e.ctrlKey);
+    }
+  };
 
   /** 첫 로드만 전체 스피너, 더보기는 테이블 상단 프로그레스 */
   const tableInitialLoading = loadingPage && allRows.length === 0;
@@ -408,15 +439,11 @@ export default function RtaSummonerRankingClient() {
                       <TableRow
                         key={r.wizardId || `${r.rank}-${r.name}`}
                         hover
-                        onClick={profileHref ? () => router.push(profileHref) : undefined}
+                        onClick={profileHref ? (e) => handleRowClick(e, profileHref) : undefined}
+                        onAuxClick={profileHref ? (e) => handleRowAuxClick(e, profileHref) : undefined}
                         onKeyDown={
                           profileHref
-                            ? (e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  router.push(profileHref);
-                                }
-                              }
+                            ? (e) => handleRowKeyDown(e, profileHref)
                             : undefined
                         }
                         tabIndex={profileHref ? 0 : -1}
