@@ -2,27 +2,14 @@
 
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
-import LocalFireDepartmentRoundedIcon from '@mui/icons-material/LocalFireDepartmentRounded';
-import WaterDropRoundedIcon from '@mui/icons-material/WaterDropRounded';
-import AirRoundedIcon from '@mui/icons-material/AirRounded';
-import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
-import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import type { AttributeType } from '@/features/siege/types/monster';
 
-const ELEMENT_ICON_COMPONENT: Record<AttributeType, typeof LocalFireDepartmentRoundedIcon> = {
-  fire: LocalFireDepartmentRoundedIcon,
-  water: WaterDropRoundedIcon,
-  wind: AirRoundedIcon,
-  light: LightModeRoundedIcon,
-  dark: DarkModeRoundedIcon,
-};
-
-const ELEMENT_ICON_COLOR: Record<AttributeType, string> = {
-  fire: '#ef4444',
-  water: '#3b82f6',
-  wind: '#22c55e',
-  light: '#f59e0b',
-  dark: '#8b5cf6',
+const ELEMENT_ICON_SRC: Record<AttributeType, string> = {
+  fire: '/images/Fire_Icon.png',
+  water: '/images/Water_Icon.png',
+  wind: '/images/Wind_Icon.png',
+  light: '/images/Light_Icon.png',
+  dark: '/images/Dark_Icon.png',
 };
 
 export type AttributeElementIconProps = {
@@ -40,12 +27,11 @@ export default function AttributeElementIcon({
   sx,
   titleAccess,
 }: AttributeElementIconProps) {
-  const IconComponent = ELEMENT_ICON_COMPONENT[attribute];
   return (
     <Box
-      component={IconComponent}
-      aria-label={titleAccess}
-      role={titleAccess ? 'img' : undefined}
+      component="img"
+      src={ELEMENT_ICON_SRC[attribute]}
+      alt={titleAccess ?? attribute}
       title={titleAccess}
       sx={{
         width: size,
@@ -53,7 +39,7 @@ export default function AttributeElementIcon({
         verticalAlign: 'middle',
         flexShrink: 0,
         display: 'inline-block',
-        color: ELEMENT_ICON_COLOR[attribute],
+        objectFit: 'contain',
         ...sx,
       }}
     />

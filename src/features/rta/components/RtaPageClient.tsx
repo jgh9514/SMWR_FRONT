@@ -275,23 +275,23 @@ export default function RtaPageClient() {
                   <Box
                     sx={{
                       display: 'flex',
-                      flexDirection: { xs: 'column', sm: 'row' },
+                      flexDirection: 'row',
                       alignItems: 'stretch',
-                      minHeight: { sm: 120 },
+                      minHeight: 64,
                     }}
                   >
                     <Box
                       sx={(theme) => ({
                         flex: 1,
                         background: p1Wins ? rtaSideBgWin(theme) : rtaSideBgLose(theme),
-                        px: { xs: 2, md: 2.5 },
-                        py: { xs: 2, md: 2.25 },
+                        px: { xs: 1.5, md: 2 },
+                        py: { xs: 1.5, md: 2 },
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'flex-start',
-                        gap: 0.75,
+                        gap: 0.5,
                         minWidth: 0,
-                        position: 'relative',
+                        overflow: 'hidden',
                       })}
                     >
                       <Chip
@@ -308,50 +308,38 @@ export default function RtaPageClient() {
                           '& .MuiChip-label': { px: 1 },
                         }}
                       />
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, width: '100%' }}>
+                      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, gap: { xs: 0.5, md: 1.25 }, width: '100%', overflow: 'hidden' }}>
                         <Avatar
                           src={getSwexPlayerImageUrl(match.p1ChannelUid || match.p1Id)}
                           sx={{
-                            width: { xs: 44, md: 52 },
-                            height: { xs: 44, md: 52 },
+                            width: { xs: 40, md: 52 },
+                            height: { xs: 40, md: 52 },
+                            flexShrink: 0,
                             boxShadow: p1Wins ? `0 0 0 3px ${alpha('#10b981', 0.65)}` : '0 2px 12px rgba(0,0,0,0.12)',
                           }}
                         />
-                        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 0.65 }}>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              flexWrap: 'wrap',
-                              justifyContent: 'flex-start',
-                            }}
-                          >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>
                             {match.p1Country && (
                               <Box
                                 component="img"
                                 src={`https://flagcdn.com/w40/${match.p1Country.toLowerCase()}.png`}
                                 alt={match.p1Country}
-                                sx={{ width: { xs: 16, md: 20 }, height: { xs: 12, md: 15 }, flexShrink: 0 }}
+                                sx={{ width: { xs: 14, md: 18 }, height: { xs: 10, md: 13 }, flexShrink: 0 }}
                               />
                             )}
                             <Typography
                               variant="body2"
                               fontWeight={700}
-                              sx={{
-                                fontSize: { xs: '0.8rem', md: '0.9rem' },
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                              }}
+                              sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             >
                               {match.p1Name || 'Player'}
                             </Typography>
                           </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <RtaRatingStarIcons rating={match.p1Rating} size={rtaStarSize} />
                             {match.p1Score > 0 && (
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.7rem', md: '0.875rem' }, fontWeight: 600 }}>
                                 {match.p1Score}
                               </Typography>
                             )}
@@ -363,17 +351,16 @@ export default function RtaPageClient() {
                     <Box
                       sx={(theme) => ({
                         flexShrink: 0,
-                        width: { xs: '100%', sm: 92 },
-                        py: { xs: 1.25, sm: 0 },
-                        px: { xs: 2, sm: 0.5 },
+                        width: { xs: 56, sm: 72, md: 92 },
+                        py: 0,
+                        px: { xs: 0.25, md: 0.5 },
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 0.75,
-                        borderTop: { xs: `1px solid ${alpha(theme.palette.divider, 0.2)}`, sm: 'none' },
-                        borderLeft: { sm: `1px solid ${alpha(theme.palette.divider, 0.18)}` },
-                        borderRight: { sm: `1px solid ${alpha(theme.palette.divider, 0.18)}` },
+                        borderLeft: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
+                        borderRight: `1px solid ${alpha(theme.palette.divider, 0.18)}`,
                         background: alpha(theme.palette.background.paper, 0.25),
                       })}
                     >
@@ -401,10 +388,10 @@ export default function RtaPageClient() {
                             const minutes = String(date.getMinutes()).padStart(2, '0');
                             return (
                               <>
-                                <Typography variant="caption" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' }, fontWeight: 600, textAlign: 'center' }}>
+                                <Typography variant="caption" sx={{ fontSize: { xs: '0.6rem', sm: '0.65rem', md: '0.75rem' }, fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap' }}>
                                   {`${year}-${month}-${day}`}
                                 </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.65rem', md: '0.7rem' }, textAlign: 'center' }}>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.55rem', sm: '0.6rem', md: '0.7rem' }, textAlign: 'center' }}>
                                   {`${hours}:${minutes}`}
                                 </Typography>
                               </>
@@ -432,13 +419,14 @@ export default function RtaPageClient() {
                       sx={(theme) => ({
                         flex: 1,
                         background: !p1Wins ? rtaSideBgWin(theme) : rtaSideBgLose(theme),
-                        px: { xs: 2, md: 2.5 },
-                        py: { xs: 2, md: 2.25 },
+                        px: { xs: 1.5, md: 2 },
+                        py: { xs: 1.5, md: 2 },
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'flex-end',
-                        gap: 0.75,
+                        gap: 0.5,
                         minWidth: 0,
+                        overflow: 'hidden',
                       })}
                     >
                       <Chip
@@ -455,35 +443,23 @@ export default function RtaPageClient() {
                           '& .MuiChip-label': { px: 1 },
                         }}
                       />
-                      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.25, width: '100%', flexDirection: 'row-reverse' }}>
+                      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row-reverse' }, alignItems: { md: 'center' }, gap: { xs: 0.5, md: 1.25 }, width: '100%', overflow: 'hidden' }}>
                         <Avatar
                           src={getSwexPlayerImageUrl(match.p2ChannelUid || match.p2Id)}
                           sx={{
-                            width: { xs: 44, md: 52 },
-                            height: { xs: 44, md: 52 },
+                            width: { xs: 40, md: 52 },
+                            height: { xs: 40, md: 52 },
+                            flexShrink: 0,
+                            alignSelf: { xs: 'flex-end', md: 'auto' },
                             boxShadow: !p1Wins ? `0 0 0 3px ${alpha('#10b981', 0.65)}` : '0 2px 12px rgba(0,0,0,0.12)',
                           }}
                         />
-                        <Box sx={{ minWidth: 0, flex: 1, display: 'flex', flexDirection: 'column', gap: 0.65, alignItems: 'flex-end' }}>
-                          <Box
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5,
-                              flexWrap: 'wrap',
-                              justifyContent: 'flex-end',
-                            }}
-                          >
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0, alignItems: 'flex-end' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>
                             <Typography
                               variant="body2"
                               fontWeight={700}
-                              sx={{
-                                fontSize: { xs: '0.8rem', md: '0.9rem' },
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
-                                textAlign: 'right',
-                              }}
+                              sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}
                             >
                               {match.p2Name || 'Opponent'}
                             </Typography>
@@ -492,13 +468,13 @@ export default function RtaPageClient() {
                                 component="img"
                                 src={`https://flagcdn.com/w40/${match.p2Country.toLowerCase()}.png`}
                                 alt={match.p2Country}
-                                sx={{ width: { xs: 16, md: 20 }, height: { xs: 12, md: 15 }, flexShrink: 0 }}
+                                sx={{ width: { xs: 14, md: 18 }, height: { xs: 10, md: 13 }, flexShrink: 0 }}
                               />
                             )}
                           </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             {match.p2Score > 0 && (
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, fontWeight: 600 }}>
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.7rem', md: '0.875rem' }, fontWeight: 600 }}>
                                 {match.p2Score}
                               </Typography>
                             )}
