@@ -747,8 +747,10 @@ export default function RtaMonsterStatsClient() {
   }, []);
 
   // ── Loading state ──────────────────────────────────────────────────────────
+  // 더보기(load-more) 중에는 누적 데이터가 있으므로 전체 스피너를 띄우지 않는다.
+  const hasAnyAccumulatedData = allSoloStats.length > 0 || allDuoStats.length > 0 || allTrioStats.length > 0;
 
-  if (isLoading && soloData === undefined && duoData === undefined && trioData === undefined) {
+  if (isLoading && !hasAnyAccumulatedData) {
     return (
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <PageHeader title="RTA 몬스터별 통계" />

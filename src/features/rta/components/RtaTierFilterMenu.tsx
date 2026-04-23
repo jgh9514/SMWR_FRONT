@@ -40,7 +40,7 @@ export function tierSelectionSummary(value: string, byTier: Map<string, RtaRatin
     <Stack direction="row" alignItems="center" gap={1} component="span">
       {r ? <RtaRatingStarIcons rating={r.ratingId} size={16} gap={1} /> : null}
       <Typography component="span" variant="body2" fontWeight={600}>
-        {r?.gradeName?.trim() ? `${r.gradeName} (${value})` : value}
+        {value}
       </Typography>
     </Stack>
   );

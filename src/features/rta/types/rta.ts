@@ -230,7 +230,7 @@ export interface MonsterDetail {
       monster_image?: string;
     }>;
   }>;
-  /** rta_agg_counter_matchup (시즌·몬스터·상대 조합) */
+  /** (시즌·몬스터·상대 조합) */
   counter_matchups?: CounterMatchupRow[];
 }
 
