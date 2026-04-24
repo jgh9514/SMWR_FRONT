@@ -71,6 +71,7 @@ import RtaSeasonTierSelectRow, {
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
+import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -192,12 +193,6 @@ function formatPercentage(value: number): string {
   return `${toNum(value).toFixed(2)}%`;
 }
 
-function parseElemental(raw?: string): AttributeType | null {
-  const k = raw?.trim().toLowerCase();
-  if (k === 'fire' || k === 'water' || k === 'wind' || k === 'light' || k === 'dark') return k;
-  return null;
-}
-
 function monsterOptionMatchesSearch(m: MonsterOption, q: string): boolean {
   const t = q.trim().toLowerCase();
   if (!t) return true;
@@ -209,7 +204,7 @@ function monsterOptionMatchesSearch(m: MonsterOption, q: string): boolean {
 
 function monsterOptionMatchesElement(m: MonsterOption, elementFilter: ElementFilterValue): boolean {
   if (elementFilter === 'all') return true;
-  const attr = parseElemental(m.monster_elemental);
+  const attr = parseMonsterElemental(m.monster_elemental);
   return attr === elementFilter;
 }
 
@@ -269,7 +264,7 @@ interface MonsterCellProps {
 }
 
 const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterId }: MonsterCellProps) {
-  const attr = parseElemental(elemental);
+  const attr = parseMonsterElemental(elemental);
   const displayName = name?.trim() || '—';
   const href = rtaMonsterDetailHref(monsterId);
 
@@ -343,7 +338,7 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
 const COMBO_TILE_AVATAR_PX = 48;
 
 const ComboMonsterTile = memo(function ComboMonsterTile({ name, image, elemental, monsterId }: MonsterCellProps) {
-  const attr = parseElemental(elemental);
+  const attr = parseMonsterElemental(elemental);
   const displayName = name?.trim() || '—';
   const href = rtaMonsterDetailHref(monsterId);
 
