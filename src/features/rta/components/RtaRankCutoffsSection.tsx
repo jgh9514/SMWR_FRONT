@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -40,6 +40,7 @@ import {
   CUT_TIER_ORDER,
   pivotRankCutoffAnchors,
 } from '@/features/rta/utils/rtaRankCutoffChart';
+import { RtaRankCutoffSectionSkeleton } from '@/features/rta/components/RtaDashboardSkeletons';
 
 /** 표시 순서·라벨 (서버 anchor_key 와 동일) */
 const ANCHOR_ROWS: { key: string; label: string }[] = [
@@ -137,6 +138,10 @@ export interface RtaRankCutoffsSectionProps {
   denseTop?: boolean;
   /** `lg+` 2열에서 좌측 티어 카드와 동일 높이 — 내부 스크롤 */
   fillHeight?: boolean;
+  /** 카드 상단 검색 UI(시즌 등) — 랭크 컷 전용 페이지 */
+  searchConditions?: ReactNode;
+  isLoading?: boolean;
+  errorMessage?: string | null;
 }
 
 export default function RtaRankCutoffsSection({
@@ -144,6 +149,9 @@ export default function RtaRankCutoffsSection({
   showTrendChart = false,
   denseTop = false,
   fillHeight = false,
+  searchConditions,
+  isLoading = false,
+  errorMessage = null,
 }: RtaRankCutoffsSectionProps) {
   const theme = useTheme();
 
@@ -224,52 +232,36 @@ export default function RtaRankCutoffsSection({
     ? { flex: 1, minHeight: 0, overflowY: 'auto' as const }
     : { display: 'contents' as const };
 
-  if (!hasAny) {
-    return (
-      <Card
-        elevation={0}
-        sx={{
-          ...cardTopSx,
-          ...cardFillSx,
-          borderRadius: 3,
-          border: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.paper',
-          p: { xs: 2, sm: 3 },
-          ...(fillHeight ? { justifyContent: 'center' } : {}),
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-          <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-          <Typography sx={{ fontWeight: 600 }}>랭크 컷</Typography>
-        </Box>
-        <Typography variant="body2" color="text.secondary">
-          P2~G3 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
-        </Typography>
-      </Card>
-    );
-  }
+  const showEmpty = !isLoading && !errorMessage && !hasAny;
 
-  return (
-    <Card
-      elevation={0}
+  const headerRightSx = {
+    ml: { xs: 0, sm: 'auto' },
+    width: { xs: '100%', sm: 'auto' },
+    display: 'flex',
+    justifyContent: { xs: 'flex-start', sm: 'flex-end' },
+    alignItems: 'center',
+    flexShrink: 0,
+  } as const;
+
+  const rankCutHeaderRow = (titleSize: 'default' | 'compact') => (
+    <Box
       sx={{
-        ...cardTopSx,
-        ...cardFillSx,
-        borderRadius: 3,
-        border: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        p: { xs: 2, sm: 3 },
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        mb: titleSize === 'compact' ? 1 : 2.5,
+        flexWrap: 'wrap',
+        gap: 1,
       }}
     >
-      <Box sx={scrollBodySx}>
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2.5, flexWrap: 'wrap', gap: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
-          <Typography sx={{ fontWeight: 600, fontSize: '1rem' }}>랭크 컷</Typography>
-        </Box>
-        {!showTrendChart ? (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <TrendingUpIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+        <Typography sx={{ fontWeight: 600, fontSize: titleSize === 'compact' ? undefined : '1rem' }}>랭크 컷</Typography>
+      </Box>
+      <Box sx={headerRightSx}>
+        {searchConditions ? (
+          searchConditions
+        ) : !showTrendChart ? (
           <Box
             component={Link}
             href="/rta/rank-cutoffs"
@@ -288,6 +280,47 @@ export default function RtaRankCutoffsSection({
           </Box>
         ) : null}
       </Box>
+    </Box>
+  );
+
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        ...cardTopSx,
+        ...cardFillSx,
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        p: { xs: 2, sm: 3 },
+        ...(showEmpty && fillHeight && !searchConditions ? { justifyContent: 'center' } : {}),
+      }}
+    >
+      {isLoading ? (
+        <>
+          {rankCutHeaderRow('default')}
+          <RtaRankCutoffSectionSkeleton
+            skipCard
+            fillHeight={fillHeight}
+            omitHeader={!!searchConditions}
+          />
+        </>
+      ) : errorMessage ? (
+        <>
+          {rankCutHeaderRow('default')}
+          <Typography color="error">{errorMessage}</Typography>
+        </>
+      ) : showEmpty ? (
+        <>
+          {rankCutHeaderRow('compact')}
+          <Typography variant="body2" color="text.secondary">
+            P2~G3 구간 리플레이·점수가 쌓이면 최저점 기준 추정 컷을 표시합니다.
+          </Typography>
+        </>
+      ) : (
+        <Box sx={scrollBodySx}>
+      {rankCutHeaderRow('default')}
 
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2, lineHeight: 1.5 }}>
         각 행은 서버 시각 기준 해당 시점이 속한 <strong>날짜</strong>에서, 그 시각 <strong>이전</strong>까지 수집된 리플레이만으로 티어별 최저점을 봅니다.
@@ -470,7 +503,8 @@ export default function RtaRankCutoffsSection({
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5, lineHeight: 1.5 }}>
         티어별 <strong>최저 점수</strong>로 추정한 값입니다. 공식 최소 승점·랭킹과는 별개이며, 리플레이로 최저점을 잡지 못하면 &quot;—&quot;로 둡니다(과거 임시값 1000도 동일).
       </Typography>
-      </Box>
+        </Box>
+      )}
     </Card>
   );
 }

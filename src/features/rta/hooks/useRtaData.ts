@@ -178,6 +178,10 @@ function normalizeRtaSeasonsResponse(raw: unknown): RtaSeasonsResponse {
 const RTA_READ_STALE_MS = 2 * 60 * 1000;
 const RTA_READ_GC_MS = 15 * 60 * 1000;
 
+/** 몬스터 집계 통계(솔·듀·트) — 배치 갱신 위주로 목록/매치보다 길게 재사용 */
+const RTA_MONSTER_STATS_STALE_MS = 10 * 60 * 1000;
+const RTA_MONSTER_STATS_GC_MS = 30 * 60 * 1000;
+
 export const useRtaStats = (seasonCode?: string | null, seasonId?: number | null) => {
   return useApiPostQuery<RtaStatsResponse>('/rta/stats', seasonBody(seasonCode, seasonId), {
     enabled: true,
@@ -282,8 +286,8 @@ export const useRtaMonsterStats = (params: RtaMonsterStatsQueryParams = {}) => {
     },
     {
       enabled,
-      staleTime: RTA_READ_STALE_MS,
-      gcTime: RTA_READ_GC_MS,
+      staleTime: RTA_MONSTER_STATS_STALE_MS,
+      gcTime: RTA_MONSTER_STATS_GC_MS,
       refetchOnWindowFocus: false,
     },
   );

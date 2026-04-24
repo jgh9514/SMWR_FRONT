@@ -1,10 +1,8 @@
 'use client';
 
-import { Box, FormControl, InputLabel, MenuItem, Select, Typography } from '@mui/material';
-import Link from 'next/link';
+import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
-import { RtaRankCutoffSectionSkeleton } from '@/features/rta/components/RtaDashboardSkeletons';
 import { useRtaDashboardRankCutoff, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 
@@ -13,6 +11,32 @@ export default function RtaRankCutoffsPageClient() {
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
   const { data, isPending, error } = useRtaDashboardRankCutoff(seasonSelectValue, seasonIdForApi);
+
+  const searchConditions = (
+    <FormControl size="small" sx={{ minWidth: 200 }}>
+      <InputLabel id="rta-cutoffs-season-label">시즌</InputLabel>
+      <Select
+        labelId="rta-cutoffs-season-label"
+        label="시즌"
+        value={seasonSelectValue}
+        onChange={(e) => setSeason(String(e.target.value))}
+        sx={{
+          bgcolor: '#ffffff',
+          '&:hover': { bgcolor: '#ffffff' },
+          '&.Mui-focused': { bgcolor: '#ffffff' },
+          '& .MuiOutlinedInput-notchedOutline': {
+            borderColor: 'divider',
+          },
+        }}
+      >
+        {seasonOptions.map((o) => (
+          <MenuItem key={o.value} value={o.value}>
+            {o.label}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
+  );
 
   return (
     <Box
@@ -25,37 +49,13 @@ export default function RtaRankCutoffsPageClient() {
       }}
     >
       <PageHeader title="랭크 컷 기록" backPath="/" />
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        <Link href="/" style={{ color: 'inherit' }}>
-          ← 홈
-        </Link>
-      </Typography>
-
-      <Box sx={{ mb: 2 }}>
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel id="rta-cutoffs-season-label">시즌</InputLabel>
-          <Select
-            labelId="rta-cutoffs-season-label"
-            label="시즌"
-            value={seasonSelectValue}
-            onChange={(e) => setSeason(String(e.target.value))}
-          >
-            {seasonOptions.map((o) => (
-              <MenuItem key={o.value} value={o.value}>
-                {o.label}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-
-      {isPending && !data ? (
-        <RtaRankCutoffSectionSkeleton />
-      ) : error ? (
-        <Typography color="error">{error.message || '불러오기에 실패했습니다.'}</Typography>
-      ) : (
-        <RtaRankCutoffsSection rankCutoffAnchors={data?.rank_cutoff_anchors} showTrendChart />
-      )}
+      <RtaRankCutoffsSection
+        rankCutoffAnchors={data?.rank_cutoff_anchors}
+        showTrendChart
+        searchConditions={searchConditions}
+        isLoading={isPending && !data}
+        errorMessage={error ? error.message || '불러오기에 실패했습니다.' : null}
+      />
     </Box>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  Fragment,
   memo,
   useCallback,
   useEffect,
@@ -21,10 +20,13 @@ import {
   CardContent,
   CircularProgress,
   Container,
-  IconButton,
+  FormControl,
   InputAdornment,
+  InputLabel,
   LinearProgress,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Tab,
   Table,
@@ -37,10 +39,10 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
+  type SelectChangeEvent,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
@@ -50,8 +52,6 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import GroupsIcon from '@mui/icons-material/Groups';
 import PersonIcon from '@mui/icons-material/Person';
 import SearchIcon from '@mui/icons-material/Search';
-import SortOutlinedIcon from '@mui/icons-material/SortOutlined';
-import SwapVertIcon from '@mui/icons-material/SwapVert';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import AttributeElementIcon from '@/shared/ui/attribute-element-icon/AttributeElementIcon';
@@ -64,16 +64,47 @@ import {
   buildMonsterStatsTierBody,
 } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
-import RtaSeasonTierSelectRow from '@/features/rta/components/RtaSeasonTierSelectRow';
+import RtaSeasonTierSelectRow, {
+  RTA_OUTLINED_SELECT_FIELD_SX,
+  RTA_OUTLINED_SELECT_INPUT_SLOT_SX,
+} from '@/features/rta/components/RtaSeasonTierSelectRow';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SortField = 'pick_count' | 'pick_rate' | 'win_rate' | 'ban_rate' | 'monster_name';
 type SortOrder = 'asc' | 'desc';
 type ComboSortField = 'match_count' | 'win_rate';
+
+/** 솔로 목록: 픽횟수·승률 × 오름/내림 4가지만 */
+const SOLO_STATS_SORT_KEYS = [
+  'pick_count_asc',
+  'pick_count_desc',
+  'win_rate_asc',
+  'win_rate_desc',
+] as const;
+type SoloStatsSortKey = (typeof SOLO_STATS_SORT_KEYS)[number];
+
+const SOLO_STATS_SORT_LABEL: Record<SoloStatsSortKey, string> = {
+  pick_count_asc: '픽횟수 오름차순',
+  pick_count_desc: '픽횟수 내림차순',
+  win_rate_asc: '승률 오름차순',
+  win_rate_desc: '승률 내림차순',
+};
+
+function soloStatsSortToParts(key: SoloStatsSortKey): { field: 'pick_count' | 'win_rate'; order: SortOrder } {
+  switch (key) {
+    case 'pick_count_asc':
+      return { field: 'pick_count', order: 'asc' };
+    case 'pick_count_desc':
+      return { field: 'pick_count', order: 'desc' };
+    case 'win_rate_asc':
+      return { field: 'win_rate', order: 'asc' };
+    case 'win_rate_desc':
+      return { field: 'win_rate', order: 'desc' };
+  }
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -219,7 +250,7 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
   const href = rtaMonsterDetailHref(monsterId);
 
   const inner = (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0, width: '100%' }}>
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0, width: '100%' }}>
       <Avatar
         src={getRenderableImageUrl(image)}
         alt={displayName}
@@ -228,8 +259,26 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
       >
         {displayName.charAt(0)}
       </Avatar>
-      <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
-        <Typography variant="body2" fontWeight={600} noWrap title={displayName}>
+      <Box sx={{ minWidth: 0, flex: 1, overflow: { xs: 'visible', md: 'hidden' } }}>
+        <Typography
+          variant="body2"
+          fontWeight={600}
+          title={displayName}
+          sx={(theme) => ({
+            lineHeight: 1.4,
+            wordBreak: 'break-word',
+            [theme.breakpoints.down('md')]: {
+              whiteSpace: 'normal',
+              overflow: 'visible',
+              textOverflow: 'clip',
+            },
+            [theme.breakpoints.up('md')]: {
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            },
+          })}
+        >
           {displayName}
         </Typography>
         {attr && (
@@ -266,6 +315,97 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
   return <Box sx={{ width: '100%', minWidth: 0 }}>{inner}</Box>;
 });
 
+/** 듀오·트리오: 썸네일 위 + 이름 아래(솔로 좌측 썸네일 그리드와 유사) */
+const COMBO_TILE_AVATAR_PX = 48;
+
+const ComboMonsterTile = memo(function ComboMonsterTile({ name, image, elemental, monsterId }: MonsterCellProps) {
+  const attr = parseElemental(elemental);
+  const displayName = name?.trim() || '—';
+  const href = rtaMonsterDetailHref(monsterId);
+
+  const body = (
+    <Stack
+      alignItems="center"
+      spacing={0.5}
+      sx={{ minWidth: 0, width: '100%', py: 0.5, textAlign: 'center' }}
+    >
+      <Avatar
+        src={getRenderableImageUrl(image)}
+        alt={displayName}
+        variant="rounded"
+        sx={{
+          width: COMBO_TILE_AVATAR_PX,
+          height: COMBO_TILE_AVATAR_PX,
+          flexShrink: 0,
+          border: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
+        {displayName.charAt(0)}
+      </Avatar>
+      <Typography
+        variant="caption"
+        color="text.primary"
+        fontWeight={600}
+        title={displayName}
+        sx={{
+          display: '-webkit-box',
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden',
+          lineHeight: 1.35,
+          wordBreak: 'break-word',
+          maxWidth: '100%',
+          fontSize: '0.7rem',
+        }}
+      >
+        {displayName}
+      </Typography>
+      {attr ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+          <AttributeElementIcon attribute={attr} size={15} />
+        </Box>
+      ) : null}
+    </Stack>
+  );
+
+  if (href) {
+    return (
+      <Box
+        component={Link}
+        href={href}
+        sx={{
+          textDecoration: 'none',
+          color: 'inherit',
+          minWidth: 0,
+          borderRadius: 1.25,
+          border: '1px solid',
+          borderColor: 'divider',
+          display: 'block',
+          bgcolor: (t) => alpha(t.palette.background.paper, 0.6),
+          transition: 'background-color 0.2s, border-color 0.2s',
+          '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.light' },
+        }}
+      >
+        {body}
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        minWidth: 0,
+        borderRadius: 1.25,
+        border: '1px dashed',
+        borderColor: 'divider',
+      }}
+    >
+      {body}
+    </Box>
+  );
+});
+
 // ─── StatsEmptyState ──────────────────────────────────────────────────────────
 
 const StatsEmptyState = memo(function StatsEmptyState({
@@ -292,6 +432,151 @@ const StatsEmptyState = memo(function StatsEmptyState({
   );
 });
 
+// ─── 솔로 탭: 정렬(픽횟수·승률 4가지) ───────────────────────────────────────
+
+const SOLO_STATS_SORT_ID = 'rta-solo-stats-sort';
+
+const SoloStatsSortSelect = memo(function SoloStatsSortSelect({
+  value,
+  onChange,
+}: {
+  value: SoloStatsSortKey;
+  onChange: (next: SoloStatsSortKey) => void;
+}) {
+  const handle = useCallback(
+    (e: SelectChangeEvent<SoloStatsSortKey>) => {
+      onChange(e.target.value as SoloStatsSortKey);
+    },
+    [onChange],
+  );
+
+  return (
+    <Paper
+      variant="outlined"
+      sx={{
+        mb: 2,
+        borderRadius: 2.5,
+        px: { xs: 1.25, sm: 1.5 },
+        py: 1.25,
+        borderColor: 'divider',
+        bgcolor: 'common.white',
+      }}
+    >
+      <FormControl size="small" fullWidth>
+        <InputLabel id={SOLO_STATS_SORT_ID}>정렬</InputLabel>
+        <Select<SoloStatsSortKey>
+          labelId={SOLO_STATS_SORT_ID}
+          label="정렬"
+          value={value}
+          onChange={handle}
+          aria-label="솔로 통계 정렬(픽횟수·승률)"
+          sx={RTA_OUTLINED_SELECT_FIELD_SX}
+          slotProps={{ input: { sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX } }}
+          MenuProps={{ disableScrollLock: true, PaperProps: { sx: { maxHeight: 360, bgcolor: 'common.white' } } }}
+        >
+          {SOLO_STATS_SORT_KEYS.map((k) => (
+            <MenuItem key={k} value={k}>
+              {SOLO_STATS_SORT_LABEL[k]}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+    </Paper>
+  );
+});
+
+const SoloStatCard = memo(function SoloStatCard({ rank, stat }: { rank: number; stat: MonsterStats }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: 2.5,
+        border: '1px solid',
+        borderColor: 'divider',
+        p: { xs: 1.75, sm: 2 },
+        background: (t) =>
+          `linear-gradient(120deg, ${alpha(t.palette.primary.main, 0.03)} 0%, ${alpha(t.palette.background.paper, 1)} 45%)`,
+        transition: 'border-color 0.2s, box-shadow 0.2s',
+        '&:hover': {
+          borderColor: 'primary.light',
+          boxShadow: (t) => `0 6px 22px ${alpha(t.palette.common.black, 0.07)}`,
+        },
+      }}
+    >
+      <Stack spacing={1.5}>
+        <Stack direction="row" alignItems="flex-start" spacing={1.5}>
+          <Typography
+            component="span"
+            sx={{
+              fontWeight: 900,
+              fontSize: '0.8rem',
+              color: 'text.secondary',
+              minWidth: 30,
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.2,
+              pt: 0.25,
+            }}
+          >
+            #{rank}
+          </Typography>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <MonsterCell
+              name={stat.monster_name}
+              image={stat.monster_image}
+              elemental={stat.monster_elemental}
+              monsterId={stat.monster_id}
+            />
+          </Box>
+        </Stack>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(4, minmax(0, 1fr))' },
+            gap: { xs: 1.25, sm: 1.5 },
+            alignItems: 'flex-start',
+            pt: 1.5,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+              픽횟수
+            </Typography>
+            <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, fontSize: '0.95rem' }}>
+              {toNum(stat.pick_count).toLocaleString()}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+              픽률
+            </Typography>
+            <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, fontSize: '0.95rem' }}>
+              {formatPercentage(stat.pick_rate)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+              승률
+            </Typography>
+            <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, fontSize: '0.95rem' }}>
+              {formatPercentage(stat.win_rate)}
+            </Typography>
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
+              벤율
+            </Typography>
+            <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, fontSize: '0.95rem' }}>
+              {formatPercentage(stat.ban_rate)}
+            </Typography>
+          </Box>
+        </Box>
+      </Stack>
+    </Paper>
+  );
+});
+
 // ─── Combo 조합 행 (듀오·트리오 공통) ─────────────────────────────────────────
 
 const ComboStatRow = memo(function ComboStatRow({
@@ -314,7 +599,7 @@ const ComboStatRow = memo(function ComboStatRow({
         borderRadius: 2.5,
         border: '1px solid',
         borderColor: 'divider',
-        p: { xs: 2, sm: 2.25 },
+        p: { xs: 1.75, sm: 2.25 },
         background: (t) =>
           `linear-gradient(120deg, ${alpha(t.palette.success.main, 0.04)} 0%, ${alpha(t.palette.background.paper, 1)} 40%)`,
         transition: 'border-color 0.2s, box-shadow 0.2s',
@@ -324,31 +609,45 @@ const ComboStatRow = memo(function ComboStatRow({
         },
       }}
     >
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}>
-        <Typography
-          sx={{
-            fontWeight: 900,
-            fontSize: '0.8rem',
-            color: 'text.secondary',
-            width: { md: 40 },
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          #{rank}
-        </Typography>
-        <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+      <Stack
+        direction={{ xs: 'column', md: 'row' }}
+        spacing={2}
+        alignItems={{ xs: 'stretch', md: 'center' }}
+      >
+        <Stack direction="row" alignItems="flex-start" spacing={1.5} sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+          <Typography
+            component="span"
+            sx={{
+              fontWeight: 900,
+              fontSize: '0.8rem',
+              color: 'text.secondary',
+              minWidth: 30,
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1.2,
+              pt: 0.25,
+            }}
+          >
+            #{rank}
+          </Typography>
+          <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+        </Stack>
         <Stack
           direction="row"
           spacing={2.5}
           sx={{
             flexShrink: 0,
-            alignSelf: { xs: 'stretch', md: 'center' },
             justifyContent: { xs: 'space-between', md: 'flex-end' },
+            width: { xs: '100%', md: 'auto' },
+            minWidth: { md: 200 },
+            pl: { xs: 0, md: 0 },
+            borderTop: { xs: '1px solid', md: 'none' },
+            borderColor: 'divider',
+            pt: { xs: 1.5, md: 0 },
           }}
         >
           <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
-              표본
+              경기 수
             </Typography>
             <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, fontSize: '1rem' }}>
               {matchCount.toLocaleString()}
@@ -375,26 +674,35 @@ const ComboStatRow = memo(function ComboStatRow({
   );
 });
 
-// ─── ComboSortBar ─────────────────────────────────────────────────────────────
+// ─── 듀오·트리오 정렬 (Select + ↑/↓ — 솔로 정렬 막대와 동일 패턴) ─────────────
 
 const ComboSortBar = memo(function ComboSortBar({
   sortField,
   sortOrder,
   onFieldChange,
-  onFlipOrder,
+  onOrderChange,
   ariaLabel,
+  selectLabelId,
 }: {
   sortField: ComboSortField;
   sortOrder: SortOrder;
   onFieldChange: (field: ComboSortField) => void;
-  onFlipOrder: () => void;
+  onOrderChange: (order: SortOrder) => void;
   ariaLabel: string;
+  selectLabelId: string;
 }) {
-  const handleToggle = useCallback(
-    (_: SyntheticEvent, value: ComboSortField | null) => {
-      if (value !== null) onFieldChange(value);
+  const handleFieldChange = useCallback(
+    (e: SelectChangeEvent<ComboSortField>) => {
+      onFieldChange(e.target.value as ComboSortField);
     },
     [onFieldChange],
+  );
+
+  const handleOrderToggle = useCallback(
+    (_: SyntheticEvent, value: SortOrder | null) => {
+      if (value !== null) onOrderChange(value);
+    },
+    [onOrderChange],
   );
 
   return (
@@ -403,106 +711,65 @@ const ComboSortBar = memo(function ComboSortBar({
       sx={{
         mb: 2.5,
         borderRadius: 2.5,
-        px: { xs: 2, sm: 2.5 },
-        py: 2,
+        px: { xs: 1.25, sm: 1.5 },
+        py: 1.25,
         borderColor: 'divider',
-        bgcolor: (t) => alpha(t.palette.action.hover, 0.2),
+        bgcolor: 'common.white',
       }}
     >
       <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={2}
-        alignItems={{ xs: 'stretch', md: 'center' }}
-        justifyContent="space-between"
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.25}
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        sx={{ width: '100%' }}
       >
-        <Stack spacing={1}>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <SortOutlinedIcon sx={{ fontSize: 20, color: 'text.secondary' }} aria-hidden />
-            <Typography variant="body2" color="text.secondary" fontWeight={600}>
-              정렬 기준
-            </Typography>
-          </Stack>
-          <ToggleButtonGroup
-            exclusive
+        <FormControl size="small" sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+          <InputLabel id={selectLabelId}>정렬 기준</InputLabel>
+          <Select<ComboSortField>
+            labelId={selectLabelId}
+            label="정렬 기준"
             value={sortField}
-            onChange={handleToggle}
-            size="small"
-            color="primary"
+            onChange={handleFieldChange}
             aria-label={ariaLabel}
-            sx={{
-              alignSelf: { xs: 'stretch', md: 'flex-start' },
-              '& .MuiToggleButton-root': { px: 2, textTransform: 'none', fontWeight: 600 },
-            }}
+            sx={RTA_OUTLINED_SELECT_FIELD_SX}
+            slotProps={{ input: { sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX } }}
+            MenuProps={{ disableScrollLock: true, PaperProps: { sx: { maxHeight: 320, bgcolor: 'common.white' } } }}
           >
-            <ToggleButton value="match_count">표본(경기 수)</ToggleButton>
-            <ToggleButton value="win_rate">승률</ToggleButton>
-          </ToggleButtonGroup>
-        </Stack>
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ alignSelf: { md: 'center' }, flexWrap: 'wrap' }}>
-          <Typography variant="caption" color="text.secondary">
-            {sortOrder === 'desc' ? '높은 값 먼저' : '낮은 값 먼저'}
-          </Typography>
-          <Tooltip title="오름차순 ↔ 내림차순">
-            <IconButton
-              size="small"
-              onClick={onFlipOrder}
-              aria-label="정렬 순서 바꾸기"
-              sx={{ border: '1px solid', borderColor: 'divider' }}
-            >
-              <SwapVertIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
+            <MenuItem value="match_count">경기 수</MenuItem>
+            <MenuItem value="win_rate">승률</MenuItem>
+          </Select>
+        </FormControl>
+        <ToggleButtonGroup
+          exclusive
+          value={sortOrder}
+          onChange={handleOrderToggle}
+          size="small"
+          color="primary"
+          aria-label={`${ariaLabel} 방향`}
+          sx={{
+            flexShrink: 0,
+            alignSelf: { xs: 'center', sm: 'auto' },
+            borderColor: 'divider',
+            bgcolor: 'common.white',
+            '& .MuiToggleButton-root': {
+              px: 1.1,
+              minWidth: 40,
+              fontWeight: 800,
+              textTransform: 'none',
+              bgcolor: 'common.white',
+              '&:not(.Mui-selected)': { bgcolor: 'common.white' },
+            },
+          }}
+        >
+          <ToggleButton value="desc" aria-label="내림차순" title="내림차순">
+            <ArrowDownwardIcon sx={{ fontSize: 18 }} />
+          </ToggleButton>
+          <ToggleButton value="asc" aria-label="오름차순" title="오름차순">
+            <ArrowUpwardIcon sx={{ fontSize: 18 }} />
+          </ToggleButton>
+        </ToggleButtonGroup>
       </Stack>
     </Paper>
-  );
-});
-
-// ─── 솔로 표 헤더 (정렬) ────────────────────────────────────────────────────────
-
-const SoloSortableTh = memo(function SoloSortableTh({
-  label,
-  field,
-  activeField,
-  order,
-  onSort,
-  align = 'right',
-}: {
-  label: string;
-  field: SortField;
-  activeField: SortField;
-  order: SortOrder;
-  onSort: (f: SortField) => void;
-  align?: 'left' | 'right';
-}) {
-  const active = activeField === field;
-  return (
-    <TableCell
-      align={align}
-      onClick={() => onSort(field)}
-      sx={{
-        ...TABLE_HEAD_CELL_SX,
-        cursor: 'pointer',
-        userSelect: 'none',
-        '&:hover': { bgcolor: 'action.selected' },
-      }}
-    >
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent={align === 'right' ? 'flex-end' : 'flex-start'}
-        spacing={0.5}
-      >
-        {label}
-        {active ? (
-          order === 'asc' ? (
-            <ArrowUpwardIcon sx={{ fontSize: 16, opacity: 0.85 }} />
-          ) : (
-            <ArrowDownwardIcon sx={{ fontSize: 16, opacity: 0.85 }} />
-          )
-        ) : null}
-      </Stack>
-    </TableCell>
   );
 });
 
@@ -575,9 +842,8 @@ export default function RtaMonsterStatsClient() {
   const [soloSearch, setSoloSearch] = useState('');
   const [elementFilter, setElementFilter] = useState<ElementFilterValue>('all');
 
-  // Solo sort
-  const [sortField, setSortField] = useState<SortField>('pick_count');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  // Solo: 픽횟수/승률 × 오름·내림 4가지
+  const [soloStatsSort, setSoloStatsSort] = useState<SoloStatsSortKey>('pick_count_desc');
 
   // Combo sort
   const [duoSortField, setDuoSortField] = useState<ComboSortField>('match_count');
@@ -605,10 +871,11 @@ export default function RtaMonsterStatsClient() {
     '/summonerswar/monster-list',
     {},
     {
-      enabled: tab === 0,
+      /** md 이상: 좌측 검색·속성·썸네일. 모바일은 시즌/티어·목록·정렬만 */
+      enabled: tab === 0 && !isNarrow,
       select: (raw) => normalizeMonsterList(raw),
-      staleTime: 30 * 60 * 1000,
-      gcTime: 60 * 60 * 1000,
+      staleTime: 60 * 60 * 1000,
+      gcTime: 2 * 60 * 60 * 1000,
       refetchOnWindowFocus: false,
     },
   );
@@ -671,17 +938,17 @@ export default function RtaMonsterStatsClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trioData]);
 
-  // Sorted data
+  // Sorted data (솔로: 픽횟수 또는 승률만)
   const sortedStats = useMemo(() => {
     if (allSoloStats.length === 0) return [];
-    const mul = sortOrder === 'asc' ? 1 : -1;
+    const { field, order } = soloStatsSortToParts(soloStatsSort);
+    const mul = order === 'asc' ? 1 : -1;
     return [...allSoloStats].sort((a, b) => {
-      if (sortField === 'monster_name') return mul * a.monster_name.localeCompare(b.monster_name);
-      const aVal = (a as unknown as Record<string, number>)[sortField] ?? 0;
-      const bVal = (b as unknown as Record<string, number>)[sortField] ?? 0;
+      const aVal = (a as unknown as Record<string, number>)[field] ?? 0;
+      const bVal = (b as unknown as Record<string, number>)[field] ?? 0;
       return mul * (aVal - bVal);
     });
-  }, [allSoloStats, sortField, sortOrder]);
+  }, [allSoloStats, soloStatsSort]);
 
   /** 전체 몬스터 마스터(노말·각성·2각 등 전 행) — 검색·속성만 목록용 (테이블과 무관). 표시는 역순. */
   const soloCatalogFiltered = useMemo(() => {
@@ -699,17 +966,6 @@ export default function RtaMonsterStatsClient() {
   const sortedTrio = useMemo(() => sortCombo(allTrioStats, trioSortField, trioSortOrder), [allTrioStats, trioSortField, trioSortOrder]);
 
   // Handlers
-  const handleSort = useCallback((field: SortField) => {
-    setSortField((prev) => {
-      if (prev === field) {
-        setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
-        return prev;
-      }
-      setSortOrder('desc');
-      return field;
-    });
-  }, []);
-
   const handleDuoFieldChange = useCallback((field: ComboSortField) => {
     setDuoSortField(field);
     setDuoSortOrder('desc');
@@ -719,9 +975,6 @@ export default function RtaMonsterStatsClient() {
     setTrioSortField(field);
     setTrioSortOrder('desc');
   }, []);
-
-  const flipDuoOrder  = useCallback(() => setDuoSortOrder( (o) => (o === 'asc' ? 'desc' : 'asc')), []);
-  const flipTrioOrder = useCallback(() => setTrioSortOrder((o) => (o === 'asc' ? 'desc' : 'asc')), []);
 
   const handleTabChange = useCallback(
     (_e: SyntheticEvent, v: number) => {
@@ -810,9 +1063,9 @@ export default function RtaMonsterStatsClient() {
             '& .MuiTabs-indicator': { height: 3, borderRadius: 999 },
           }}
         >
-          <Tab icon={<PersonIcon fontSize="small" />}     iconPosition="start" label="솔로 (1마리)" />
-          <Tab icon={<Diversity3Icon fontSize="small" />} iconPosition="start" label="듀오 (2마리)" />
-          <Tab icon={<GroupsIcon fontSize="small" />}     iconPosition="start" label="트리오 (3마리)" />
+          <Tab icon={<PersonIcon fontSize="small" />}     iconPosition="start" label="솔로" />
+          <Tab icon={<Diversity3Icon fontSize="small" />} iconPosition="start" label="듀오" />
+          <Tab icon={<GroupsIcon fontSize="small" />}     iconPosition="start" label="트리오" />
         </Tabs>
       </Paper>
 
@@ -821,13 +1074,14 @@ export default function RtaMonsterStatsClient() {
         <Stack
           direction={{ xs: 'column', md: 'row' }}
           spacing={{ xs: 2.5, md: 3 }}
-          alignItems={{ xs: 'stretch', md: 'flex-start' }}
-          sx={{ width: '100%', alignItems: { md: 'stretch' } }}
+          alignItems="stretch"
+          sx={{ width: '100%' }}
         >
           {/* 좌측: 검색 → 상세 조건 → 몬스터 썸네일 3열 */}
           <Box
             id="search-hero"
             sx={{
+              display: { xs: 'none', md: 'block' },
               width: { xs: '100%' },
               flex: { md: '0 0 380px' },
               maxWidth: { md: 400 },
@@ -844,74 +1098,97 @@ export default function RtaMonsterStatsClient() {
                 height: { md: '100%' },
               }}
             >
-              <Box className="serchbox-wrap" sx={{ mb: 2 }}>
-                <Box
-                  component="form"
-                  className="search-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                  }}
-                >
-                  <Stack
-                    direction={{ xs: 'column', sm: 'row', md: 'column' }}
-                    spacing={1.5}
-                    alignItems={{ xs: 'stretch', sm: 'center', md: 'stretch' }}
-                    className="search-container"
+              <Stack
+                direction="column"
+                spacing={2}
+                className="search-detail-split"
+                sx={{ mb: soloCatalogFiltered.length > 0 || catalogLoading ? 2 : 0 }}
+              >
+                <Box className="serchbox-wrap" sx={{ width: '100%' }}>
+                  <Typography
+                    component="h3"
+                    sx={{ m: 0, mb: 1, fontSize: { xs: '0.85rem', sm: '1rem' }, fontWeight: 800 }}
                   >
-                    <TextField
-                      size="small"
-                      fullWidth
-                      className="search-input"
-                      placeholder="몬스터 검색"
-                      value={soloSearch}
-                      onChange={(e) => setSoloSearch(e.target.value)}
-                      autoComplete="off"
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon fontSize="small" color="action" aria-hidden />
-                          </InputAdornment>
-                        ),
-                      }}
-                      sx={{ flex: 1 }}
-                    />
-                    <Button type="submit" variant="contained" size="medium" className="search-button" sx={{ flexShrink: 0, minWidth: { xs: 88, md: '100%' } }}>
-                      검색
-                    </Button>
-                  </Stack>
-                </Box>
-              </Box>
-
-              <Box className="detail-filter" sx={{ textAlign: 'left', mb: soloCatalogFiltered.length > 0 || catalogLoading ? 2 : 0 }}>
-                <Typography component="h3" sx={{ m: 0, mb: 1.25, fontSize: '1rem', fontWeight: 800 }}>
-                  상세 조건
-                </Typography>
-                <Box className="filter-list">
-                  <ToggleButtonGroup
-                    exclusive
-                    value={elementFilter}
-                    onChange={handleElementFilterChange}
-                    size="small"
-                    color="primary"
-                    aria-label="속성 필터"
-                    sx={{
-                      flexWrap: 'wrap',
-                      gap: 0.75,
-                      justifyContent: 'flex-start',
-                      '& .MuiToggleButtonGroup-grouped': { borderRadius: '8px !important', border: '1px solid', my: 0.25 },
+                    검색
+                  </Typography>
+                  <Box
+                    component="form"
+                    className="search-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
                     }}
                   >
-                    <ToggleButton value="all" sx={{ px: 1.5, textTransform: 'none', fontWeight: 600 }}>
-                      전체
-                    </ToggleButton>
-                    {ELEMENT_TOGGLE_ORDER.map((el) => (
-                      <ToggleButton key={el} value={el} sx={{ px: 1.25, minWidth: 44 }} aria-label={el}>
-                        <AttributeElementIcon attribute={el} size={22} />
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row', md: 'column' }}
+                      spacing={1.5}
+                      alignItems={{ xs: 'stretch', sm: 'center', md: 'stretch' }}
+                      className="search-container"
+                    >
+                      <TextField
+                        size="small"
+                        fullWidth
+                        className="search-input"
+                        placeholder="몬스터 검색"
+                        value={soloSearch}
+                        onChange={(e) => setSoloSearch(e.target.value)}
+                        autoComplete="off"
+                        InputProps={{
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <SearchIcon fontSize="small" color="action" aria-hidden />
+                            </InputAdornment>
+                          ),
+                        }}
+                        sx={{ flex: 1 }}
+                      />
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        size="medium"
+                        className="search-button"
+                        sx={{ flexShrink: 0, minWidth: { xs: '100%', sm: 88, md: '100%' } }}
+                      >
+                        검색
+                      </Button>
+                    </Stack>
+                  </Box>
                 </Box>
-              </Box>
+
+                <Box className="detail-filter" sx={{ width: '100%', textAlign: 'left' }}>
+                  <Typography
+                    component="h3"
+                    sx={{ m: 0, mb: 1, fontSize: { xs: '0.85rem', sm: '1rem' }, fontWeight: 800 }}
+                  >
+                    상세 조건
+                  </Typography>
+                  <Box className="filter-list">
+                    <ToggleButtonGroup
+                      exclusive
+                      value={elementFilter}
+                      onChange={handleElementFilterChange}
+                      size="small"
+                      color="primary"
+                      aria-label="속성 필터"
+                      sx={{
+                        flexWrap: 'wrap',
+                        gap: 0.75,
+                        justifyContent: 'flex-start',
+                        '& .MuiToggleButtonGroup-grouped': { borderRadius: '8px !important', border: '1px solid', my: 0.25 },
+                        '& .MuiToggleButton-root': { minWidth: { xs: 36, sm: 44 } },
+                      }}
+                    >
+                      <ToggleButton value="all" sx={{ px: { xs: 1, sm: 1.5 }, textTransform: 'none', fontWeight: 600, fontSize: { xs: '0.7rem', sm: '0.875rem' } }}>
+                        전체
+                      </ToggleButton>
+                      {ELEMENT_TOGGLE_ORDER.map((el) => (
+                        <ToggleButton key={el} value={el} sx={{ px: { xs: 1, sm: 1.25 } }} aria-label={el}>
+                          <AttributeElementIcon attribute={el} size={isNarrow ? 20 : 22} />
+                        </ToggleButton>
+                      ))}
+                    </ToggleButtonGroup>
+                  </Box>
+                </Box>
+              </Stack>
 
               {catalogLoading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
@@ -924,7 +1201,7 @@ export default function RtaMonsterStatsClient() {
                   component="ul"
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
                     gap: 1,
                     m: 0,
                     p: 0,
@@ -1003,11 +1280,23 @@ export default function RtaMonsterStatsClient() {
               seasonLabelId="monster-stats-season-label"
             />
 
+            <SoloStatsSortSelect value={soloStatsSort} onChange={setSoloStatsSort} />
+
             {sortedStats.length === 0 ? (
               <StatsEmptyState
                 title="표시할 통계가 없습니다"
-                description="표본이 100판 미만인 몬스터는 목록에서 제외합니다. 리플레이가 부족하거나 집계가 아직 반영되지 않았을 수 있습니다. 잠시 후 다시 확인해 주세요."
+                description="경기 수가 100판 미만인 몬스터는 목록에서 제외합니다. 리플레이가 부족하거나 집계가 아직 반영되지 않았을 수 있습니다. 잠시 후 다시 확인해 주세요."
               />
+            ) : isNarrow ? (
+              <Stack spacing={1.5}>
+                {sortedStats.map((stat, idx) => (
+                  <SoloStatCard
+                    key={stat.monster_id ?? stat.monster_name}
+                    rank={idx + 1}
+                    stat={stat}
+                  />
+                ))}
+              </Stack>
             ) : (
               <TableContainer
                 component={Paper}
@@ -1023,11 +1312,21 @@ export default function RtaMonsterStatsClient() {
                   <TableHead>
                     <TableRow>
                       <TableCell align="center" sx={{ ...TABLE_HEAD_CELL_SX, width: 52 }}>#</TableCell>
-                      <SoloSortableTh label="몬스터" field="monster_name" activeField={sortField} order={sortOrder} onSort={handleSort} align="left" />
-                      <SoloSortableTh label="픽횟수" field="pick_count" activeField={sortField} order={sortOrder} onSort={handleSort} />
-                      <SoloSortableTh label="픽률" field="pick_rate" activeField={sortField} order={sortOrder} onSort={handleSort} />
-                      <SoloSortableTh label="승률" field="win_rate" activeField={sortField} order={sortOrder} onSort={handleSort} />
-                      <SoloSortableTh label="벤율" field="ban_rate" activeField={sortField} order={sortOrder} onSort={handleSort} />
+                      <TableCell align="left" sx={{ ...TABLE_HEAD_CELL_SX }}>
+                        몬스터
+                      </TableCell>
+                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
+                        픽횟수
+                      </TableCell>
+                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
+                        픽률
+                      </TableCell>
+                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
+                        승률
+                      </TableCell>
+                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
+                        벤율
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1082,10 +1381,11 @@ export default function RtaMonsterStatsClient() {
             seasonLabelId="monster-stats-season-label"
           />
           <ComboSortBar
+            selectLabelId="rta-monster-stats-duo-sort"
             sortField={duoSortField}
             sortOrder={duoSortOrder}
             onFieldChange={handleDuoFieldChange}
-            onFlipOrder={flipDuoOrder}
+            onOrderChange={setDuoSortOrder}
             ariaLabel="듀오 조합 정렬"
           />
 
@@ -1105,32 +1405,24 @@ export default function RtaMonsterStatsClient() {
                 >
                   <Box
                     sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: { xs: 1, sm: 1.5 },
-                      justifyContent: { xs: 'center', sm: 'flex-start' },
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                      gap: 1,
+                      width: '100%',
                     }}
                   >
-                    <Box sx={{ flex: { sm: '1 1 200px' }, minWidth: 0 }}>
-                      <MonsterCell
-                        name={row.monster_name_1}
-                        image={pickComboMonsterImage(row, 1)}
-                        elemental={row.monster_elemental_1}
-                        monsterId={row.monster_id_1}
-                      />
-                    </Box>
-                    <Typography variant="body2" color="text.disabled" sx={{ px: 0.25, fontWeight: 700 }}>
-                      +
-                    </Typography>
-                    <Box sx={{ flex: { sm: '1 1 200px' }, minWidth: 0 }}>
-                      <MonsterCell
-                        name={row.monster_name_2}
-                        image={pickComboMonsterImage(row, 2)}
-                        elemental={row.monster_elemental_2}
-                        monsterId={row.monster_id_2}
-                      />
-                    </Box>
+                    <ComboMonsterTile
+                      name={row.monster_name_1}
+                      image={pickComboMonsterImage(row, 1)}
+                      elemental={row.monster_elemental_1}
+                      monsterId={row.monster_id_1}
+                    />
+                    <ComboMonsterTile
+                      name={row.monster_name_2}
+                      image={pickComboMonsterImage(row, 2)}
+                      elemental={row.monster_elemental_2}
+                      monsterId={row.monster_id_2}
+                    />
                   </Box>
                 </ComboStatRow>
               ))}
@@ -1160,10 +1452,11 @@ export default function RtaMonsterStatsClient() {
             seasonLabelId="monster-stats-season-label"
           />
           <ComboSortBar
+            selectLabelId="rta-monster-stats-trio-sort"
             sortField={trioSortField}
             sortOrder={trioSortOrder}
             onFieldChange={handleTrioFieldChange}
-            onFlipOrder={flipTrioOrder}
+            onOrderChange={setTrioSortOrder}
             ariaLabel="트리오 조합 정렬"
           />
 
@@ -1183,30 +1476,30 @@ export default function RtaMonsterStatsClient() {
                 >
                   <Box
                     sx={{
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      alignItems: 'center',
-                      gap: { xs: 0.75, sm: 1 },
-                      justifyContent: { xs: 'center', md: 'flex-start' },
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                      gap: 1,
+                      width: '100%',
                     }}
                   >
-                    {[1, 2, 3].map((slot, j) => (
-                      <Fragment key={slot}>
-                        {j > 0 && (
-                          <Typography variant="body2" color="text.disabled" sx={{ px: 0.15, fontWeight: 700 }}>
-                            +
-                          </Typography>
-                        )}
-                        <Box sx={{ flex: { md: '1 1 140px' }, minWidth: { md: 120 }, maxWidth: '100%' }}>
-                          <MonsterCell
-                            name={slot === 1 ? row.monster_name_1 : slot === 2 ? row.monster_name_2 : row.monster_name_3}
-                            image={pickComboMonsterImage(row, slot)}
-                            elemental={slot === 1 ? row.monster_elemental_1 : slot === 2 ? row.monster_elemental_2 : row.monster_elemental_3}
-                            monsterId={slot === 1 ? row.monster_id_1 : slot === 2 ? row.monster_id_2 : row.monster_id_3}
-                          />
-                        </Box>
-                      </Fragment>
-                    ))}
+                    <ComboMonsterTile
+                      name={row.monster_name_1}
+                      image={pickComboMonsterImage(row, 1)}
+                      elemental={row.monster_elemental_1}
+                      monsterId={row.monster_id_1}
+                    />
+                    <ComboMonsterTile
+                      name={row.monster_name_2}
+                      image={pickComboMonsterImage(row, 2)}
+                      elemental={row.monster_elemental_2}
+                      monsterId={row.monster_id_2}
+                    />
+                    <ComboMonsterTile
+                      name={row.monster_name_3}
+                      image={pickComboMonsterImage(row, 3)}
+                      elemental={row.monster_elemental_3}
+                      monsterId={row.monster_id_3}
+                    />
                   </Box>
                 </ComboStatRow>
               ))}

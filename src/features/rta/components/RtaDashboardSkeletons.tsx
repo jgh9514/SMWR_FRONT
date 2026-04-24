@@ -76,10 +76,49 @@ export function RtaTierDistributionSkeleton() {
 export function RtaRankCutoffSectionSkeleton({
   noTopMargin = false,
   fillHeight = false,
+  /** true면 Card 래퍼 없이 내용만 (부모 Card 안에 넣을 때) */
+  skipCard = false,
+  /** true면 제목 줄 스켈레톤 생략(부모가 실제 헤더·우측 필터를 그릴 때) */
+  omitHeader = false,
 }: {
   noTopMargin?: boolean;
   fillHeight?: boolean;
+  skipCard?: boolean;
+  omitHeader?: boolean;
 }) {
+  const inner = (
+    <Box
+      sx={
+        fillHeight
+          ? { flex: 1, minHeight: 0, overflowY: 'auto' }
+          : { display: 'contents' }
+      }
+    >
+      {!omitHeader ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+          <Skeleton variant="circular" width={22} height={22} />
+          <Skeleton width={160} height={24} />
+        </Box>
+      ) : null}
+      <Skeleton variant="rounded" height={120} sx={{ mb: 2 }} />
+      <Skeleton variant="rounded" height={200} />
+    </Box>
+  );
+
+  if (skipCard) {
+    return (
+      <Box
+        sx={
+          fillHeight
+            ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
+            : {}
+        }
+      >
+        {inner}
+      </Box>
+    );
+  }
+
   return (
     <Card
       elevation={0}
@@ -101,20 +140,7 @@ export function RtaRankCutoffSectionSkeleton({
           : {}),
       }}
     >
-      <Box
-        sx={
-          fillHeight
-            ? { flex: 1, minHeight: 0, overflowY: 'auto' }
-            : { display: 'contents' }
-        }
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Skeleton variant="circular" width={22} height={22} />
-          <Skeleton width={160} height={24} />
-        </Box>
-        <Skeleton variant="rounded" height={120} sx={{ mb: 2 }} />
-        <Skeleton variant="rounded" height={200} />
-      </Box>
+      {inner}
     </Card>
   );
 }

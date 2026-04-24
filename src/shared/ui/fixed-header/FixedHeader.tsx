@@ -117,9 +117,9 @@ function getNavGroups(
       {
         title: 'RTA 몬스터 통계', path: '/rta/monster-stats/solo', icon: <BarChartIcon />,
         children: [
-          { title: '솔로 (1마리)', path: '/rta/monster-stats/solo', icon: <PersonIcon /> },
-          { title: '듀오 (2마리)', path: '/rta/monster-stats/duo', icon: <Diversity3Icon /> },
-          { title: '트리오 (3마리)', path: '/rta/monster-stats/trio', icon: <GroupsIcon /> },
+          { title: '솔로', path: '/rta/monster-stats/solo', icon: <PersonIcon /> },
+          { title: '듀오', path: '/rta/monster-stats/duo', icon: <Diversity3Icon /> },
+          { title: '트리오', path: '/rta/monster-stats/trio', icon: <GroupsIcon /> },
         ],
       },
       { title: 'RTA 소환사 랭킹', path: '/rta/summoner-ranking', icon: <EmojiEventsIcon /> },
