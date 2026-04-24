@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
   CircularProgress,
-  Container,
   FormControl,
   InputLabel,
   LinearProgress,
@@ -21,6 +27,8 @@ import {
   TableHead,
   TableRow,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
@@ -161,7 +169,137 @@ function buildRow(row: RtaSummonerRankingRow) {
   };
 }
 
+type SummonerRankingRowView = ReturnType<typeof buildRow>;
+
+const RTA_OUTLINED_SELECT_SX = {
+  bgcolor: '#ffffff',
+  '&:hover': { bgcolor: '#ffffff' },
+  '&.Mui-focused': { bgcolor: '#ffffff' },
+  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+} as const;
+
+const SummonerRankCard = memo(function SummonerRankCard({
+  r,
+  profileHref,
+  onRowClick,
+  onAuxClick,
+  onKeyDown,
+}: {
+  r: SummonerRankingRowView;
+  profileHref: string | null;
+  onRowClick: (e: ReactMouseEvent<HTMLElement>, href: string) => void;
+  onAuxClick: (e: ReactMouseEvent<HTMLElement>, href: string) => void;
+  onKeyDown: (e: ReactKeyboardEvent<HTMLElement>, href: string) => void;
+}) {
+  const serverLabel = r.country ? r.country.toUpperCase() : '—';
+  return (
+    <Paper
+      elevation={0}
+      onClick={profileHref ? (e) => onRowClick(e, profileHref) : undefined}
+      onAuxClick={profileHref ? (e) => onAuxClick(e, profileHref) : undefined}
+      onKeyDown={profileHref ? (e) => onKeyDown(e, profileHref) : undefined}
+      tabIndex={profileHref ? 0 : -1}
+      role={profileHref ? 'link' : undefined}
+      sx={{
+        p: { xs: 1.5, sm: 1.75 },
+        borderRadius: 2.5,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        transition: (t) => t.transitions.create(['box-shadow', 'border-color'], { duration: 150 }),
+        ...(profileHref
+          ? {
+              cursor: 'pointer',
+              '&:hover': { borderColor: 'primary.light', boxShadow: 1 },
+              '&:focus-visible': {
+                outline: '2px solid',
+                outlineColor: 'primary.main',
+                outlineOffset: 2,
+              },
+            }
+          : {}),
+      }}
+    >
+      <Stack spacing={1.25}>
+        <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
+          <Typography
+            sx={{
+              width: 36,
+              flexShrink: 0,
+              textAlign: 'center',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {r.rank}
+          </Typography>
+          <Box
+            component="img"
+            src={getSwexPlayerImageUrl(r.channelUid || r.wizardId)}
+            alt=""
+            loading="lazy"
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              flexShrink: 0,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'action.hover',
+            }}
+          />
+          <Stack flex={1} minWidth={0} spacing={0.25}>
+            <Typography
+              variant="body2"
+              fontWeight={800}
+              noWrap
+              title={r.wizardId ? `${r.name} (${r.wizardId})` : r.name}
+            >
+              {r.name}
+            </Typography>
+            <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+              {r.country && r.country !== '—' && /^[a-z]{2}$/i.test(r.country) ? (
+                <Box
+                  component="img"
+                  src={`https://flagcdn.com/w40/${r.country.toLowerCase()}.png`}
+                  alt=""
+                  sx={{ width: 20, height: 14, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
+                />
+              ) : null}
+              <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                {serverLabel}
+              </Typography>
+            </Stack>
+          </Stack>
+        </Stack>
+
+        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={0.5} columnGap={1}>
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+            <RtaRatingStarIcons rating={r.ratingId} size={14} />
+            <Typography
+              component="span"
+              variant="body2"
+              fontWeight={800}
+              sx={{ fontVariantNumeric: 'tabular-nums' }}
+            >
+              {r.score.toLocaleString()}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Box sx={{ pl: 0.25 }}>
+          <WinRateBar wins={r.winCount} total={r.matchCount} />
+        </Box>
+      </Stack>
+    </Paper>
+  );
+});
+
 export default function RtaSummonerRankingClient() {
+  const theme = useTheme();
+  const isNarrow = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
   const { data: seasonsData } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
@@ -196,7 +334,7 @@ export default function RtaSummonerRankingClient() {
     router.push(href);
   };
 
-  const handleRowClick = (e: ReactMouseEvent<HTMLTableRowElement>, href: string) => {
+  const handleRowClick = (e: ReactMouseEvent<HTMLElement>, href: string) => {
     if (e.defaultPrevented) return;
     if (e.metaKey || e.ctrlKey) {
       navigateToProfile(href, true);
@@ -205,14 +343,14 @@ export default function RtaSummonerRankingClient() {
     router.push(href);
   };
 
-  const handleRowAuxClick = (e: ReactMouseEvent<HTMLTableRowElement>, href: string) => {
+  const handleRowAuxClick = (e: ReactMouseEvent<HTMLElement>, href: string) => {
     if (e.button === 1) {
       e.preventDefault();
       navigateToProfile(href, true);
     }
   };
 
-  const handleRowKeyDown = (e: ReactKeyboardEvent<HTMLTableRowElement>, href: string) => {
+  const handleRowKeyDown = (e: ReactKeyboardEvent<HTMLElement>, href: string) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       navigateToProfile(href, e.metaKey || e.ctrlKey);
@@ -259,17 +397,25 @@ export default function RtaSummonerRankingClient() {
   );
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: { xs: '100%', md: 1100, lg: 1200, xl: 1280 },
+        mx: 'auto',
+        px: { xs: 2, sm: 3 },
+        py: { xs: 2, md: 4 },
+      }}
+    >
       <PageHeader title="RTA 소환사 랭킹" backPath="/rta" />
 
       <Box sx={{ mb: 3 }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
-          alignItems={{ xs: 'stretch', sm: 'center' }}
+          alignItems={{ xs: 'stretch', sm: 'flex-start' }}
           justifyContent="space-between"
         >
-          <FormControl size="small" sx={{ minWidth: 200 }}>
+          <FormControl size="small" fullWidth={isNarrow} sx={{ minWidth: { sm: 200 }, maxWidth: { sm: 360 } }}>
             <InputLabel id="rta-season-label">시즌</InputLabel>
             <Select
               labelId="rta-season-label"
@@ -279,6 +425,7 @@ export default function RtaSummonerRankingClient() {
                 setSeason(String(e.target.value));
                 setCountryFilter(null);
               }}
+              sx={RTA_OUTLINED_SELECT_SX}
             >
               {seasonOptions.map((o) => (
                 <MenuItem key={o.value} value={o.value}>
@@ -290,8 +437,13 @@ export default function RtaSummonerRankingClient() {
 
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 0.75 }}>
-              <Typography variant="caption" color="text.secondary">
-                국가 비율 (상위 {SUMMONER_RANKING_MAX}명 샘플) · 표는 페이지마다 서버 조회
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.45, flex: 1, minWidth: 0 }}>
+                <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                  국가 비율 (상위 {SUMMONER_RANKING_MAX}명 샘플) · 표는 페이지마다 서버 조회
+                </Box>
+                <Box component="span" sx={{ display: { xs: 'inline', sm: 'none' } }}>
+                  국가 비율 · 상위 {SUMMONER_RANKING_MAX}명 샘플
+                </Box>
               </Typography>
               {countryFilter != null ? (
                 <Button
@@ -305,7 +457,21 @@ export default function RtaSummonerRankingClient() {
                 </Button>
               ) : null}
             </Box>
-            <Stack direction="row" flexWrap="wrap" gap={1} useFlexGap>
+            <Stack
+              direction="row"
+              flexWrap={{ xs: 'nowrap', sm: 'wrap' }}
+              gap={1}
+              useFlexGap
+              sx={{
+                maxWidth: '100%',
+                overflowX: { xs: 'auto', sm: 'visible' },
+                py: 0.25,
+                WebkitOverflowScrolling: 'touch',
+                scrollbarGutter: { xs: 'stable', sm: 'auto' },
+                '&::-webkit-scrollbar': { height: 4 },
+                '&::-webkit-scrollbar-thumb': { borderRadius: 1, bgcolor: 'action.disabled' },
+              }}
+            >
               {countryChips.length === 0 && countrySampleLoading ? (
                 <Typography variant="caption" color="text.disabled">
                   불러오는 중…
@@ -330,6 +496,7 @@ export default function RtaSummonerRankingClient() {
                       onClick={() => handleCountryChipClick(code)}
                       aria-pressed={selected}
                       sx={{
+                        flexShrink: 0,
                         px: 1.25,
                         py: 0.5,
                         borderRadius: 999,
@@ -387,10 +554,43 @@ export default function RtaSummonerRankingClient() {
                   left: 0,
                   right: 0,
                   zIndex: 2,
-                  borderRadius: '8px 8px 0 0',
+                  borderRadius: { xs: 2, md: '8px 8px 0 0' },
                 }}
               />
             ) : null}
+            {isNarrow ? (
+              <Box
+                aria-busy={tableLoadingMore}
+                sx={{
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1.5,
+                  ...(tableLoadingMore ? { opacity: 0.72, transition: 'opacity 0.2s' } : {}),
+                }}
+              >
+                {allRows.length === 0 ? (
+                  <Paper variant="outlined" sx={{ p: 4, borderRadius: 2, textAlign: 'center' }}>
+                    <Typography color="text.secondary">표시할 랭킹 데이터가 없습니다.</Typography>
+                  </Paper>
+                ) : (
+                  allRows.map((r) => {
+                    const profileHref =
+                      r.wizardId !== '' ? `/rta/player/${encodeURIComponent(r.wizardId)}` : null;
+                    return (
+                      <SummonerRankCard
+                        key={r.wizardId || `${r.rank}-${r.name}`}
+                        r={r}
+                        profileHref={profileHref}
+                        onRowClick={handleRowClick}
+                        onAuxClick={handleRowAuxClick}
+                        onKeyDown={handleRowKeyDown}
+                      />
+                    );
+                  })
+                )}
+              </Box>
+            ) : (
             <TableContainer
               component={Paper}
               variant="outlined"
@@ -563,23 +763,28 @@ export default function RtaSummonerRankingClient() {
               </TableBody>
             </Table>
           </TableContainer>
+            )}
           </Box>
 
           {(hasMore || tableLoadingMore) && (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
               <Button
                 variant="outlined"
+                size={isNarrow ? 'small' : 'medium'}
                 onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
                 disabled={fetchingPage}
                 startIcon={tableLoadingMore ? <CircularProgress size={16} thickness={4} /> : undefined}
-                sx={(theme) => ({
+                fullWidth={isNarrow}
+                sx={(t) => ({
                   borderRadius: 2,
+                  maxWidth: isNarrow ? 400 : 'none',
+                  mx: isNarrow ? 'auto' : 0,
                   px: 5,
                   py: 1,
                   fontWeight: 700,
-                  fontSize: '0.9rem',
-                  borderColor: `${theme.palette.primary.main}80`,
-                  '&:hover': { borderColor: theme.palette.primary.main },
+                  fontSize: isNarrow ? '0.85rem' : '0.9rem',
+                  borderColor: `${t.palette.primary.main}80`,
+                  '&:hover': { borderColor: t.palette.primary.main },
                 })}
               >
                 {tableLoadingMore ? '불러오는 중…' : '더보기'}
@@ -588,6 +793,6 @@ export default function RtaSummonerRankingClient() {
           )}
         </>
       )}
-    </Container>
+    </Box>
   );
 }

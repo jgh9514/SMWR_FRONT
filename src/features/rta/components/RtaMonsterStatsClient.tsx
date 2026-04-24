@@ -77,23 +77,40 @@ import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 type SortOrder = 'asc' | 'desc';
 type ComboSortField = 'match_count' | 'win_rate';
 
-/** 솔로 목록: 픽횟수·승률 × 오름/내림 4가지만 */
-const SOLO_STATS_SORT_KEYS = [
+/** 솔로·듀오·트리오 공통: 픽횟수(듀오·트리오는 경기 수)·승률 × 오름/내림 4가지 */
+const MONSTER_STATS_SORT_KEYS = [
   'pick_count_asc',
   'pick_count_desc',
   'win_rate_asc',
   'win_rate_desc',
 ] as const;
-type SoloStatsSortKey = (typeof SOLO_STATS_SORT_KEYS)[number];
+type MonsterStatsSortKey = (typeof MONSTER_STATS_SORT_KEYS)[number];
 
-const SOLO_STATS_SORT_LABEL: Record<SoloStatsSortKey, string> = {
+/** 접근용 전체 문구(화면에는 지표+화살표만) */
+const MONSTER_STATS_SORT_LABEL: Record<MonsterStatsSortKey, string> = {
   pick_count_asc: '픽횟수 오름차순',
   pick_count_desc: '픽횟수 내림차순',
   win_rate_asc: '승률 오름차순',
   win_rate_desc: '승률 내림차순',
 };
 
-function soloStatsSortToParts(key: SoloStatsSortKey): { field: 'pick_count' | 'win_rate'; order: SortOrder } {
+function monsterStatsSortOptionContent(k: MonsterStatsSortKey) {
+  const metric = k.startsWith('pick_count') ? '픽횟수' : '승률';
+  const asc = k.endsWith('_asc');
+  const Icon = asc ? ArrowUpwardIcon : ArrowDownwardIcon;
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.5} component="span">
+      <Box component="span" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+        {metric}
+      </Box>
+      <Icon sx={{ fontSize: 18, color: 'action.active' }} aria-hidden />
+    </Stack>
+  );
+}
+
+function monsterStatsSortToSoloField(
+  key: MonsterStatsSortKey,
+): { field: 'pick_count' | 'win_rate'; order: SortOrder } {
   switch (key) {
     case 'pick_count_asc':
       return { field: 'pick_count', order: 'asc' };
@@ -104,6 +121,13 @@ function soloStatsSortToParts(key: SoloStatsSortKey): { field: 'pick_count' | 'w
     case 'win_rate_desc':
       return { field: 'win_rate', order: 'desc' };
   }
+}
+
+/** 듀오·트리오: pick_count_* → match_count(경기 수) 정렬 */
+function monsterStatsSortToComboField(key: MonsterStatsSortKey): { field: ComboSortField; order: SortOrder } {
+  const { field, order } = monsterStatsSortToSoloField(key);
+  if (field === 'pick_count') return { field: 'match_count', order };
+  return { field: 'win_rate', order };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -432,20 +456,20 @@ const StatsEmptyState = memo(function StatsEmptyState({
   );
 });
 
-// ─── 솔로 탭: 정렬(픽횟수·승률 4가지) ───────────────────────────────────────
+// ─── 솔로·듀오·트리오 공통 정렬(픽횟수/경기 수·승률 4가지) ─────────────
 
-const SOLO_STATS_SORT_ID = 'rta-solo-stats-sort';
+const MONSTER_STATS_SORT_ID = 'rta-monster-stats-sort';
 
-const SoloStatsSortSelect = memo(function SoloStatsSortSelect({
+const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
   value,
   onChange,
 }: {
-  value: SoloStatsSortKey;
-  onChange: (next: SoloStatsSortKey) => void;
+  value: MonsterStatsSortKey;
+  onChange: (next: MonsterStatsSortKey) => void;
 }) {
   const handle = useCallback(
-    (e: SelectChangeEvent<SoloStatsSortKey>) => {
-      onChange(e.target.value as SoloStatsSortKey);
+    (e: SelectChangeEvent<MonsterStatsSortKey>) => {
+      onChange(e.target.value as MonsterStatsSortKey);
     },
     [onChange],
   );
@@ -463,20 +487,25 @@ const SoloStatsSortSelect = memo(function SoloStatsSortSelect({
       }}
     >
       <FormControl size="small" fullWidth>
-        <InputLabel id={SOLO_STATS_SORT_ID}>정렬</InputLabel>
-        <Select<SoloStatsSortKey>
-          labelId={SOLO_STATS_SORT_ID}
+        <InputLabel id={MONSTER_STATS_SORT_ID}>정렬</InputLabel>
+        <Select<MonsterStatsSortKey>
+          labelId={MONSTER_STATS_SORT_ID}
           label="정렬"
           value={value}
           onChange={handle}
-          aria-label="솔로 통계 정렬(픽횟수·승률)"
+          renderValue={(v) => monsterStatsSortOptionContent(v as MonsterStatsSortKey)}
           sx={RTA_OUTLINED_SELECT_FIELD_SX}
-          slotProps={{ input: { sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX } }}
+          slotProps={{
+            input: {
+              sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX,
+              'aria-label': `정렬: ${MONSTER_STATS_SORT_LABEL[value]}`,
+            },
+          }}
           MenuProps={{ disableScrollLock: true, PaperProps: { sx: { maxHeight: 360, bgcolor: 'common.white' } } }}
         >
-          {SOLO_STATS_SORT_KEYS.map((k) => (
-            <MenuItem key={k} value={k}>
-              {SOLO_STATS_SORT_LABEL[k]}
+          {MONSTER_STATS_SORT_KEYS.map((k) => (
+            <MenuItem key={k} value={k} aria-label={MONSTER_STATS_SORT_LABEL[k]}>
+              {monsterStatsSortOptionContent(k)}
             </MenuItem>
           ))}
         </Select>
@@ -674,105 +703,6 @@ const ComboStatRow = memo(function ComboStatRow({
   );
 });
 
-// ─── 듀오·트리오 정렬 (Select + ↑/↓ — 솔로 정렬 막대와 동일 패턴) ─────────────
-
-const ComboSortBar = memo(function ComboSortBar({
-  sortField,
-  sortOrder,
-  onFieldChange,
-  onOrderChange,
-  ariaLabel,
-  selectLabelId,
-}: {
-  sortField: ComboSortField;
-  sortOrder: SortOrder;
-  onFieldChange: (field: ComboSortField) => void;
-  onOrderChange: (order: SortOrder) => void;
-  ariaLabel: string;
-  selectLabelId: string;
-}) {
-  const handleFieldChange = useCallback(
-    (e: SelectChangeEvent<ComboSortField>) => {
-      onFieldChange(e.target.value as ComboSortField);
-    },
-    [onFieldChange],
-  );
-
-  const handleOrderToggle = useCallback(
-    (_: SyntheticEvent, value: SortOrder | null) => {
-      if (value !== null) onOrderChange(value);
-    },
-    [onOrderChange],
-  );
-
-  return (
-    <Paper
-      variant="outlined"
-      sx={{
-        mb: 2.5,
-        borderRadius: 2.5,
-        px: { xs: 1.25, sm: 1.5 },
-        py: 1.25,
-        borderColor: 'divider',
-        bgcolor: 'common.white',
-      }}
-    >
-      <Stack
-        direction={{ xs: 'column', sm: 'row' }}
-        spacing={1.25}
-        alignItems={{ xs: 'stretch', sm: 'center' }}
-        sx={{ width: '100%' }}
-      >
-        <FormControl size="small" sx={{ flex: 1, minWidth: 0, width: '100%' }}>
-          <InputLabel id={selectLabelId}>정렬 기준</InputLabel>
-          <Select<ComboSortField>
-            labelId={selectLabelId}
-            label="정렬 기준"
-            value={sortField}
-            onChange={handleFieldChange}
-            aria-label={ariaLabel}
-            sx={RTA_OUTLINED_SELECT_FIELD_SX}
-            slotProps={{ input: { sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX } }}
-            MenuProps={{ disableScrollLock: true, PaperProps: { sx: { maxHeight: 320, bgcolor: 'common.white' } } }}
-          >
-            <MenuItem value="match_count">경기 수</MenuItem>
-            <MenuItem value="win_rate">승률</MenuItem>
-          </Select>
-        </FormControl>
-        <ToggleButtonGroup
-          exclusive
-          value={sortOrder}
-          onChange={handleOrderToggle}
-          size="small"
-          color="primary"
-          aria-label={`${ariaLabel} 방향`}
-          sx={{
-            flexShrink: 0,
-            alignSelf: { xs: 'center', sm: 'auto' },
-            borderColor: 'divider',
-            bgcolor: 'common.white',
-            '& .MuiToggleButton-root': {
-              px: 1.1,
-              minWidth: 40,
-              fontWeight: 800,
-              textTransform: 'none',
-              bgcolor: 'common.white',
-              '&:not(.Mui-selected)': { bgcolor: 'common.white' },
-            },
-          }}
-        >
-          <ToggleButton value="desc" aria-label="내림차순" title="내림차순">
-            <ArrowDownwardIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-          <ToggleButton value="asc" aria-label="오름차순" title="오름차순">
-            <ArrowUpwardIcon sx={{ fontSize: 18 }} />
-          </ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
-    </Paper>
-  );
-});
-
 // ─── LoadMoreButton ───────────────────────────────────────────────────────────
 
 const LoadMoreButton = memo(function LoadMoreButton({
@@ -842,14 +772,8 @@ export default function RtaMonsterStatsClient() {
   const [soloSearch, setSoloSearch] = useState('');
   const [elementFilter, setElementFilter] = useState<ElementFilterValue>('all');
 
-  // Solo: 픽횟수/승률 × 오름·내림 4가지
-  const [soloStatsSort, setSoloStatsSort] = useState<SoloStatsSortKey>('pick_count_desc');
-
-  // Combo sort
-  const [duoSortField, setDuoSortField] = useState<ComboSortField>('match_count');
-  const [duoSortOrder, setDuoSortOrder] = useState<SortOrder>('desc');
-  const [trioSortField, setTrioSortField] = useState<ComboSortField>('match_count');
-  const [trioSortOrder, setTrioSortOrder] = useState<SortOrder>('desc');
+  // 솔로·듀오·트리오 공통: 픽횟수(듀오·트리오는 경기 수)·승률 × 오름·내림
+  const [monsterStatsSort, setMonsterStatsSort] = useState<MonsterStatsSortKey>('pick_count_desc');
 
   // Reset all on filter change
   useEffect(() => {
@@ -941,14 +865,14 @@ export default function RtaMonsterStatsClient() {
   // Sorted data (솔로: 픽횟수 또는 승률만)
   const sortedStats = useMemo(() => {
     if (allSoloStats.length === 0) return [];
-    const { field, order } = soloStatsSortToParts(soloStatsSort);
+    const { field, order } = monsterStatsSortToSoloField(monsterStatsSort);
     const mul = order === 'asc' ? 1 : -1;
     return [...allSoloStats].sort((a, b) => {
       const aVal = (a as unknown as Record<string, number>)[field] ?? 0;
       const bVal = (b as unknown as Record<string, number>)[field] ?? 0;
       return mul * (aVal - bVal);
     });
-  }, [allSoloStats, soloStatsSort]);
+  }, [allSoloStats, monsterStatsSort]);
 
   /** 전체 몬스터 마스터(노말·각성·2각 등 전 행) — 검색·속성만 목록용 (테이블과 무관). 표시는 역순. */
   const soloCatalogFiltered = useMemo(() => {
@@ -962,19 +886,15 @@ export default function RtaMonsterStatsClient() {
     return rows.slice().reverse();
   }, [monsterCatalog, soloSearch, elementFilter]);
 
-  const sortedDuo  = useMemo(() => sortCombo(allDuoStats,  duoSortField,  duoSortOrder),  [allDuoStats,  duoSortField,  duoSortOrder]);
-  const sortedTrio = useMemo(() => sortCombo(allTrioStats, trioSortField, trioSortOrder), [allTrioStats, trioSortField, trioSortOrder]);
+  const sortedDuo = useMemo(() => {
+    const { field, order } = monsterStatsSortToComboField(monsterStatsSort);
+    return sortCombo(allDuoStats, field, order);
+  }, [allDuoStats, monsterStatsSort]);
 
-  // Handlers
-  const handleDuoFieldChange = useCallback((field: ComboSortField) => {
-    setDuoSortField(field);
-    setDuoSortOrder('desc');
-  }, []);
-
-  const handleTrioFieldChange = useCallback((field: ComboSortField) => {
-    setTrioSortField(field);
-    setTrioSortOrder('desc');
-  }, []);
+  const sortedTrio = useMemo(() => {
+    const { field, order } = monsterStatsSortToComboField(monsterStatsSort);
+    return sortCombo(allTrioStats, field, order);
+  }, [allTrioStats, monsterStatsSort]);
 
   const handleTabChange = useCallback(
     (_e: SyntheticEvent, v: number) => {
@@ -1280,7 +1200,7 @@ export default function RtaMonsterStatsClient() {
               seasonLabelId="monster-stats-season-label"
             />
 
-            <SoloStatsSortSelect value={soloStatsSort} onChange={setSoloStatsSort} />
+            <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
 
             {sortedStats.length === 0 ? (
               <StatsEmptyState
@@ -1380,14 +1300,7 @@ export default function RtaMonsterStatsClient() {
             tierRulesLoading={tierRulesLoading}
             seasonLabelId="monster-stats-season-label"
           />
-          <ComboSortBar
-            selectLabelId="rta-monster-stats-duo-sort"
-            sortField={duoSortField}
-            sortOrder={duoSortOrder}
-            onFieldChange={handleDuoFieldChange}
-            onOrderChange={setDuoSortOrder}
-            ariaLabel="듀오 조합 정렬"
-          />
+          <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
 
           {sortedDuo.length === 0 ? (
             <StatsEmptyState
@@ -1451,14 +1364,7 @@ export default function RtaMonsterStatsClient() {
             tierRulesLoading={tierRulesLoading}
             seasonLabelId="monster-stats-season-label"
           />
-          <ComboSortBar
-            selectLabelId="rta-monster-stats-trio-sort"
-            sortField={trioSortField}
-            sortOrder={trioSortOrder}
-            onFieldChange={handleTrioFieldChange}
-            onOrderChange={setTrioSortOrder}
-            ariaLabel="트리오 조합 정렬"
-          />
+          <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
 
           {sortedTrio.length === 0 ? (
             <StatsEmptyState
