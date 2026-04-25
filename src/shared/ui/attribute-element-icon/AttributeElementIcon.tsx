@@ -3,13 +3,15 @@
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
 import type { AttributeType } from '@/features/siege/types/monster';
+import { getCdnImageUrl } from '@/shared/lib/env';
 
+/** 속성 아이콘 PNG — S3(CloudFront) `images/*_Icon.png` (`getCdnImageUrl` / `NEXT_PUBLIC_CDN_BASE_URL` 등) */
 const ELEMENT_ICON_SRC: Record<AttributeType, string> = {
-  fire: '/images/Fire_Icon.png',
-  water: '/images/Water_Icon.png',
-  wind: '/images/Wind_Icon.png',
-  light: '/images/Light_Icon.png',
-  dark: '/images/Dark_Icon.png',
+  fire: getCdnImageUrl('/images/Fire_Icon.png'),
+  water: getCdnImageUrl('/images/Water_Icon.png'),
+  wind: getCdnImageUrl('/images/Wind_Icon.png'),
+  light: getCdnImageUrl('/images/Light_Icon.png'),
+  dark: getCdnImageUrl('/images/Dark_Icon.png'),
 };
 
 export type AttributeElementIconProps = {
