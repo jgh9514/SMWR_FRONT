@@ -28,6 +28,7 @@ function matchListTierBody(ratingId?: number | null, ratingIds?: number[] | null
 }
 import type {
   MonsterDetail,
+  RtaDashboardLinkPreviewResponse,
   RtaDashboardRankCutoffResponse,
   RtaDashboardTierDistributionResponse,
   RtaMonsterStatsResponse,
@@ -458,6 +459,26 @@ export const useRtaSummonerRanking = (
       gcTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
       ...queryOptions,
+    },
+  );
+};
+
+/**
+ * 메인/대시보드 4패널(솔·듀·트 + 소환사 랭킹) — WAS 가 한 응답으로 병렬 집계
+ */
+export const useRtaDashboardLinkPreview = (
+  seasonCode: string,
+  seasonId: number | null,
+  previewLimit: number = 5,
+) => {
+  return useApiPostQuery<RtaDashboardLinkPreviewResponse>(
+    '/rta/dashboard/link-preview',
+    { previewLimit, ...seasonBody(seasonCode, seasonId) },
+    {
+      enabled: true,
+      staleTime: RTA_MONSTER_STATS_STALE_MS,
+      gcTime: RTA_MONSTER_STATS_GC_MS,
+      refetchOnWindowFocus: false,
     },
   );
 };

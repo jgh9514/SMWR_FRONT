@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, Box, Button, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { useRtaMonsterStats, useRtaSummonerRanking } from '@/features/rta/hooks/useRtaData';
+import { useRtaDashboardLinkPreview } from '@/features/rta/hooks/useRtaData';
 import type { DuoComboStat, MonsterStats, RtaSummonerRankingRow, TrioComboStat } from '@/features/rta/types/rta';
 import { getRenderableImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
@@ -177,16 +177,16 @@ type GridProps = {
  */
 export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedded = false }: GridProps) {
   const router = useRouter();
-  const bodyOpts = { seasonId: seasonId ?? undefined };
-  const soloQ = useRtaMonsterStats({ type: 'solo', limit: 5, offset: 0, seasonCode, ...bodyOpts });
-  const duoQ = useRtaMonsterStats({ type: 'duo', limit: 5, offset: 0, seasonCode, ...bodyOpts });
-  const trioQ = useRtaMonsterStats({ type: 'trio', limit: 5, offset: 0, seasonCode, ...bodyOpts });
-  const sumQ = useRtaSummonerRanking(5, 0, seasonCode, { seasonId: seasonId ?? undefined });
+  const linkQ = useRtaDashboardLinkPreview(seasonCode, seasonId, 5);
+  const bundle = linkQ.data;
 
-  const soloRows = (soloQ.data?.type === 'solo' ? (soloQ.data.rows as MonsterStats[]) : []) ?? [];
-  const duoRows = (duoQ.data?.type === 'duo' ? (duoQ.data.rows as DuoComboStat[]) : []) ?? [];
-  const trioRows = (trioQ.data?.type === 'trio' ? (trioQ.data.rows as TrioComboStat[]) : []) ?? [];
-  const rankRows: RtaSummonerRankingRow[] = sumQ.data?.rankings?.slice(0, 5) ?? [];
+  const soloRows =
+    (bundle?.solo?.type === 'solo' ? (bundle.solo.rows as MonsterStats[]) : []) ?? [];
+  const duoRows =
+    (bundle?.duo?.type === 'duo' ? (bundle.duo.rows as DuoComboStat[]) : []) ?? [];
+  const trioRows =
+    (bundle?.trio?.type === 'trio' ? (bundle.trio.rows as TrioComboStat[]) : []) ?? [];
+  const rankRows: RtaSummonerRankingRow[] = bundle?.summoner_ranking?.rankings?.slice(0, 5) ?? [];
 
   const navigateToProfile = (href: string, openInNewTab = false) => {
     if (openInNewTab && typeof window !== 'undefined') {
@@ -235,12 +235,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
     >
       <Box>
       <DashboardPreviewPanel title="솔로 몬스터 통계" detailHref={MONSTER_STATS_PATHS.solo}>
-        {soloQ.isPending && !soloQ.data
+        {linkQ.isPending && !bundle
           ? rowSkeletons()
-          : soloQ.error
+          : linkQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {soloQ.error.message || '불러오지 못했습니다.'}
+                  {linkQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : soloRows.length === 0
@@ -304,12 +304,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
 
       <Box>
       <DashboardPreviewPanel title="듀오 몬스터 통계" detailHref={MONSTER_STATS_PATHS.duo}>
-        {duoQ.isPending && !duoQ.data
+        {linkQ.isPending && !bundle
           ? rowSkeletons()
-          : duoQ.error
+          : linkQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {duoQ.error.message || '불러오지 못했습니다.'}
+                  {linkQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : duoRows.length === 0
@@ -373,12 +373,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
 
       <Box>
       <DashboardPreviewPanel title="트리오 몬스터 통계" detailHref={MONSTER_STATS_PATHS.trio}>
-        {trioQ.isPending && !trioQ.data
+        {linkQ.isPending && !bundle
           ? rowSkeletons()
-          : trioQ.error
+          : linkQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {trioQ.error.message || '불러오지 못했습니다.'}
+                  {linkQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : trioRows.length === 0
@@ -447,12 +447,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
 
       <Box>
       <DashboardPreviewPanel title="소환사 랭킹" detailHref={SUMMONER_RANKING_PATH}>
-        {sumQ.isPending && !sumQ.data
+        {linkQ.isPending && !bundle
           ? rowSkeletons()
-          : sumQ.error
+          : linkQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {sumQ.error.message || '불러오지 못했습니다.'}
+                  {linkQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : rankRows.length === 0

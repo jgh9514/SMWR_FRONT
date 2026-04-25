@@ -358,6 +358,16 @@ export interface RtaSummonerRankingResponse {
   countryFilter?: string | null;
 }
 
+/** POST /rta/dashboard/link-preview — 메인 4패널 한 번에 */
+export interface RtaDashboardLinkPreviewResponse {
+  seasonId?: number | null;
+  previewLimit: number;
+  solo: RtaMonsterStatsResponse;
+  duo: RtaMonsterStatsResponse;
+  trio: RtaMonsterStatsResponse;
+  summoner_ranking: RtaSummonerRankingResponse;
+}
+
 /** POST /rta/summoner-search — WAS `searchRtaSummonersInAgg` (snake_case만) */
 export interface RtaSummonerSearchHit {
   wizard_id?: string;

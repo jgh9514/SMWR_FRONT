@@ -145,7 +145,10 @@ function isValidMonsterInfoPayload(data: unknown): data is MonsterInfoResponse {
   return id != null && String(id).trim() !== '';
 }
 
-export async function getMonsterInfoData(monsterId: string): Promise<MonsterInfoResponse | null> {
+/**
+ * generateMetadata·페이지 본문이 같은 요청에서 동일 몬스터를 부를 때 fetch 1회로 합친다.
+ */
+export const getMonsterInfoData = cache(async (monsterId: string): Promise<MonsterInfoResponse | null> => {
   const trimmed = monsterId?.trim();
   if (!trimmed) {
     return null;
@@ -164,17 +167,17 @@ export async function getMonsterInfoData(monsterId: string): Promise<MonsterInfo
   } catch {
     return null;
   }
-}
+});
 
 /** 몬스터 목록에 없어도 `/monster/info`로 데빌몬 아이콘 URL 확보 — DB `image_url` → CloudFront(S3)와 동일하게 해석 */
-export async function getDevilmonImageUrlForSearch(): Promise<string> {
+export const getDevilmonImageUrlForSearch = cache(async (): Promise<string> => {
   const info = await getMonsterInfoData(DEVILMON_MONSTER_ID);
   const url = info?.image_url;
   if (url != null && String(url).trim() !== '') {
     return getMonsterImageUrl(url);
   }
   return getMonsterImageUrl('/images/default-monster.png');
-}
+});
 
 export type GetRtaMonsterStatsParams = {
   /** 페이지 크기(기본 20, 최대 500) */

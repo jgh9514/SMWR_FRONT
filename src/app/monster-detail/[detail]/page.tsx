@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import MonsterDetailContent from '@/features/siege/components/MonsterDetailContent';
-import { getDevilmonImageUrlForSearch, getMonsterInfoData, getMonsterListData, getRtaMonsterDetailData } from '@/shared/lib/api/server';
+import { getDevilmonImageUrlForSearch, getMonsterInfoData, getMonsterListData } from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 
-/** RTA 블록은 실시간에 가깝게 — 전 페이지 동적 렌더 */
+/** 몬스터 기본 정보는 서버에서, RTA 블록은 클라이언트에서 조회해 RSC가 RTA WAS 응답까지 기다리지 않게 함 */
 export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
@@ -32,14 +32,6 @@ function buildMonsterDetailDescription(monsterInfo: Awaited<ReturnType<typeof ge
     : '';
 
   return `${monsterInfo.kr_name} ${monsterInfo.monster_elemental} 속성 ${monsterInfo.star}성 몬스터의 ${statSummary}, ${leaderSummary}${monsterInfo.skills.length}개 스킬 구성을 확인할 수 있는 서머너즈워 몬스터 상세 페이지입니다.`;
-}
-
-function parseMonsterIdNumeric(detail: string): number | null {
-  const n = Number.parseInt(String(detail).trim(), 10);
-  if (!Number.isFinite(n) || n <= 0) {
-    return null;
-  }
-  return n;
 }
 
 export async function generateStaticParams() {
@@ -90,11 +82,9 @@ export default async function MonsterDetailPage({
 }: MonsterDetailPageProps) {
   const { detail: detailParam } = await params;
   const detail = decodeURIComponent(detailParam ?? '').trim();
-  const pid = parseMonsterIdNumeric(detail);
-  const [monsterInfo, devilmonImageUrl, rtaDetail] = await Promise.all([
+  const [monsterInfo, devilmonImageUrl] = await Promise.all([
     getMonsterInfoData(detail),
     getDevilmonImageUrlForSearch(),
-    pid != null ? getRtaMonsterDetailData(pid).catch(() => null) : Promise.resolve(null),
   ]);
 
   if (!monsterInfo) {
@@ -135,7 +125,7 @@ export default async function MonsterDetailPage({
       <MonsterDetailContent
         monsterInfo={monsterInfo}
         devilmonImageUrl={devilmonImageUrl}
-        rtaDetail={rtaDetail}
+        rtaDetail={null}
       />
     </>
   );
