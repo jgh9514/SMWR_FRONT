@@ -224,7 +224,7 @@ export default function HomeMainVisual() {
                 mx: 'auto',
               }}
             >
-              RTA 랭킹·몬스터·점령전 — 소환사 닉으로 바로 이동
+              RTA 랭킹·몬스터·점령전
             </Typography>
           </Box>
 
