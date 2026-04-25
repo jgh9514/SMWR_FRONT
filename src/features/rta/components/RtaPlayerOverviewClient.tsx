@@ -13,40 +13,35 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
+  useMediaQuery,
   useTheme,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import TimelineIcon from '@mui/icons-material/Timeline';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
+import GroupsIcon from '@mui/icons-material/Groups';
 import {
   Area,
   AreaChart,
   CartesianGrid,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
-import { useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
+import { useRtaDashboardRankCutoff, useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
+import { isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
 import { getMatchPerspective } from '@/features/rta/utils/rtaPlayerPerspective';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
-
-const HEATMAP_COLORS = {
-  none: '#3f3f46',
-  low: 'rgb(215, 48, 39)',
-  midLow: 'rgb(252, 141, 89)',
-  mid: 'rgb(255, 255, 191)',
-  midHigh: 'rgb(145, 207, 96)',
-  high: 'rgb(26, 152, 80)',
-} as const;
 
 function num(v: unknown): number {
   const n = Number(v);
@@ -133,21 +128,12 @@ function formatMatchDateTime(iso: string): string {
   });
 }
 
-function winRateHeatColor(wins: number, total: number): string {
-  if (total <= 0) return HEATMAP_COLORS.none;
-  const r = (wins / total) * 100;
-  if (r < 35) return HEATMAP_COLORS.low;
-  if (r < 50) return HEATMAP_COLORS.midLow;
-  if (r < 51) return HEATMAP_COLORS.mid;
-  if (r < 60) return HEATMAP_COLORS.midHigh;
-  return HEATMAP_COLORS.high;
-}
-
 type ChartMode = 'daily' | 'match';
 
 export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string }) {
   const theme = useTheme();
   const { seasonCode, seasonId } = useRtaPlayerSeason();
+  const { data: rankCutData } = useRtaDashboardRankCutoff(seasonCode, seasonId);
   const { data: summary } = useRtaPlayerSummary(wizardId, undefined, seasonCode, { seasonId });
   const {
     data: infinite,
@@ -157,8 +143,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     hasNextPage,
   } = useRtaPlayerMatchesInfinite(wizardId, true, seasonCode, seasonId);
 
-  const [chartOpen, setChartOpen] = useState(true);
+  /** ‘전체 점수 추이’ 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
+  const [chartOpen, setChartOpen] = useState(false);
   const [chartMode, setChartMode] = useState<ChartMode>('daily');
+  /** 30일·‘N일 전’ 기준 시각(마운트 시 1회) — render 순수성 */
+  const [asOfTime] = useState(() => Date.now());
 
   const allMatches = useMemo(() => {
     const pages = infinite?.pages ?? [];
@@ -197,29 +186,6 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const maxScoreDisplay =
     maxSeasonScoreAgg > 0 ? maxSeasonScoreAgg : summaryScore > 0 ? summaryScore : 0;
 
-  const heatmapWeeks = useMemo(() => {
-    const today = startOfLocalDay(new Date());
-    const cells: { key: string; wins: number; total: number; dayNum: number }[] = [];
-    for (let i = 41; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      cells.push({ key: ymdLocal(d), wins: 0, total: 0, dayNum: d.getDate() });
-    }
-    const map = new Map(cells.map((c) => [c.key, c]));
-    for (const c of chronological) {
-      const k = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
-      const cell = map.get(k);
-      if (!cell) continue;
-      cell.total += 1;
-      if (c.won) cell.wins += 1;
-    }
-    const rows: (typeof cells)[] = [];
-    for (let r = 0; r < 6; r++) {
-      rows.push(cells.slice(r * 7, r * 7 + 7));
-    }
-    return rows;
-  }, [chronological]);
-
   const topMonsters = useMemo(() => {
     const acc = new Map<string, { name: string; image: string; wins: number; games: number }>();
     for (const c of chronological) {
@@ -236,6 +202,53 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       .filter((x) => x.games > 0)
       .sort((a, b) => b.games - a.games)
       .slice(0, 5);
+  }, [chronological]);
+
+  const LAST_N_GAMES = 20;
+  /** 직전 N경기 구간에서 상대별 대전 수(판수) 상위만 표시 */
+  const LAST20_TOP_OPPONENTS = 5;
+  const last20VsOpponents = useMemo(() => {
+    if (chronological.length === 0) {
+      return {
+        sampleSize: 0,
+        rows: [] as { oppId: string; oppName: string; wins: number; losses: number; channelUid?: string }[],
+      };
+    }
+    const slice = chronological.slice(-LAST_N_GAMES);
+    const sampleSize = slice.length;
+    const byKey = new Map<
+      string,
+      { oppId: string; oppName: string; wins: number; losses: number; channelUid?: string }
+    >();
+    for (const c of slice) {
+      const oid = String(c.p.oppId ?? '').trim();
+      const key = oid || String(c.p.oppName ?? '').trim();
+      if (!key) continue;
+      if (!byKey.has(key)) {
+        byKey.set(key, {
+          oppId: oid || key,
+          oppName: String(c.p.oppName ?? key).trim() || key,
+          wins: 0,
+          losses: 0,
+          channelUid: c.p.oppChannelUid,
+        });
+      } else {
+        const g = byKey.get(key)!;
+        if (c.p.oppChannelUid) g.channelUid = c.p.oppChannelUid;
+      }
+      const g = byKey.get(key)!;
+      if (c.won) g.wins += 1;
+      else g.losses += 1;
+    }
+    const rows = [...byKey.values()]
+      .sort((a, b) => {
+        const ta = a.wins + a.losses;
+        const tb = b.wins + b.losses;
+        if (tb !== ta) return tb - ta;
+        return a.oppName.localeCompare(b.oppName, 'ko');
+      })
+      .slice(0, LAST20_TOP_OPPONENTS);
+    return { sampleSize, rows };
   }, [chronological]);
 
   const chartData = useMemo(() => {
@@ -273,6 +286,97 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     return [Math.floor(min - pad), Math.ceil(max + pad)] as [number, number];
   }, [chartData]);
 
+  const ratingId = summary?.rating_id != null && summary.rating_id !== undefined ? Number(summary.rating_id) : null;
+  const shortTier = getRtaTierShortLabel(ratingId ?? undefined);
+  const winRateDisplay =
+    summary?.win_rate_pct != null && Number.isFinite(Number(summary.win_rate_pct))
+      ? Number(summary.win_rate_pct)
+      : matchCount > 0
+        ? (winCount / matchCount) * 100
+        : null;
+
+  /** 랭크컷 스냅샷(등급별 최저): 왼쪽=현재 티어 랭크컷, 오른쪽=다음 티어 랭크컷. 이 구간에 현재 LP 표시. 최상위 티어는 구간 없음. */
+  const tierBand = useMemo(() => {
+    const rid = ratingId;
+    if (rid == null || !Number.isFinite(rid) || rid <= 0) return { type: 'scoreOnly' as const };
+    const raw = rankCutData?.snapshot_rank_cut ?? [];
+    const rows = raw
+      .map((r) => {
+        const rec = r as { ratingId?: number; rating_id?: number; cutoffScore?: number; cutoff_score?: number };
+        const id = rec.ratingId ?? rec.rating_id;
+        const c = rec.cutoffScore ?? rec.cutoff_score;
+        return { ratingId: Number(id), cutoff: Number(c) };
+      })
+      .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
+      .filter((x) => !isRtaCutoffMissing(x.cutoff))
+      .sort((a, b) => a.ratingId - b.ratingId);
+    if (rows.length < 1) return { type: 'scoreOnly' as const };
+    const i = rows.findIndex((r) => r.ratingId === rid);
+    if (i < 0) return { type: 'scoreOnly' as const };
+    if (i >= rows.length - 1) return { type: 'highest' as const };
+    const min = rows[i]!.cutoff;
+    const max = rows[i + 1]!.cutoff;
+    if (isRtaCutoffMissing(max) || min >= max) {
+      if (min > 0) return { type: 'highest' as const };
+      return { type: 'scoreOnly' as const };
+    }
+    const currentTierRatingId = rows[i]!.ratingId;
+    const nextRatingId = rows[i + 1]!.ratingId;
+    return { type: 'range' as const, min, max, currentTierRatingId, nextRatingId };
+  }, [rankCutData?.snapshot_rank_cut, ratingId]);
+
+  const tierBarPct = useMemo(() => {
+    if (tierBand.type !== 'range' || !Number.isFinite(summaryScore)) return 0;
+    const { min, max } = tierBand;
+    if (max <= min) return 50;
+    const t = (summaryScore - min) / (max - min);
+    return Math.min(100, Math.max(0, t * 100));
+  }, [summaryScore, tierBand]);
+
+  const last30dSeries = useMemo(() => {
+    const t30 = asOfTime - THIRTY_DAYS_MS;
+    return chronological
+      .filter((c) => parseMatchDate(c.date).getTime() >= t30)
+      .map((c, idx) => {
+        const t = parseMatchDate(c.date).getTime();
+        const daysAgo = Math.max(0, Math.floor((asOfTime - t) / 86400000));
+        return { idx, score: c.myScore, t: c.date, daysAgo };
+      });
+  }, [asOfTime, chronological]);
+
+  const chart30dDomain = useMemo((): [number, number] => {
+    const s = last30dSeries.map((d) => d.score).filter((n) => Number.isFinite(n));
+    if (s.length === 0) return [0, 2000] as [number, number];
+    const mn = Math.min(...s);
+    const mx = Math.max(...s);
+    const pad = Math.max(3, (mx - mn) * 0.1 || 1);
+    return [Math.floor(mn - pad), Math.ceil(mx + pad)] as [number, number];
+  }, [last30dSeries]);
+
+  const lpChange30d = useMemo(() => {
+    const t30 = asOfTime - THIRTY_DAYS_MS;
+    let lastBefore: number | null = null;
+    for (const c of chronological) {
+      if (parseMatchDate(c.date).getTime() < t30) {
+        lastBefore = c.myScore;
+      }
+    }
+    const last = chronological.length > 0 ? chronological[chronological.length - 1]!.myScore : null;
+    if (last == null) return { delta: null as number | null, hasBoth: false };
+    if (lastBefore != null) return { delta: last - lastBefore, hasBoth: true };
+    const firstIn = chronological.find((c) => parseMatchDate(c.date).getTime() >= t30);
+    if (firstIn) return { delta: last - firstIn.myScore, hasBoth: true };
+    return { delta: 0, hasBoth: true };
+  }, [asOfTime, chronological]);
+
+  const chart30dTicks = useMemo(() => {
+    const n = last30dSeries.length;
+    if (n === 0) return [];
+    if (n === 1) return [0];
+    if (n === 2) return [0, 1];
+    return [0, Math.floor((n - 1) / 2), n - 1];
+  }, [last30dSeries.length]);
+
   const loadedTotal = allMatches.length;
   const totalFromSummary = matchCount;
 
@@ -287,118 +391,274 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       sx={{
         display: 'grid',
         gap: 2,
-        gridTemplateColumns: { xs: '1fr', md: 'minmax(280px, 360px) 1fr' },
+        gridTemplateColumns: { xs: '1fr', md: 'minmax(300px, 420px) 1fr' },
         alignItems: 'start',
       }}
     >
       {/* 왼쪽 열 */}
       <Stack spacing={2}>
-        <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
-          <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
-            <EmojiEventsIcon color="primary" fontSize="small" />
-            <Typography variant="subtitle2" fontWeight={700}>
-              시즌 통계
-            </Typography>
-          </Stack>
-          <Stack spacing={1.5}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                게임
+        <Card variant="outlined" sx={{ p: 2, borderRadius: 2, overflow: 'hidden' }}>
+          <Stack
+            direction="row"
+            alignItems="flex-start"
+            justifyContent="space-between"
+            gap={2}
+            sx={{ flexWrap: { xs: 'wrap', sm: 'nowrap' } }}
+          >
+            <Box flex={1} minWidth={0}>
+              <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap" sx={{ mb: 0.5 }}>
+                <Typography variant="h6" fontWeight={800} sx={{ color: 'primary.main', lineHeight: 1.2 }}>
+                  {shortTier}
+                </Typography>
+                {ratingId != null && ratingId > 0 && <RtaRatingStarIcons rating={ratingId} size={16} gap={0.5} />}
+              </Stack>
+              <Typography variant="body2" fontWeight={800}>
+                {summaryScore > 0 ? `${Math.round(summaryScore).toLocaleString()} LP` : '—'}
               </Typography>
-              <Typography variant="body2" fontWeight={600}>
-                {winCount}승 - {lossCount}패
+            </Box>
+            <Stack alignItems="flex-end" spacing={0.25}>
+              <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.3 }}>
+                {winCount}승 {lossCount}패
+              </Typography>
+              <Typography variant="body2" color="text.secondary" component="div" sx={{ textAlign: 'right', lineHeight: 1.3 }}>
+                승률{' '}
+                <Box component="span" fontWeight={800} color={winRateDisplay != null && winRateDisplay >= 50 ? 'success.main' : 'error.main'}>
+                  {winRateDisplay != null ? `${winRateDisplay.toFixed(1)}%` : '—'}
+                </Box>
               </Typography>
             </Stack>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="body2" color="text.secondary">
-                최고 점수
-              </Typography>
-              <Typography variant="body2" fontWeight={600}>
-                {maxScoreDisplay > 0 ? Math.round(maxScoreDisplay).toLocaleString() : '—'}
-              </Typography>
-            </Stack>
           </Stack>
-        </Card>
 
-        <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <TimelineIcon color="primary" fontSize="small" />
-              <Typography variant="subtitle2" fontWeight={700}>
-                최근 활동
+          <Box sx={{ mt: 2 }}>
+            {tierBand.type === 'range' ? (
+              <>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                  {tierBand.currentTierRatingId > 0 && (
+                    <RtaRatingStarIcons rating={tierBand.currentTierRatingId} size={14} gap={0.5} />
+                  )}
+                  {tierBand.nextRatingId > 0 && (
+                    <RtaRatingStarIcons rating={tierBand.nextRatingId} size={14} gap={0.5} />
+                  )}
+                </Stack>
+                <Box
+                  sx={{
+                    position: 'relative',
+                    height: 8,
+                    borderRadius: 1,
+                    background: `linear-gradient(90deg, ${theme.palette.info.dark}22 0%, ${theme.palette.success.main}33 50%, ${theme.palette.warning.main}55 100%)`,
+                    overflow: 'visible',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: 0,
+                      right: 0,
+                      height: 1,
+                      transform: 'translateY(-50%)',
+                      borderTop: `1px dashed ${theme.palette.divider}`,
+                      opacity: 0.6,
+                    }}
+                  />
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `clamp(0px, ${tierBarPct}%, calc(100% - 10px))`,
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      bgcolor: 'background.paper',
+                      border: `2px solid ${theme.palette.warning.main}`,
+                      boxShadow: 1,
+                    }}
+                    title="현재 LP"
+                  />
+                </Box>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
+                  <Typography variant="body2" fontWeight={800} color="text.primary" component="span">
+                    {Math.round(tierBand.min).toLocaleString()} LP
+                  </Typography>
+                  <Typography variant="body2" fontWeight={800} color="text.primary" component="span" textAlign="right">
+                    {Math.round(tierBand.max).toLocaleString()} LP
+                  </Typography>
+                </Stack>
+              </>
+            ) : (
+              <Typography variant="body2" fontWeight={800} textAlign="center" sx={{ py: 0.5 }}>
+                {summaryScore > 0 ? `${Math.round(summaryScore).toLocaleString()} LP` : '—'}
               </Typography>
-              <Tooltip title="날짜별 승률에 따라 색이 달라집니다. (로드된 경기 기준)">
-                <InfoOutlinedIcon sx={{ fontSize: 16, color: 'text.disabled', cursor: 'help' }} />
-              </Tooltip>
-            </Stack>
-          </Stack>
-          <Stack direction="row" justifyContent="center" gap={2} flexWrap="wrap" sx={{ mb: 1.5 }}>
-            {[
-              { c: HEATMAP_COLORS.low, t: '<35%' },
-              { c: HEATMAP_COLORS.midLow, t: '35-49%' },
-              { c: HEATMAP_COLORS.mid, t: '50%' },
-              { c: HEATMAP_COLORS.midHigh, t: '51-59%' },
-              { c: HEATMAP_COLORS.high, t: '>60%' },
-            ].map((x) => (
-              <Stack key={x.t} alignItems="center" gap={0.25}>
-                <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: x.c }} />
-                <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
-                  {x.t}
+            )}
+          </Box>
+
+          <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              flexWrap="wrap"
+              gap={1}
+              sx={{ mb: 1 }}
+            >
+              <Stack direction="row" alignItems="center" flexWrap="wrap" gap={0.75}>
+                <EmojiEventsIcon color="action" fontSize="small" />
+                <Typography variant="subtitle2" fontWeight={700} component="span">
+                  최근 30일
+                </Typography>
+                {lpChange30d.delta != null && lpChange30d.hasBoth ? (
+                  <Typography
+                    component="span"
+                    variant="body2"
+                    fontWeight={800}
+                    sx={{ color: lpChange30d.delta > 0 ? 'success.main' : lpChange30d.delta < 0 ? 'error.main' : 'text.secondary' }}
+                  >
+                    {lpChange30d.delta > 0 ? '+' : ''}
+                    {Math.round(lpChange30d.delta).toLocaleString()} LP
+                  </Typography>
+                ) : (
+                  <Typography component="span" variant="body2" color="text.disabled">
+                    —
+                  </Typography>
+                )}
+              </Stack>
+              <Stack direction="row" alignItems="baseline" gap={0.5} flexShrink={0}>
+                <Typography variant="caption" color="text.secondary" component="span">
+                  최고점수:
+                </Typography>
+                <Typography variant="body2" fontWeight={800} color="text.primary" component="span">
+                  {maxScoreDisplay > 0 ? `${Math.round(maxScoreDisplay).toLocaleString()} LP` : '—'}
                 </Typography>
               </Stack>
-            ))}
-          </Stack>
-          <Box sx={{ maxWidth: 220, mx: 'auto' }}>
-            <Stack direction="row" justifyContent="space-around" sx={{ mb: 0.5 }}>
-              {['월', '화', '수', '목', '금', '토', '일'].map((d) => (
-                <Typography key={d} variant="caption" color="text.secondary" sx={{ width: 28, textAlign: 'center', fontSize: 10 }}>
-                  {d}
+            </Stack>
+            <Box sx={{ width: '100%', height: 180, mx: 'auto' }}>
+              {last30dSeries.length === 0 ? (
+                <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
+                  최근 30일 내 로드된 경기가 없습니다.
                 </Typography>
-              ))}
-            </Stack>
-            <Stack spacing={0.5}>
-              {heatmapWeeks.map((row, ri) => (
-                <Stack key={ri} direction="row" spacing={0.5} justifyContent="center">
-                  {row.map((cell) => {
-                    const rate = cell.total > 0 ? (cell.wins / cell.total) * 100 : null;
-                    const bg = winRateHeatColor(cell.wins, cell.total);
-                    return (
-                      <Tooltip
-                        key={cell.key}
-                        title={`${cell.key} · ${cell.total ? `${cell.wins}/${cell.total}승` : '경기 없음'}`}
-                      >
-                        <Box
-                          sx={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: 0.5,
-                            bgcolor: bg,
-                            fontSize: 10,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: cell.total ? 'common.white' : 'text.disabled',
-                            cursor: 'default',
-                          }}
-                        >
-                          {cell.dayNum}
-                        </Box>
-                      </Tooltip>
-                    );
-                  })}
-                </Stack>
-              ))}
-            </Stack>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={last30dSeries} margin={{ top: 6, right: 4, left: 0, bottom: 2 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} opacity={0.4} />
+                    <XAxis
+                      dataKey="idx"
+                      type="number"
+                      domain={[0, last30dSeries.length - 1]}
+                      ticks={chart30dTicks}
+                      tick={{ fontSize: 10 }}
+                      stroke={theme.palette.text.disabled}
+                      allowDecimals={false}
+                      tickFormatter={(v) => {
+                        const i = typeof v === 'number' ? v : parseInt(String(v), 10);
+                        const p = last30dSeries[Math.min(Math.max(0, i), last30dSeries.length - 1)];
+                        return p ? `${p.daysAgo}일 전` : '';
+                      }}
+                    />
+                    <YAxis
+                      domain={chart30dDomain}
+                      width={40}
+                      tick={{ fontSize: 10 }}
+                      stroke={theme.palette.text.disabled}
+                      tickFormatter={(v) => (Number.isFinite(v) ? String(Math.round(v)) : '')}
+                    />
+                    <RechartsTooltip
+                      formatter={(v) => {
+                        const n = typeof v === 'number' ? v : Number(v);
+                        return [Number.isFinite(n) ? `${Math.round(n).toLocaleString()} LP` : '—', '점수'];
+                      }}
+                      labelFormatter={(_l, p) => {
+                        const d = p?.[0]?.payload as { t?: string } | undefined;
+                        return d?.t ? formatMatchDateTime(d.t) : '';
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="score"
+                      stroke={accent}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </Box>
           </Box>
-          <Box sx={{ mt: 2, pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
-            <Typography variant="body2">
-              <Box component="span" fontWeight={700}>
-                {loadedTotal}
+
+          <Box sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider' }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ cursor: 'pointer', py: 0.5, '&:hover': { bgcolor: 'action.hover' } }}
+              onClick={() => setChartOpen((v) => !v)}
+            >
+              <Stack direction="row" alignItems="center" gap={0.75}>
+                <TimelineIcon color="action" fontSize="small" />
+                <Typography variant="subtitle2" fontWeight={700}>
+                  전체 점수 추이
+                </Typography>
+                <Typography variant="caption" color="text.disabled">
+                  (로드된 전체 {chartMode === 'daily' ? '일별' : '경기별'})
+                </Typography>
+              </Stack>
+              <IconButton size="small" aria-label="접기">
+                <ExpandMoreIcon sx={{ transform: chartOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </IconButton>
+            </Stack>
+            <Collapse in={chartOpen}>
+              <Box sx={{ pt: 1.5 }}>
+                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
+                  <ToggleButtonGroup size="small" value={chartMode} exclusive onChange={handleChartMode}>
+                    <ToggleButton value="daily">일별</ToggleButton>
+                    <ToggleButton value="match">경기별</ToggleButton>
+                  </ToggleButtonGroup>
+                </Stack>
+                <Box sx={{ width: '100%', height: 200 }}>
+                  {chartData.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 5 }}>
+                      차트 데이터가 없습니다.
+                    </Typography>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="rtaScoreGrad2" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={accent} stopOpacity={0.22} />
+                            <stop offset="100%" stopColor={accent} stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} opacity={0.5} />
+                        <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} />
+                        <YAxis domain={chartDomain} tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} width={44} />
+                        <RechartsTooltip
+                          formatter={(value) => {
+                            const n = typeof value === 'number' ? value : Number(value);
+                            return [Number.isFinite(n) ? Math.round(n).toLocaleString() : '—', '점수'];
+                          }}
+                          labelFormatter={(_l, payload) => {
+                            const p = payload?.[0]?.payload as { t?: string } | undefined;
+                            return p?.t ? formatMatchDateTime(p.t) : '';
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="score"
+                          stroke={accent}
+                          strokeWidth={2}
+                          fill="url(#rtaScoreGrad2)"
+                          dot={{ r: 2.5 }}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </Box>
+                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
+                  로드된 경기·일자에 한해 그래프가 늘어납니다.
+                </Typography>
               </Box>
-              <Box component="span" color="text.secondary" sx={{ ml: 0.5 }}>
-                games played
-              </Box>
-            </Typography>
+            </Collapse>
           </Box>
         </Card>
 
@@ -446,97 +706,92 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
             )}
           </Stack>
         </Card>
+
+        <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
+          <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
+            <GroupsIcon color="primary" fontSize="small" />
+            <Typography variant="subtitle2" fontWeight={700}>
+              최근 20판 추이
+            </Typography>
+          </Stack>
+          <Stack spacing={1}>
+            {last20VsOpponents.sampleSize === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                로드된 경기가 없습니다.
+              </Typography>
+            ) : last20VsOpponents.rows.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                상대 정보가 없는 경기만 있습니다.
+              </Typography>
+            ) : (
+              last20VsOpponents.rows.map((r) => {
+                const href = `/rta/player/${encodeURIComponent(r.oppId)}`;
+                return (
+                  <Stack
+                    key={`${r.oppId}-${r.oppName}`}
+                    direction="row"
+                    alignItems="center"
+                    gap={1.25}
+                    sx={{ py: 0.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                  >
+                    <Avatar
+                      component={Link}
+                      href={href}
+                      src={getSwexPlayerImageUrl(r.channelUid ?? r.oppId)}
+                      sx={{ width: 32, height: 32, flexShrink: 0 }}
+                    />
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography
+                        component={Link}
+                        href={href}
+                        variant="body2"
+                        fontWeight={600}
+                        noWrap
+                        color="text.primary"
+                        sx={{ textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                      >
+                        {r.oppName}
+                      </Typography>
+                      <Typography variant="caption" component="div" color="text.secondary">
+                        <Box component="span" fontWeight={700} color="success.main">
+                          {r.wins}승
+                        </Box>
+                        <Box component="span" sx={{ mx: 0.5 }} color="text.disabled">
+                          |
+                        </Box>
+                        <Box component="span" fontWeight={700} color="error.main">
+                          {r.losses}패
+                        </Box>
+                      </Typography>
+                    </Box>
+                  </Stack>
+                );
+              })
+            )}
+          </Stack>
+        </Card>
       </Stack>
 
       {/* 오른쪽 열 */}
       <Stack spacing={2}>
-        <Card variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <Card variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2 }}>
           <Stack
-            direction="row"
-            alignItems="center"
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
             justifyContent="space-between"
-            sx={{ px: 2, py: 1.5, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
-            onClick={() => setChartOpen((v) => !v)}
+            gap={1.5}
+            sx={{ mb: 2 }}
           >
-            <Typography variant="subtitle2" fontWeight={700}>
-              점수 추이
-            </Typography>
-            <IconButton size="small" aria-label="접기">
-              <ExpandMoreIcon sx={{ transform: chartOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-            </IconButton>
-          </Stack>
-          <Collapse in={chartOpen}>
-            <Box sx={{ px: 2, pb: 2 }}>
-              <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
-                <ToggleButtonGroup size="small" value={chartMode} exclusive onChange={handleChartMode}>
-                  <ToggleButton value="daily">일별</ToggleButton>
-                  <ToggleButton value="match">경기별</ToggleButton>
-                </ToggleButtonGroup>
-              </Stack>
-              <Box sx={{ width: '100%', height: 220 }}>
-                {chartData.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 6 }}>
-                    차트 데이터가 없습니다.
-                  </Typography>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="rtaScoreGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={accent} stopOpacity={0.25} />
-                          <stop offset="100%" stopColor={accent} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} opacity={0.5} />
-                      <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} />
-                      <YAxis domain={chartDomain} tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} width={44} />
-                      <RechartsTooltip
-                        formatter={(value) => {
-                          const n = typeof value === 'number' ? value : Number(value);
-                          return [
-                            Number.isFinite(n) ? Math.round(n).toLocaleString() : '—',
-                            '점수',
-                          ];
-                        }}
-                        labelFormatter={(_, payload) => {
-                          const p = payload?.[0]?.payload as { t?: string } | undefined;
-                          return p?.t ? formatMatchDateTime(p.t) : '';
-                        }}
-                      />
-                      <Area type="monotone" dataKey="score" stroke={accent} strokeWidth={2} fill="url(#rtaScoreGrad)" dot={{ r: 3 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </Box>
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
-                <Typography variant="caption" color="text.disabled">
-                  로드된 경기 기준
-                </Typography>
-                <Stack direction="row" gap={2}>
-                  <Stack direction="row" alignItems="center" gap={0.5}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'success.main' }} />
-                    <Typography variant="caption" color="text.secondary">
-                      상승 구간
-                    </Typography>
-                  </Stack>
-                  <Stack direction="row" alignItems="center" gap={0.5}>
-                    <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'error.main' }} />
-                    <Typography variant="caption" color="text.secondary">
-                      하락 구간
-                    </Typography>
-                  </Stack>
-                </Stack>
-              </Stack>
-            </Box>
-          </Collapse>
-        </Card>
-
-        <Card variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
             <Typography variant="subtitle2" fontWeight={700}>
               내 경기
             </Typography>
-            <Stack direction="row" alignItems="center" gap={2}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              gap={2}
+              flexWrap="wrap"
+              sx={{ width: { xs: '100%', sm: 'auto' }, rowGap: 1 }}
+            >
               <Typography variant="body2" color="text.secondary">
                 승률
               </Typography>
@@ -593,6 +848,9 @@ function MatchRow({
     won: boolean;
   };
 }) {
+  const theme = useTheme();
+  const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
+  const starSizeRow = isMdUp ? 16 : 10;
   const { match, p, won } = c;
   const oppHref = `/rta/player/${encodeURIComponent(p.oppId)}`;
   const when = formatMatchWhenUnderResult(match.date);
@@ -611,15 +869,22 @@ function MatchRow({
         borderWidth: 1,
       }}
     >
-      <Stack direction={{ xs: 'column', lg: 'row' }} sx={{ p: 2, gap: 2 }}>
+      <Stack
+        direction={{ xs: 'column', lg: 'row' }}
+        sx={{ p: { xs: 1.5, sm: 2 }, gap: { xs: 1.5, sm: 2 } }}
+      >
         <Stack
           sx={{
             minWidth: { lg: 100 },
+            width: { xs: '100%', lg: 'auto' },
             alignItems: 'center',
             justifyContent: 'center',
             borderRight: { lg: 1 },
+            borderBottom: { xs: 1, lg: 0 },
             borderColor: 'divider',
             pr: { lg: 2 },
+            pb: { xs: 1.5, lg: 0 },
+            flexShrink: 0,
           }}
         >
           <Typography fontWeight={900} color={won ? 'success.main' : 'error.main'}>
@@ -643,78 +908,188 @@ function MatchRow({
           )}
         </Stack>
 
-        <Stack flex={1} spacing={1.5}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-              <Avatar src={getSwexPlayerImageUrl(p.myChannelUid ?? p.myId)} sx={{ width: 32, height: 32 }} />
-              <Typography variant="body2" fontWeight={600} noWrap sx={{ maxWidth: 120 }}>
-                {p.myName}
-              </Typography>
-              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-                {p.myRating > 0 ? (
-                  <RtaRatingStarIcons rating={p.myRating} size={16} gap={1} />
-                ) : (
-                  <Typography variant="caption" color="text.disabled">
-                    —
-                  </Typography>
-                )}
-                <Typography variant="body2" fontWeight={700} color="text.primary" component="span">
-                  {Math.round(p.myScore).toLocaleString()}
+        <Stack flex={1} spacing={1.5} minWidth={0}>
+          {/** /rta 목록과 동일: md 미만은 아바타+텍스트 세로, md+는 가로 — 양측 flex:1·minWidth:0로 찌그러짐 방지 */}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'stretch',
+              width: '100%',
+              gap: { xs: 0.75, md: 1.5 },
+            }}
+          >
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row' },
+                alignItems: { xs: 'flex-start', md: 'center' },
+                gap: { xs: 0.5, md: 1.25 },
+              }}
+            >
+              <Avatar
+                src={getSwexPlayerImageUrl(p.myChannelUid ?? p.myId)}
+                sx={{
+                  width: { xs: 40, md: 44 },
+                  height: { xs: 40, md: 44 },
+                  flexShrink: 0,
+                }}
+              />
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
+                <Typography
+                  variant="body2"
+                  fontWeight={700}
+                  noWrap
+                  title={p.myName}
+                  sx={{
+                    fontSize: { xs: '0.75rem', md: '0.875rem' },
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '100%',
+                  }}
+                >
+                  {p.myName}
                 </Typography>
-              </Stack>
-            </Stack>
-            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-              <Typography
+                <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap">
+                  {p.myRating > 0 ? (
+                    <RtaRatingStarIcons rating={p.myRating} size={starSizeRow} gap={0.5} />
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">
+                      —
+                    </Typography>
+                  )}
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    color="text.primary"
+                    component="span"
+                    sx={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}
+                  >
+                    {Math.round(p.myScore).toLocaleString()}
+                  </Typography>
+                </Stack>
+              </Box>
+            </Box>
+
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: { xs: 'column', md: 'row-reverse' },
+                alignItems: { xs: 'flex-end', md: 'center' },
+                gap: { xs: 0.5, md: 1.25 },
+              }}
+            >
+              <Avatar
                 component={Link}
                 href={oppHref}
-                variant="body2"
-                fontWeight={600}
-                color="text.primary"
-                sx={{ maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                src={getSwexPlayerImageUrl(p.oppChannelUid ?? p.oppId)}
+                sx={{
+                  width: { xs: 40, md: 44 },
+                  height: { xs: 40, md: 44 },
+                  flexShrink: 0,
+                  alignSelf: { xs: 'flex-end', md: 'auto' },
+                }}
+              />
+              <Box
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.5,
+                  minWidth: 0,
+                  width: { xs: '100%', md: 'auto' },
+                  alignItems: { xs: 'flex-end', md: 'flex-end' },
+                }}
               >
-                {p.oppName}
-              </Typography>
-              <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-                {p.oppRating > 0 ? (
-                  <RtaRatingStarIcons rating={p.oppRating} size={16} gap={1} />
-                ) : (
-                  <Typography variant="caption" color="text.disabled">
-                    —
-                  </Typography>
-                )}
-                <Typography variant="body2" fontWeight={700} color="text.primary" component="span">
-                  {Math.round(p.oppScore).toLocaleString()}
+                <Typography
+                  component={Link}
+                  href={oppHref}
+                  variant="body2"
+                  fontWeight={700}
+                  color="text.primary"
+                  noWrap
+                  title={p.oppName}
+                  sx={{
+                    fontSize: { xs: '0.75rem', md: '0.875rem' },
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    textAlign: { xs: 'right', md: 'right' },
+                    textDecoration: 'none',
+                    '&:hover': { textDecoration: 'underline' },
+                  }}
+                >
+                  {p.oppName}
                 </Typography>
-              </Stack>
-              <Avatar component={Link} href={oppHref} src={getSwexPlayerImageUrl(p.oppChannelUid ?? p.oppId)} sx={{ width: 32, height: 32 }} />
-            </Stack>
-          </Stack>
+                <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5} flexWrap="wrap">
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    color="text.primary"
+                    component="span"
+                    sx={{ fontSize: { xs: '0.7rem', md: '0.875rem' } }}
+                  >
+                    {Math.round(p.oppScore).toLocaleString()}
+                  </Typography>
+                  {p.oppRating > 0 ? (
+                    <RtaRatingStarIcons rating={p.oppRating} size={starSizeRow} gap={0.5} />
+                  ) : (
+                    <Typography variant="caption" color="text.disabled">
+                      —
+                    </Typography>
+                  )}
+                </Stack>
+              </Box>
+            </Box>
+          </Box>
 
-          <Stack
-            direction="row"
-            alignItems="center"
-            gap={{ xs: 0.5, md: 1 }}
-            flexWrap="wrap"
-            justifyContent="center"
-            sx={{ width: '100%' }}
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: 'minmax(0,1fr) auto minmax(0,1fr)', md: 'minmax(0,1fr) auto minmax(0,1fr)' },
+              alignItems: 'center',
+              columnGap: { xs: 0.5, sm: 1 },
+              width: '100%',
+            }}
           >
-            <UnitPickGrid units={p.myUnits} side="p1" />
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'flex-start',
+                minWidth: 0,
+              }}
+            >
+              <UnitPickGrid units={p.myUnits} side="p1" />
+            </Box>
             <Typography
               variant="h6"
               sx={{
-                alignSelf: 'center',
                 fontSize: { xs: '0.875rem', md: '1rem' },
                 fontWeight: 700,
                 color: 'primary.main',
-                px: { xs: 0.5, md: 1 },
-                flexShrink: 0,
+                px: { xs: 0.25, sm: 0.5 },
                 lineHeight: 1,
+                justifySelf: 'center',
+                textAlign: 'center',
               }}
             >
               VS
             </Typography>
-            <UnitPickGrid units={p.oppUnits} side="p2" />
-          </Stack>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                minWidth: 0,
+              }}
+            >
+              <UnitPickGrid units={p.oppUnits} side="p2" />
+            </Box>
+          </Box>
         </Stack>
       </Stack>
     </Card>
@@ -743,7 +1118,6 @@ function UnitPickGrid({
         gap: { xs: 0.25, md: 0.5 },
         width: 'fit-content',
         maxWidth: '100%',
-        ...(isP1 ? {} : { ml: { sm: 'auto' } }),
         gridTemplateAreas,
       }}
     >

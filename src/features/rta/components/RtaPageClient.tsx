@@ -315,7 +315,7 @@ export default function RtaPageClient() {
                             width: { xs: 40, md: 52 },
                             height: { xs: 40, md: 52 },
                             flexShrink: 0,
-                            boxShadow: p1Wins ? `0 0 0 3px ${alpha('#10b981', 0.65)}` : '0 2px 12px rgba(0,0,0,0.12)',
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
                           }}
                         />
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
@@ -451,7 +451,7 @@ export default function RtaPageClient() {
                             height: { xs: 40, md: 52 },
                             flexShrink: 0,
                             alignSelf: { xs: 'flex-end', md: 'auto' },
-                            boxShadow: !p1Wins ? `0 0 0 3px ${alpha('#10b981', 0.65)}` : '0 2px 12px rgba(0,0,0,0.12)',
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
                           }}
                         />
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0, alignItems: 'flex-end' }}>
