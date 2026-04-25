@@ -36,7 +36,8 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(helper(value));
 }
 
-function keyPart(value: unknown): unknown {
+/** `useApiPostQuery` / prefetch 와 동일한 queryKey 두 번째 조각 (POST body 직렬화) */
+export function keyPart(value: unknown): unknown {
   if (value === undefined || value === null) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
   if (typeof value === 'object') {

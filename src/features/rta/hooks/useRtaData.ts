@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { UseQueryOptions } from '@tanstack/react-query';
-import { useApiPostQuery } from '@/hooks/api/useApiQuery';
+import { keyPart, useApiPostQuery } from '@/hooks/api/useApiQuery';
 import {
   RtaStatsResponse,
   RtaMatchesResponse,
@@ -179,8 +179,8 @@ const RTA_READ_STALE_MS = 2 * 60 * 1000;
 const RTA_READ_GC_MS = 15 * 60 * 1000;
 
 /** 몬스터 집계 통계(솔·듀·트) — 배치 갱신 위주로 목록/매치보다 길게 재사용 */
-const RTA_MONSTER_STATS_STALE_MS = 10 * 60 * 1000;
-const RTA_MONSTER_STATS_GC_MS = 30 * 60 * 1000;
+export const RTA_MONSTER_STATS_STALE_MS = 10 * 60 * 1000;
+export const RTA_MONSTER_STATS_GC_MS = 30 * 60 * 1000;
 
 export const useRtaStats = (seasonCode?: string | null, seasonId?: number | null) => {
   return useApiPostQuery<RtaStatsResponse>('/rta/stats', seasonBody(seasonCode, seasonId), {
@@ -237,6 +237,26 @@ export type RtaMonsterStatsQueryParams = {
   enabled?: boolean;
 };
 
+function buildRtaMonsterStatsRequestBody(params: RtaMonsterStatsQueryParams) {
+  const { limit = 20, offset = 0, type = 'solo', seasonCode, seasonId, ratingId, ratingIds } = params;
+  return {
+    limit,
+    offset,
+    type,
+    ...seasonBody(seasonCode, seasonId),
+    ...monsterStatsTierBody(ratingId, ratingIds),
+  };
+}
+
+/** {@link useRtaMonsterStats} / prefetch 와 동일한 React Query 키 */
+export function getRtaMonsterStatsQueryKey(params: RtaMonsterStatsQueryParams) {
+  return ['/rta/monster-stats', keyPart(buildRtaMonsterStatsRequestBody(params))] as const;
+}
+
+export async function fetchRtaMonsterStats(params: RtaMonsterStatsQueryParams) {
+  return apiClient.post<RtaMonsterStatsResponse>('/rta/monster-stats', buildRtaMonsterStatsRequestBody(params));
+}
+
 function normalizeRtaRatingGradeRules(raw: unknown): RtaRatingGradeRule[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -273,17 +293,10 @@ export const useRtaRatingGradeRules = () => {
  * 백엔드: POST /api/v1/rta/monster-stats — type: solo|duo|trio
  */
 export const useRtaMonsterStats = (params: RtaMonsterStatsQueryParams = {}) => {
-  const { limit = 20, offset = 0, type = 'solo', seasonCode, seasonId, ratingId, ratingIds, enabled = true } =
-    params;
+  const { enabled = true, ...rest } = params;
   return useApiPostQuery<RtaMonsterStatsResponse>(
     '/rta/monster-stats',
-    {
-      limit,
-      offset,
-      type,
-      ...seasonBody(seasonCode, seasonId),
-      ...monsterStatsTierBody(ratingId, ratingIds),
-    },
+    buildRtaMonsterStatsRequestBody(rest),
     {
       enabled,
       staleTime: RTA_MONSTER_STATS_STALE_MS,

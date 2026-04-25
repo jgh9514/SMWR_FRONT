@@ -11,6 +11,7 @@ import {
 } from 'react'; // useEffect는 페이지 리셋용으로 유지
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   Avatar,
@@ -62,6 +63,10 @@ import {
   useRtaMonsterStats,
   useRtaRatingGradeRules,
   buildMonsterStatsTierBody,
+  fetchRtaMonsterStats,
+  getRtaMonsterStatsQueryKey,
+  RTA_MONSTER_STATS_GC_MS,
+  RTA_MONSTER_STATS_STALE_MS,
 } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import RtaSeasonTierSelectRow, {
@@ -741,6 +746,7 @@ export default function RtaMonsterStatsClient() {
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'));
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const tab = useMemo(() => tabFromPathname(pathname), [pathname]);
 
   // Season
@@ -810,6 +816,38 @@ export default function RtaMonsterStatsClient() {
     seasonId: seasonIdForApi,
     ...tierFilterBody,
   };
+
+  /** 몬스터 통계 화면에서 시즌·티어가 정해지면 듀오·트리오 1페이지를 200ms 후 백그라운드 prefetch */
+  useEffect(() => {
+    if (!seasonSelectValue?.trim() && (seasonIdForApi == null || seasonIdForApi < 1)) return;
+    const t = window.setTimeout(() => {
+      const base = {
+        limit: PAGE_SIZE,
+        offset: 0,
+        seasonCode: seasonSelectValue,
+        seasonId: seasonIdForApi,
+        ...tierFilterBody,
+      };
+      const opts = {
+        staleTime: RTA_MONSTER_STATS_STALE_MS,
+        gcTime: RTA_MONSTER_STATS_GC_MS,
+      };
+      void queryClient.prefetchQuery({
+        queryKey: getRtaMonsterStatsQueryKey({ ...base, type: 'duo' }),
+        queryFn: () => fetchRtaMonsterStats({ ...base, type: 'duo' }),
+        ...opts,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: getRtaMonsterStatsQueryKey({ ...base, type: 'trio' }),
+        queryFn: () => fetchRtaMonsterStats({ ...base, type: 'trio' }),
+        ...opts,
+      });
+    }, 200);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [queryClient, seasonSelectValue, seasonIdForApi, tierFilterBody]);
+
   const { data: soloData, isLoading: soloLoading, isFetching: soloFetching, error: soloError } = useRtaMonsterStats({ ...commonParams, type: 'solo', offset: statsOffset, enabled: tab === 0 });
   const { data: duoData,  isLoading: duoLoading,  isFetching: duoFetching  } = useRtaMonsterStats({ ...commonParams, type: 'duo',  offset: duoOffset,  enabled: tab === 1 });
   const { data: trioData, isLoading: trioLoading, isFetching: trioFetching } = useRtaMonsterStats({ ...commonParams, type: 'trio', offset: trioOffset, enabled: tab === 2 });
