@@ -28,6 +28,13 @@ export interface BatchRunResponse {
   message?: string;
 }
 
+/** POST /batch/slack/test — 배치용 smw.rta.batch Slack 토큰·채널로 샘플 전송 */
+export interface SlackTestResponse {
+  result: string;
+  configured: boolean;
+  message?: string;
+}
+
 export interface BatchHistoryItem {
   bat_exe_log_sn: string | number; // run_sn
   bat_id: string;
@@ -69,5 +76,17 @@ export const useBatchRun = (
   options?: Omit<Parameters<typeof useApiPostMutation<BatchRunResponse, BatchRunRequest>>[1], 'mutationFn'>
 ) => {
   return useApiPostMutation<BatchRunResponse, BatchRunRequest>('/batch/run', options);
+};
+
+/**
+ * Slack 테스트 (관리자) — WAS `smw.rta.batch.slack-token` / `slack-channel-id` 사용 (배치 실패 알림과 동일)
+ */
+export const useSlackTestSend = (
+  options?: Omit<
+    Parameters<typeof useApiPostMutation<SlackTestResponse, { message?: string } | undefined>>[1],
+    'mutationFn'
+  >,
+) => {
+  return useApiPostMutation<SlackTestResponse, { message?: string } | undefined>('/batch/slack/test', options);
 };
 

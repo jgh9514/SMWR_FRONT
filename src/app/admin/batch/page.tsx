@@ -25,6 +25,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  Stack,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -32,7 +34,15 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useBatchConfig, useBatchRun, useBatchHistory, BatchConfigItem, BatchRunResponse } from '@/features/admin/hooks/useBatch';
+import {
+  useBatchConfig,
+  useBatchRun,
+  useBatchHistory,
+  useSlackTestSend,
+  BatchConfigItem,
+  BatchRunResponse,
+  SlackTestResponse,
+} from '@/features/admin/hooks/useBatch';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { PageHeader } from '@/shared/ui';
@@ -63,6 +73,7 @@ export default function BatchManagementPage() {
   const [streamLogStatus, setStreamLogStatus] = useState<
     'idle' | 'connecting' | 'running' | 'success' | 'fail' | 'error'
   >('idle');
+  const [slackTestMessage, setSlackTestMessage] = useState('');
   const streamEsRef = useRef<EventSource | null>(null);
   const streamRunStartedRef = useRef(false);
   const streamLogPreRef = useRef<HTMLPreElement | null>(null);
@@ -182,6 +193,19 @@ export default function BatchManagementPage() {
   };
 
   // 배치 수동 실행 Mutation (행 단위 실행) — WAS는 Quartz 트리거만 하고 즉시 응답; 실제 결과는 이력에 쌓임
+  const slackTestMutation = useSlackTestSend({
+    onSuccess: (res: SlackTestResponse) => {
+      if (res.result === 'SUCCESS') {
+        showToast.success(res.message ?? 'Slack으로 전송했습니다.');
+      } else {
+        showToast.error(res.message ?? 'Slack 전송에 실패했습니다.');
+      }
+    },
+    onError: () => {
+      showToast.error('Slack 테스트 요청에 실패했습니다.');
+    },
+  });
+
   const runMutation = useBatchRun({
     onSuccess: (response: BatchRunResponse) => {
       if (response.result === 'SUCCESS') {
@@ -308,6 +332,43 @@ export default function BatchManagementPage() {
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {incidentMessage && <Alert severity="warning">{incidentMessage}</Alert>}
+
+          <Card variant="outlined">
+            <CardHeader title="Slack 테스트 발송" subheader="배치 실패 알림과 동일 설정 (smw.rta.batch)" />
+            <CardContent>
+              <Stack spacing={2}>
+                <Typography variant="body2" color="text.secondary">
+                  WAS에 설정된 <code>slack-token</code>·<code>slack-channel-id</code>로{' '}
+                  <code>chat.postMessage</code> 를 호출합니다. 운영에서는 보통{' '}
+                  <code>SMW_BATCH_SLACK_TOKEN</code> / <code>SMW_BATCH_SLACK_CHANNEL_ID</code> 로 주입합니다.
+                  메시지를 비우면 기본 테스트 문구가 전송됩니다.
+                </Typography>
+                <TextField
+                  label="메시지 (선택)"
+                  placeholder="비우면 [SMW 관리자] Slack 연동 테스트 …"
+                  value={slackTestMessage}
+                  onChange={(e) => setSlackTestMessage(e.target.value)}
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  size="small"
+                />
+                <Box>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    disabled={slackTestMutation.isPending}
+                    onClick={() => {
+                      const m = slackTestMessage.trim();
+                      slackTestMutation.mutate(m ? { message: m } : {});
+                    }}
+                  >
+                    {slackTestMutation.isPending ? '전송 중…' : '샘플 메시지 보내기'}
+                  </Button>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
 
           {/* 배치 설정 */}
           <Card>
