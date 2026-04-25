@@ -20,6 +20,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
+import RtaDashboardLinkListsGrid from '@/features/rta/components/RtaDashboardLinkListsGrid';
 import { RtaRankCutoffSectionSkeleton, RtaTierDistributionSkeleton } from '@/features/rta/components/RtaDashboardSkeletons';
 import { useRtaDashboardRankCutoff, useRtaDashboardTierDistribution, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
@@ -250,13 +251,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
         py: embedded ? 0 : { xs: 2, md: 4 },
       }}
     >
-      {embedded ? (
-        <Typography variant="h5" component="h2" fontWeight={800} sx={{ mb: 2 }}>
-          RTA 티어 분포·랭크 컷
-        </Typography>
-      ) : (
-        <PageHeader title="RTA 대시보드" />
-      )}
+      {!embedded && <PageHeader title="RTA 대시보드" />}
 
       <Box
         sx={{
@@ -545,6 +540,12 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
         )}
       </Box>
       </Box>
+
+      <RtaDashboardLinkListsGrid
+        seasonCode={seasonSelectValue}
+        seasonId={seasonIdForApi}
+        embedded={embedded}
+      />
     </Box>
   );
 }

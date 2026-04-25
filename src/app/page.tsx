@@ -8,9 +8,10 @@ import JsonLd from '@/shared/ui/seo/JsonLd';
 export const metadata: Metadata = {
   ...buildPublicMetadata({
     title: SITE_TITLE_DEFAULT,
-    description: 'RTA 티어 분포·랭크 컷 등 대시보드를 확인할 수 있습니다.',
+    description:
+      '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
     path: '/',
-    keywords: ['홈', '서머너즈워 포털', '점령전 분석', 'RTA 분석', 'RTA 티어 분포', '랭크 컷'],
+    keywords: ['홈', '서머너즈워 포털', '점령전 분석', 'RTA 분석'],
   }),
   title: { absolute: SITE_TITLE_DEFAULT },
 };
@@ -22,7 +23,8 @@ export default function HomePage() {
     name: SITE_TITLE_DEFAULT,
     url: getAbsoluteUrl('/'),
     inLanguage: 'ko-KR',
-    description: 'RTA 티어 분포·랭크 컷 등 대시보드를 확인할 수 있습니다.',
+    description:
+      '점령전, 실레나, 몬스터 정보를 빠르게 탐색하고 분석할 수 있는 서머너즈워 데이터 플랫폼',
     hasPart: PUBLIC_SITEMAP_STATIC_ROUTES.filter((route) => route.path).map((route) => ({
       '@type': 'WebPage',
       name: route.name,
