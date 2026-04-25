@@ -115,19 +115,8 @@ export default function RtaPlayerDetailShell({
   const rank = num(summary?.rank_position);
   const rating = num(summary?.rating_id);
   const winRate = num(summary?.win_rate_pct);
-  const matchCount = num(summary?.match_count);
-  const winCount = num(summary?.win_count);
-
   const countryLabel = (summary?.country || '').trim() || '—';
   const countryFlag = countryFlagSrc(summary?.country);
-
-  const lastMatchLabel = useMemo(() => {
-    const raw = summary?.last_match_at;
-    if (!raw) return null;
-    const d = new Date(raw);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleString('ko-KR', { dateStyle: 'medium', timeStyle: 'short' });
-  }, [summary]);
 
   const [fav, setFav] = useState(false);
 
@@ -284,19 +273,6 @@ export default function RtaPlayerDetailShell({
               {summary && !summary.found ? (
                 <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
                   수집된 실레나 리플레이에 없는 소환사입니다. (ID: {wizardId})
-                </Typography>
-              ) : null}
-
-              {lastMatchLabel ? (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                  최근 수집 경기: {lastMatchLabel}
-                  {matchCount != null && matchCount > 0 ? (
-                    <>
-                      {' '}
-                      · 리플레이 {matchCount.toLocaleString()}경기
-                      {winCount != null ? ` (${winCount.toLocaleString()}승)` : ''}
-                    </>
-                  ) : null}
                 </Typography>
               ) : null}
             </Stack>

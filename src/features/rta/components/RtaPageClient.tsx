@@ -31,8 +31,9 @@ import {
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
+import RtaUnitPickGrid from '@/features/rta/components/RtaUnitPickGrid';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
-import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import type { MatchItem, RawMatchItem } from '@/types';
 
@@ -252,6 +253,10 @@ export default function RtaPageClient() {
             {!isInitialLoading && !pageError && !hasNoData && allMatches.map((match: MatchItem, index: number) => {
               const isExpanded = expandedMatches[index] !== false;
               const p1Wins = match.winnerPosition === '1';
+              const expLeftUnits = p1Wins ? (match.p1Units ?? []) : (match.p2Units ?? []);
+              const expLeftSide: 'p1' | 'p2' = p1Wins ? 'p1' : 'p2';
+              const expRightUnits = p1Wins ? (match.p2Units ?? []) : (match.p1Units ?? []);
+              const expRightSide: 'p1' | 'p2' = p1Wins ? 'p2' : 'p1';
               return (
                 <Card
                   key={`${match.p1Id}-${match.p2Id}-${match.date}-${index}`}
@@ -520,7 +525,7 @@ export default function RtaPageClient() {
                               <Box
                                 sx={{
                                   width: '100%',
-                                  background: match.winnerPosition === '1' ? RTA_BADGE_WIN : RTA_BADGE_LOSE,
+                                  background: RTA_BADGE_WIN,
                                   clipPath: 'polygon(0% 0%, 80% 0%, 100% 100%, 0% 100%)',
                                   px: { xs: 1, md: 1.5 },
                                   py: { xs: 0.35, md: 0.45 },
@@ -538,108 +543,11 @@ export default function RtaPageClient() {
                                     textAlign: 'left',
                                   }}
                                 >
-                                  {match.winnerPosition === '1' ? 'WIN' : 'LOSE'}
+                                  WIN
                                 </Typography>
                               </Box>
                             </Box>
-                            <Box
-                              sx={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(3, 1fr)',
-                                gridTemplateRows: 'repeat(2, 1fr)',
-                                gap: { xs: 0.25, md: 0.5 },
-                                width: 'fit-content',
-                                gridTemplateAreas: `"fp-0 fp-1 fp-3" "fp-0 fp-2 fp-4"`,
-                              }}
-                            >
-                              {match.p1Units?.map((unit, unitIndex) => {
-                                let gridArea = '';
-                                if (unitIndex === 0) gridArea = 'fp-0';
-                                else if (unitIndex === 1) gridArea = 'fp-1';
-                                else if (unitIndex === 2) gridArea = 'fp-2';
-                                else if (unitIndex === 3) gridArea = 'fp-3';
-                                else if (unitIndex === 4) gridArea = 'fp-4';
-
-                                return (
-                                  <Box
-                                    key={unitIndex}
-                                    sx={{
-                                      position: 'relative',
-                                      p: 0.25,
-                                      display: 'flex',
-                                      justifyContent: 'center',
-                                      alignItems: 'center',
-                                      gridArea,
-                                      alignSelf: unitIndex === 0 ? 'center' : 'stretch',
-                                    }}
-                                  >
-                                    <Avatar
-                                      src={getMonsterImageUrl(unit.image)}
-                                      alt={unit.name}
-                                      sx={{
-                                        width: { xs: 32, md: 36 },
-                                        height: { xs: 32, md: 36 },
-                                        border: unit.leader ? '2px solid gold' : '2px solid #d4a574',
-                                        borderRadius: '50%',
-                                        backgroundColor: 'transparent',
-                                        position: 'relative',
-                                      }}
-                                    />
-                                    {unit.banned && (
-                                      <Box
-                                        sx={{
-                                          position: 'absolute',
-                                          top: 0,
-                                          left: 0,
-                                          right: 0,
-                                          bottom: 0,
-                                          borderRadius: '50%',
-                                          backgroundImage: 'linear-gradient(to bottom right, transparent 48%, #fff 48%, #fff 52%, transparent 52%)',
-                                          pointerEvents: 'none',
-                                          zIndex: 1,
-                                        }}
-                                      />
-                                    )}
-                                    {unit.leader && (
-                                      <Box
-                                        sx={{
-                                          position: 'absolute',
-                                          left: -2,
-                                          bottom: -2,
-                                          width: { xs: 12, md: 14 },
-                                          height: { xs: 12, md: 14 },
-                                          backgroundColor: '#d32f2f',
-                                          clipPath: 'polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%)',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          boxShadow: '0 0 2px 1px rgba(255, 255, 255, 0.8)',
-                                        }}
-                                      >
-                                        <Typography
-                                          sx={{
-                                            color: '#fff',
-                                            fontSize: { xs: '7px', md: '9px' },
-                                            fontWeight: 'bold',
-                                            lineHeight: 1,
-                                            textShadow: '0 0 1px rgba(255, 255, 255, 0.8)',
-                                          }}
-                                        >
-                                          L
-                                        </Typography>
-                                      </Box>
-                                    )}
-                                  </Box>
-                                );
-                              })}
-                              {(!match.p1Units || match.p1Units.length === 0) && (
-                                <Box sx={{ gridColumn: '1 / -1', textAlign: 'left', py: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' } }}>
-                                    몬스터 정보가 없습니다
-                                  </Typography>
-                                </Box>
-                              )}
-                            </Box>
+                            <RtaUnitPickGrid units={expLeftUnits} side={expLeftSide} />
                           </Box>
 
                           <Typography
@@ -669,7 +577,7 @@ export default function RtaPageClient() {
                               <Box
                                 sx={{
                                   width: '100%',
-                                  background: match.winnerPosition === '2' ? RTA_BADGE_WIN : RTA_BADGE_LOSE,
+                                  background: RTA_BADGE_LOSE,
                                   clipPath: 'polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%)',
                                   px: { xs: 1, md: 1.5 },
                                   py: { xs: 0.35, md: 0.45 },
@@ -687,109 +595,12 @@ export default function RtaPageClient() {
                                     textAlign: 'right',
                                   }}
                                 >
-                                  {match.winnerPosition === '2' ? 'WIN' : 'LOSE'}
+                                  LOSE
                                 </Typography>
                               </Box>
                             </Box>
-                            <Box
-                              sx={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(3, 1fr)',
-                                gridTemplateRows: 'repeat(2, 1fr)',
-                                gap: { xs: 0.25, md: 0.5 },
-                                width: 'fit-content',
-                                ml: 'auto',
-                                gridTemplateAreas: `"fp-1 fp-3 fp-5" "fp-2 fp-4 fp-5"`,
-                              }}
-                            >
-                              {match.p2Units?.map((unit, unitIndex) => {
-                                const units = match.p2Units;
-                                let gridArea = '';
-                                if (unitIndex === 0) gridArea = 'fp-1';
-                                else if (unitIndex === 1) gridArea = 'fp-2';
-                                else if (unitIndex === 2) gridArea = 'fp-3';
-                                else if (unitIndex === 3) gridArea = 'fp-4';
-                                else if (unitIndex === 4) gridArea = 'fp-5';
-
-                                return (
-                                  <Box
-                                    key={unitIndex}
-                                    sx={{
-                                      position: 'relative',
-                                      p: 0.25,
-                                      display: 'flex',
-                                      justifyContent: 'center',
-                                      alignItems: 'center',
-                                      gridArea,
-                                      alignSelf: units && unitIndex === units.length - 1 ? 'center' : 'stretch',
-                                    }}
-                                  >
-                                    <Avatar
-                                      src={getMonsterImageUrl(unit.image)}
-                                      alt={unit.name}
-                                      sx={{
-                                        width: { xs: 32, md: 36 },
-                                        height: { xs: 32, md: 36 },
-                                        border: unit.leader ? '2px solid gold' : '2px solid #d4a574',
-                                        borderRadius: '50%',
-                                        backgroundColor: 'transparent',
-                                        position: 'relative',
-                                      }}
-                                    />
-                                    {unit.banned && (
-                                      <Box
-                                        sx={{
-                                          position: 'absolute',
-                                          top: 0,
-                                          left: 0,
-                                          right: 0,
-                                          bottom: 0,
-                                          borderRadius: '50%',
-                                          backgroundImage: 'linear-gradient(to bottom right, transparent 48%, #fff 48%, #fff 52%, transparent 52%)',
-                                          pointerEvents: 'none',
-                                          zIndex: 1,
-                                        }}
-                                      />
-                                    )}
-                                    {unit.leader && (
-                                      <Box
-                                        sx={{
-                                          position: 'absolute',
-                                          left: -2,
-                                          bottom: -2,
-                                          width: { xs: 12, md: 14 },
-                                          height: { xs: 12, md: 14 },
-                                          backgroundColor: '#d32f2f',
-                                          clipPath: 'polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%)',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          boxShadow: '0 0 2px 1px rgba(255, 255, 255, 0.8)',
-                                        }}
-                                      >
-                                        <Typography
-                                          sx={{
-                                            color: '#fff',
-                                            fontSize: { xs: '7px', md: '9px' },
-                                            fontWeight: 'bold',
-                                            lineHeight: 1,
-                                            textShadow: '0 0 1px rgba(255, 255, 255, 0.8)',
-                                          }}
-                                        >
-                                          L
-                                        </Typography>
-                                      </Box>
-                                    )}
-                                  </Box>
-                                );
-                              })}
-                              {(!match.p2Units || match.p2Units.length === 0) && (
-                                <Box sx={{ gridColumn: '1 / -1', textAlign: 'right', py: 1 }}>
-                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' } }}>
-                                    몬스터 정보가 없습니다
-                                  </Typography>
-                                </Box>
-                              )}
+                            <Box sx={{ width: 'fit-content', ml: 'auto' }}>
+                              <RtaUnitPickGrid units={expRightUnits} side={expRightSide} />
                             </Box>
                           </Box>
                         </Box>

@@ -41,7 +41,8 @@ import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContex
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
 import { getMatchPerspective } from '@/features/rta/utils/rtaPlayerPerspective';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
-import { getMonsterImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
+import RtaUnitPickGrid from '@/features/rta/components/RtaUnitPickGrid';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 
 function num(v: unknown): number {
   const n = Number(v);
@@ -295,7 +296,10 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
         ? (winCount / matchCount) * 100
         : null;
 
-  /** 랭크컷 스냅샷(등급별 최저): 왼쪽=현재 티어 랭크컷, 오른쪽=다음 티어 랭크컷. 이 구간에 현재 LP 표시. 최상위 티어는 구간 없음. */
+  /**
+   * 랭크컷 구간: POST /rta/dashboard/rank-cutoff → `snapshot_rank_cut` = WAS `getRtaSnapshotRankCutLatest` = 테이블 `rta_snapshot_rank_cut` 최신 스냅(등급별 최저).
+   * 왼쪽=현재 티어 하한, 오른쪽=바로 윗 티어 하한(배열에서 i+1). `ratingId`로 재정렬하지 않음 — API가 tier_sort·rating_id 순과 동일.
+   */
   const tierBand = useMemo(() => {
     const rid = ratingId;
     if (rid == null || !Number.isFinite(rid) || rid <= 0) return { type: 'scoreOnly' as const };
@@ -308,8 +312,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
         return { ratingId: Number(id), cutoff: Number(c) };
       })
       .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
-      .filter((x) => !isRtaCutoffMissing(x.cutoff))
-      .sort((a, b) => a.ratingId - b.ratingId);
+      .filter((x) => !isRtaCutoffMissing(x.cutoff));
     if (rows.length < 1) return { type: 'scoreOnly' as const };
     const i = rows.findIndex((r) => r.ratingId === rid);
     if (i < 0) return { type: 'scoreOnly' as const };
@@ -827,9 +830,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                 disabled={isFetchingNextPage}
                 onClick={() => fetchNextPage()}
               >
-                {isFetchingNextPage
-                  ? '불러오는 중…'
-                  : `더 보기 (${loadedTotal}${totalFromSummary ? ` / ${totalFromSummary}` : ''})`}
+                {isFetchingNextPage ? '불러오는 중…' : '더보기'}
               </Button>
             </Box>
           )}
@@ -852,6 +853,9 @@ function MatchRow({
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
   const starSizeRow = isMdUp ? 16 : 10;
   const { match, p, won } = c;
+  const iAmP1 = String(p.myId) === String(match.p1Id);
+  const myGridSide: 'p1' | 'p2' = iAmP1 ? 'p1' : 'p2';
+  const oppGridSide: 'p1' | 'p2' = iAmP1 ? 'p2' : 'p1';
   const oppHref = `/rta/player/${encodeURIComponent(p.oppId)}`;
   const when = formatMatchWhenUnderResult(match.date);
 
@@ -1064,7 +1068,7 @@ function MatchRow({
                 minWidth: 0,
               }}
             >
-              <UnitPickGrid units={p.myUnits} side="p1" />
+              <RtaUnitPickGrid units={p.myUnits} side={myGridSide} />
             </Box>
             <Typography
               variant="h6"
@@ -1087,7 +1091,7 @@ function MatchRow({
                 minWidth: 0,
               }}
             >
-              <UnitPickGrid units={p.oppUnits} side="p2" />
+              <RtaUnitPickGrid units={p.oppUnits} side={oppGridSide} />
             </Box>
           </Box>
         </Stack>
@@ -1096,134 +1100,3 @@ function MatchRow({
   );
 }
 
-/** /rta 매치 목록과 동일: 픽 순서(인덱스)에 맞춘 3×2 그리드 — P1 왼쪽·P2 오른쪽 레이아웃 */
-function UnitPickGrid({
-  units,
-  side,
-}: {
-  units: { image: string; name: string; banned?: boolean; leader?: boolean }[];
-  side: 'p1' | 'p2';
-}) {
-  const isP1 = side === 'p1';
-  const gridTemplateAreas = isP1
-    ? `"fp-0 fp-1 fp-3" "fp-0 fp-2 fp-4"`
-    : `"fp-1 fp-3 fp-5" "fp-2 fp-4 fp-5"`;
-
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gridTemplateRows: 'repeat(2, 1fr)',
-        gap: { xs: 0.25, md: 0.5 },
-        width: 'fit-content',
-        maxWidth: '100%',
-        gridTemplateAreas,
-      }}
-    >
-      {units.slice(0, 5).map((unit, unitIndex) => {
-        let gridArea = '';
-        if (isP1) {
-          if (unitIndex === 0) gridArea = 'fp-0';
-          else if (unitIndex === 1) gridArea = 'fp-1';
-          else if (unitIndex === 2) gridArea = 'fp-2';
-          else if (unitIndex === 3) gridArea = 'fp-3';
-          else if (unitIndex === 4) gridArea = 'fp-4';
-        } else {
-          if (unitIndex === 0) gridArea = 'fp-1';
-          else if (unitIndex === 1) gridArea = 'fp-2';
-          else if (unitIndex === 2) gridArea = 'fp-3';
-          else if (unitIndex === 3) gridArea = 'fp-4';
-          else if (unitIndex === 4) gridArea = 'fp-5';
-        }
-        const alignSelf = isP1
-          ? unitIndex === 0
-            ? 'center'
-            : 'stretch'
-          : units && unitIndex === units.length - 1
-            ? 'center'
-            : 'stretch';
-
-        return (
-          <Box
-            key={unitIndex}
-            sx={{
-              position: 'relative',
-              p: 0.25,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gridArea,
-              alignSelf,
-            }}
-          >
-            <Avatar
-              src={getMonsterImageUrl(unit.image)}
-              alt={unit.name}
-              sx={{
-                width: { xs: 32, md: 36 },
-                height: { xs: 32, md: 36 },
-                border: unit.leader ? '2px solid gold' : '2px solid #d4a574',
-                borderRadius: '50%',
-                backgroundColor: 'transparent',
-                position: 'relative',
-              }}
-            />
-            {unit.banned && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  borderRadius: '50%',
-                  backgroundImage:
-                    'linear-gradient(to bottom right, transparent 48%, #fff 48%, #fff 52%, transparent 52%)',
-                  pointerEvents: 'none',
-                  zIndex: 1,
-                }}
-              />
-            )}
-            {unit.leader && (
-              <Box
-                sx={{
-                  position: 'absolute',
-                  left: -2,
-                  bottom: -2,
-                  width: { xs: 12, md: 14 },
-                  height: { xs: 12, md: 14 },
-                  backgroundColor: '#d32f2f',
-                  clipPath: 'polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  boxShadow: '0 0 2px 1px rgba(255, 255, 255, 0.8)',
-                }}
-              >
-                <Typography
-                  sx={{
-                    color: '#fff',
-                    fontSize: { xs: '7px', md: '9px' },
-                    fontWeight: 'bold',
-                    lineHeight: 1,
-                    textShadow: '0 0 1px rgba(255, 255, 255, 0.8)',
-                  }}
-                >
-                  L
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        );
-      })}
-      {(!units || units.length === 0) && (
-        <Box sx={{ gridColumn: '1 / -1', py: 0.5, textAlign: isP1 ? 'left' : 'right' }}>
-          <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', md: '0.75rem' } }}>
-            몬스터 정보가 없습니다
-          </Typography>
-        </Box>
-      )}
-    </Box>
-  );
-}
