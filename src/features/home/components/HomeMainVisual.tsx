@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Autocomplete,
@@ -8,6 +8,7 @@ import {
   Box,
   CircularProgress,
   Container,
+  IconButton,
   Stack,
   TextField,
   Typography,
@@ -15,6 +16,11 @@ import {
   useTheme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import StarIcon from '@mui/icons-material/Star';
+import StarBorderIcon from '@mui/icons-material/StarBorder';
+import { useRtaSummonerSessionSearchLists } from '@/features/rta/hooks/useRtaSummonerSessionSearchLists';
+import { filterSessionBookmarks } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
+import RtaSummonerSessionSearchPanel from '@/features/rta/components/RtaSummonerSessionSearchPanel';
 import { useRtaSummonerSearch } from '@/features/rta/hooks/useRtaData';
 import type { RtaSummonerSearchHit } from '@/features/rta/types/rta';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
@@ -58,17 +64,101 @@ export default function HomeMainVisual() {
   const { data, isFetching } = useRtaSummonerSearch(debounced, null);
   const options = useMemo(() => data?.results ?? [], [data]);
 
-  const handleSelect = useCallback(
-    (_: unknown, v: RtaSummonerSearchHit | null) => {
-      if (!v) return;
-      const id = pickWizardId(v);
-      if (!id) return;
-      router.push(`/rta/player/${encodeURIComponent(id)}`);
+  /** 세션 기준(탭) 최근/즐겨찾기 패널: 검색창 포커스 시 표시, 기본 탭=최근 */
+  const [subPanelOpen, setSubPanelOpen] = useState(false);
+  const [sessionListTab, setSessionListTab] = useState(0);
+  const subPanelBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openSubPanel = useCallback(() => {
+    if (subPanelBlurTimer.current) {
+      clearTimeout(subPanelBlurTimer.current);
+      subPanelBlurTimer.current = null;
+    }
+    setSessionListTab(0);
+    setSubPanelOpen(true);
+  }, []);
+  const scheduleCloseSubPanel = useCallback(() => {
+    if (subPanelBlurTimer.current) {
+      clearTimeout(subPanelBlurTimer.current);
+    }
+    subPanelBlurTimer.current = setTimeout(() => {
+      setSubPanelOpen(false);
+      subPanelBlurTimer.current = null;
+    }, 200);
+  }, []);
+  useEffect(
+    () => () => {
+      if (subPanelBlurTimer.current) clearTimeout(subPanelBlurTimer.current);
+    },
+    [],
+  );
+
+  const {
+    recent: recentList,
+    favorites: favoriteList,
+    addRecent,
+    removeRecent,
+    isFavorite,
+    toggleFavorite,
+  } = useRtaSummonerSessionSearchLists();
+
+  const toBookmark = useCallback((v: RtaSummonerSearchHit) => {
+    return {
+      wizardId: pickWizardId(v),
+      wizardName: pickWizardName(v),
+      channelUid: pickChannelUid(v),
+      country: v.country,
+    };
+  }, []);
+
+  const goPlayer = useCallback(
+    (wizardId: string) => {
+      if (!wizardId) return;
+      router.push(`/rta/player/${encodeURIComponent(wizardId)}`);
       setInput('');
       setDebounced('');
     },
     [router],
   );
+
+  const handleSelect = useCallback(
+    (_: unknown, v: RtaSummonerSearchHit | null) => {
+      if (!v) return;
+      const id = pickWizardId(v);
+      if (!id) return;
+      addRecent(toBookmark(v));
+      goPlayer(id);
+    },
+    [addRecent, goPlayer, toBookmark],
+  );
+
+  const openBookmark = useCallback(
+    (b: { wizardId: string; wizardName: string; channelUid?: string; country?: string }) => {
+      if (!b.wizardId) return;
+      addRecent(b);
+      goPlayer(b.wizardId);
+    },
+    [addRecent, goPlayer],
+  );
+
+  const sessionFilteredRecent = useMemo(
+    () => filterSessionBookmarks(recentList, input),
+    [recentList, input],
+  );
+  const sessionFilteredFav = useMemo(
+    () => filterSessionBookmarks(favoriteList, input),
+    [favoriteList, input],
+  );
+  const hasSessionFilter = input.trim() !== '';
+
+  /** API 드롭다운(포털)과 세션 패널이 동시에 떠서 겹치는 것 방지: 검색 API 목록이 열릴 때는 세션 패널만 숨김 */
+  const [acListboxOpen, setAcListboxOpen] = useState(false);
+  const canQueryApi = input.trim().length > 0;
+  const apiMenuOpen = canQueryApi && acListboxOpen;
+  useEffect(() => {
+    if (!canQueryApi) {
+      setAcListboxOpen(false);
+    }
+  }, [canQueryApi]);
 
   return (
     <Box
@@ -78,17 +168,20 @@ export default function HomeMainVisual() {
         width: '100%',
         overflow: 'hidden',
         color: 'common.white',
-        py: { xs: 3.5, md: 5 },
-        background: (t) =>
-          t.palette.mode === 'dark'
-            ? 'linear-gradient(155deg, #0b1220 0%, #1a1f35 40%, #12324d 100%)'
-            : 'linear-gradient(155deg, #0a1628 0%, #122a4a 45%, #163d62 100%)',
+        py: { xs: 3.5, md: 6 },
+        minHeight: { xs: 280, sm: 320, md: 360 },
+        bgcolor: '#0a1526',
+        backgroundImage: 'url(/main_banner.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
         '&::before': {
           content: '""',
           position: 'absolute',
           inset: 0,
-          backgroundImage: `radial-gradient(circle at 20% 20%, ${theme.palette.mode === 'dark' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(96, 165, 250, 0.2)'} 0%, transparent 50%),
-            radial-gradient(circle at 80% 60%, ${theme.palette.mode === 'dark' ? 'rgba(34, 211, 238, 0.08)' : 'rgba(125, 211, 252, 0.12)'} 0%, transparent 45%)`,
+          zIndex: 0,
+          background: `linear-gradient(180deg, rgba(4, 12, 24, 0.5) 0%, rgba(4, 12, 24, 0.62) 100%),
+            radial-gradient(circle at 50% 0%, ${theme.palette.mode === 'dark' ? 'rgba(30, 58, 99, 0.35)' : 'rgba(30, 64, 120, 0.25)'} 0%, transparent 55%)`,
           pointerEvents: 'none',
         },
       }}
@@ -114,7 +207,7 @@ export default function HomeMainVisual() {
                 backgroundClip: 'text',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
-                textShadow: '0 0 40px rgba(99, 102, 241, 0.35)',
+                filter: 'drop-shadow(0 2px 12px rgba(0,0,0,0.5))',
               }}
             >
               {SITE_NAME_DISPLAY}
@@ -123,7 +216,8 @@ export default function HomeMainVisual() {
               variant="body2"
               sx={{
                 mt: 1.25,
-                color: 'rgba(255,255,255,0.72)',
+                color: 'rgba(255,255,255,0.88)',
+                textShadow: '0 1px 8px rgba(0,0,0,0.45)',
                 fontWeight: 500,
                 fontSize: { xs: '0.8rem', md: '0.9rem' },
                 maxWidth: 420,
@@ -151,10 +245,19 @@ export default function HomeMainVisual() {
                   getOptionLabel={(o) => pickWizardName(o)}
                   isOptionEqualToValue={(a, b) => pickWizardId(a) === pickWizardId(b)}
                   inputValue={input}
-                  onInputChange={(_, v) => setInput(v)}
+                  open={apiMenuOpen}
+                  onOpen={() => setAcListboxOpen(true)}
+                  onClose={() => setAcListboxOpen(false)}
+                  onInputChange={(_, v, reason) => {
+                    if (reason === 'reset' || reason === 'blur') {
+                      return;
+                    }
+                    setInput(v);
+                  }}
                   onChange={handleSelect}
                   value={null}
                   blurOnSelect
+                  clearOnBlur={false}
                   noOptionsText="결과 없음"
                   slotProps={{
                     paper: {
@@ -173,12 +276,13 @@ export default function HomeMainVisual() {
                     const nm = pickWizardName(option);
                     const ch = pickChannelUid(option);
                     const flag = countryFlagSrc(option.country);
+                    const fav = isFavorite(wid);
                     return (
                       <Box
                         component="li"
                         key={key}
                         {...other}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.75, px: 1 }}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 1, pr: 0.5 }}
                       >
                         <Avatar
                           src={getSwexPlayerImageUrl(ch ?? wid)}
@@ -196,6 +300,21 @@ export default function HomeMainVisual() {
                             sx={{ width: 20, height: 14, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
                           />
                         ) : null}
+                        <IconButton
+                          type="button"
+                          size="small"
+                          tabIndex={-1}
+                          aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            toggleFavorite(toBookmark(option));
+                          }}
+                          sx={{ color: fav ? 'warning.main' : 'action.active', flexShrink: 0 }}
+                        >
+                          {fav ? <StarIcon sx={{ fontSize: 20 }} /> : <StarBorderIcon sx={{ fontSize: 20 }} />}
+                        </IconButton>
                       </Box>
                     );
                   }}
@@ -205,6 +324,25 @@ export default function HomeMainVisual() {
                       className="search-input"
                       placeholder="소환사 닉네임"
                       aria-label="RTA 소환사 검색"
+                      inputProps={{
+                        ...params.inputProps,
+                        onFocus: (e: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                          (
+                            params.inputProps as {
+                              onFocus?: (ev: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+                            }
+                          ).onFocus?.(e);
+                          openSubPanel();
+                        },
+                        onBlur: (e: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+                          (
+                            params.inputProps as {
+                              onBlur?: (ev: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+                            }
+                          ).onBlur?.(e);
+                          scheduleCloseSubPanel();
+                        },
+                      }}
                       InputProps={{
                         ...params.InputProps,
                         startAdornment: (
@@ -232,6 +370,23 @@ export default function HomeMainVisual() {
                     />
                   )}
                 />
+
+            {subPanelOpen && !apiMenuOpen && (
+              <RtaSummonerSessionSearchPanel
+                idPrefix="rta-sess-home"
+                layout="inline"
+                sessionListTab={sessionListTab}
+                onSessionListTabChange={setSessionListTab}
+                favoriteListLength={favoriteList.length}
+                sessionFilteredRecent={sessionFilteredRecent}
+                sessionFilteredFav={sessionFilteredFav}
+                hasSessionFilter={hasSessionFilter}
+                isFavorite={isFavorite}
+                onOpenBookmark={openBookmark}
+                onToggleFavorite={toggleFavorite}
+                onRemoveRecent={removeRecent}
+              />
+            )}
             </Box>
           </Box>
         </Stack>

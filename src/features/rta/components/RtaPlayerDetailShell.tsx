@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -34,6 +34,7 @@ import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { showToast } from '@/shared/lib/notification';
+import { addRtaSessionRecent } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
 
 
 type NavItem = {
@@ -99,6 +100,30 @@ export default function RtaPlayerDetailShell({
     seasonSelectValue,
     { seasonId: seasonIdForApi },
   );
+
+  /** 검색/헤더가 아닌 랭킹·URL 직접 진입이어도 sessionStorage 최근검색에 1회 반영 */
+  const sessionRecentForWizardRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const w = String(wizardId).trim();
+    if (!w) return;
+    if (sessionRecentForWizardRef.current === w) {
+      return;
+    }
+    const s = summary ?? initialSummary;
+    if (!s) {
+      return;
+    }
+    const name = s.found && s.wizard_name?.trim() ? s.wizard_name.trim() : `소환사 ${w}`;
+    const ch = s.channel_uid;
+    addRtaSessionRecent({
+      wizardId: w,
+      wizardName: name,
+      channelUid: ch != null && ch !== '' ? String(ch) : undefined,
+      country: s.country,
+    });
+    sessionRecentForWizardRef.current = w;
+  }, [wizardId, initialSummary, summary]);
 
   const displayName = useMemo(() => {
     if (summary?.found) {
