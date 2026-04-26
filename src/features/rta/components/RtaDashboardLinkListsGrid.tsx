@@ -5,7 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Avatar, Box, Button, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { useRtaDashboardLinkPreview } from '@/features/rta/hooks/useRtaData';
+import {
+  useRtaDashboardPreviewSolo,
+  useRtaDashboardPreviewDuo,
+  useRtaDashboardPreviewTrio,
+  useRtaDashboardPreviewSummoner,
+} from '@/features/rta/hooks/useRtaData';
 import type { DuoComboStat, MonsterStats, RtaSummonerRankingRow, TrioComboStat } from '@/features/rta/types/rta';
 import { getRenderableImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
@@ -19,17 +24,15 @@ const MONSTER_STATS_PATHS = {
 const SUMMONER_RANKING_PATH = '/rta/summoner-ranking';
 const MONSTER_DETAIL_BASE = '/monster-detail';
 
-type LinkPreviewMonsterBlock = { type?: string; rows?: unknown };
+type PreviewBlock = { type?: string; rows?: unknown } | null | undefined;
 
-/**
- * /rta/dashboard/link-preview → solo|duo|trio — WAS `getRtaMonsterStats` 와 동일 `rows`·`type`.
- * `type` 은 캐시/역직렬화에서 빠질 수 있으므로, 일치·빈 값일 때만 rows 를 쓴다(잘못된 패널에 데이터가 끼는 것은 `type` 불일치 시에만 막음).
- */
-function linkPreviewRows<T>(block: LinkPreviewMonsterBlock | null | undefined, expected: 'solo' | 'duo' | 'trio'): T[] {
+function linkPreviewRows<T>(block: PreviewBlock, expected: 'solo' | 'duo' | 'trio'): T[] {
   if (block == null) return [];
-  if (!Array.isArray(block.rows)) return [];
-  if (block.type != null && block.type !== expected) return [];
-  return block.rows as T[];
+  if (!Array.isArray((block as { rows?: unknown }).rows)) return [];
+  const rows = (block as { type?: string; rows: unknown[] }).rows;
+  const type = (block as { type?: string }).type;
+  if (type != null && type !== expected) return [];
+  return rows as T[];
 }
 
 /** 메인 4열 패널: 행 5개 동일 높이 · 카드(헤더+목록) 스트레치 */
@@ -190,13 +193,16 @@ type GridProps = {
  */
 export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedded = false }: GridProps) {
   const router = useRouter();
-  const linkQ = useRtaDashboardLinkPreview(seasonCode, seasonId, 5);
-  const bundle = linkQ.data;
 
-  const soloRows = linkPreviewRows<MonsterStats>(bundle?.solo, 'solo');
-  const duoRows = linkPreviewRows<DuoComboStat>(bundle?.duo, 'duo');
-  const trioRows = linkPreviewRows<TrioComboStat>(bundle?.trio, 'trio');
-  const rankRows: RtaSummonerRankingRow[] = bundle?.summoner_ranking?.rankings?.slice(0, 5) ?? [];
+  const soloQ = useRtaDashboardPreviewSolo(seasonCode, seasonId, 5);
+  const duoQ = useRtaDashboardPreviewDuo(seasonCode, seasonId, 5);
+  const trioQ = useRtaDashboardPreviewTrio(seasonCode, seasonId, 5);
+  const rankQ = useRtaDashboardPreviewSummoner(seasonCode, seasonId, 5);
+
+  const soloRows = linkPreviewRows<MonsterStats>(soloQ.data, 'solo');
+  const duoRows = linkPreviewRows<DuoComboStat>(duoQ.data, 'duo');
+  const trioRows = linkPreviewRows<TrioComboStat>(trioQ.data, 'trio');
+  const rankRows: RtaSummonerRankingRow[] = rankQ.data?.rankings?.slice(0, 5) ?? [];
 
   const navigateToProfile = (href: string, openInNewTab = false) => {
     if (openInNewTab && typeof window !== 'undefined') {
@@ -245,12 +251,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
     >
       <Box>
       <DashboardPreviewPanel title="솔로 몬스터 통계" detailHref={MONSTER_STATS_PATHS.solo}>
-        {linkQ.isPending && !bundle
+        {soloQ.isPending && !soloQ.data
           ? rowSkeletons()
-          : linkQ.error
+          : soloQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {linkQ.error.message || '불러오지 못했습니다.'}
+                  {soloQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : soloRows.length === 0
@@ -314,12 +320,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
 
       <Box>
       <DashboardPreviewPanel title="듀오 몬스터 통계" detailHref={MONSTER_STATS_PATHS.duo}>
-        {linkQ.isPending && !bundle
+        {duoQ.isPending && !duoQ.data
           ? rowSkeletons()
-          : linkQ.error
+          : duoQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {linkQ.error.message || '불러오지 못했습니다.'}
+                  {duoQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : duoRows.length === 0
@@ -383,12 +389,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
 
       <Box>
       <DashboardPreviewPanel title="트리오 몬스터 통계" detailHref={MONSTER_STATS_PATHS.trio}>
-        {linkQ.isPending && !bundle
+        {trioQ.isPending && !trioQ.data
           ? rowSkeletons()
-          : linkQ.error
+          : trioQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {linkQ.error.message || '불러오지 못했습니다.'}
+                  {trioQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : trioRows.length === 0
@@ -457,12 +463,12 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
 
       <Box>
       <DashboardPreviewPanel title="소환사 랭킹" detailHref={SUMMONER_RANKING_PATH}>
-        {linkQ.isPending && !bundle
+        {rankQ.isPending && !rankQ.data
           ? rowSkeletons()
-          : linkQ.error
+          : rankQ.error
             ? (
                 <Typography color="error" variant="body2">
-                  {linkQ.error.message || '불러오지 못했습니다.'}
+                  {rankQ.error.message || '불러오지 못했습니다.'}
                 </Typography>
               )
             : rankRows.length === 0

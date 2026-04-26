@@ -275,13 +275,13 @@ function normalizeRtaRatingGradeRules(raw: unknown): RtaRatingGradeRule[] {
 
 /**
  * RTA 공식 등급 규칙 (티어 키·rating_id) — 몬스터 통계 티어 필터 등
- * 백엔드: GET /api/v1/rta/rating-grade-rules
+ * 백엔드: POST /api/v1/rta/rating-grade-rules
  */
 export const useRtaRatingGradeRules = () => {
   return useApiQuery<RtaRatingGradeRule[]>({
     queryKey: ['rta', 'rating-grade-rules'],
     queryFn: async () => {
-      const raw = await apiClient.get<unknown>('/rta/rating-grade-rules');
+      const raw = await apiClient.post<unknown>('/rta/rating-grade-rules', {});
       return normalizeRtaRatingGradeRules(raw);
     },
     staleTime: 60 * 60 * 1000,
@@ -391,17 +391,16 @@ export function useRtaSeasonSelect(seasonsData: RtaSeasonsResponse | undefined):
   return { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions };
 }
 
-/** RTA 시즌 목록 (DB) — GET /api/v1/rta/seasons. /rta 레이아웃에서 Provider로 한 번만 마운트 권장 */
+/** RTA 시즌 목록 (DB) — POST /api/v1/rta/seasons. /rta 레이아웃에서 Provider로 한 번만 마운트 권장 */
 export const useRtaSeasons = () => {
   return useApiQuery<RtaSeasonsResponse>({
     queryKey: ['rta', 'seasons'],
     queryFn: async () => {
-      const raw = await apiClient.get<unknown>('/rta/seasons');
+      const raw = await apiClient.post<unknown>('/rta/seasons', {});
       return normalizeRtaSeasonsResponse(raw);
     },
     staleTime: 60 * 60 * 1000,
     gcTime: 2 * 60 * 60 * 1000,
-    /** 동일 키 캐시가 있을 때 탭 포커스마다 GET 재호출되는 것 방지 */
     refetchOnWindowFocus: false,
   });
 };
@@ -483,6 +482,54 @@ export const useRtaDashboardLinkPreview = (
     },
   );
 };
+
+/**
+ * 대시보드 프리뷰 — 4개 패널 별도 훅 (독립 로딩, 먼저 오는 패널부터 렌더링)
+ * 각 훅은 /rta/dashboard/preview/{solo|duo|trio|summoner} 를 각각 호출한다.
+ */
+export const useRtaDashboardPreviewSolo = (
+  seasonCode: string,
+  seasonId: number | null,
+  limit: number = 5,
+) =>
+  useApiPostQuery<RtaMonsterStatsResponse>(
+    '/rta/dashboard/preview/solo',
+    { limit, ...seasonBody(seasonCode, seasonId) },
+    { enabled: true, staleTime: RTA_MONSTER_STATS_STALE_MS, gcTime: RTA_MONSTER_STATS_GC_MS, refetchOnWindowFocus: false },
+  );
+
+export const useRtaDashboardPreviewDuo = (
+  seasonCode: string,
+  seasonId: number | null,
+  limit: number = 5,
+) =>
+  useApiPostQuery<RtaMonsterStatsResponse>(
+    '/rta/dashboard/preview/duo',
+    { limit, ...seasonBody(seasonCode, seasonId) },
+    { enabled: true, staleTime: RTA_MONSTER_STATS_STALE_MS, gcTime: RTA_MONSTER_STATS_GC_MS, refetchOnWindowFocus: false },
+  );
+
+export const useRtaDashboardPreviewTrio = (
+  seasonCode: string,
+  seasonId: number | null,
+  limit: number = 5,
+) =>
+  useApiPostQuery<RtaMonsterStatsResponse>(
+    '/rta/dashboard/preview/trio',
+    { limit, ...seasonBody(seasonCode, seasonId) },
+    { enabled: true, staleTime: RTA_MONSTER_STATS_STALE_MS, gcTime: RTA_MONSTER_STATS_GC_MS, refetchOnWindowFocus: false },
+  );
+
+export const useRtaDashboardPreviewSummoner = (
+  seasonCode: string,
+  seasonId: number | null,
+  limit: number = 5,
+) =>
+  useApiPostQuery<RtaSummonerRankingResponse>(
+    '/rta/dashboard/preview/summoner',
+    { limit, ...seasonBody(seasonCode, seasonId) },
+    { enabled: true, staleTime: RTA_MONSTER_STATS_STALE_MS, gcTime: RTA_MONSTER_STATS_GC_MS, refetchOnWindowFocus: false },
+  );
 
 /** RTA 소환사 상세 헤더 요약 (서버 initialData와 병행 가능) */
 export const useRtaPlayerSummary = (

@@ -171,7 +171,7 @@ export interface RtaMonsterStatsResponse {
   ratingIds?: number[] | null;
 }
 
-/** GET /rta/rating-grade-rules — 티어 선택 UI용 */
+/** POST /rta/rating-grade-rules — 티어 선택 UI용 */
 export interface RtaRatingGradeRule {
   ratingId: number;
   gradeName?: string;
@@ -301,7 +301,7 @@ export interface RtaDashboardRankCutoffResponse {
   seasonId?: number | null;
 }
 
-/** DB rta_season (GET /api/v1/rta/seasons) */
+/** DB rta_season (POST /api/v1/rta/seasons) */
 export interface RtaSeasonRow {
   /** rta_season.season_id — API 필터에 권장 */
   seasonId: number;
