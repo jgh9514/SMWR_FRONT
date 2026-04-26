@@ -3,11 +3,10 @@
 import { Box } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
 import type { AttributeType } from '@/features/siege/types/monster';
-import { getCdnImageUrl } from '@/shared/lib/env';
 
 /**
- * DB·게임 기준 정적 경로만 상수로 둔다. URL( CDN )은 {@link getCdnImageUrl}이 런타임·클라이언트에서 읽는다.
- * 모듈 로드 시점에 getCdnImageUrl을 부르면 `window.env.APP_CDN_URL` 주입 전 값으로 고정되어 운영에서 깨질 수 있음.
+ * 레포 `public/images` 5개 아이콘만 사용. {@code getCdnImageUrl} 을 쓰지 않는다.
+ * (CDN·로컬 자산 이중화 시 버전이 어긋나는 문제 방지, 배포한 Next 정적과 항상 동일)
  */
 const ELEMENT_IMAGE_PATH: Record<AttributeType, string> = {
   fire: '/images/Fire_Icon.png',
@@ -32,7 +31,7 @@ export default function AttributeElementIcon({
   sx,
   titleAccess,
 }: AttributeElementIconProps) {
-  const src = getCdnImageUrl(ELEMENT_IMAGE_PATH[attribute]);
+  const src = ELEMENT_IMAGE_PATH[attribute];
   return (
     <Box
       component="img"
