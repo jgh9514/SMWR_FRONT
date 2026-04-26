@@ -58,9 +58,10 @@ export default function HomeMainVisual() {
   const { data, isFetching } = useRtaSummonerSearch(debounced, null);
   const options = useMemo(() => data?.results ?? [], [data]);
 
-  /** 세션 기준(탭) 최근/즐겨찾기 패널: 검색창 포커스 시 표시, 기본 탭=최근 */
+  /** 세션 기준(탭) 최근/즐겨찾기 패널: 비어 있는 입력 + 포커스일 때만(값 있을 땐 API 목록만) */
   const [subPanelOpen, setSubPanelOpen] = useState(false);
   const [sessionListTab, setSessionListTab] = useState(0);
+  const inputFocusRef = useRef(false);
   const subPanelBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openSubPanel = useCallback(() => {
     if (subPanelBlurTimer.current) {
@@ -142,6 +143,7 @@ export default function HomeMainVisual() {
     [favoriteList, input],
   );
   const hasSessionFilter = input.trim() !== '';
+  const inputEmpty = input.trim() === '';
 
   /** API 드롭다운(포털)과 세션 패널이 동시에 떠서 겹치는 것 방지: 검색 API 목록이 열릴 때는 세션 패널만 숨김 */
   const [acListboxOpen, setAcListboxOpen] = useState(false);
@@ -152,6 +154,18 @@ export default function HomeMainVisual() {
       setAcListboxOpen(false);
     }
   }, [canQueryApi]);
+
+  useEffect(() => {
+    if (!inputEmpty) {
+      setSubPanelOpen(false);
+    }
+  }, [input, inputEmpty]);
+
+  useEffect(() => {
+    if (inputEmpty && inputFocusRef.current) {
+      setSubPanelOpen(true);
+    }
+  }, [input, inputEmpty]);
 
   return (
     <Box
@@ -331,7 +345,12 @@ export default function HomeMainVisual() {
                               onFocus?: (ev: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
                             }
                           ).onFocus?.(e);
-                          openSubPanel();
+                          inputFocusRef.current = true;
+                          if (!String(e.currentTarget.value ?? '').trim()) {
+                            openSubPanel();
+                          } else {
+                            setSubPanelOpen(false);
+                          }
                         },
                         onBlur: (e: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                           (
@@ -339,6 +358,7 @@ export default function HomeMainVisual() {
                               onBlur?: (ev: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
                             }
                           ).onBlur?.(e);
+                          inputFocusRef.current = false;
                           scheduleCloseSubPanel();
                         },
                       }}
@@ -370,7 +390,7 @@ export default function HomeMainVisual() {
                   )}
                 />
 
-            {subPanelOpen && !apiMenuOpen && (
+            {subPanelOpen && inputEmpty && (
               <RtaSummonerSessionSearchPanel
                 idPrefix="rta-sess-home"
                 layout="inline"

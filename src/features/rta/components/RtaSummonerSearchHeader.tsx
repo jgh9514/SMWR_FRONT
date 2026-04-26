@@ -46,6 +46,8 @@ export default function RtaSummonerSearchHeader() {
 
   const [subPanelOpen, setSubPanelOpen] = useState(false);
   const [sessionListTab, setSessionListTab] = useState(0);
+  /** input 비우고 포커스 유지 시 다시 열기용 */
+  const inputFocusRef = useRef(false);
   const subPanelBlurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const openSubPanel = useCallback(() => {
     if (subPanelBlurTimer.current) {
@@ -127,6 +129,7 @@ export default function RtaSummonerSearchHeader() {
     [favoriteList, input],
   );
   const hasSessionFilter = input.trim() !== '';
+  const inputEmpty = input.trim() === '';
 
   /** Autocomplete(포털)과 세션 패널 동시 표시로 겹침 방지 */
   const [acListboxOpen, setAcListboxOpen] = useState(false);
@@ -137,6 +140,20 @@ export default function RtaSummonerSearchHeader() {
       setAcListboxOpen(false);
     }
   }, [canQueryApi]);
+
+  /** 입력이 있을 때는 최근/즐겨찾기 패널 금지(블러 순간 listbox 닫힘 + apiMenuOpen false 로 플래시 방지) */
+  useEffect(() => {
+    if (!inputEmpty) {
+      setSubPanelOpen(false);
+    }
+  }, [input, inputEmpty]);
+
+  /** 비운 뒤에도 포커스가 있으면 최근/즐겨찾기 다시 표시 */
+  useEffect(() => {
+    if (inputEmpty && inputFocusRef.current) {
+      setSubPanelOpen(true);
+    }
+  }, [input, inputEmpty]);
 
   return (
     <Box
@@ -246,7 +263,12 @@ export default function RtaSummonerSearchHeader() {
                     onFocus?: (ev: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
                   }
                 ).onFocus?.(e);
-                openSubPanel();
+                inputFocusRef.current = true;
+                if (!String(e.currentTarget.value ?? '').trim()) {
+                  openSubPanel();
+                } else {
+                  setSubPanelOpen(false);
+                }
               },
               onBlur: (e: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
                 (
@@ -254,6 +276,7 @@ export default function RtaSummonerSearchHeader() {
                     onBlur?: (ev: FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
                   }
                 ).onBlur?.(e);
+                inputFocusRef.current = false;
                 scheduleCloseSubPanel();
               },
             }}
@@ -286,7 +309,7 @@ export default function RtaSummonerSearchHeader() {
         )}
       />
 
-      {subPanelOpen && !apiMenuOpen && (
+      {subPanelOpen && inputEmpty && (
         <RtaSummonerSessionSearchPanel
           idPrefix="rta-sess-hdr"
           layout="dropdown"

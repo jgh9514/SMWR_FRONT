@@ -33,6 +33,7 @@ import type { RtaPlayerSummary } from '@/features/rta/types/rta';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
+import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { showToast } from '@/shared/lib/notification';
 import { addRtaSessionRecent } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
@@ -308,7 +309,7 @@ export default function RtaPlayerDetailShell({
             <FormControl size="small" sx={{ minWidth: 180 }}>
               <Select
                 value={seasonSelectValue}
-                onChange={(e) => setSeason(String(e.target.value))}
+                onChange={(e) => { blurFocusedMenuItem(); setSeason(String(e.target.value)); }}
                 MenuProps={RTA_SELECT_MENU_PROPS}
                 renderValue={(v) => {
                   const opt = seasonOptions.find((o) => o.value === v);

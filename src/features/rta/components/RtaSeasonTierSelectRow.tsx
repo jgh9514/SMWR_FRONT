@@ -3,7 +3,7 @@
 import { memo } from 'react';
 import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
 import type { RtaRatingGradeRule } from '@/features/rta/types/rta';
-import { RTA_SELECT_MENU_PROPS } from '@/features/rta/rtaMenuModalProps';
+import { RTA_SELECT_MENU_PROPS, blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
 
 /** Outlined 콤보박스(Select) — 필드·입력 루트 모두 흰 배경 (MUI7는 slot + sx 병행이 안정적) */
@@ -75,7 +75,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
           labelId={seasonLabelId}
           label="시즌"
           value={seasonSelectValue}
-          onChange={(e) => setSeason(String(e.target.value))}
+          onChange={(e) => { blurFocusedMenuItem(); setSeason(String(e.target.value)); }}
           sx={RTA_OUTLINED_SELECT_FIELD_SX}
           slotProps={{ input: { sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX } }}
           MenuProps={RTA_SELECT_MENU_PROPS}

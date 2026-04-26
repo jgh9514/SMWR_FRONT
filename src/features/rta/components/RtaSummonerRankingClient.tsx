@@ -32,6 +32,7 @@ import {
 } from '@mui/material';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
+import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import { useRtaSummonerRanking, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
@@ -423,6 +424,7 @@ export default function RtaSummonerRankingClient() {
               label="시즌"
               value={seasonSelectValue}
               onChange={(e) => {
+                blurFocusedMenuItem();
                 setSeason(String(e.target.value));
                 setCountryFilter(null);
               }}

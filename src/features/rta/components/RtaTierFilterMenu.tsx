@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Box, Button, Menu, Stack, Typography } from '@mui/material';
-import { RTA_SELECT_MENU_PROPS } from '@/features/rta/rtaMenuModalProps';
+import { RTA_SELECT_MENU_PROPS, blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import type { RtaRatingGradeRule } from '@/features/rta/types/rta';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
@@ -63,9 +63,13 @@ export default function RtaTierFilterMenu({
   const visibleRules = useMemo(() => rules.filter((r) => !isLegendRatingId(r.ratingId)), [rules]);
   const byTier = useMemo(() => tierRuleMap(visibleRules), [visibleRules]);
 
-  const handleClose = useCallback(() => setAnchorEl(null), []);
+  const handleClose = useCallback(() => {
+    blurFocusedMenuItem();
+    setAnchorEl(null);
+  }, []);
   const handleSelect = useCallback(
     (next: string) => {
+      blurFocusedMenuItem();
       onChange(next);
       setAnchorEl(null);
     },

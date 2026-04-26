@@ -54,9 +54,14 @@ function formatPct2(n: number): string {
   return `${toNum(n, 0).toFixed(2)}%`;
 }
 
-/** 메인 몬스터 미리보기: 경기 수(또는 솔로 픽 횟수) · 승률 */
+/** 듀오·트리오: 콤보 기준 match_count */
 function formatMonsterMatchWinLine(count: number, winRate: number) {
   return `경기수 ${toNum(count, 0).toLocaleString()} | 승률 ${formatPct2(winRate)}`;
+}
+
+/** 솔로: 집계 pick_count(메인·목록과 동일) — ‘경기수’가 아님 */
+function formatMonsterSoloPickWinLine(pickCount: number, winRate: number) {
+  return `픽횟수 ${toNum(pickCount, 0).toLocaleString()} | 승률 ${formatPct2(winRate)}`;
 }
 
 function comboMonsterImageUrl(row: DuoComboStat | TrioComboStat, slot: 1 | 2 | 3): string | undefined {
@@ -308,7 +313,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                             color="text.secondary"
                             sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0, textAlign: 'right' }}
                           >
-                            {formatMonsterMatchWinLine(toNum(r.pick_count), toNum(r.win_rate))}
+                            {formatMonsterSoloPickWinLine(toNum(r.pick_count), toNum(r.win_rate))}
                           </Typography>
                         </Box>
                       );

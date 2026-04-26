@@ -74,6 +74,7 @@ import RtaSeasonTierSelectRow, {
   RTA_OUTLINED_SELECT_INPUT_SLOT_SX,
   RTA_SELECT_MENU_PROPS,
 } from '@/features/rta/components/RtaSeasonTierSelectRow';
+import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
@@ -470,6 +471,7 @@ const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
 }) {
   const handle = useCallback(
     (e: SelectChangeEvent<MonsterStatsSortKey>) => {
+      blurFocusedMenuItem();
       onChange(e.target.value as MonsterStatsSortKey);
     },
     [onChange],
@@ -504,7 +506,10 @@ const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
           }}
           MenuProps={{
             ...RTA_SELECT_MENU_PROPS,
-            PaperProps: { sx: { maxHeight: 360, bgcolor: 'common.white' } },
+            slotProps: {
+              ...RTA_SELECT_MENU_PROPS.slotProps,
+              paper: { sx: { maxHeight: 360, bgcolor: 'common.white' } },
+            },
           }}
         >
           {MONSTER_STATS_SORT_KEYS.map((k) => (

@@ -6,6 +6,7 @@ import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSecti
 import { useRtaDashboardRankCutoff, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
+import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 
 export default function RtaRankCutoffsPageClient() {
   const { data: seasonsData } = useRtaSeasonsContext();
@@ -20,7 +21,7 @@ export default function RtaRankCutoffsPageClient() {
         labelId="rta-cutoffs-season-label"
         label="시즌"
         value={seasonSelectValue}
-        onChange={(e) => setSeason(String(e.target.value))}
+        onChange={(e) => { blurFocusedMenuItem(); setSeason(String(e.target.value)); }}
         MenuProps={RTA_SELECT_MENU_PROPS}
         sx={{
           bgcolor: '#ffffff',
