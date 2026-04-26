@@ -19,7 +19,10 @@ export type RtaSummonerSessionSearchPanelProps = {
   onOpenBookmark: (b: Entry) => void;
   onToggleFavorite: (b: Entry) => void;
   onRemoveRecent: (wizardId: string) => void;
-  /** home: 히어로 아래 / header: 인풋 아래 absolute */
+  /**
+   * home: 검색 박스 하단 absolute(레이아웃 밀지 않음, 세션 패널 z-index) —
+   * header: 우측 정렬 `dropdown`과 동일 absolute.
+   */
   layout: 'inline' | 'dropdown';
 };
 
@@ -73,13 +76,18 @@ export default function RtaSummonerSessionSearchPanel({
               boxShadow: 6,
             }
           : {
-              mt: 1.5,
-              width: '100%',
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '100%',
+              mt: 0.5,
+              zIndex: (theme) => theme.zIndex.modal,
               textAlign: 'left',
               borderRadius: 1,
-              bgcolor: 'rgba(8, 15, 30, 0.94)',
+              bgcolor: 'rgba(8, 15, 30, 0.96)',
               border: '1px solid rgba(255,255,255,0.12)',
               overflow: 'hidden',
+              boxShadow: 6,
             }
       }
     >
@@ -108,6 +116,7 @@ export default function RtaSummonerSessionSearchPanel({
           aria-disabled={false}
           aria-controls={p0}
           onClick={() => onSessionListTabChange(0)}
+          onMouseDown={(e) => e.preventDefault()}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -139,6 +148,7 @@ export default function RtaSummonerSessionSearchPanel({
           aria-disabled={false}
           aria-controls={p1}
           onClick={() => onSessionListTabChange(1)}
+          onMouseDown={(e) => e.preventDefault()}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();

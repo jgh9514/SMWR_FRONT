@@ -404,3 +404,37 @@ export interface RtaPlayerSummary {
   last_match_at?: string;
 }
 
+/** 소환사×시즌 RTA 몬스터 스냅 분모(`rta_agg_summoner_season_fight_snap`) */
+export interface RtaPlayerMonsterFightSnapshot {
+  match_cnt?: number;
+  non_ban_pick_cnt?: number;
+  ban_event_cnt?: number;
+  computed_at?: string;
+}
+
+/** 소환사×시즌×몬스터 스냅 한 행 */
+export interface RtaPlayerMonsterUsageRow {
+  unit_master_id: number;
+  pick_cnt: number;
+  ban_cnt: number;
+  win_cnt: number;
+  lose_cnt: number;
+  first_pick_cnt: number;
+  owned_copy_count?: number | null;
+  monster_name?: string | null;
+  monster_image?: string | null;
+  monster_elemental?: string | null;
+  pick_rate_pct?: number | null;
+  ban_rate_pct?: number | null;
+  win_rate_pct?: number | null;
+  first_pick_rate_pct?: number | null;
+}
+
+/** POST /rta/player/{wizardId}/monster-usage */
+export interface RtaPlayerMonsterUsageResponse {
+  seasonId?: number | null;
+  wizardId?: string;
+  fight: RtaPlayerMonsterFightSnapshot | null;
+  rows: RtaPlayerMonsterUsageRow[];
+}
+

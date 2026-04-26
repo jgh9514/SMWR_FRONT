@@ -108,7 +108,21 @@ function TierStars({ shortLabel }: { shortLabel: string }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
       {Array.from({ length: n }).map((_, i) => (
-        <Image key={i} src={src} alt="" width={TIER_STAR_PX} height={TIER_STAR_PX} unoptimized style={{ display: 'block' }} />
+        <Image
+          key={i}
+          src={src}
+          alt=""
+          width={TIER_STAR_PX}
+          height={TIER_STAR_PX}
+          unoptimized
+          style={{
+            display: 'block',
+            width: TIER_STAR_PX,
+            height: TIER_STAR_PX,
+            objectFit: 'contain',
+            flexShrink: 0,
+          }}
+        />
       ))}
     </Box>
   );

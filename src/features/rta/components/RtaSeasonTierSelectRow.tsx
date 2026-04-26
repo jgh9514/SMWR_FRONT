@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
+import type { MenuProps } from '@mui/material';
 import type { RtaRatingGradeRule } from '@/features/rta/types/rta';
 import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
 
@@ -27,6 +28,16 @@ export const RTA_OUTLINED_SELECT_INPUT_SLOT_SX = {
   '&:hover': { backgroundColor: 'common.white', bgcolor: 'common.white' },
   '&.Mui-focused': { backgroundColor: 'common.white', bgcolor: 'common.white' },
 } as const;
+
+/**
+ * MUI Select 드롭다운: `aria-hidden` / 포커스 경고 완화
+ * - `disableScrollLock`: 본문 스크롤 락·모달 스택 이슈 완화
+ * - `closeAfterTransition`: 닫힘 시 exit 트랜지션이 끝난 뒤에 Modal 정리(aria-hidden) — MenuItem에 포커스가 남은 채로 조상이 숨겨지는 것을 줄임
+ */
+export const RTA_SELECT_MENU_PROPS: Partial<MenuProps> = {
+  disableScrollLock: true,
+  closeAfterTransition: true,
+};
 
 /** 시즌·티어 필터 (몬스터 통계·상세 개요 등 공통) */
 const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
@@ -77,6 +88,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
           onChange={(e) => setSeason(String(e.target.value))}
           sx={RTA_OUTLINED_SELECT_FIELD_SX}
           slotProps={{ input: { sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX } }}
+          MenuProps={RTA_SELECT_MENU_PROPS}
         >
           {seasonOptions.map((o) => (
             <MenuItem key={o.value} value={o.value}>

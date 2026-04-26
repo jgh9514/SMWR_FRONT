@@ -166,7 +166,8 @@ export default function HomeMainVisual() {
       sx={{
         position: 'relative',
         width: '100%',
-        overflow: 'hidden',
+        // 최근검색/즐겨창기 드롭(absolute)이 섹션 밑으로 이어질 수 있음 — hidden이면 패널이 잘림
+        overflow: 'visible',
         color: 'common.white',
         py: { xs: 3.5, md: 6 },
         minHeight: { xs: 280, sm: 320, md: 360 },
@@ -235,7 +236,10 @@ export default function HomeMainVisual() {
               maxWidth: 640,
             }}
           >
-            <Box className="searchbox-wrap" sx={{ width: '100%' }}>
+            <Box
+              className="searchbox-wrap"
+              sx={{ position: 'relative', zIndex: 1, width: '100%' }}
+            >
                 <Autocomplete<RtaSummonerSearchHit, false, false, false>
                   size={isMdUp ? 'medium' : 'small'}
                   fullWidth
@@ -305,7 +309,10 @@ export default function HomeMainVisual() {
                           size="small"
                           tabIndex={-1}
                           aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                          onMouseDown={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                          }}
                           onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();

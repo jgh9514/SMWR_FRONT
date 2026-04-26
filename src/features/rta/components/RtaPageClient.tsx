@@ -31,6 +31,7 @@ import {
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
+import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
 import RtaUnitPickGrid from '@/features/rta/components/RtaUnitPickGrid';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
@@ -209,6 +210,7 @@ export default function RtaPageClient() {
                     label="시즌"
                     value={seasonSelectValue}
                     onChange={(e) => setSeason(String(e.target.value))}
+                    MenuProps={RTA_SELECT_MENU_PROPS}
                     sx={{ borderRadius: 2 }}
                   >
                     {seasonOptions.map((o) => (

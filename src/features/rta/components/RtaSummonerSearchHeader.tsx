@@ -225,7 +225,10 @@ export default function RtaSummonerSearchHeader() {
                 size="small"
                 tabIndex={-1}
                 aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                onMouseDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   e.preventDefault();

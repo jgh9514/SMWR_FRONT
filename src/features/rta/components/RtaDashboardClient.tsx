@@ -27,6 +27,7 @@ import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { RTA_DASHBOARD_TIER_RATING_IDS, type RtaTierBucket, type RtaTierDailyRow } from '@/features/rta/types/rta';
 import { toYmdKst } from '@/features/rta/utils/ymdKst';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
+import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
 
 /** C 컨커: 금색 · P 플래: 옥색(청록) · G 골드: 빨강 */
 const TIER_BAR_COLORS: Record<string, string> = {
@@ -292,6 +293,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
               label="시즌"
               value={seasonSelectValue}
               onChange={(e) => setSeason(String(e.target.value))}
+              MenuProps={RTA_SELECT_MENU_PROPS}
             >
               {seasonOptions.map((o) => (
                 <MenuItem key={o.value} value={o.value}>

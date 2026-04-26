@@ -33,6 +33,7 @@ import type {
   RtaDashboardTierDistributionResponse,
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
+  RtaPlayerMonsterUsageResponse,
   RtaRatingGradeRule,
   RtaSeasonRow,
   RtaSeasonsResponse,
@@ -507,6 +508,29 @@ export const useRtaPlayerSummary = (
       ...restOptions,
     },
   );
+};
+
+const RTA_PLAYER_MONSTER_USAGE_STALE_MS = 60_000;
+
+/**
+ * 소환사×시즌 몬스터 사용 스냅(픽/밴/승/선첫비밴/보유). 배치 rta_agg_summoner_monster_snap.
+ */
+export const useRtaPlayerMonsterUsage = (
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  options: {
+    seasonId: number | null;
+    enabled?: boolean;
+  },
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/monster-usage` : '/rta/player/-/monster-usage';
+  return useApiPostQuery<RtaPlayerMonsterUsageResponse>(path, seasonBody(seasonCode ?? null, options.seasonId), {
+    enabled: Boolean(id) && (options.enabled !== false),
+    staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
 };
 
 export const useRtaMonsterDetail = (

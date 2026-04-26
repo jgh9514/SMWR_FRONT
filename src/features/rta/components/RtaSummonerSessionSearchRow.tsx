@@ -84,6 +84,7 @@ export default function RtaSummonerSessionSearchRow({
           className="common_search"
           href={`/rta/player/${encodeURIComponent(wid)}`}
           onClick={onOpen}
+          onMouseDown={(e) => e.preventDefault()}
           sx={{
             color: 'rgba(255,255,255,0.95)',
             textDecoration: 'none',
@@ -113,6 +114,7 @@ export default function RtaSummonerSessionSearchRow({
           component="button"
           type="button"
           className={fav ? 'bookmark on' : 'bookmark off'}
+          onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -146,6 +148,7 @@ export default function RtaSummonerSessionSearchRow({
         className="remove"
         size="small"
         aria-label="목록에서 제거"
+        onMouseDown={(e) => e.preventDefault()}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();

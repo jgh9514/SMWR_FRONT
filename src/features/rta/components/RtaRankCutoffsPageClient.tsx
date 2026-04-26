@@ -5,6 +5,7 @@ import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
 import { useRtaDashboardRankCutoff, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
+import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
 
 export default function RtaRankCutoffsPageClient() {
   const { data: seasonsData } = useRtaSeasonsContext();
@@ -20,6 +21,7 @@ export default function RtaRankCutoffsPageClient() {
         label="시즌"
         value={seasonSelectValue}
         onChange={(e) => setSeason(String(e.target.value))}
+        MenuProps={RTA_SELECT_MENU_PROPS}
         sx={{
           bgcolor: '#ffffff',
           '&:hover': { bgcolor: '#ffffff' },

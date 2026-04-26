@@ -31,6 +31,7 @@ import {
   useTheme,
 } from '@mui/material';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
+import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import { useRtaSummonerRanking, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
@@ -426,6 +427,7 @@ export default function RtaSummonerRankingClient() {
                 setCountryFilter(null);
               }}
               sx={RTA_OUTLINED_SELECT_SX}
+              MenuProps={RTA_SELECT_MENU_PROPS}
             >
               {seasonOptions.map((o) => (
                 <MenuItem key={o.value} value={o.value}>

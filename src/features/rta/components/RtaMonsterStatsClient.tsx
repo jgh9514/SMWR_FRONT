@@ -72,6 +72,7 @@ import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import RtaSeasonTierSelectRow, {
   RTA_OUTLINED_SELECT_FIELD_SX,
   RTA_OUTLINED_SELECT_INPUT_SLOT_SX,
+  RTA_SELECT_MENU_PROPS,
 } from '@/features/rta/components/RtaSeasonTierSelectRow';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
@@ -501,7 +502,10 @@ const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
               'aria-label': `정렬: ${MONSTER_STATS_SORT_LABEL[value]}`,
             },
           }}
-          MenuProps={{ disableScrollLock: true, PaperProps: { sx: { maxHeight: 360, bgcolor: 'common.white' } } }}
+          MenuProps={{
+            ...RTA_SELECT_MENU_PROPS,
+            PaperProps: { sx: { maxHeight: 360, bgcolor: 'common.white' } },
+          }}
         >
           {MONSTER_STATS_SORT_KEYS.map((k) => (
             <MenuItem key={k} value={k} aria-label={MONSTER_STATS_SORT_LABEL[k]}>
