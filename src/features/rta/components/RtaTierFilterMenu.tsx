@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Box, Button, Menu, Stack, Typography } from '@mui/material';
+import { RTA_SELECT_MENU_PROPS } from '@/features/rta/rtaMenuModalProps';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import type { RtaRatingGradeRule } from '@/features/rta/types/rta';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
@@ -100,7 +101,11 @@ export default function RtaTierFilterMenu({
         onClose={handleClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
         transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-        slotProps={{ paper: { sx: { maxWidth: 'min(100vw - 24px, 440px)', width: '100%' } } }}
+        {...RTA_SELECT_MENU_PROPS}
+        slotProps={{
+          ...RTA_SELECT_MENU_PROPS.slotProps,
+          paper: { sx: { maxWidth: 'min(100vw - 24px, 440px)', width: '100%' } },
+        }}
       >
         <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5 }}>
           <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 0.75 }}>

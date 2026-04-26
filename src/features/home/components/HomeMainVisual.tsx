@@ -35,12 +35,6 @@ function pickWizardName(row: RtaSummonerSearchHit): string {
   return String(row.wizard_name ?? '').trim() || '—';
 }
 
-function pickChannelUid(row: RtaSummonerSearchHit): string | undefined {
-  const u = row.channel_uid;
-  if (u == null || u === '') return undefined;
-  return String(u).trim();
-}
-
 function countryFlagSrc(country: string | undefined): string | null {
   const c = (country ?? '').trim();
   if (!c || c === '—') return null;
@@ -105,7 +99,6 @@ export default function HomeMainVisual() {
     return {
       wizardId: pickWizardId(v),
       wizardName: pickWizardName(v),
-      channelUid: pickChannelUid(v),
       country: v.country,
     };
   }, []);
@@ -278,7 +271,6 @@ export default function HomeMainVisual() {
                     const { key, ...other } = props;
                     const wid = pickWizardId(option);
                     const nm = pickWizardName(option);
-                    const ch = pickChannelUid(option);
                     const flag = countryFlagSrc(option.country);
                     const fav = isFavorite(wid);
                     return (
@@ -289,7 +281,7 @@ export default function HomeMainVisual() {
                         sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 1, pr: 0.5 }}
                       >
                         <Avatar
-                          src={getSwexPlayerImageUrl(ch ?? wid)}
+                          src={getSwexPlayerImageUrl(wid)}
                           alt=""
                           sx={{ width: 32, height: 32, flexShrink: 0 }}
                         />

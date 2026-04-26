@@ -368,15 +368,11 @@ export interface RtaDashboardLinkPreviewResponse {
   summoner_ranking: RtaSummonerRankingResponse;
 }
 
-/** POST /rta/summoner-search — WAS `searchRtaSummonersInAgg` (snake_case만) */
+/** POST /rta/summoner-search — 검색 전용: wizard_id·닉·국가만 (snake_case) */
 export interface RtaSummonerSearchHit {
   wizard_id?: string;
   wizard_name?: string;
   country?: string;
-  /** SWEX 프로필 이미지 — 없으면 wizard_id 로 폴백 */
-  channel_uid?: string | number | null;
-  score?: number;
-  rating_id?: number;
 }
 
 export interface RtaSummonerSearchResponse {

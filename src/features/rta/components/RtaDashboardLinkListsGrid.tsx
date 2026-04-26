@@ -19,6 +19,19 @@ const MONSTER_STATS_PATHS = {
 const SUMMONER_RANKING_PATH = '/rta/summoner-ranking';
 const MONSTER_DETAIL_BASE = '/monster-detail';
 
+type LinkPreviewMonsterBlock = { type?: string; rows?: unknown };
+
+/**
+ * /rta/dashboard/link-preview → solo|duo|trio — WAS `getRtaMonsterStats` 와 동일 `rows`·`type`.
+ * `type` 은 캐시/역직렬화에서 빠질 수 있으므로, 일치·빈 값일 때만 rows 를 쓴다(잘못된 패널에 데이터가 끼는 것은 `type` 불일치 시에만 막음).
+ */
+function linkPreviewRows<T>(block: LinkPreviewMonsterBlock | null | undefined, expected: 'solo' | 'duo' | 'trio'): T[] {
+  if (block == null) return [];
+  if (!Array.isArray(block.rows)) return [];
+  if (block.type != null && block.type !== expected) return [];
+  return block.rows as T[];
+}
+
 /** 메인 4열 패널: 행 5개 동일 높이 · 카드(헤더+목록) 스트레치 */
 const DASH_LIST_ROW_PX = 48;
 const DASH_LIST_BODY_PX = 5 * DASH_LIST_ROW_PX;
@@ -180,12 +193,9 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
   const linkQ = useRtaDashboardLinkPreview(seasonCode, seasonId, 5);
   const bundle = linkQ.data;
 
-  const soloRows =
-    (bundle?.solo?.type === 'solo' ? (bundle.solo.rows as MonsterStats[]) : []) ?? [];
-  const duoRows =
-    (bundle?.duo?.type === 'duo' ? (bundle.duo.rows as DuoComboStat[]) : []) ?? [];
-  const trioRows =
-    (bundle?.trio?.type === 'trio' ? (bundle.trio.rows as TrioComboStat[]) : []) ?? [];
+  const soloRows = linkPreviewRows<MonsterStats>(bundle?.solo, 'solo');
+  const duoRows = linkPreviewRows<DuoComboStat>(bundle?.duo, 'duo');
+  const trioRows = linkPreviewRows<TrioComboStat>(bundle?.trio, 'trio');
   const rankRows: RtaSummonerRankingRow[] = bundle?.summoner_ranking?.rankings?.slice(0, 5) ?? [];
 
   const navigateToProfile = (href: string, openInNewTab = false) => {

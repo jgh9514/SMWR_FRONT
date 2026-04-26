@@ -2,8 +2,8 @@
 
 import { memo } from 'react';
 import { Box, FormControl, InputLabel, MenuItem, Select } from '@mui/material';
-import type { MenuProps } from '@mui/material';
 import type { RtaRatingGradeRule } from '@/features/rta/types/rta';
+import { RTA_SELECT_MENU_PROPS } from '@/features/rta/rtaMenuModalProps';
 import RtaTierFilterMenu from '@/features/rta/components/RtaTierFilterMenu';
 
 /** Outlined 콤보박스(Select) — 필드·입력 루트 모두 흰 배경 (MUI7는 slot + sx 병행이 안정적) */
@@ -28,16 +28,6 @@ export const RTA_OUTLINED_SELECT_INPUT_SLOT_SX = {
   '&:hover': { backgroundColor: 'common.white', bgcolor: 'common.white' },
   '&.Mui-focused': { backgroundColor: 'common.white', bgcolor: 'common.white' },
 } as const;
-
-/**
- * MUI Select 드롭다운: `aria-hidden` / 포커스 경고 완화
- * - `disableScrollLock`: 본문 스크롤 락·모달 스택 이슈 완화
- * - `closeAfterTransition`: 닫힘 시 exit 트랜지션이 끝난 뒤에 Modal 정리(aria-hidden) — MenuItem에 포커스가 남은 채로 조상이 숨겨지는 것을 줄임
- */
-export const RTA_SELECT_MENU_PROPS: Partial<MenuProps> = {
-  disableScrollLock: true,
-  closeAfterTransition: true,
-};
 
 /** 시즌·티어 필터 (몬스터 통계·상세 개요 등 공통) */
 const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
@@ -120,4 +110,5 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
   );
 });
 
+export { RTA_SELECT_MENU_PROPS };
 export default RtaSeasonTierSelectRow;

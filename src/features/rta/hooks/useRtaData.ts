@@ -407,8 +407,8 @@ export const useRtaSeasons = () => {
 };
 
 /**
- * RTA 소환사 검색 (집계 랭킹 기준)
- * 백엔드: POST /api/v1/rta/summoner-search — seasonCode 생략 시 서버 기본 시즌
+ * RTA 소환사 검색 (집계 검색 스냅, 시즌과 무관)
+ * 백엔드: POST /api/v1/rta/summoner-search — seasonCode 는 응답 메타용(선택)
  */
 export const useRtaSummonerSearch = (
   q: string,

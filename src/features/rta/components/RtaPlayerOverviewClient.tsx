@@ -90,6 +90,9 @@ function formatMatchTimeOnly(iso: string): string {
 }
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+/** Recharts ResponsiveContainer: % 높이만 쓰면 그리드·첫 측정에서 width/height -1 → 픽셀 지정 */
+const RTA_OVERVIEW_CHART_30D_PX = 180;
+const RTA_OVERVIEW_CHART_SCORE_PX = 200;
 
 /** 내 경기 카드: 30일 이내는 상대 시각, 이후는 일자+시각 */
 function formatMatchWhenUnderResult(
@@ -535,13 +538,20 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                 </Typography>
               </Stack>
             </Stack>
-            <Box sx={{ width: '100%', height: 180, mx: 'auto' }}>
+            <Box
+              sx={{
+                width: '100%',
+                minWidth: 0,
+                height: RTA_OVERVIEW_CHART_30D_PX,
+                mx: 'auto',
+              }}
+            >
               {last30dSeries.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
                   최근 30일 내 로드된 경기가 없습니다.
                 </Typography>
               ) : (
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height={RTA_OVERVIEW_CHART_30D_PX}>
                   <LineChart data={last30dSeries} margin={{ top: 6, right: 4, left: 0, bottom: 2 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} opacity={0.4} />
                     <XAxis
@@ -618,13 +628,13 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                     <ToggleButton value="match">경기별</ToggleButton>
                   </ToggleButtonGroup>
                 </Stack>
-                <Box sx={{ width: '100%', height: 200 }}>
+                <Box sx={{ width: '100%', minWidth: 0, height: RTA_OVERVIEW_CHART_SCORE_PX }}>
                   {chartData.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 5 }}>
                       차트 데이터가 없습니다.
                     </Typography>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height={RTA_OVERVIEW_CHART_SCORE_PX}>
                       <AreaChart data={chartData} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="rtaScoreGrad2" x1="0" y1="0" x2="0" y2="1">
