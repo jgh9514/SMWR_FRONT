@@ -321,6 +321,7 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
       <Box
         component={Link}
         href={href}
+        prefetch={false}
         sx={{
           textDecoration: 'none',
           color: 'inherit',
@@ -400,6 +401,7 @@ const ComboMonsterTile = memo(function ComboMonsterTile({ name, image, elemental
       <Box
         component={Link}
         href={href}
+        prefetch={false}
         sx={{
           textDecoration: 'none',
           color: 'inherit',
@@ -1198,6 +1200,7 @@ export default function RtaMonsterStatsClient() {
                           <Box
                             component={Link}
                             href={href}
+                            prefetch={false}
                             sx={{
                               borderRadius: 1,
                               border: '1px solid',

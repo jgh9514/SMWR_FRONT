@@ -376,9 +376,11 @@ export default function BatchManagementPage() {
               title="배치 설정 목록"
               action={
                 <Tooltip title="새로고침">
-                  <IconButton onClick={handleRefresh} disabled={isLoadingConfig} size="small">
-                    <RefreshIcon />
-                  </IconButton>
+                  <Box component="span" sx={{ display: 'inline-flex' }}>
+                    <IconButton onClick={handleRefresh} disabled={isLoadingConfig} size="small">
+                      <RefreshIcon />
+                    </IconButton>
+                  </Box>
                 </Tooltip>
               }
             />
@@ -460,9 +462,11 @@ export default function BatchManagementPage() {
               title={`배치 실행 이력 (${filteredBatchHistory.length}건)`}
               action={
                 <Tooltip title="새로고침">
-                  <IconButton onClick={() => refetchHistory()} disabled={isLoadingHistory} size="small">
-                    <RefreshIcon />
-                  </IconButton>
+                  <Box component="span" sx={{ display: 'inline-flex' }}>
+                    <IconButton onClick={() => refetchHistory()} disabled={isLoadingHistory} size="small">
+                      <RefreshIcon />
+                    </IconButton>
+                  </Box>
                 </Tooltip>
               }
             />

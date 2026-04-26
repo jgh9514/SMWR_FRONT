@@ -1,9 +1,8 @@
 'use client';
 
-import type { ReactNode, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Avatar, Box, Button, Paper, Skeleton, Stack, Typography } from '@mui/material';
+import { Avatar, Box, Button, Link as MuiLink, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   useRtaDashboardPreviewSolo,
@@ -22,7 +21,6 @@ const MONSTER_STATS_PATHS = {
 } as const;
 
 const SUMMONER_RANKING_PATH = '/rta/summoner-ranking';
-const MONSTER_DETAIL_BASE = '/monster-detail';
 
 type PreviewBlock = { type?: string; rows?: unknown } | null | undefined;
 
@@ -38,12 +36,6 @@ function linkPreviewRows<T>(block: PreviewBlock, expected: 'solo' | 'duo' | 'tri
 /** 메인 4열 패널: 행 5개 동일 높이 · 카드(헤더+목록) 스트레치 */
 const DASH_LIST_ROW_PX = 48;
 const DASH_LIST_BODY_PX = 5 * DASH_LIST_ROW_PX;
-
-function rtaMonsterDetailHref(monsterId: string | undefined | null): string | undefined {
-  const id = monsterId != null ? String(monsterId).trim() : '';
-  if (!id) return undefined;
-  return `${MONSTER_DETAIL_BASE}/${encodeURIComponent(id)}`;
-}
 
 function toNum(v: unknown, fallback = 0): number {
   const n = Number(v);
@@ -92,6 +84,38 @@ const ROW_SX = {
   flexShrink: 0,
   '&:last-of-type': { borderBottom: 'none' },
 } as const;
+
+const rowLinkToListSx = {
+  display: 'block' as const,
+  width: '100%',
+  borderRadius: 0,
+  textDecoration: 'none',
+  color: 'inherit' as const,
+  '&:focus-visible': {
+    outline: '2px solid',
+    outlineColor: 'primary.main',
+    outlineOffset: -2,
+  },
+} as const;
+
+const rowLinkInnerSx = [
+  ROW_SX,
+  {
+    cursor: 'pointer' as const,
+    '&:hover': { bgcolor: 'action.hover' },
+  },
+] as const;
+
+/** 행 전체 = 목록 페이지(더보기와 동일) — 네이티브 링크(중클·새 탭·포커스) */
+function PreviewListRowLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Box component="li" sx={{ p: 0, m: 0, listStyle: 'none', display: 'block' }}>
+      <MuiLink component={Link} href={href} underline="none" prefetch={false} sx={rowLinkToListSx}>
+        <Box sx={rowLinkInnerSx}>{children}</Box>
+      </MuiLink>
+    </Box>
+  );
+}
 
 type PanelProps = {
   title: string;
@@ -197,8 +221,6 @@ type GridProps = {
  * 랭크 컷 하단 — 상위 5건, 순위(번호) 없이 한 줄 요약
  */
 export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedded = false }: GridProps) {
-  const router = useRouter();
-
   const soloQ = useRtaDashboardPreviewSolo(seasonCode, seasonId, 5);
   const duoQ = useRtaDashboardPreviewDuo(seasonCode, seasonId, 5);
   const trioQ = useRtaDashboardPreviewTrio(seasonCode, seasonId, 5);
@@ -208,37 +230,6 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
   const duoRows = linkPreviewRows<DuoComboStat>(duoQ.data, 'duo');
   const trioRows = linkPreviewRows<TrioComboStat>(trioQ.data, 'trio');
   const rankRows: RtaSummonerRankingRow[] = rankQ.data?.rankings?.slice(0, 5) ?? [];
-
-  const navigateToProfile = (href: string, openInNewTab = false) => {
-    if (openInNewTab && typeof window !== 'undefined') {
-      window.open(href, '_blank', 'noopener,noreferrer');
-      return;
-    }
-    router.push(href);
-  };
-
-  const handleRowClick = (e: ReactMouseEvent<HTMLElement>, href: string) => {
-    if (e.defaultPrevented) return;
-    if (e.metaKey || e.ctrlKey) {
-      navigateToProfile(href, true);
-      return;
-    }
-    router.push(href);
-  };
-
-  const handleRowAuxClick = (e: ReactMouseEvent<HTMLElement>, href: string) => {
-    if (e.button === 1) {
-      e.preventDefault();
-      navigateToProfile(href, true);
-    }
-  };
-
-  const handleRowKeyDown = (e: ReactKeyboardEvent<HTMLElement>, href: string) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      navigateToProfile(href, e.metaKey || e.ctrlKey);
-    }
-  };
 
   return (
     <Box
@@ -273,7 +264,6 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
               : (
                   <Stack component="ul" spacing={0} sx={{ m: 0, p: 0, listStyle: 'none', width: '100%' }}>
                     {soloRows.map((r) => {
-                      const href = rtaMonsterDetailHref(r.monster_id) ?? null;
                       const face = (
                         <Avatar
                           src={getRenderableImageUrl(r.monster_image)}
@@ -284,28 +274,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                         />
                       );
                       return (
-                        <Box
-                          key={r.monster_id ?? r.monster_name}
-                          component="li"
-                          role={href ? 'link' : undefined}
-                          tabIndex={href ? 0 : -1}
-                          onClick={href ? (e) => handleRowClick(e, href) : undefined}
-                          onAuxClick={href ? (e) => handleRowAuxClick(e, href) : undefined}
-                          onKeyDown={href ? (e) => handleRowKeyDown(e, href) : undefined}
-                          aria-label={href ? '몬스터 상세' : undefined}
-                          sx={[
-                            ROW_SX,
-                            ...(href
-                              ? [
-                                  {
-                                    cursor: 'pointer' as const,
-                                    '&:hover': { bgcolor: 'action.hover' },
-                                    '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
-                                  },
-                                ]
-                              : []),
-                          ]}
-                        >
+                        <PreviewListRowLink key={String(r.monster_id ?? r.monster_name)} href={MONSTER_STATS_PATHS.solo}>
                           {face}
                           <Typography
                             component="span"
@@ -315,7 +284,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                           >
                             {formatMonsterSoloPickWinLine(toNum(r.pick_count), toNum(r.win_rate))}
                           </Typography>
-                        </Box>
+                        </PreviewListRowLink>
                       );
                     })}
                   </Stack>
@@ -342,9 +311,6 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
               : (
                   <Stack component="ul" spacing={0} sx={{ m: 0, p: 0, listStyle: 'none', width: '100%' }}>
                     {duoRows.map((r) => {
-                      const h1 = rtaMonsterDetailHref(r.monster_id_1);
-                      const h2 = rtaMonsterDetailHref(r.monster_id_2);
-                      const href = (h1 || h2) ?? null;
                       const thumb = (img: string | undefined) => (
                         <Avatar
                           src={getRenderableImageUrl(img)}
@@ -355,28 +321,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                         />
                       );
                       return (
-                        <Box
-                          key={`${r.monster_id_1}-${r.monster_id_2}`}
-                          component="li"
-                          role={href ? 'link' : undefined}
-                          tabIndex={href ? 0 : -1}
-                          onClick={href ? (e) => handleRowClick(e, href) : undefined}
-                          onAuxClick={href ? (e) => handleRowAuxClick(e, href) : undefined}
-                          onKeyDown={href ? (e) => handleRowKeyDown(e, href) : undefined}
-                          aria-label={href ? '몬스터 상세' : undefined}
-                          sx={[
-                            ROW_SX,
-                            ...(href
-                              ? [
-                                  {
-                                    cursor: 'pointer' as const,
-                                    '&:hover': { bgcolor: 'action.hover' },
-                                    '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
-                                  },
-                                ]
-                              : []),
-                          ]}
-                        >
+                        <PreviewListRowLink key={`${r.monster_id_1}-${r.monster_id_2}`} href={MONSTER_STATS_PATHS.duo}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, minWidth: 0 }}>
                             {thumb(comboMonsterImageUrl(r, 1))}
                             {thumb(comboMonsterImageUrl(r, 2))}
@@ -384,7 +329,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0 }}>
                             {formatMonsterMatchWinLine(toNum(r.match_count), toNum(r.win_rate))}
                           </Typography>
-                        </Box>
+                        </PreviewListRowLink>
                       );
                     })}
                   </Stack>
@@ -411,10 +356,6 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
               : (
                   <Stack component="ul" spacing={0} sx={{ m: 0, p: 0, listStyle: 'none', width: '100%' }}>
                     {trioRows.map((r) => {
-                      const h1 = rtaMonsterDetailHref(r.monster_id_1);
-                      const h2 = rtaMonsterDetailHref(r.monster_id_2);
-                      const h3 = rtaMonsterDetailHref(r.monster_id_3);
-                      const href = (h1 || h2 || h3) ?? null;
                       const thumb = (slot: 1 | 2 | 3) => {
                         const src = getRenderableImageUrl(comboMonsterImageUrl(r, slot));
                         return (
@@ -428,27 +369,9 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                         );
                       };
                       return (
-                        <Box
+                        <PreviewListRowLink
                           key={`${r.monster_id_1}-${r.monster_id_2}-${r.monster_id_3}`}
-                          component="li"
-                          role={href ? 'link' : undefined}
-                          tabIndex={href ? 0 : -1}
-                          onClick={href ? (e) => handleRowClick(e, href) : undefined}
-                          onAuxClick={href ? (e) => handleRowAuxClick(e, href) : undefined}
-                          onKeyDown={href ? (e) => handleRowKeyDown(e, href) : undefined}
-                          aria-label={href ? '몬스터 상세' : undefined}
-                          sx={[
-                            ROW_SX,
-                            ...(href
-                              ? [
-                                  {
-                                    cursor: 'pointer' as const,
-                                    '&:hover': { bgcolor: 'action.hover' },
-                                    '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
-                                  },
-                                ]
-                              : []),
-                          ]}
+                          href={MONSTER_STATS_PATHS.trio}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.35, flexShrink: 0, minWidth: 0, flexWrap: 'nowrap' }}>
                             {thumb(1)}
@@ -458,7 +381,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', flexShrink: 0 }}>
                             {formatMonsterMatchWinLine(toNum(r.match_count), toNum(r.win_rate))}
                           </Typography>
-                        </Box>
+                        </PreviewListRowLink>
                       );
                     })}
                   </Stack>
@@ -487,31 +410,10 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                     {rankRows.map((row) => {
                       const wid = row.wizard_id != null ? String(row.wizard_id).trim() : '';
                       const name = (row.wizard_name && String(row.wizard_name).trim() !== '' ? row.wizard_name : wid) || '—';
-                      const href = wid ? `/rta/player/${encodeURIComponent(wid)}` : null;
                       const score = toNum(row.score, 0);
                       const c = row.country && String(row.country).trim() !== '' ? String(row.country).trim() : '—';
                       return (
-                        <Box
-                          key={wid || name}
-                          component="li"
-                          role={href ? 'link' : undefined}
-                          tabIndex={href ? 0 : -1}
-                          onClick={href ? (e) => handleRowClick(e, href) : undefined}
-                          onAuxClick={href ? (e) => handleRowAuxClick(e, href) : undefined}
-                          onKeyDown={href ? (e) => handleRowKeyDown(e, href) : undefined}
-                          sx={[
-                            ROW_SX,
-                            ...(href
-                              ? [
-                                  {
-                                    cursor: 'pointer' as const,
-                                    '&:hover': { bgcolor: 'action.hover' },
-                                    '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
-                                  },
-                                ]
-                              : []),
-                          ]}
-                        >
+                        <PreviewListRowLink key={wid || name} href={SUMMONER_RANKING_PATH}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flex: 1, mr: 1 }}>
                             <Box
                               component="img"
@@ -546,7 +448,7 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                               {score.toLocaleString()}
                             </Typography>
                           </Box>
-                        </Box>
+                        </PreviewListRowLink>
                       );
                     })}
                   </Stack>
