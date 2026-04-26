@@ -36,8 +36,10 @@ export default function RtaSummonerSessionSearchRow({
   onBookmark?: (e: React.MouseEvent) => void;
   onRemove: (e: React.MouseEvent) => void;
 }) {
-  const ch = b.channelUid;
+  const ch = b.channelUid?.trim();
   const wid = b.wizardId;
+  const thumbSrc = ch ? getSwexPlayerImageUrl(ch) : undefined;
+  const initial = (b.wizardName?.trim().charAt(0) || '#').toUpperCase();
   return (
     <Box
       component="li"
@@ -63,11 +65,13 @@ export default function RtaSummonerSessionSearchRow({
         }}
       >
         <Avatar
-          src={getSwexPlayerImageUrl(ch ?? wid)}
+          src={thumbSrc}
           alt=""
           variant="rounded"
           sx={{ width: 40, height: 40, fontSize: 11, fontWeight: 700, borderRadius: 0.5 }}
-        />
+        >
+          {thumbSrc ? undefined : initial}
+        </Avatar>
       </Box>
       <Typography
         component="p"

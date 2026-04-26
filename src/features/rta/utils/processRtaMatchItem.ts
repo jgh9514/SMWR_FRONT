@@ -22,12 +22,22 @@ function normalizeUnitBannedFlags(raw: unknown): boolean[] | undefined {
   return raw.map((v) => isTruthyBanFlag(v));
 }
 
+/** WAS `p1_unit_pick_slot_no` 배열의 i번째 = 해당 슬롯 `pick_slot_no` (1~N 전체 드래프트 턴) */
+function pickSlotNoAt(pickNos: unknown, i: number): number | undefined {
+  if (!Array.isArray(pickNos) || i < 0 || i >= pickNos.length) return undefined;
+  const v = pickNos[i];
+  if (v == null || v === '') return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function createUnits(
   unitNames?: string[],
   unitImages?: string[],
   bannedUnit?: number,
   leaderUnit?: number,
   unitBannedFlags?: boolean[] | (boolean | string | number)[],
+  unitPickSlotNos?: unknown,
 ) {
   if (!Array.isArray(unitNames) || !Array.isArray(unitImages) || unitNames.length === 0) {
     return [];
@@ -43,6 +53,7 @@ function createUnits(
         ? flags[i] === true
         : bannedUnit === i + 1,
     leader: leaderUnit === i + 1,
+    pickSlotNo: pickSlotNoAt(unitPickSlotNos, i),
   }));
 }
 
@@ -57,6 +68,7 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p1_banned_unit,
       match.p1_leader_unit,
       match.p1_unit_banned,
+      match.p1_unit_pick_slot_no,
     ),
     p2Units: createUnits(
       match.p2_unit_names,
@@ -64,6 +76,7 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p2_banned_unit,
       match.p2_leader_unit,
       match.p2_unit_banned,
+      match.p2_unit_pick_slot_no,
     ),
     p1Id: String(match.p1_wizard_id ?? ''),
     p2Id: String(match.p2_wizard_id ?? ''),

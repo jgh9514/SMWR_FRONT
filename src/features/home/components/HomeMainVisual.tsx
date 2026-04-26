@@ -8,7 +8,6 @@ import {
   Box,
   CircularProgress,
   Container,
-  IconButton,
   Stack,
   TextField,
   Typography,
@@ -16,8 +15,6 @@ import {
   useTheme,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
 import { useRtaSummonerSessionSearchLists } from '@/features/rta/hooks/useRtaSummonerSessionSearchLists';
 import { filterSessionBookmarks } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
 import RtaSummonerSessionSearchPanel from '@/features/rta/components/RtaSummonerSessionSearchPanel';
@@ -33,6 +30,13 @@ function pickWizardId(row: RtaSummonerSearchHit): string {
 
 function pickWizardName(row: RtaSummonerSearchHit): string {
   return String(row.wizard_name ?? '').trim() || '—';
+}
+
+function pickChannelUid(row: RtaSummonerSearchHit): string | undefined {
+  const c = row.channel_uid;
+  if (c == null) return undefined;
+  const t = String(c).trim();
+  return t === '' ? undefined : t;
 }
 
 function countryFlagSrc(country: string | undefined): string | null {
@@ -101,6 +105,7 @@ export default function HomeMainVisual() {
       wizardId: pickWizardId(v),
       wizardName: pickWizardName(v),
       country: v.country,
+      channelUid: pickChannelUid(v),
     };
   }, []);
 
@@ -283,19 +288,18 @@ export default function HomeMainVisual() {
                   }}
                   renderOption={(props, option) => {
                     const { key, ...other } = props;
-                    const wid = pickWizardId(option);
                     const nm = pickWizardName(option);
+                    const ch = pickChannelUid(option);
                     const flag = countryFlagSrc(option.country);
-                    const fav = isFavorite(wid);
                     return (
                       <Box
                         component="li"
                         key={key}
                         {...other}
-                        sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 1, pr: 0.5 }}
+                        sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 1, pr: 1 }}
                       >
                         <Avatar
-                          src={getSwexPlayerImageUrl(wid)}
+                          src={getSwexPlayerImageUrl(ch)}
                           alt=""
                           sx={{ width: 32, height: 32, flexShrink: 0 }}
                         />
@@ -310,24 +314,6 @@ export default function HomeMainVisual() {
                             sx={{ width: 20, height: 14, objectFit: 'cover', borderRadius: 0.5, flexShrink: 0 }}
                           />
                         ) : null}
-                        <IconButton
-                          type="button"
-                          size="small"
-                          tabIndex={-1}
-                          aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                          onMouseDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            toggleFavorite(toBookmark(option));
-                          }}
-                          sx={{ color: fav ? 'warning.main' : 'action.active', flexShrink: 0 }}
-                        >
-                          {fav ? <StarIcon sx={{ fontSize: 20 }} /> : <StarBorderIcon sx={{ fontSize: 20 }} />}
-                        </IconButton>
                       </Box>
                     );
                   }}

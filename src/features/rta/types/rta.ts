@@ -42,6 +42,9 @@ export interface RawMatchItem {
   p2_unit_names?: string[];
   p2_unit_images?: string[];
   p2_unit_banned?: boolean[] | (boolean | string | number)[];
+  /** `pick_slot_no` (전체 밴/픽 턴) — `unit_names`·`unit_images`·`unit_banned`와 동일 순서 */
+  p1_unit_pick_slot_no?: number[] | (string | number | null)[];
+  p2_unit_pick_slot_no?: number[] | (string | number | null)[];
   p1_units_str?: string;
   p2_units_str?: string;
 }
@@ -63,8 +66,8 @@ export interface MatchItem {
   p2Score: number;
   winnerPosition: '1' | '2';
   date: string;
-  p1Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean }>;
-  p2Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean }>;
+  p1Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean; pickSlotNo?: number }>;
+  p2Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean; pickSlotNo?: number }>;
   p1FirstPick?: string;
   p2FirstPick?: string;
 }
@@ -368,11 +371,13 @@ export interface RtaDashboardLinkPreviewResponse {
   summoner_ranking: RtaSummonerRankingResponse;
 }
 
-/** POST /rta/summoner-search — 검색 전용: wizard_id·닉·국가만 (snake_case) */
+/** POST /rta/summoner-search — 검색: wizard_id·닉·국가·채널(프로필 이미지용, snake_case) */
 export interface RtaSummonerSearchHit {
   wizard_id?: string;
   wizard_name?: string;
   country?: string;
+  /** SWEX `playerImage/{channel_uid}.jpg` — 없으면 클라이언트에서 기본 썸네일 */
+  channel_uid?: string | number | null;
 }
 
 export interface RtaSummonerSearchResponse {

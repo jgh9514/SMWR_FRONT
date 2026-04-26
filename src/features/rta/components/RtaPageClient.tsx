@@ -260,6 +260,10 @@ export default function RtaPageClient() {
               const expLeftSide: 'p1' | 'p2' = p1Wins ? 'p1' : 'p2';
               const expRightUnits = p1Wins ? (match.p2Units ?? []) : (match.p1Units ?? []);
               const expRightSide: 'p1' | 'p2' = p1Wins ? 'p2' : 'p1';
+              const expLeftFirstPick =
+                (expLeftSide === 'p1' ? match.p1FirstPick : match.p2FirstPick) === '1';
+              const expRightFirstPick =
+                (expRightSide === 'p1' ? match.p1FirstPick : match.p2FirstPick) === '1';
               return (
                 <Card
                   key={`${match.p1Id}-${match.p2Id}-${match.date}-${index}`}
@@ -550,7 +554,11 @@ export default function RtaPageClient() {
                                 </Typography>
                               </Box>
                             </Box>
-                            <RtaUnitPickGrid units={expLeftUnits} side={expLeftSide} />
+                            <RtaUnitPickGrid
+                              units={expLeftUnits}
+                              isFirstPickInDraft={expLeftFirstPick}
+                              rowAlign="start"
+                            />
                           </Box>
 
                           <Typography
@@ -603,7 +611,11 @@ export default function RtaPageClient() {
                               </Box>
                             </Box>
                             <Box sx={{ width: 'fit-content', ml: 'auto' }}>
-                              <RtaUnitPickGrid units={expRightUnits} side={expRightSide} />
+                              <RtaUnitPickGrid
+                                units={expRightUnits}
+                                isFirstPickInDraft={expRightFirstPick}
+                                rowAlign="end"
+                              />
                             </Box>
                           </Box>
                         </Box>

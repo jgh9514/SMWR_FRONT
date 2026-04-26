@@ -2,10 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Autocomplete, Avatar, Box, CircularProgress, IconButton, TextField, Typography } from '@mui/material';
+import { Autocomplete, Avatar, Box, CircularProgress, TextField, Typography } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import StarIcon from '@mui/icons-material/Star';
-import StarBorderIcon from '@mui/icons-material/StarBorder';
 import { useRtaSummonerSearch } from '@/features/rta/hooks/useRtaData';
 import { useRtaSummonerSessionSearchLists } from '@/features/rta/hooks/useRtaSummonerSessionSearchLists';
 import { filterSessionBookmarks } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
@@ -20,6 +18,13 @@ function pickWizardId(row: RtaSummonerSearchHit): string {
 
 function pickWizardName(row: RtaSummonerSearchHit): string {
   return String(row.wizard_name ?? '').trim() || '—';
+}
+
+function pickChannelUid(row: RtaSummonerSearchHit): string | undefined {
+  const c = row.channel_uid;
+  if (c == null) return undefined;
+  const t = String(c).trim();
+  return t === '' ? undefined : t;
 }
 
 function countryFlagSrc(country: string | undefined): string | null {
@@ -87,6 +92,7 @@ export default function RtaSummonerSearchHeader() {
       wizardId: pickWizardId(v),
       wizardName: pickWizardName(v),
       country: v.country,
+      channelUid: pickChannelUid(v),
     };
   }, []);
 
@@ -202,18 +208,17 @@ export default function RtaSummonerSearchHeader() {
         }}
         renderOption={(props, option) => {
           const { key, ...other } = props;
-          const wid = pickWizardId(option);
           const nm = pickWizardName(option);
+          const ch = pickChannelUid(option);
           const flag = countryFlagSrc(option.country);
-          const fav = isFavorite(wid);
           return (
             <Box
               component="li"
               key={key}
               {...other}
-              sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 1, pr: 0.5 }}
+              sx={{ display: 'flex', alignItems: 'center', gap: 1, py: 0.5, pl: 1, pr: 1 }}
             >
-              <Avatar src={getSwexPlayerImageUrl(wid)} alt="" sx={{ width: 28, height: 28, flexShrink: 0 }} />
+              <Avatar src={getSwexPlayerImageUrl(ch)} alt="" sx={{ width: 28, height: 28, flexShrink: 0 }} />
               <Typography variant="body2" noWrap sx={{ flex: 1, minWidth: 0, fontWeight: 600 }}>
                 {nm}
               </Typography>
@@ -229,24 +234,6 @@ export default function RtaSummonerSearchHeader() {
                   —
                 </Typography>
               )}
-              <IconButton
-                type="button"
-                size="small"
-                tabIndex={-1}
-                aria-label={fav ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  toggleFavorite(toBookmark(option));
-                }}
-                sx={{ color: fav ? 'warning.main' : 'action.active', flexShrink: 0, p: 0.5 }}
-              >
-                {fav ? <StarIcon sx={{ fontSize: 18 }} /> : <StarBorderIcon sx={{ fontSize: 18 }} />}
-              </IconButton>
             </Box>
           );
         }}

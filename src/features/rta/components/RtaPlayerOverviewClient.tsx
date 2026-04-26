@@ -864,8 +864,8 @@ function MatchRow({
   const starSizeRow = isMdUp ? 16 : 10;
   const { match, p, won } = c;
   const iAmP1 = String(p.myId) === String(match.p1Id);
-  const myGridSide: 'p1' | 'p2' = iAmP1 ? 'p1' : 'p2';
-  const oppGridSide: 'p1' | 'p2' = iAmP1 ? 'p2' : 'p1';
+  const myFirstPickInDraft = (iAmP1 ? match.p1FirstPick : match.p2FirstPick) === '1';
+  const oppFirstPickInDraft = (iAmP1 ? match.p2FirstPick : match.p1FirstPick) === '1';
   const oppHref = `/rta/player/${encodeURIComponent(p.oppId)}`;
   const when = formatMatchWhenUnderResult(match.date);
 
@@ -1078,7 +1078,7 @@ function MatchRow({
                 minWidth: 0,
               }}
             >
-              <RtaUnitPickGrid units={p.myUnits} side={myGridSide} />
+              <RtaUnitPickGrid units={p.myUnits} isFirstPickInDraft={myFirstPickInDraft} rowAlign="start" />
             </Box>
             <Typography
               variant="h6"
@@ -1101,7 +1101,7 @@ function MatchRow({
                 minWidth: 0,
               }}
             >
-              <RtaUnitPickGrid units={p.oppUnits} side={oppGridSide} />
+              <RtaUnitPickGrid units={p.oppUnits} isFirstPickInDraft={oppFirstPickInDraft} rowAlign="end" />
             </Box>
           </Box>
         </Stack>

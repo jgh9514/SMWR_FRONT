@@ -36,7 +36,7 @@ import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSe
 import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { showToast } from '@/shared/lib/notification';
-import { addRtaSessionRecent } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
+import { addRtaSessionRecent, mergeRtaSessionBookmarkFromServer } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
 
 
 type NavItem = {
@@ -122,6 +122,11 @@ export default function RtaPlayerDetailShell({
       wizardId: w,
       wizardName: name,
       channelUid: ch != null && ch !== '' ? String(ch) : undefined,
+      country: s.country,
+    });
+    mergeRtaSessionBookmarkFromServer(w, {
+      channelUid: ch,
+      wizardName: s.wizard_name,
       country: s.country,
     });
     sessionRecentForWizardRef.current = w;

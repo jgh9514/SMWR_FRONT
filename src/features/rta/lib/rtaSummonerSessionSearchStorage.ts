@@ -8,6 +8,8 @@ const PREFIX = 'smw:rta:home:sess:';
 
 const RECENT_KEY = `${PREFIX}recent:v${STORAGE_VERSION}`;
 const FAV_KEY = `${PREFIX}fav:v${STORAGE_VERSION}`;
+/** `useSyncExternalStore` 스냅샷 — 모듈 인스턴스가 여러 개여도 sessionStorage 한 곳만 본다 */
+const STORE_REV_KEY = `${PREFIX}storeRev:v${STORAGE_VERSION}`;
 
 export type RtaSummonerSessionBookmark = {
   wizardId: string;
@@ -19,11 +21,28 @@ export type RtaSummonerSessionBookmark = {
 
 type StoredV1 = { v: number; list: RtaSummonerSessionBookmark[] };
 
-/** `useSyncExternalStore`용 — 저장될 때마다 증가(리스너 등록 전에 쓰여도 다음 스냅샷이 달라짐) */
-let sessionSearchStoreRevision = 0;
+function readStoreRevision(): number {
+  const s = getStorage();
+  if (!s) return 0;
+  const raw = s.getItem(STORE_REV_KEY);
+  const n = raw != null ? parseInt(raw, 10) : 0;
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
 
+function bumpStoreRevision(): void {
+  const s = getStorage();
+  if (!s) return;
+  const next = readStoreRevision() + 1;
+  try {
+    s.setItem(STORE_REV_KEY, String(next));
+  } catch {
+    // quota
+  }
+}
+
+/** `useSyncExternalStore` getSnapshot — 번들 청크별 전역 변수 대신 sessionStorage 기준 */
 export function getRtaSessionSearchStoreRevision(): number {
-  return sessionSearchStoreRevision;
+  return readStoreRevision();
 }
 
 function notifyRtaSessionSearchStorageChanged() {
@@ -70,7 +89,7 @@ function writeList(key: string, list: RtaSummonerSessionBookmark[]) {
   const body: StoredV1 = { v: 1, list };
   try {
     s.setItem(key, JSON.stringify(body));
-    sessionSearchStoreRevision += 1;
+    bumpStoreRevision();
     notifyRtaSessionSearchStorageChanged();
   } catch {
     // quota
@@ -146,6 +165,60 @@ export function filterSessionBookmarks(
   const q = searchQuery.trim().toLowerCase();
   if (q === '') return list;
   return list.filter((b) => b.wizardName.toLowerCase().includes(q));
+}
+
+/**
+ * 플레이어 요약 등 서버에서 받은 `channel_uid`·이름·국가로
+ * 최근검색·즐겨찾기에 동일 `wizardId` 행을 보강한다(즐겨찾기 썸네일 누락 방지).
+ */
+export function mergeRtaSessionBookmarkFromServer(
+  wizardId: string,
+  opts: {
+    channelUid?: string | number | null;
+    wizardName?: string | null;
+    country?: string | null;
+  },
+): void {
+  const w = wizardId.trim();
+  if (!w) return;
+
+  const chRaw = opts.channelUid;
+  const ch =
+    chRaw != null && String(chRaw).trim() !== '' ? String(chRaw).trim() : undefined;
+  const name = opts.wizardName?.trim();
+  const co = opts.country?.trim();
+
+  const patchList = (list: RtaSummonerSessionBookmark[]): RtaSummonerSessionBookmark[] | null => {
+    let any = false;
+    const next = list.map((x) => {
+      if (x.wizardId !== w) return x;
+      let changed = false;
+      const nu = { ...x };
+      if (ch && nu.channelUid !== ch) {
+        nu.channelUid = ch;
+        changed = true;
+      }
+      if (name && name !== '' && name !== '—' && nu.wizardName !== name) {
+        nu.wizardName = name;
+        changed = true;
+      }
+      if (co && co !== '' && co !== '—' && nu.country !== co) {
+        nu.country = co;
+        changed = true;
+      }
+      if (changed) {
+        any = true;
+        nu.updatedAt = Date.now();
+      }
+      return nu;
+    });
+    return any ? next : null;
+  };
+
+  const r = patchList(readRtaSessionRecent());
+  if (r) writeList(RECENT_KEY, r);
+  const f = patchList(readRtaSessionFavorites());
+  if (f) writeList(FAV_KEY, f);
 }
 
 /** `useSyncExternalStore` subscribe — window 전용 */
