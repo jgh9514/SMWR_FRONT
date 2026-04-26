@@ -24,6 +24,12 @@ const SUMMONER_RANKING_PATH = '/rta/summoner-ranking';
 
 type PreviewBlock = { type?: string; rows?: unknown } | null | undefined;
 
+function rtaPlayerDetailHref(wizardId: string | undefined | null): string | null {
+  const id = wizardId != null ? String(wizardId).trim() : '';
+  if (!id) return null;
+  return `/rta/player/${encodeURIComponent(id)}`;
+}
+
 function linkPreviewRows<T>(block: PreviewBlock, expected: 'solo' | 'duo' | 'trio'): T[] {
   if (block == null) return [];
   if (!Array.isArray((block as { rows?: unknown }).rows)) return [];
@@ -410,10 +416,11 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                     {rankRows.map((row) => {
                       const wid = row.wizard_id != null ? String(row.wizard_id).trim() : '';
                       const name = (row.wizard_name && String(row.wizard_name).trim() !== '' ? row.wizard_name : wid) || '—';
+                      const playerHref = rtaPlayerDetailHref(wid);
                       const score = toNum(row.score, 0);
                       const c = row.country && String(row.country).trim() !== '' ? String(row.country).trim() : '—';
-                      return (
-                        <PreviewListRowLink key={wid || name} href={SUMMONER_RANKING_PATH}>
+                      const rowContent = (
+                        <>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, flex: 1, mr: 1 }}>
                             <Box
                               component="img"
@@ -448,7 +455,16 @@ export default function RtaDashboardLinkListsGrid({ seasonCode, seasonId, embedd
                               {score.toLocaleString()}
                             </Typography>
                           </Box>
+                        </>
+                      );
+                      return playerHref ? (
+                        <PreviewListRowLink key={wid || name} href={playerHref}>
+                          {rowContent}
                         </PreviewListRowLink>
+                      ) : (
+                        <Box key={name} component="li" sx={rowLinkInnerSx}>
+                          {rowContent}
+                        </Box>
                       );
                     })}
                   </Stack>

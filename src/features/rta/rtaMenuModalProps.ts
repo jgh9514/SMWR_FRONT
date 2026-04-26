@@ -3,26 +3,37 @@ import type { MenuProps } from '@mui/material';
 /**
  * MUI `Select` / `Menu` 공통 MenuProps.
  *
- * "Blocked aria-hidden ... descendant retained focus" 수정.
+ * Chrome "Blocked aria-hidden ... descendant retained focus" 완화.
  *
- * 원인: open=false → Modal이 aria-hidden 즉시 적용 → exit 트랜지션 진행 중에 MenuItem이
- *       포커스 유지. onExit/onExiting 은 aria-hidden 적용 이후에 호출되므로 효과 없음.
+ * 원인: 닫힘 시 `Modal` 루트에 `aria-hidden`이 먼지어가는 찰나에 `MenuItem`이 아직 focus를 유지.
  *
- * 수정: MenuProps 자체에 onClose 를 두지 않고, 호출 측(Select onChange, Menu onClose)에서
- *       상태 변경 직전에 blur 를 호출해야 한다. ← 각 컴포넌트에서 blurFocusedMenuItem() 호출.
- *       여기서는 closeAfterTransition 으로 DOM 정리 타이밍만 보강한다.
+ * 대응:
+ * - `TransitionProps.onExiting`에서 blur (닫힘 트랜지션 시작 직전)
+ * - `disableEnforceFocus` / `disableRestoreFocus`로 포커스 트랜지션과의 경합 완화
+ * - `Select` `onChange` 직전 `blurFocusedMenuItem()` (각 RTA 셀렉트에서 유지)
  */
 export function blurFocusedMenuItem() {
   if (typeof document === 'undefined') return;
-  const active = document.activeElement;
-  if (active instanceof HTMLElement) {
-    active.blur();
-  }
+  const run = () => {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement) {
+      el.blur();
+    }
+  };
+  run();
+  queueMicrotask(run);
 }
 
 export const RTA_SELECT_MENU_PROPS: Partial<MenuProps> = {
   disableScrollLock: true,
   closeAfterTransition: true,
+  disableEnforceFocus: true,
+  disableRestoreFocus: true,
+  TransitionProps: {
+    onExiting: () => {
+      blurFocusedMenuItem();
+    },
+  },
   slotProps: {
     root: {
       closeAfterTransition: true,
