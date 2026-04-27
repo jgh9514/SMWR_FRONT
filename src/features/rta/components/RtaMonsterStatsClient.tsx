@@ -1468,3 +1468,17 @@ export default function RtaMonsterStatsClient() {
     </Container>
   );
 }
+
+/** 소환사 픽 탭 등에서 몬스터 통계(솔로) UI 재사용 */
+export type { MonsterStatsSortKey };
+export {
+  MONSTER_STATS_SORT_KEYS,
+  monsterStatsSortToSoloField,
+  MonsterStatsSortSelect,
+  MonsterCell,
+  StatsEmptyState,
+  TABLE_HEAD_CELL_SX,
+  NUMERIC_CELL_SX,
+  formatPercentage,
+  toNum,
+};

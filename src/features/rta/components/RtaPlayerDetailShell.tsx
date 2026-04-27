@@ -26,7 +26,12 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
-import { useRtaPlayerSummary, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
+import {
+  resolveDefaultRtaSeasonCode,
+  resolveRtaSeasonIdForApi,
+  useRtaPlayerSummary,
+  useRtaSeasonSelect,
+} from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { RtaPlayerSeasonContext } from '@/features/rta/context/RtaPlayerSeasonContext';
 import type { RtaPlayerSummary } from '@/features/rta/types/rta';
@@ -96,9 +101,21 @@ export default function RtaPlayerDetailShell({
     }));
   }, [seasonsData]);
 
+  /** RSC는 `POST .../summary` body 없음(서버 기본 시즌). 기본 시즌 선택일 때만 클라 쿼리에 시드한다. */
+  const rscSummaryInitial = useMemo((): RtaPlayerSummary | undefined => {
+    if (initialSummary == null) return undefined;
+    const rows = seasonsData?.seasons;
+    if (!rows?.length) return undefined;
+    const defaultCode = resolveDefaultRtaSeasonCode(seasonsData, '');
+    const defaultSid = resolveRtaSeasonIdForApi(rows, defaultCode);
+    if (defaultSid == null || seasonIdForApi == null) return undefined;
+    if (seasonIdForApi !== defaultSid) return undefined;
+    return initialSummary;
+  }, [initialSummary, seasonsData, seasonIdForApi]);
+
   const { data: summary, refetch, isFetching } = useRtaPlayerSummary(
     wizardId,
-    initialSummary,
+    rscSummaryInitial,
     seasonSelectValue,
     { seasonId: seasonIdForApi },
   );
@@ -393,7 +410,6 @@ export default function RtaPlayerDetailShell({
                 key={item.href}
                 component={Link}
                 href={item.href}
-                prefetch={false}
                 variant="text"
                 size="small"
                 startIcon={<Icon sx={{ fontSize: 18 }} />}

@@ -439,3 +439,17 @@ export interface RtaPlayerMonsterUsageResponse {
   rows: RtaPlayerMonsterUsageRow[];
 }
 
+/** POST /rta/player/{wizardId}/owned-box — rta_agg_summoner_owned_box_snap */
+export interface RtaPlayerOwnedBoxRow {
+  unit_master_id: number;
+  copy_count: number;
+  monster_name?: string | null;
+  monster_image?: string | null;
+  monster_elemental?: string | null;
+}
+
+export interface RtaPlayerOwnedBoxResponse {
+  wizardId?: string;
+  rows: RtaPlayerOwnedBoxRow[];
+}
+

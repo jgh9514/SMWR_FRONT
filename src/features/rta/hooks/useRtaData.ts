@@ -34,6 +34,7 @@ import type {
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
   RtaPlayerMonsterUsageResponse,
+  RtaPlayerOwnedBoxResponse,
   RtaRatingGradeRule,
   RtaSeasonRow,
   RtaSeasonsResponse,
@@ -531,7 +532,11 @@ export const useRtaDashboardPreviewSummoner = (
     { enabled: true, staleTime: RTA_MONSTER_STATS_STALE_MS, gcTime: RTA_MONSTER_STATS_GC_MS, refetchOnWindowFocus: false },
   );
 
-/** RTA 소환사 상세 헤더 요약 (서버 initialData와 병행 가능) */
+/**
+ * RTA 소환사 상세 헤더 요약 (서버 initialData와 병행 가능).
+ * - `initialData`는 RSC가 가져온 **기본 시즌** 요약일 때만 넘기는 것이 안전(시즌 변경 시 다른 season 키에 잘못 시드되지 않게 Shell에서 필터).
+ * - RSC와 함께 쓸 때 `staleTime>0`으로 마운트 직후 중복 `summary` POST를 막는다.
+ */
 export const useRtaPlayerSummary = (
   wizardId: string,
   initialData?: RtaPlayerSummary | null,
@@ -543,19 +548,24 @@ export const useRtaPlayerSummary = (
   const { seasonId, ...restOptions } = options ?? {};
   const id = wizardId?.trim() ?? '';
   const path = id ? `/rta/player/${encodeURIComponent(id)}/summary` : '/rta/player/-/summary';
+  const fromRsc = initialData != null;
   return useApiPostQuery<RtaPlayerSummary>(
     path,
     seasonBody(seasonCode, seasonId),
     {
       enabled: Boolean(id),
-      staleTime: 0,
-      gcTime: 0,
+      staleTime: fromRsc ? RTA_PLAYER_SUMMARY_RSC_STALE_MS : 0,
+      gcTime: fromRsc ? RTA_PLAYER_SUMMARY_RSC_GC_MS : 0,
       refetchOnWindowFocus: true,
-      ...(initialData != null ? { initialData } : {}),
+      ...(fromRsc ? { initialData: initialData as RtaPlayerSummary } : {}),
       ...restOptions,
     },
   );
 };
+
+/** RSC `getRtaPlayerSummaryData` 직후 하이드레이션 — staleTime 0이면 동일 API가 즉시 한 번 더 나간다. */
+const RTA_PLAYER_SUMMARY_RSC_STALE_MS = 2 * 60 * 1000;
+const RTA_PLAYER_SUMMARY_RSC_GC_MS = 10 * 60 * 1000;
 
 const RTA_PLAYER_MONSTER_USAGE_STALE_MS = 60_000;
 
@@ -575,6 +585,18 @@ export const useRtaPlayerMonsterUsage = (
   return useApiPostQuery<RtaPlayerMonsterUsageResponse>(path, seasonBody(seasonCode ?? null, options.seasonId), {
     enabled: Boolean(id) && (options.enabled !== false),
     staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+/** SWEX 보유 스냅 rta_agg_summoner_owned_box_snap (시즌 무관) */
+export const useRtaPlayerOwnedBox = (wizardId: string, options?: { enabled?: boolean }) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/owned-box` : '/rta/player/-/owned-box';
+  return useApiPostQuery<RtaPlayerOwnedBoxResponse>(path, {}, {
+    enabled: Boolean(id) && (options?.enabled !== false),
+    staleTime: 60_000,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
