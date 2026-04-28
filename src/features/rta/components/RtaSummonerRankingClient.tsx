@@ -253,14 +253,36 @@ const SummonerRankCard = memo(function SummonerRankCard({
             }}
           />
           <Stack flex={1} minWidth={0} spacing={0.25}>
-            <Typography
-              variant="body2"
-              fontWeight={800}
-              noWrap
-              title={r.wizardId ? `${r.name} (${r.wizardId})` : r.name}
-            >
-              {r.name}
-            </Typography>
+            <Stack direction="row" alignItems="center" gap={1} sx={{ minWidth: 0, width: '100%' }}>
+              <Typography
+                variant="body2"
+                fontWeight={800}
+                noWrap
+                title={r.wizardId ? `${r.name} (${r.wizardId})` : r.name}
+                sx={{ flex: 1, minWidth: 0 }}
+              >
+                {r.name}
+              </Typography>
+              <Box
+                sx={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 0.5,
+                  flexShrink: 0,
+                  ml: 'auto',
+                }}
+              >
+                <RtaRatingStarIcons rating={r.ratingId} size={14} />
+                <Typography
+                  component="span"
+                  variant="body2"
+                  fontWeight={800}
+                  sx={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {r.score.toLocaleString()}
+                </Typography>
+              </Box>
+            </Stack>
             <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
               {r.country && r.country !== '—' && /^[a-z]{2}$/i.test(r.country) ? (
                 <Box
@@ -275,20 +297,6 @@ const SummonerRankCard = memo(function SummonerRankCard({
               </Typography>
             </Stack>
           </Stack>
-        </Stack>
-
-        <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" rowGap={0.5} columnGap={1}>
-          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-            <RtaRatingStarIcons rating={r.ratingId} size={14} />
-            <Typography
-              component="span"
-              variant="body2"
-              fontWeight={800}
-              sx={{ fontVariantNumeric: 'tabular-nums' }}
-            >
-              {r.score.toLocaleString()}
-            </Typography>
-          </Box>
         </Stack>
 
         <Box sx={{ pl: 0.25 }}>

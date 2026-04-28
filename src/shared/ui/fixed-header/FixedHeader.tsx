@@ -1105,8 +1105,13 @@ export default function FixedHeader() {
                         const childActive = isNavLeafActive(child.path, pathname);
                         return (
                           <ListItem key={`${group.id}-${child.path}`} disablePadding sx={{ px: 1, mb: 0.25 }}>
-                            <ListItemButton component={Link} href={child.path} selected={childActive}
-                              sx={{ borderRadius: 2, py: 0.75, pl: 3, '&.Mui-selected': { bgcolor: 'action.selected', '&:hover': { bgcolor: 'action.selected' } }, '&:hover': { bgcolor: 'action.hover' } }}>
+                            <ListItemButton
+                              component={Link}
+                              href={child.path}
+                              selected={childActive}
+                              onClick={() => setDrawerOpen(false)}
+                              sx={{ borderRadius: 2, py: 0.75, pl: 3, '&.Mui-selected': { bgcolor: 'action.selected', '&:hover': { bgcolor: 'action.selected' } }, '&:hover': { bgcolor: 'action.hover' } }}
+                            >
                               <ListItemIcon sx={{ color: childActive ? 'primary.main' : 'text.secondary', minWidth: 36 }}>{child.icon}</ListItemIcon>
                               <ListItemText primary={child.title} primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: childActive ? 600 : 400 }} />
                             </ListItemButton>
