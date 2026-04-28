@@ -83,7 +83,10 @@ export default function MonsterDetailRtaOverviewTab({
   );
 
   const chartData = useMemo(
-    () => buildWinRateSeries(rtaDetail?.win_rate ?? 50),
+    () =>
+      buildWinRateSeries(rtaDetail?.win_rate != null && Number.isFinite(Number(rtaDetail.win_rate))
+        ? Number(rtaDetail.win_rate)
+        : 50),
     [rtaDetail?.win_rate],
   );
 
@@ -157,9 +160,19 @@ export default function MonsterDetailRtaOverviewTab({
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">승률</Typography>
-              <Typography variant="h6" fontWeight={700} color={rtaDetail.win_rate >= 50 ? 'success.main' : 'error.main'}>
-                {rtaDetail.win_rate.toFixed(2)}%
-              </Typography>
+              {rtaDetail.win_rate != null && Number.isFinite(Number(rtaDetail.win_rate)) ? (
+                <Typography
+                  variant="h6"
+                  fontWeight={700}
+                  color={Number(rtaDetail.win_rate) >= 50 ? 'success.main' : 'error.main'}
+                >
+                  {Number(rtaDetail.win_rate).toFixed(2)}%
+                </Typography>
+              ) : (
+                <Typography variant="h6" fontWeight={700} color="text.secondary">
+                  —
+                </Typography>
+              )}
             </Box>
             <Box>
               <Typography variant="caption" color="text.secondary">벤율</Typography>
@@ -174,19 +187,27 @@ export default function MonsterDetailRtaOverviewTab({
           최근 7일 승률 추이 (%)
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-          일별 집계 API 전까지 현재 승률을 기준으로 한 참고용 곡선입니다.
+          {rtaDetail.win_rate != null && Number.isFinite(Number(rtaDetail.win_rate))
+            ? '일별 집계 API 전까지 현재 승률을 기준으로 한 참고용 곡선입니다.'
+            : '시즌 승률을 집계할 수 없어(경기 미참전 등) 참고 곡선을 표시하지 않습니다.'}
         </Typography>
-        <Box sx={{ width: '100%', height: 260 }}>
-          <ResponsiveContainer>
-            <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.35} />
-              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-              <Tooltip formatter={(v) => [`${v ?? '—'}%`, '승률']} />
-              <Line type="monotone" dataKey="win_rate" stroke="#1976d2" strokeWidth={2} dot />
-            </LineChart>
-          </ResponsiveContainer>
-        </Box>
+        {rtaDetail.win_rate != null && Number.isFinite(Number(rtaDetail.win_rate)) ? (
+          <Box sx={{ width: '100%', height: 260 }}>
+            <ResponsiveContainer>
+              <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.35} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
+                <Tooltip formatter={(v) => [`${v ?? '—'}%`, '승률']} />
+                <Line type="monotone" dataKey="win_rate" stroke="#1976d2" strokeWidth={2} dot />
+              </LineChart>
+            </ResponsiveContainer>
+          </Box>
+        ) : (
+          <Alert severity="info" variant="outlined" sx={{ py: 1 }}>
+            승·패가 확정된 참전 기록이 없어 곡선을 그리지 않습니다.
+          </Alert>
+        )}
       </Paper>
 
       <Box

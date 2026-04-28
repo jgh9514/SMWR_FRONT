@@ -33,6 +33,7 @@ import type {
   RtaDashboardTierDistributionResponse,
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
+  RtaMonsterPickBreakdownResponse,
   RtaPlayerMonsterUsageResponse,
   RtaPlayerOwnedBoxResponse,
   RtaRatingGradeRule,
@@ -588,6 +589,43 @@ export const useRtaPlayerMonsterUsage = (
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
+};
+
+const RTA_MONSTER_PICK_BREAKDOWN_STALE_MS = 120_000;
+
+/**
+ * 소환사×몬스터별 드래프트 슬롯 묶음(펼치기 행 용 라이브 집계).
+ */
+export const useRtaMonsterPickBreakdown = (
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null,
+  unitMasterId: number | null,
+  options?: { enabled?: boolean },
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/monster-pick-breakdown` : '/rta/player/-/monster-pick-breakdown';
+  const enabled =
+    Boolean(id) &&
+    seasonId != null &&
+    typeof seasonId === 'number' &&
+    unitMasterId != null &&
+    unitMasterId > 0 &&
+    (options?.enabled !== false);
+
+  return useApiPostQuery<RtaMonsterPickBreakdownResponse>(
+    path,
+    {
+      ...seasonBody(seasonCode ?? null, seasonId ?? null),
+      unit_master_id: unitMasterId ?? 0,
+    },
+    {
+      enabled,
+      staleTime: RTA_MONSTER_PICK_BREAKDOWN_STALE_MS,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    },
+  );
 };
 
 /** SWEX 보유 스냅 rta_agg_summoner_owned_box_snap (시즌 무관) */

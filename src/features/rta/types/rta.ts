@@ -45,9 +45,6 @@ export interface RawMatchItem {
   /** `pick_slot_no` (전체 밴/픽 턴) — `unit_names`·`unit_images`·`unit_banned`와 동일 순서 */
   p1_unit_pick_slot_no?: number[] | (string | number | null)[];
   p2_unit_pick_slot_no?: number[] | (string | number | null)[];
-  /** `monster.monster_elemental`, `unit_names` 순서와 동일 */
-  p1_unit_elementals?: string[] | null;
-  p2_unit_elementals?: string[] | null;
   p1_units_str?: string;
   p2_units_str?: string;
 }
@@ -69,23 +66,8 @@ export interface MatchItem {
   p2Score: number;
   winnerPosition: '1' | '2';
   date: string;
-  p1Units?: Array<{
-    image: string;
-    name: string;
-    banned?: boolean;
-    leader?: boolean;
-    pickSlotNo?: number;
-    /** DB `monster_elemental` 원문 — UI에서 `parseMonsterElemental` */
-    elemental?: string;
-  }>;
-  p2Units?: Array<{
-    image: string;
-    name: string;
-    banned?: boolean;
-    leader?: boolean;
-    pickSlotNo?: number;
-    elemental?: string;
-  }>;
+  p1Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean; pickSlotNo?: number }>;
+  p2Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean; pickSlotNo?: number }>;
   p1FirstPick?: string;
   p2FirstPick?: string;
 }
@@ -206,7 +188,8 @@ export interface MonsterDetail {
   monster_image?: string;
   pick_count: number;
   pick_rate: number;
-  win_rate: number;
+  /** 경기 참전 후 승·패 집계가 없으면 null (예: 즉시 밴 등) */
+  win_rate: number | null;
   ban_rate: number;
   strong_against: Array<{
     monster_id: number;
@@ -423,11 +406,13 @@ export interface RtaPlayerSummary {
   last_match_at?: string;
 }
 
-/** 소환사×시즌 RTA 몬스터 스냅 분모(`rta_agg_summoner_season_fight_snap`) */
+/** 소환사×시즌 RTA 몬스터 스냅 분모 + 시즌 참가자 기준 승률 */
 export interface RtaPlayerMonsterFightSnapshot {
   match_cnt?: number;
   non_ban_pick_cnt?: number;
   ban_event_cnt?: number;
+  /** `rta_match_participant` 집계 시즌 승률(%) */
+  season_win_rate_pct?: number | null;
   computed_at?: string;
 }
 
@@ -439,7 +424,8 @@ export interface RtaPlayerMonsterUsageRow {
   win_cnt: number;
   lose_cnt: number;
   first_pick_cnt: number;
-  owned_copy_count?: number | null;
+  /** 픽횟수 컬럼 값 = pick_cnt + ban_cnt (WAS actual_pick_cnt와 동일 의도) */
+  actual_pick_cnt: number;
   monster_name?: string | null;
   monster_image?: string | null;
   monster_elemental?: string | null;
@@ -455,6 +441,24 @@ export interface RtaPlayerMonsterUsageResponse {
   wizardId?: string;
   fight: RtaPlayerMonsterFightSnapshot | null;
   rows: RtaPlayerMonsterUsageRow[];
+}
+
+/** POST /rta/player/{wizardId}/monster-pick-breakdown — 라이브 슬롯 버킷 */
+export interface RtaMonsterPickBucketRow {
+  bucket_id?: number | null;
+  bucket_label?: string | null;
+  event_cnt?: number | null;
+  field_cnt?: number | null;
+  win_cnt?: number | null;
+  pick_share_pct?: number | null;
+  win_rate_pct?: number | null;
+}
+
+export interface RtaMonsterPickBreakdownResponse {
+  seasonId?: number | null;
+  wizardId?: string | null;
+  unitMasterId?: number | null;
+  buckets?: RtaMonsterPickBucketRow[] | null;
 }
 
 /** POST /rta/player/{wizardId}/owned-box — rta_agg_summoner_owned_box_snap */

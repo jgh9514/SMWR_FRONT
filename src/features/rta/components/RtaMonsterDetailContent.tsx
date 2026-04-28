@@ -88,12 +88,18 @@ export default function RtaMonsterDetailContent({
         <Typography variant="caption" color="text.secondary">
           승률
         </Typography>
-        <Typography
-          variant="h6"
-          sx={{ fontWeight: 600, color: data.win_rate >= 50 ? 'success.main' : 'error.main' }}
-        >
-          {formatPercentage(data.win_rate)}
-        </Typography>
+        {data.win_rate != null && Number.isFinite(Number(data.win_rate)) ? (
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 600, color: Number(data.win_rate) >= 50 ? 'success.main' : 'error.main' }}
+          >
+            {formatPercentage(Number(data.win_rate))}
+          </Typography>
+        ) : (
+          <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+            —
+          </Typography>
+        )}
       </Box>
       <Box>
         <Typography variant="caption" color="text.secondary">

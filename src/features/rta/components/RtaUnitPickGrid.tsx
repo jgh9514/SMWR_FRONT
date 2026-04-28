@@ -2,8 +2,6 @@
 
 import { Box, Stack, Avatar, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import AttributeElementIcon from '@/shared/ui/attribute-element-icon/AttributeElementIcon';
-import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 
 type Unit = {
@@ -12,7 +10,6 @@ type Unit = {
   banned?: boolean;
   leader?: boolean;
   pickSlotNo?: number;
-  elemental?: string;
 };
 
 /**
@@ -163,7 +160,6 @@ function PickSlotTile({
 }) {
   const leader = unit.leader === true;
   const banned = unit.banned === true;
-  const elementAttr = parseMonsterElemental(unit.elemental);
 
   /* 리더: 빨간 테두리 / 벤: 테두리 없음(투명) / 일반: 연한 테두리 */
   const borderSpec = banned
@@ -244,21 +240,6 @@ function PickSlotTile({
               '& .MuiAvatar-img': { objectFit: 'cover' },
             }}
           />
-          {elementAttr != null && (
-            <Box
-              sx={{
-                position: 'absolute',
-                top: 2,
-                right: 2,
-                zIndex: 3,
-                pointerEvents: 'none',
-                lineHeight: 0,
-                filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.55))',
-              }}
-            >
-              <AttributeElementIcon attribute={elementAttr} size={14} titleAccess={`속성 ${elementAttr}`} />
-            </Box>
-          )}
           {banned && <BanMonOverlayLayers />}
         </Box>
         {leader && (
