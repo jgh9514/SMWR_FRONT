@@ -160,10 +160,24 @@ jobs:
               }
             fi
 
-            ${KUBECTL} apply -f k8s/deployment.yaml --request-timeout=180s || {
-              echo "ERROR: k8s/deployment.yaml 적용 실패"
-              exit 1
+            # Deployment apply는 strategic-merge 패치로 API 서버 부하·etcd 지연 시 Timeout 날 수 있음 (특히 단일노드 k3s)
+            apply_deployment() {
+              ${KUBECTL} apply -f k8s/deployment.yaml --request-timeout=300s
             }
+            DEPLOY_APPLY_OK=false
+            for attempt in 1 2 3; do
+              if apply_deployment; then
+                DEPLOY_APPLY_OK=true
+                break
+              fi
+              echo "WARNING: k8s/deployment.yaml apply 실패 (${attempt}/3). 20초 대기 후 재시도..."
+              ${KUBECTL} get deployment "${DEPLOY_NAME}" -o wide --request-timeout=30s 2>/dev/null || true
+              sleep 20
+            done
+            if [ "$DEPLOY_APPLY_OK" != "true" ]; then
+              echo "ERROR: k8s/deployment.yaml 적용 실패 (3회). EC2에서: sudo k3s kubectl get pods -A; journalctl -u k3s -n 80"
+              exit 1
+            fi
 
             if [ -f k8s/ingress.yaml ]; then
               ${KUBECTL} apply -f k8s/ingress.yaml --request-timeout=180s || {

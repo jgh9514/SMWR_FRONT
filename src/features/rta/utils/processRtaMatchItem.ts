@@ -38,6 +38,7 @@ function createUnits(
   leaderUnit?: number,
   unitBannedFlags?: boolean[] | (boolean | string | number)[],
   unitPickSlotNos?: unknown,
+  unitElementals?: string[] | null,
 ) {
   if (!Array.isArray(unitNames) || !Array.isArray(unitImages) || unitNames.length === 0) {
     return [];
@@ -45,16 +46,23 @@ function createUnits(
 
   const flags = normalizeUnitBannedFlags(unitBannedFlags);
 
-  return unitNames.map((name, i) => ({
-    name: name || `Unit ${i + 1}`,
-    image: unitImages[i] || getMonsterImageUrl('/images/default-unit.png'),
-    banned:
-      flags != null && i < flags.length
-        ? flags[i] === true
-        : bannedUnit === i + 1,
-    leader: leaderUnit === i + 1,
-    pickSlotNo: pickSlotNoAt(unitPickSlotNos, i),
-  }));
+  return unitNames.map((name, i) => {
+    const rawEl =
+      Array.isArray(unitElementals) && i < unitElementals.length ? unitElementals[i] : undefined;
+    const elemental =
+      rawEl != null && String(rawEl).trim() !== '' ? String(rawEl).trim() : undefined;
+    return {
+      name: name || `Unit ${i + 1}`,
+      image: unitImages[i] || getMonsterImageUrl('/images/default-unit.png'),
+      banned:
+        flags != null && i < flags.length
+          ? flags[i] === true
+          : bannedUnit === i + 1,
+      leader: leaderUnit === i + 1,
+      pickSlotNo: pickSlotNoAt(unitPickSlotNos, i),
+      ...(elemental != null ? { elemental } : {}),
+    };
+  });
 }
 
 export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
@@ -69,6 +77,7 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p1_leader_unit,
       match.p1_unit_banned,
       match.p1_unit_pick_slot_no,
+      match.p1_unit_elementals,
     ),
     p2Units: createUnits(
       match.p2_unit_names,
@@ -77,6 +86,7 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p2_leader_unit,
       match.p2_unit_banned,
       match.p2_unit_pick_slot_no,
+      match.p2_unit_elementals,
     ),
     p1Id: String(match.p1_wizard_id ?? ''),
     p2Id: String(match.p2_wizard_id ?? ''),

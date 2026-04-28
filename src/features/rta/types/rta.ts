@@ -45,6 +45,9 @@ export interface RawMatchItem {
   /** `pick_slot_no` (전체 밴/픽 턴) — `unit_names`·`unit_images`·`unit_banned`와 동일 순서 */
   p1_unit_pick_slot_no?: number[] | (string | number | null)[];
   p2_unit_pick_slot_no?: number[] | (string | number | null)[];
+  /** `monster.monster_elemental`, `unit_names` 순서와 동일 */
+  p1_unit_elementals?: string[] | null;
+  p2_unit_elementals?: string[] | null;
   p1_units_str?: string;
   p2_units_str?: string;
 }
@@ -66,8 +69,23 @@ export interface MatchItem {
   p2Score: number;
   winnerPosition: '1' | '2';
   date: string;
-  p1Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean; pickSlotNo?: number }>;
-  p2Units?: Array<{ image: string; name: string; banned?: boolean; leader?: boolean; pickSlotNo?: number }>;
+  p1Units?: Array<{
+    image: string;
+    name: string;
+    banned?: boolean;
+    leader?: boolean;
+    pickSlotNo?: number;
+    /** DB `monster_elemental` 원문 — UI에서 `parseMonsterElemental` */
+    elemental?: string;
+  }>;
+  p2Units?: Array<{
+    image: string;
+    name: string;
+    banned?: boolean;
+    leader?: boolean;
+    pickSlotNo?: number;
+    elemental?: string;
+  }>;
   p1FirstPick?: string;
   p2FirstPick?: string;
 }

@@ -1,6 +1,9 @@
 'use client';
 
 import { Box, Stack, Avatar, Typography } from '@mui/material';
+import { alpha } from '@mui/material/styles';
+import AttributeElementIcon from '@/shared/ui/attribute-element-icon/AttributeElementIcon';
+import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 
 type Unit = {
@@ -9,6 +12,7 @@ type Unit = {
   banned?: boolean;
   leader?: boolean;
   pickSlotNo?: number;
+  elemental?: string;
 };
 
 /**
@@ -106,37 +110,47 @@ function showSeonPickBadge(
   return unitIndex === 0;
 }
 
-function BanMonOverlay() {
+function BanMonOverlayLayers() {
   return (
-    <Box
-      sx={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'rgba(136, 19, 55, 0.5)',
-        borderRadius: 1,
-        zIndex: 1,
-        pointerEvents: 'none',
-      }}
-      aria-hidden
-    >
+    <>
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          bgcolor: 'rgba(0, 0, 0, 0.2)',
+          borderRadius: 'inherit',
+          zIndex: 1,
+          pointerEvents: 'none',
+        }}
+        aria-hidden
+      />
       <Box
         component="svg"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="2.25"
         strokeLinecap="round"
         strokeLinejoin="round"
-        sx={{ width: { xs: 16, sm: 20 }, height: { xs: 16, sm: 20 }, color: '#fb7185' }}
+        sx={{
+          position: 'absolute',
+          right: '2px',
+          bottom: '2px',
+          display: 'block',
+          width: { xs: 15, sm: 17 },
+          height: { xs: 15, sm: 17 },
+          zIndex: 2,
+          color: 'rgba(251, 113, 133, 0.98)',
+          filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.75))',
+          pointerEvents: 'none',
+        }}
+        aria-hidden
       >
         <path d="M4.929 4.929 19.07 19.071" />
         <circle cx="12" cy="12" r="10" />
       </Box>
-    </Box>
+    </>
   );
 }
 
@@ -149,10 +163,14 @@ function PickSlotTile({
 }) {
   const leader = unit.leader === true;
   const banned = unit.banned === true;
+  const elementAttr = parseMonsterElemental(unit.elemental);
 
-  const ring = banned
-    ? '0 0 0 2px rgba(244, 63, 94, 0.4)'
-    : '0 0 0 2px rgba(255, 255, 255, 0.1)';
+  /* 리더: 빨간 테두리 / 벤: 테두리 없음(투명) / 일반: 연한 테두리 */
+  const borderSpec = banned
+    ? '2px solid transparent'
+    : leader
+      ? '2px solid rgba(211, 47, 47, 0.92)'
+      : '2px solid rgba(255, 255, 255, 0.22)';
 
   return (
     <Box sx={{ position: 'relative' }} title={leader ? `${unit.name} (리더)` : unit.name}>
@@ -191,59 +209,85 @@ function PickSlotTile({
         sx={(theme) => ({
           position: 'relative',
           borderRadius: 1,
-          overflow: 'hidden',
-          bgcolor: 'rgba(0,0,0,0.4)',
+          overflow: 'visible',
+          boxSizing: 'border-box',
+          border: borderSpec,
+          bgcolor:
+            theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.1)',
           width: { xs: 36, sm: 40 },
           height: { xs: 36, sm: 40 },
-          boxShadow: ring,
           flexShrink: 0,
-          transition: 'box-shadow 0.2s, transform 0.2s',
+          transition: 'border-color 0.2s, transform 0.2s, filter 0.2s',
           '@media (hover: hover)': {
             '&:hover': {
-              boxShadow: `${ring}, 0 0 0 2px ${theme.palette.mode === 'dark' ? 'rgba(99, 102, 241, 0.55)' : 'rgba(37, 99, 235, 0.45)'}`,
-              transform: 'scale(1.05)',
+              borderColor: banned
+                ? 'transparent'
+                : leader
+                  ? 'rgba(239, 68, 68, 0.98)'
+                  : alpha(theme.palette.primary.main, 0.55),
+              filter: theme.palette.mode === 'dark' ? 'brightness(1.12)' : 'brightness(1.05)',
+              transform: 'scale(1.06)',
             },
           },
         })}
       >
-        <Avatar
-          src={getMonsterImageUrl(unit.image)}
-          alt={unit.name}
-          variant="rounded"
-          sx={{
-            width: '100%',
-            height: '100%',
-            borderRadius: 1,
-            border: 'none',
-            '& .MuiAvatar-img': { objectFit: 'cover' },
-          }}
-        />
-        {banned && <BanMonOverlay />}
+        <Box sx={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 1 }}>
+          <Avatar
+            src={getMonsterImageUrl(unit.image)}
+            alt={unit.name}
+            variant="rounded"
+            sx={{
+              width: '100%',
+              height: '100%',
+              borderRadius: 1,
+              border: 'none',
+              '& .MuiAvatar-img': { objectFit: 'cover' },
+            }}
+          />
+          {elementAttr != null && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                zIndex: 3,
+                pointerEvents: 'none',
+                lineHeight: 0,
+                filter: 'drop-shadow(0 0 1px rgba(0,0,0,0.55))',
+              }}
+            >
+              <AttributeElementIcon attribute={elementAttr} size={14} titleAccess={`속성 ${elementAttr}`} />
+            </Box>
+          )}
+          {banned && <BanMonOverlayLayers />}
+        </Box>
         {leader && (
           <Box
             sx={{
               position: 'absolute',
-              left: 2,
-              bottom: 2,
-              width: { xs: 12, sm: 14 },
-              height: { xs: 12, sm: 14 },
-              backgroundColor: '#d32f2f',
+              left: '-6px',
+              bottom: '-6px',
+              width: { xs: 13, sm: 15 },
+              height: { xs: 13, sm: 15 },
+              backgroundColor: '#c62828',
               clipPath: 'polygon(0% 0%, 100% 0%, 100% 70%, 50% 100%, 0% 70%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 2px 1px rgba(255, 255, 255, 0.8)',
-              zIndex: 3,
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.35)',
+              zIndex: 4,
+              pointerEvents: 'none',
             }}
             aria-hidden
           >
             <Typography
               sx={{
+                position: 'relative',
+                top: -0.75,
                 color: '#fff',
                 fontSize: { xs: '7px', sm: '8px' },
                 fontWeight: 'bold',
                 lineHeight: 1,
-                textShadow: '0 0 1px rgba(255, 255, 255, 0.8)',
               }}
             >
               L
@@ -294,7 +338,8 @@ export default function RtaUnitPickGrid({
         flexWrap: 'nowrap',
         overflow: 'auto',
         direction: 'ltr',
-        py: 0.25,
+        pt: 0.25,
+        pb: '10px',
       }}
     >
       {groups.map((col, colIdx) => {

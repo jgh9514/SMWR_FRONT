@@ -136,6 +136,8 @@ type ChartMode = 'daily' | 'match';
 
 export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string }) {
   const theme = useTheme();
+  const picksHref = `/rta/player/${encodeURIComponent(wizardId)}/picks`;
+  const opponentsHref = `/rta/player/${encodeURIComponent(wizardId)}/opponents`;
   const { seasonCode, seasonId } = useRtaPlayerSeason();
   const { data: rankCutData } = useRtaDashboardRankCutoff(seasonCode, seasonId);
   const { data: summary } = useRtaPlayerSummary(wizardId, undefined, seasonCode, { seasonId });
@@ -679,7 +681,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
           <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
             <GpsFixedIcon color="primary" fontSize="small" />
             <Typography variant="subtitle2" fontWeight={700}>
-              자주 사용하는 몬스터
+              사용 몬스터
             </Typography>
           </Stack>
           <Stack spacing={1}>
@@ -718,14 +720,24 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
               })
             )}
           </Stack>
+          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
+            <Button component={Link} href={picksHref} variant="outlined" size="small">
+              더보기
+            </Button>
+          </Box>
         </Card>
 
         <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
           <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
             <GroupsIcon color="primary" fontSize="small" />
-            <Typography variant="subtitle2" fontWeight={700}>
-              최근 20판 추이
-            </Typography>
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} component="div">
+                라이벌
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                최근 {LAST_N_GAMES}판 상대
+              </Typography>
+            </Box>
           </Stack>
           <Stack spacing={1}>
             {last20VsOpponents.sampleSize === 0 ? (
@@ -782,6 +794,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
               })
             )}
           </Stack>
+          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
+            <Button component={Link} href={opponentsHref} variant="outlined" size="small">
+              더보기
+            </Button>
+          </Box>
         </Card>
       </Stack>
 
@@ -789,32 +806,31 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       <Stack spacing={2}>
         <Card variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: 2 }}>
           <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            alignItems={{ xs: 'flex-start', sm: 'center' }}
+            direction="row"
+            alignItems="center"
             justifyContent="space-between"
-            gap={1.5}
-            sx={{ mb: 2 }}
+            sx={{ mb: 2, width: '100%', minWidth: 0, gap: 1 }}
           >
-            <Typography variant="subtitle2" fontWeight={700}>
+            <Typography variant="subtitle2" fontWeight={700} sx={{ flexShrink: 0 }}>
               내 경기
             </Typography>
             <Stack
               direction="row"
               alignItems="center"
-              gap={2}
-              flexWrap="wrap"
-              sx={{ width: { xs: '100%', sm: 'auto' }, rowGap: 1 }}
+              flexWrap="nowrap"
+              gap={{ xs: 0.75, sm: 2 }}
+              sx={{ flexShrink: 0, minWidth: 0 }}
             >
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                 승률
               </Typography>
-              <Typography variant="body2" fontWeight={800} color="success.main">
+              <Typography variant="body2" fontWeight={800} color="success.main" sx={{ whiteSpace: 'nowrap' }}>
                 {matchCount > 0 ? `${((winCount / matchCount) * 100).toFixed(1)}%` : '—'}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
                 총
               </Typography>
-              <Typography variant="body2" fontWeight={800}>
+              <Typography variant="body2" fontWeight={800} sx={{ whiteSpace: 'nowrap' }}>
                 {totalFromSummary || loadedTotal}
               </Typography>
             </Stack>

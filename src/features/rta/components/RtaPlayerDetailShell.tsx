@@ -14,6 +14,8 @@ import {
   MenuItem,
   Select,
   Stack,
+  Tab,
+  Tabs,
   Typography,
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
@@ -179,6 +181,11 @@ export default function RtaPlayerDetailShell({
     [pathname],
   );
 
+  const activeTabIndex = useMemo(() => {
+    const idx = navItems.findIndex((item) => isTabActive(item.href));
+    return idx >= 0 ? idx : 0;
+  }, [navItems, isTabActive]);
+
   const onRefresh = async () => {
     try {
       await refetch();
@@ -189,12 +196,20 @@ export default function RtaPlayerDetailShell({
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-      <PageHeader title={displayName} backPath="/rta/summoner-ranking" />
+    <Container
+      maxWidth="lg"
+      sx={{
+        py: { xs: 1.25, md: 4 },
+        px: { xs: 1.25, sm: 3 },
+      }}
+    >
+      <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
+        <PageHeader title={displayName} backPath="/rta/summoner-ranking" />
+      </Box>
 
       <Box
         sx={{
-          p: { xs: 2, sm: 3 },
+          p: { xs: 1.25, sm: 3 },
           borderRadius: 2,
           border: '1px solid',
           borderColor: 'divider',
@@ -204,13 +219,13 @@ export default function RtaPlayerDetailShell({
       >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
-          spacing={3}
+          spacing={{ xs: 2, sm: 3 }}
           alignItems={{ xs: 'center', sm: 'flex-start' }}
           justifyContent="space-between"
         >
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
-            spacing={3}
+            spacing={{ xs: 2, sm: 3 }}
             alignItems={{ xs: 'center', sm: 'flex-start' }}
             sx={{ flex: 1, minWidth: 0, width: '100%' }}
           >
@@ -327,8 +342,13 @@ export default function RtaPlayerDetailShell({
             </Stack>
           </Stack>
 
-          <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
-            <FormControl size="small" sx={{ minWidth: 180 }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            gap={1}
+            sx={{ flexShrink: 0, width: { xs: '100%', sm: 'auto' } }}
+          >
+            <FormControl size="small" sx={{ minWidth: { xs: 0, sm: 180 }, width: { xs: '100%', sm: 'auto' } }}>
               <Select
                 value={seasonSelectValue}
                 onChange={(e) => { blurFocusedMenuItem(); setSeason(String(e.target.value)); }}
@@ -379,7 +399,7 @@ export default function RtaPlayerDetailShell({
               startIcon={<RefreshIcon />}
               onClick={() => void onRefresh()}
               disabled={isFetching}
-              sx={{ whiteSpace: 'nowrap' }}
+              sx={{ whiteSpace: 'nowrap', alignSelf: { xs: 'stretch', sm: 'center' } }}
             >
               <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
                 업데이트
@@ -389,53 +409,85 @@ export default function RtaPlayerDetailShell({
         </Stack>
       </Box>
 
-      <Box sx={{ px: { xs: 0, sm: 0 }, pb: 2, overflowX: 'auto' }}>
-        <Stack
-          direction="row"
-          component="nav"
-          spacing={0.5}
+      <Box
+        component="nav"
+        aria-label="플레이어 상세 탭"
+        sx={{
+          mx: { xs: -0.25, sm: 0 },
+          pb: 0,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          '& .MuiTabs-scrollButtons': {
+            '&.Mui-disabled': { opacity: 0.35 },
+          },
+        }}
+      >
+        <Tabs
+          value={activeTabIndex}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
-            minWidth: 'max-content',
-            py: 1,
-            px: { xs: 2, sm: 3 },
-            borderBottom: '1px solid',
-            borderColor: 'divider',
+            minHeight: { xs: 44, sm: 48 },
+            '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+            '& .MuiTabs-flexContainer': { gap: { xs: 0, sm: 0.25 } },
           }}
         >
-          {navItems.map((item) => {
-            const active = isTabActive(item.href);
+          {navItems.map((item, index) => {
             const Icon = item.icon;
+            const selected = activeTabIndex === index;
             return (
-              <Button
+              <Tab
                 key={item.href}
                 component={Link}
                 href={item.href}
-                variant="text"
-                size="small"
-                startIcon={<Icon sx={{ fontSize: 18 }} />}
+                scroll={false}
+                value={index}
+                disableRipple
+                label={
+                  <Stack
+                    component="span"
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="center"
+                    spacing={0.25}
+                    sx={{ gap: 0.5 }}
+                  >
+                    <Icon sx={{ fontSize: { xs: 17, sm: 18 }, opacity: selected ? 1 : 0.85 }} />
+                    <Box
+                      component="span"
+                      sx={{
+                        fontWeight: selected ? 700 : 600,
+                        fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {item.label}
+                    </Box>
+                    {item.premium ? (
+                      <WorkspacePremiumIcon sx={{ fontSize: 13, ml: 0.25, color: 'warning.main', flexShrink: 0 }} />
+                    ) : null}
+                  </Stack>
+                }
                 sx={{
-                  px: 2,
-                  py: 1,
-                  borderRadius: 2,
-                  fontWeight: 600,
-                  color: active ? 'primary.main' : 'text.secondary',
-                  bgcolor: active ? (theme) => (theme.palette.mode === 'dark' ? 'primary.dark' : 'primary.light') : 'transparent',
-                  '&:hover': {
-                    bgcolor: active ? undefined : 'action.hover',
+                  minHeight: { xs: 44, sm: 48 },
+                  py: { xs: 0.75, sm: 1 },
+                  px: { xs: 1, sm: 1.5 },
+                  minWidth: { xs: 64, sm: 80 },
+                  textTransform: 'none',
+                  color: 'text.secondary',
+                  opacity: 1,
+                  '&.Mui-selected': {
+                    color: 'primary.main',
                   },
                 }}
-              >
-                {item.label}
-                {item.premium ? (
-                  <WorkspacePremiumIcon sx={{ fontSize: 14, ml: 0.5, color: 'warning.main' }} />
-                ) : null}
-              </Button>
+              />
             );
           })}
-        </Stack>
+        </Tabs>
       </Box>
 
-      <Box sx={{ px: { xs: 2, sm: 3 }, pb: 4 }}>
+      <Box sx={{ px: { xs: 0, sm: 0 }, pt: { xs: 1.5, sm: 2 }, pb: { xs: 2, sm: 4 } }}>
         <RtaPlayerSeasonContext.Provider
           value={{ seasonCode: seasonSelectValue, seasonId: seasonIdForApi }}
         >
