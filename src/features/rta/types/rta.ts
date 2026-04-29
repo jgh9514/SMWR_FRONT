@@ -443,7 +443,7 @@ export interface RtaPlayerMonsterUsageResponse {
   rows: RtaPlayerMonsterUsageRow[];
 }
 
-/** POST /rta/player/{wizardId}/monster-pick-breakdown — 라이브 슬롯 버킷 */
+/** POST /rta/player/{wizardId}/monster-pick-breakdown — 스냅 pick_turn 롤업 슬롯 구간 */
 export interface RtaMonsterPickBucketRow {
   bucket_id?: number | null;
   bucket_label?: string | null;
@@ -493,6 +493,15 @@ export interface RtaPlayerOpponentResponse {
   limit?: number;
   offset?: number;
   rows: RtaPlayerOpponentRow[];
+  has_more: boolean;
+}
+
+/** POST /rta/matches/player/{wizardId}/vs/{opponentWizardId} */
+export interface RtaVsMatchesResponse {
+  wizardId?: string;
+  opponentWizardId?: string;
+  seasonId?: number | null;
+  matches: RawMatchItem[];
   has_more: boolean;
 }
 

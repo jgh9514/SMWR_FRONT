@@ -37,6 +37,7 @@ import type {
   RtaPlayerMonsterUsageResponse,
   RtaPlayerOwnedBoxResponse,
   RtaPlayerOpponentResponse,
+  RtaVsMatchesResponse,
   RtaRatingGradeRule,
   RtaSeasonRow,
   RtaSeasonsResponse,
@@ -650,6 +651,30 @@ export const useRtaPlayerOpponentRecords = (
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
+};
+
+/** 두 소환사 간 맞대결 경기 목록 */
+export const useRtaVsMatches = (
+  wizardId: string,
+  opponentWizardId: string,
+  seasonCode: string | null,
+  options?: { seasonId?: number | null; enabled?: boolean },
+) => {
+  const id = wizardId?.trim() ?? '';
+  const oppId = opponentWizardId?.trim() ?? '';
+  const path = id && oppId
+    ? `/rta/matches/player/${encodeURIComponent(id)}/vs/${encodeURIComponent(oppId)}`
+    : '/rta/matches/player/-/vs/-';
+  return useApiPostQuery<RtaVsMatchesResponse>(
+    path,
+    { limit: 20, ...seasonBody(seasonCode, options?.seasonId ?? null) },
+    {
+      enabled: Boolean(id) && Boolean(oppId) && (options?.enabled !== false),
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    },
+  );
 };
 
 /** SWEX 보유 스냅 rta_agg_summoner_owned_box_snap (시즌 무관) */

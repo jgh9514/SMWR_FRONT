@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Box,
   Card,
@@ -341,9 +342,12 @@ export default function RtaPageClient() {
                               />
                             )}
                             <Typography
+                              component={Link}
+                              href={`/rta/player/${encodeURIComponent(match.p1Id)}`}
+                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
                               variant="body2"
                               fontWeight={700}
-                              sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}
                             >
                               {match.p1Name || 'Player'}
                             </Typography>
@@ -469,9 +473,12 @@ export default function RtaPageClient() {
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0, alignItems: 'flex-end' }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>
                             <Typography
+                              component={Link}
+                              href={`/rta/player/${encodeURIComponent(match.p2Id)}`}
+                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
                               variant="body2"
                               fontWeight={700}
-                              sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}
+                              sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}
                             >
                               {match.p2Name || 'Opponent'}
                             </Typography>

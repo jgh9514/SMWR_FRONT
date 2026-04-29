@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
   Box,
   Button,
   CircularProgress,
+  Collapse,
+  IconButton,
   Paper,
   Stack,
   Table,
@@ -17,9 +18,14 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
-import { useRtaPlayerOpponentRecords } from '@/features/rta/hooks/useRtaData';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import { useRtaPlayerOpponentRecords, useRtaVsMatches } from '@/features/rta/hooks/useRtaData';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
+import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
+import { RtaMatchCard } from '@/features/rta/components/RtaMatchCard';
 import type { RtaPlayerOpponentRow } from '@/features/rta/types/rta';
+import type { RawMatchItem } from '@/types';
 
 const PAGE_SIZE = 50;
 
@@ -41,7 +47,6 @@ function rowFromApi(r: Record<string, unknown>): RtaPlayerOpponentRow {
   };
 }
 
-
 function WinRateLabel({ value }: { value: number | null | undefined }) {
   if (value == null) return <Typography variant="caption" color="text.disabled">—</Typography>;
   const color = value >= 60 ? 'success.main' : value <= 40 ? 'error.main' : 'warning.main';
@@ -49,6 +54,151 @@ function WinRateLabel({ value }: { value: number | null | undefined }) {
     <Typography sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, fontSize: '0.85rem', color }}>
       {value.toFixed(1)}%
     </Typography>
+  );
+}
+
+function VsMatchList({
+  wizardId,
+  opponentWizardId,
+  seasonCode,
+  seasonId,
+  onLoaded,
+}: {
+  wizardId: string;
+  opponentWizardId: string;
+  seasonCode: string | null;
+  seasonId: number | null;
+  onLoaded?: (wins: number, losses: number, total: number, hasMore: boolean) => void;
+}) {
+  const { data, isLoading, error } = useRtaVsMatches(wizardId, opponentWizardId, seasonCode, {
+    seasonId,
+    enabled: Boolean(wizardId) && Boolean(opponentWizardId),
+  });
+
+  const matches = (data?.matches ?? []).map((r) =>
+    processRawMatchToMatchItem(r as unknown as RawMatchItem),
+  );
+
+  // 로드 완료 시 실제 승패 콜백
+  const hasMore = data?.has_more ?? false;
+  if (data && onLoaded) {
+    let wins = 0;
+    let losses = 0;
+    for (const m of matches) {
+      const isP1 = m.p1Id === wizardId;
+      const won = isP1 ? m.winnerPosition === '1' : m.winnerPosition === '2';
+      if (won) wins++; else losses++;
+    }
+    onLoaded(wins, losses, matches.length, hasMore);
+  }
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+        <CircularProgress size={28} />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Typography variant="body2" color="error" sx={{ p: 1.5 }}>
+        {error.message || '불러오기에 실패했습니다.'}
+      </Typography>
+    );
+  }
+
+  if (matches.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ p: 1.5 }}>
+        이 시즌에 수집된 맞대결 기록이 없습니다.
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack spacing={1} sx={{ p: { xs: 1, sm: 1.5 } }}>
+      {matches.map((match) => (
+        <RtaMatchCard key={`${match.p1Id}-${match.p2Id}-${match.date}`} match={match} wizardId={wizardId} />
+      ))}
+      {hasMore && (
+        <Typography variant="caption" color="text.secondary" textAlign="center">
+          최대 20경기까지 표시됩니다.
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
+function OpponentRow({
+  row,
+  wizardId,
+  seasonCode,
+  seasonId,
+}: {
+  row: RtaPlayerOpponentRow;
+  wizardId: string;
+  seasonCode: string | null;
+  seasonId: number | null;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [liveStats, setLiveStats] = useState<{ wins: number; losses: number; total: number; hasMore: boolean } | null>(null);
+  const name = row.opponent_wizard_name?.trim() || `소환사 ${row.opponent_wizard_id}`;
+
+  const winCnt = liveStats?.wins ?? row.win_cnt;
+  const loseCnt = liveStats?.losses ?? row.lose_cnt;
+  const matchCnt = liveStats ? (liveStats.hasMore ? `${liveStats.total}+` : String(liveStats.total)) : String(row.match_cnt);
+  const winRate = liveStats && liveStats.total > 0
+    ? (liveStats.wins / liveStats.total) * 100
+    : row.win_rate_pct;
+
+  return (
+    <>
+      <TableRow
+        hover
+        sx={{ cursor: 'pointer', '& > td': { borderBottom: expanded ? 0 : undefined } }}
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <TableCell sx={{ width: 40, pr: 0 }}>
+          <IconButton size="small" tabIndex={-1} sx={{ p: 0.25 }}>
+            {expanded ? <KeyboardArrowDownIcon fontSize="small" /> : <KeyboardArrowRightIcon fontSize="small" />}
+          </IconButton>
+        </TableCell>
+        <TableCell>
+          <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{name}</Typography>
+        </TableCell>
+        <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', px: { xs: 1, sm: 2 } }}>
+          {matchCnt}
+        </TableCell>
+        <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', color: 'success.main', fontWeight: 700, px: { xs: 1, sm: 2 } }}>
+          {winCnt}
+        </TableCell>
+        <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', color: 'error.main', fontWeight: 700, px: { xs: 1, sm: 2 } }}>
+          {loseCnt}
+        </TableCell>
+        <TableCell align="center" sx={{ px: { xs: 1, sm: 2 } }}>
+          <WinRateLabel value={winRate} />
+        </TableCell>
+      </TableRow>
+
+      <TableRow sx={{ '& > td': { p: 0 } }}>
+        <TableCell colSpan={6} sx={{ borderBottom: expanded ? undefined : 0 }}>
+          <Collapse in={expanded} timeout="auto" unmountOnExit>
+            <Box sx={{ bgcolor: 'action.hover', borderTop: '1px solid', borderColor: 'divider' }}>
+              <VsMatchList
+                wizardId={wizardId}
+                opponentWizardId={row.opponent_wizard_id}
+                seasonCode={seasonCode}
+                seasonId={seasonId}
+                onLoaded={(wins, losses, total, hasMore) =>
+                  setLiveStats({ wins, losses, total, hasMore })
+                }
+              />
+            </Box>
+          </Collapse>
+        </TableCell>
+      </TableRow>
+    </>
   );
 }
 
@@ -61,7 +211,6 @@ export default function RtaPlayerOpponentsClient() {
   const [accumulated, setAccumulated] = useState<RtaPlayerOpponentRow[]>([]);
   const prevSeasonRef = useRef(seasonCode);
 
-  // 시즌 변경 시 초기화
   useEffect(() => {
     if (prevSeasonRef.current !== seasonCode) {
       prevSeasonRef.current = seasonCode;
@@ -79,7 +228,6 @@ export default function RtaPlayerOpponentsClient() {
   const pageRows = (data?.rows ?? []).map((r) => rowFromApi(r as unknown as Record<string, unknown>));
   const hasMore = data?.has_more ?? false;
 
-  // offset=0 응답 → accumulated 교체, offset>0 → 누적
   useEffect(() => {
     if (!data) return;
     if ((data.offset ?? 0) === 0) {
@@ -94,9 +242,7 @@ export default function RtaPlayerOpponentsClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  const onLoadMore = () => {
-    setOffset(accumulated.length);
-  };
+  const onLoadMore = () => setOffset(accumulated.length);
 
   if (!wizardId) {
     return <Typography variant="body2" color="text.secondary">위자드 ID가 없습니다.</Typography>;
@@ -130,16 +276,17 @@ export default function RtaPlayerOpponentsClient() {
         </Typography>
       ) : (
         <Stack spacing={1}>
-          {isFetching && accumulated.length > 0 ? (
+          {isFetching && accumulated.length > 0 && (
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', minHeight: 20 }}>
               <CircularProgress size={16} />
             </Box>
-          ) : null}
+          )}
 
           <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
             <Table size="small" sx={{ minWidth: { xs: 0, sm: 480 } }}>
               <TableHead>
                 <TableRow>
+                  <TableCell sx={{ width: 40, pr: 0 }} />
                   <TableCell sx={{ fontWeight: 700 }}>소환사</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700, whiteSpace: 'nowrap', px: { xs: 1, sm: 2 } }}>대전</TableCell>
                   <TableCell align="center" sx={{ fontWeight: 700, px: { xs: 1, sm: 2 } }}>승</TableCell>
@@ -148,36 +295,20 @@ export default function RtaPlayerOpponentsClient() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {accumulated.map((row) => {
-                  const name = row.opponent_wizard_name?.trim() || `소환사 ${row.opponent_wizard_id}`;
-                  const href = `/rta/player/${encodeURIComponent(row.opponent_wizard_id)}`;
-                  return (
-                    <TableRow key={row.opponent_wizard_id} hover>
-                      <TableCell>
-                        <Link href={href} style={{ fontWeight: 600, textDecoration: 'none', color: 'inherit' }}>
-                          {name}
-                        </Link>
-                      </TableCell>
-                      <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', px: { xs: 1, sm: 2 } }}>
-                        {row.match_cnt}
-                      </TableCell>
-                      <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', color: 'success.main', fontWeight: 700, px: { xs: 1, sm: 2 } }}>
-                        {row.win_cnt}
-                      </TableCell>
-                      <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', color: 'error.main', fontWeight: 700, px: { xs: 1, sm: 2 } }}>
-                        {row.lose_cnt}
-                      </TableCell>
-                      <TableCell align="center" sx={{ px: { xs: 1, sm: 2 } }}>
-                        <WinRateLabel value={row.win_rate_pct} />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {accumulated.map((row) => (
+                  <OpponentRow
+                    key={row.opponent_wizard_id}
+                    row={row}
+                    wizardId={wizardId}
+                    seasonCode={seasonCode}
+                    seasonId={seasonId}
+                  />
+                ))}
               </TableBody>
             </Table>
           </TableContainer>
 
-          {hasMore ? (
+          {hasMore && (
             <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1 }}>
               <Button
                 variant="outlined"
@@ -189,7 +320,7 @@ export default function RtaPlayerOpponentsClient() {
                 더 보기
               </Button>
             </Box>
-          ) : null}
+          )}
 
           <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'right' }}>
             총 {accumulated.length.toLocaleString()}명{hasMore ? '+' : ''}
