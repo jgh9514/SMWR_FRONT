@@ -130,10 +130,10 @@ function TierStars({ shortLabel }: { shortLabel: string }) {
 
 function TierHeaderCell({ shortLabel }: { shortLabel: string }) {
   return (
-    <TableCell align="center" sx={{ px: 1, py: 1.5, borderColor: 'divider' }}>
-      <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+    <TableCell align="center" sx={{ px: { xs: 0.5, sm: 1 }, py: { xs: 1, sm: 1.5 }, borderColor: 'divider' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0.25 }}>
         <TierStars shortLabel={shortLabel} />
-        <Typography sx={{ fontSize: '10px', fontWeight: 800, color: tierAccent(shortLabel), whiteSpace: 'nowrap' }}>
+        <Typography sx={{ fontSize: { xs: '9px', sm: '10px' }, fontWeight: 800, color: tierAccent(shortLabel), whiteSpace: 'nowrap' }}>
           {shortLabel}
         </Typography>
       </Box>
@@ -396,15 +396,11 @@ export default function RtaRankCutoffsSection({
 
       <Box
         sx={{
-          display: 'flex',
-          flexDirection: 'row',
-          flexWrap: 'nowrap',
-          gap: { xs: 1, sm: 1.5 },
+          display: 'grid',
+          gridTemplateColumns: `repeat(${CUT_TIER_ORDER.length}, 1fr)`,
+          gap: { xs: 0.75, sm: 1.5 },
           mb: 2,
           width: '100%',
-          overflowX: 'auto',
-          WebkitOverflowScrolling: 'touch',
-          pb: 0.25,
         }}
       >
         {CUT_TIER_ORDER.map((k) => (
@@ -412,27 +408,26 @@ export default function RtaRankCutoffsSection({
             key={k}
             variant="outlined"
             sx={{
-              flex: '1 1 0',
-              minWidth: { xs: 72, sm: 0 },
-              p: { xs: 1, sm: 1.5 },
+              p: { xs: '6px 4px', sm: 1.5 },
               borderRadius: 2,
               bgcolor: 'action.hover',
               borderColor: 'divider',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: 0.75,
+              gap: { xs: 0.5, sm: 0.75 },
+              minWidth: 0,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'nowrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, sm: 0.75 }, flexWrap: 'nowrap' }}>
               <TierStars shortLabel={k} />
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: tierAccent(k), whiteSpace: 'nowrap' }}>
+              <Typography sx={{ fontSize: { xs: '0.65rem', sm: '0.75rem' }, fontWeight: 800, color: tierAccent(k), whiteSpace: 'nowrap' }}>
                 {k}
               </Typography>
             </Box>
             <Typography
               sx={{
-                fontSize: { xs: '1.05rem', sm: '1.25rem' },
+                fontSize: { xs: '0.85rem', sm: '1.25rem' },
                 fontWeight: 900,
                 fontVariantNumeric: 'tabular-nums',
                 color: tierAccent(k),
@@ -451,11 +446,11 @@ export default function RtaRankCutoffsSection({
       </Box>
 
       <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden', borderColor: 'divider' }}>
-        <TableContainer sx={{ overflowX: 'auto' }}>
-          <Table size="small" sx={{ minWidth: 520 }}>
+        <TableContainer sx={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <Table size="small" sx={{ minWidth: { xs: 0, sm: 480 }, tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow sx={{ borderBottom: '1px solid', borderColor: 'divider' }}>
-                <TableCell sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600, py: 1.5 }}>기준</TableCell>
+                <TableCell sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600, py: 1.5, px: { xs: 1, sm: 2 }, width: { xs: '54px', sm: 'auto' } }}>기준</TableCell>
                 {CUT_TIER_ORDER.map((k) => (
                   <TierHeaderCell key={k} shortLabel={k} />
                 ))}
@@ -468,8 +463,8 @@ export default function RtaRankCutoffsSection({
                   hover
                   sx={{ '&:last-child td': { borderBottom: 0 }, borderColor: 'divider' }}
                 >
-                  <TableCell sx={{ py: 1.25, verticalAlign: 'top' }}>
-                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>
+                  <TableCell sx={{ py: { xs: 1, sm: 1.25 }, px: { xs: 1, sm: 2 }, verticalAlign: 'top' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', fontSize: { xs: '0.65rem', sm: '0.75rem' }, whiteSpace: 'nowrap' }}>
                       {row.label}
                     </Typography>
                   </TableCell>
@@ -477,15 +472,15 @@ export default function RtaRankCutoffsSection({
                     const sc = row.scores[k];
                     const d = row.deltas[k];
                     return (
-                      <TableCell key={k} align="center" sx={{ py: 1.25, whiteSpace: 'nowrap' }}>
-                        <Box sx={{ display: 'inline-flex', flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: 0.5, flexWrap: 'nowrap' }}>
+                      <TableCell key={k} align="center" sx={{ py: { xs: 1, sm: 1.25 }, px: { xs: 0.5, sm: 1 }, whiteSpace: 'nowrap' }}>
+                        <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 0 }}>
                           <Typography
                             component="span"
                             sx={{
                               fontWeight: 800,
                               fontVariantNumeric: 'tabular-nums',
                               color: tierAccent(k),
-                              fontSize: '0.85rem',
+                              fontSize: { xs: '0.75rem', sm: '0.85rem' },
                             }}
                           >
                             {formatRtaCutoffScore(sc)}
@@ -494,9 +489,10 @@ export default function RtaRankCutoffsSection({
                             <Typography
                               component="span"
                               sx={{
-                                fontSize: '0.65rem',
+                                fontSize: { xs: '0.6rem', sm: '0.65rem' },
                                 fontVariantNumeric: 'tabular-nums',
                                 color: d >= 0 ? 'success.light' : 'error.light',
+                                lineHeight: 1.2,
                               }}
                             >
                               ({d >= 0 ? '+' : ''}

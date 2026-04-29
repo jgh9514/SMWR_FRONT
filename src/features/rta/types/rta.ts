@@ -475,3 +475,24 @@ export interface RtaPlayerOwnedBoxResponse {
   rows: RtaPlayerOwnedBoxRow[];
 }
 
+/** POST /rta/player/{wizardId}/opponent-records — rta_agg_summoner_opponent_h2h_snap */
+export interface RtaPlayerOpponentRow {
+  opponent_wizard_id: string;
+  opponent_wizard_name?: string | null;
+  opponent_channel_uid?: string | null;
+  opponent_country_code?: string | null;
+  match_cnt: number;
+  win_cnt: number;
+  lose_cnt: number;
+  win_rate_pct?: number | null;
+}
+
+export interface RtaPlayerOpponentResponse {
+  seasonId?: number | null;
+  wizardId?: string;
+  limit?: number;
+  offset?: number;
+  rows: RtaPlayerOpponentRow[];
+  has_more: boolean;
+}
+
