@@ -22,7 +22,7 @@ function normalizeUnitBannedFlags(raw: unknown): boolean[] | undefined {
   return raw.map((v) => isTruthyBanFlag(v));
 }
 
-/** WAS `p1_unit_pick_slot_no` 배열의 i번째 = 해당 슬롯 `pick_slot_no` (1~N 전체 드래프트 턴) */
+/** WAS `p1_unit_pick_slot_no` 배열의 i번째 = 해당 유닛 `pick_slot_no` — 서버 값을 그대로 매칭 카드에 전달 */
 function pickSlotNoAt(pickNos: unknown, i: number): number | undefined {
   if (!Array.isArray(pickNos) || i < 0 || i >= pickNos.length) return undefined;
   const v = pickNos[i];

@@ -13,29 +13,25 @@ type Unit = {
 };
 
 /**
- * SW 월드 아레나 스네이크 픽(1-2-2-2-2-1) — **전체 드래프트 턴** 기준
+ * SW 월드 아레나 스네이크 픽 레이아웃 — 플레이어 팀 기준 {@code pick_slot_no}는 **항상 1~5**(전장 전체 1~10 순서 미사용).
  *
- * - **선픽(First pick) 팀** — 픽 1, (4·5), (8·9) → 화면 **1-2-2** (세 열)
- * - **후픽(Second pick) 팀** — 픽 (2·3), (6·7), 10 → 화면 **2-2-1**
+ * - **선턴** (선픽 참가자): 열 패턴 {@code [[1],[2,3],[4,5]]} → 화면 1-2-2
+ * - **후턴**: 열 패턴 {@code [[1,2],[3,4],[5]]} → 화면 2-2-1 (후턴 "첫 픽 칸" = 팀 로컬 1번)
  *
- * `pick_slot_no`가 모두 있으면 위 턴으로 열에 배치. 없거나 턴이 규칙에 안 맞으면
- * `units[]` 순서(이미 pick 순)로 `[[0][1,2][3,4]]` / `[[0,1][2,3][4]]` 폴백.
- * **절대 `transform: scaleX(-1)`(미러)로 역순 흉내 내지 말 것.**
- * `rowAlign`: VS 행에서 블록 전체를 왼/오 끝에 붙이는 용도만(열/턴 순서와 무관)
+ * `pick_slot_no`가 칸별로 채워지면 슬롯 번호로 열 배치. 없거나 패턴 불일치면
+ * `units[]` 배열 순(이미 픽 순)으로 같은 열 패턴 폴백.
+ * **절대 미러링으로 순서 속이지 않을 것.** `rowAlign`은 VS 줄에서 블록 끝 정렬만 담당.
  */
 
-/** 인덱스 폴백: pick_slot이 없을 때, 배열 0~4 = 팀의 1·4·5·8·9 / 2·3·6·7·10 순서라는 가정 */
+/** 픽 순서 불명일 때: 배열 0..4 순서가 곧 해당 팀의 pick_slot 1→5 순 */
 const COL_GROUPS_FIRST_PICK: readonly (readonly number[])[] = [[0], [1, 2], [3, 4]] as const;
 const COL_GROUPS_SECOND_PICK: readonly (readonly number[])[] = [[0, 1], [2, 3], [4]] as const;
 
-/** 선픽 팀: 턴 1 | 4,5 | 8,9 */
-const SNAKE_TURNS_FIRST: readonly (readonly number[])[] = [[1], [4, 5], [8, 9]] as const;
-/** 후픽 팀: 턴 2,3 | 6,7 | 10 */
-const SNAKE_TURNS_SECOND: readonly (readonly number[])[] = [
-  [2, 3],
-  [6, 7],
-  [10],
-] as const;
+/** 선턴 플레이어: 팀 픽 번호(slots)별 열 분배 (1 │ 2·3 │ 4·5) */
+const SNAKE_PICK_SLOTS_FIRST_TEAM: readonly (readonly number[])[] = [[1], [2, 3], [4, 5]] as const;
+/** 후턴 플레이어: (1·2 │ 3·4 │ 5) */
+const SNAKE_PICK_SLOTS_SECOND_TEAM: readonly (readonly number[])[] = [[1, 2], [3, 4], [5]] as const;
+
 
 function allHavePickSlotNo(list: Unit[]): boolean {
   return list.length > 0 && list.every((u) => u.pickSlotNo != null && Number.isFinite(Number(u.pickSlotNo)));
@@ -54,33 +50,33 @@ function buildIndexColumns(
 }
 
 /**
- * `pick_slot_no` = 글로벌 턴(1~10)일 때, 스네이크 규칙으로 3열 스택에 분배
+ * `pick_slot_no` 가 팀 기준 `1..5`일 때 같은 숫자로 열에 배치한다.
  */
-function buildSnakeColumnsByTurn(
+function buildSnakeColumnsByPickSlot(
   list: Unit[],
   isFirstPickInDraft: boolean,
 ): { unit: Unit; unitIndex: number }[][] | null {
   if (!allHavePickSlotNo(list)) return null;
 
-  const pattern = isFirstPickInDraft ? SNAKE_TURNS_FIRST : SNAKE_TURNS_SECOND;
-  const bucket: { unit: Unit; unitIndex: number; turn: number }[][] = [[], [], []];
+  const pattern = isFirstPickInDraft ? SNAKE_PICK_SLOTS_FIRST_TEAM : SNAKE_PICK_SLOTS_SECOND_TEAM;
+  const bucket: { unit: Unit; unitIndex: number; pickSlotNo: number }[][] = [[], [], []];
 
   for (let unitIndex = 0; unitIndex < list.length; unitIndex++) {
     const unit = list[unitIndex]!;
-    const turn = Math.round(Number(unit.pickSlotNo));
+    const pickSlotNo = Math.round(Number(unit.pickSlotNo));
     let col = -1;
     for (let c = 0; c < 3; c++) {
-      if (pattern[c]!.includes(turn)) {
+      if (pattern[c]!.includes(pickSlotNo)) {
         col = c;
         break;
       }
     }
     if (col < 0) return null;
-    bucket[col]!.push({ unit, unitIndex, turn });
+    bucket[col]!.push({ unit, unitIndex, pickSlotNo });
   }
 
   for (const b of bucket) {
-    b.sort((a, x) => a.turn - x.turn);
+    b.sort((a, x) => a.pickSlotNo - x.pickSlotNo);
   }
   return bucket.map((b) => b.map(({ unit, unitIndex }) => ({ unit, unitIndex })));
 }
@@ -88,22 +84,22 @@ function buildSnakeColumnsByTurn(
 function buildColumns(
   list: Unit[],
   isFirstPickInDraft: boolean,
-): { usedTurnSnake: boolean; columns: { unit: Unit; unitIndex: number }[][] } {
-  const byTurn = buildSnakeColumnsByTurn(list, isFirstPickInDraft);
-  if (byTurn) {
-    return { usedTurnSnake: true, columns: byTurn };
+): { usedPickSlotSnake: boolean; columns: { unit: Unit; unitIndex: number }[][] } {
+  const bySlot = buildSnakeColumnsByPickSlot(list, isFirstPickInDraft);
+  if (bySlot) {
+    return { usedPickSlotSnake: true, columns: bySlot };
   }
-  return { usedTurnSnake: false, columns: buildIndexColumns(list, isFirstPickInDraft) };
+  return { usedPickSlotSnake: false, columns: buildIndexColumns(list, isFirstPickInDraft) };
 }
 
 function showSeonPickBadge(
   isFirstPickInDraft: boolean,
   unit: Unit,
   unitIndex: number,
-  usedTurnSnake: boolean,
+  usedPickSlotSnake: boolean,
 ): boolean {
   if (!isFirstPickInDraft) return false;
-  if (usedTurnSnake) return Math.round(Number(unit.pickSlotNo)) === 1;
+  if (usedPickSlotSnake) return Math.round(Number(unit.pickSlotNo)) === 1;
   return unitIndex === 0;
 }
 
@@ -293,7 +289,7 @@ export default function RtaUnitPickGrid({
   rowAlign: 'start' | 'end';
 }) {
   const list = (units ?? []).slice(0, 5);
-  const { usedTurnSnake, columns: groups } = buildColumns(list, isFirstPickInDraft);
+  const { usedPickSlotSnake, columns: groups } = buildColumns(list, isFirstPickInDraft);
 
   if (list.length === 0) {
     return (
@@ -328,7 +324,7 @@ export default function RtaUnitPickGrid({
         if (col.length === 0) return null;
         return (
           <Stack
-            key={`rta-pick-col-${isFirstPickInDraft ? 'f' : 's'}-${usedTurnSnake ? 't' : 'i'}-${colIdx}`}
+            key={`rta-pick-col-${isFirstPickInDraft ? 'f' : 's'}-${usedPickSlotSnake ? 'p' : 'i'}-${colIdx}`}
             direction="column"
             alignItems="center"
             gap={0.5}
@@ -338,7 +334,7 @@ export default function RtaUnitPickGrid({
               <PickSlotTile
                 key={unitIndex}
                 unit={unit}
-                showSeonPick={showSeonPickBadge(isFirstPickInDraft, unit, unitIndex, usedTurnSnake)}
+                showSeonPick={showSeonPickBadge(isFirstPickInDraft, unit, unitIndex, usedPickSlotSnake)}
               />
             ))}
           </Stack>

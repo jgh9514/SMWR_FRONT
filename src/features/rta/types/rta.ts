@@ -478,6 +478,8 @@ export interface RtaPlayerOwnedBoxRow {
   monster_name?: string | null;
   monster_image?: string | null;
   monster_elemental?: string | null;
+  /** 원천별 자연별 — monster 테이블(JOIN 없으면 null) */
+  natural_stars?: number | null;
 }
 
 export interface RtaPlayerOwnedBoxResponse {

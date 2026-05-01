@@ -78,8 +78,10 @@ function rowFromApi(r: RtaPlayerMonsterUsageRow & Record<string, unknown>): RtaP
 /**
  * 선픽/후픽 스네이크 픽 레이아웃 — pick_slot_no(1~5 per player) 5칸을 3열로
  *
- * 선픽(team_side=1): col[1번] | col[2번, 3번] | col[4번, 5번]   → 전체 1·4·5·8·9번째
- * 후픽(team_side=2): col[1번, 2번] | col[3번, 4번] | col[5번]   → 전체 2·3·6·7·10번째
+ * 선턴(team_side=1): 열 패턴 [[1],[2,3],[4,5]](RtaUnitPickGrid와 동일)
+ * 후턴(team_side=2): [[1,2],[3,4],[5]]
+ *
+ * 레이블·집계는 모두 플레이어 팀 기준 픽 순서 1~5(전장 전체 1~10 순번 없음).
  *
  * 각 슬롯: 네모 박스 + 아래에 픽 비중(fill), 중앙 텍스트 픽률, 박스 밑 승률
  */
@@ -88,14 +90,17 @@ function rowFromApi(r: RtaPlayerMonsterUsageRow & Record<string, unknown>): RtaP
 const FIRST_PICK_COLS: readonly (readonly number[])[] = [[1], [2, 3], [4, 5]];
 const SECOND_PICK_COLS: readonly (readonly number[])[] = [[1, 2], [3, 4], [5]];
 
-/** 선픽 slot 번호 → 전체 드래프트 순서 */
-const FIRST_GLOBAL: Record<number, string> = { 1: '1번째', 2: '4번째', 3: '5번째', 4: '8번째', 5: '9번째' };
-/** 후픽 slot 번호 → 전체 드래프트 순서 */
-const SECOND_GLOBAL: Record<number, string> = { 1: '2번째', 2: '3번째', 3: '6번째', 4: '7번째', 5: '10번째' };
+/** 슬롯 번호 표기 — 선·후턴 공통 팀 로컬 1번~5번 */
+const TEAM_PICK_SLOT_LABEL: Record<number, string> = {
+  1: '1번',
+  2: '2번',
+  3: '3번',
+  4: '4번',
+  5: '5번',
+};
 
 function PickSlotBox({
   slotNo,
-  isFirstPick,
   pickSharePct,
   winRatePct,
   eventCnt,
@@ -105,7 +110,6 @@ function PickSlotBox({
   onClick,
 }: {
   slotNo: number;
-  isFirstPick: boolean;
   pickSharePct: number;
   winRatePct: number | null;
   eventCnt: number;
@@ -118,7 +122,7 @@ function PickSlotBox({
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const fill = Math.min(100, Math.max(0, pickSharePct));
-  const globalLabel = isFirstPick ? FIRST_GLOBAL[slotNo] : SECOND_GLOBAL[slotNo];
+  const slotLabel = TEAM_PICK_SLOT_LABEL[slotNo] ?? '—';
   const wr = winRatePct;
   const wrColor = wr == null ? 'text.disabled'
     : wr >= 55 ? 'error.main'
@@ -131,7 +135,7 @@ function PickSlotBox({
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
-      {/* 전체 픽 순서 레이블 */}
+      {/* 팀 내 픽 순서(로컬 1~5) */}
       <Typography
         variant="caption"
         sx={{
@@ -142,7 +146,7 @@ function PickSlotBox({
           whiteSpace: 'nowrap',
         }}
       >
-        {globalLabel}
+        {slotLabel}
       </Typography>
 
       {/* 박스 — 정사각형 */}
@@ -270,7 +274,6 @@ function PickSnakeGrid({
               <PickSlotBox
                 key={slotNo}
                 slotNo={slotNo}
-                isFirstPick={isFirstPick}
                 pickSharePct={row ? toNum(row.pick_share_pct) : 0}
                 winRatePct={row?.win_rate_pct != null ? toNum(row.win_rate_pct) : null}
                 eventCnt={row ? toNum(row.event_cnt) : 0}
@@ -487,8 +490,8 @@ function MonsterPickSlotBreakdownBlock({
         alignItems: 'start',
       }}
     >
-      <SideSection label="선픽" subtitle="전체 1·4·5·8·9번째" color={firstColor} isFirstPick teamSide={1} slots={firstRows} />
-      <SideSection label="후픽" subtitle="전체 2·3·6·7·10번째" color={secondColor} isFirstPick={false} teamSide={2} slots={secondRows} />
+      <SideSection label="선턴" subtitle="팀 픽 순서 1~5 · 열 (1)/(2·3)/(4·5)" color={firstColor} isFirstPick teamSide={1} slots={firstRows} />
+      <SideSection label="후턴" subtitle="팀 픽 순서 1~5 · 열 (1·2)/(3·4)/(5)" color={secondColor} isFirstPick={false} teamSide={2} slots={secondRows} />
     </Box>
   );
 }
@@ -557,8 +560,7 @@ const PlayerPickStatCard = memo(function PlayerPickStatCard({
   seasonId: number | null;
 }) {
   const pr = toNum(row.pick_rate_pct);
-  const wr =
-    row.win_rate_pct == null || row.win_rate_pct === '' ? null : toNum(row.win_rate_pct);
+  const wr = row.win_rate_pct == null ? null : toNum(row.win_rate_pct);
   const br = toNum(row.ban_rate_pct);
   return (
     <Paper

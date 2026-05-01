@@ -631,7 +631,7 @@ export const useRtaMonsterPickBreakdown = (
   );
 };
 
-/** 소환사×몬스터 특정 픽 슬롯 경기 목록 (teamSide 1=선픽/2=후픽, pickSlotNo 1~5) */
+/** 소환사×몬스터 특정 픽 슬롯 경기 — pick_slot_no·team_side(선턴·후턴)만 전송(WAS 픽 번호는 팀 내 1~5). */
 export const useRtaMonsterPickSlotMatches = (
   wizardId: string,
   seasonCode: string | null | undefined,
