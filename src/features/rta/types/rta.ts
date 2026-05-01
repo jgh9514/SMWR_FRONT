@@ -443,10 +443,11 @@ export interface RtaPlayerMonsterUsageResponse {
   rows: RtaPlayerMonsterUsageRow[];
 }
 
-/** POST /rta/player/{wizardId}/monster-pick-breakdown — 스냅 pick_turn 롤업 슬롯 구간 */
+/** POST /rta/player/{wizardId}/monster-pick-breakdown — pick_slot_no(1~5 per player) × team_side
+ *  team_side: 1=선픽 / 2=후픽  |  pick_slot_no: 1~5 (플레이어 내 순서) */
 export interface RtaMonsterPickBucketRow {
-  bucket_id?: number | null;
-  bucket_label?: string | null;
+  team_side?: number | null;
+  pick_slot_no?: number | null;
   event_cnt?: number | null;
   field_cnt?: number | null;
   win_cnt?: number | null;
@@ -461,10 +462,19 @@ export interface RtaMonsterPickBreakdownResponse {
   buckets?: RtaMonsterPickBucketRow[] | null;
 }
 
-/** POST /rta/player/{wizardId}/owned-box — rta_agg_summoner_owned_box_snap */
+/** POST /rta/player/{wizardId}/monster-pick-slot-matches */
+export interface RtaMonsterPickSlotMatchesResponse {
+  seasonId?: number | null;
+  wizardId?: string | null;
+  unitMasterId?: number | null;
+  teamSide?: number | null;
+  pickSlotNo?: number | null;
+  matches?: unknown[] | null;
+}
+
+/** POST /rta/player/{wizardId}/owned-box — rta_agg_summoner_owned_box_snap (수집 리플레이 RTA 픽·밴 DISTINCT) */
 export interface RtaPlayerOwnedBoxRow {
   unit_master_id: number;
-  copy_count: number;
   monster_name?: string | null;
   monster_image?: string | null;
   monster_elemental?: string | null;

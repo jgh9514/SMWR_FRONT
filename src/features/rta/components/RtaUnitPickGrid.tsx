@@ -321,6 +321,7 @@ export default function RtaUnitPickGrid({
         direction: 'ltr',
         pt: 0.25,
         pb: '10px',
+        pl: '6px', /* 리더 아이콘(left:-6px) 잘림 방지 */
       }}
     >
       {groups.map((col, colIdx) => {

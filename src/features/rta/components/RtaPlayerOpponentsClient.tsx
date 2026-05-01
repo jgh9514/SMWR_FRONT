@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
+  Avatar,
   Box,
   Button,
   CircularProgress,
@@ -18,6 +19,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useRtaPlayerOpponentRecords, useRtaVsMatches } from '@/features/rta/hooks/useRtaData';
@@ -62,35 +64,25 @@ function VsMatchList({
   opponentWizardId,
   seasonCode,
   seasonId,
-  onLoaded,
+  fetchEnabled,
 }: {
   wizardId: string;
   opponentWizardId: string;
   seasonCode: string | null;
   seasonId: number | null;
-  onLoaded?: (wins: number, losses: number, total: number, hasMore: boolean) => void;
+  /** 펼친 뒤에만 맞대결 목록 조회 — 표 전적(row)과 완전 분리 */
+  fetchEnabled: boolean;
 }) {
   const { data, isLoading, error } = useRtaVsMatches(wizardId, opponentWizardId, seasonCode, {
     seasonId,
-    enabled: Boolean(wizardId) && Boolean(opponentWizardId),
+    enabled: Boolean(wizardId) && Boolean(opponentWizardId) && fetchEnabled,
   });
 
   const matches = (data?.matches ?? []).map((r) =>
     processRawMatchToMatchItem(r as unknown as RawMatchItem),
   );
 
-  // 로드 완료 시 실제 승패 콜백
   const hasMore = data?.has_more ?? false;
-  if (data && onLoaded) {
-    let wins = 0;
-    let losses = 0;
-    for (const m of matches) {
-      const isP1 = m.p1Id === wizardId;
-      const won = isP1 ? m.winnerPosition === '1' : m.winnerPosition === '2';
-      if (won) wins++; else losses++;
-    }
-    onLoaded(wins, losses, matches.length, hasMore);
-  }
 
   if (isLoading) {
     return (
@@ -118,12 +110,17 @@ function VsMatchList({
 
   return (
     <Stack spacing={1} sx={{ p: { xs: 1, sm: 1.5 } }}>
+      {hasMore ? (
+        <Typography variant="caption" color="text.secondary">
+          최근 맞대결만 표시합니다 (최대 20경기).
+        </Typography>
+      ) : null}
       {matches.map((match) => (
         <RtaMatchCard key={`${match.p1Id}-${match.p2Id}-${match.date}`} match={match} wizardId={wizardId} />
       ))}
       {hasMore && (
         <Typography variant="caption" color="text.secondary" textAlign="center">
-          최대 20경기까지 표시됩니다.
+          더 많은 경기가 있습니다.
         </Typography>
       )}
     </Stack>
@@ -142,16 +139,9 @@ function OpponentRow({
   seasonId: number | null;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [liveStats, setLiveStats] = useState<{ wins: number; losses: number; total: number; hasMore: boolean } | null>(null);
   const name = row.opponent_wizard_name?.trim() || `소환사 ${row.opponent_wizard_id}`;
 
-  const winCnt = liveStats?.wins ?? row.win_cnt;
-  const loseCnt = liveStats?.losses ?? row.lose_cnt;
-  const matchCnt = liveStats ? (liveStats.hasMore ? `${liveStats.total}+` : String(liveStats.total)) : String(row.match_cnt);
-  const winRate = liveStats && liveStats.total > 0
-    ? (liveStats.wins / liveStats.total) * 100
-    : row.win_rate_pct;
-
+  /* 표의 대전·승·패·승률은 opponent-records 스냅만 사용. 펼친 목록 API와 숫자를 섞지 않는다. */
   return (
     <>
       <TableRow
@@ -165,19 +155,26 @@ function OpponentRow({
           </IconButton>
         </TableCell>
         <TableCell>
-          <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{name}</Typography>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Avatar
+              src={getSwexPlayerImageUrl(row.opponent_channel_uid ?? row.opponent_wizard_id)}
+              alt={name}
+              sx={{ width: 32, height: 32, flexShrink: 0 }}
+            />
+            <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{name}</Typography>
+          </Stack>
         </TableCell>
         <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', px: { xs: 1, sm: 2 } }}>
-          {matchCnt}
+          {row.match_cnt}
         </TableCell>
         <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', color: 'success.main', fontWeight: 700, px: { xs: 1, sm: 2 } }}>
-          {winCnt}
+          {row.win_cnt}
         </TableCell>
         <TableCell align="center" sx={{ fontVariantNumeric: 'tabular-nums', color: 'error.main', fontWeight: 700, px: { xs: 1, sm: 2 } }}>
-          {loseCnt}
+          {row.lose_cnt}
         </TableCell>
         <TableCell align="center" sx={{ px: { xs: 1, sm: 2 } }}>
-          <WinRateLabel value={winRate} />
+          <WinRateLabel value={row.win_rate_pct} />
         </TableCell>
       </TableRow>
 
@@ -190,9 +187,7 @@ function OpponentRow({
                 opponentWizardId={row.opponent_wizard_id}
                 seasonCode={seasonCode}
                 seasonId={seasonId}
-                onLoaded={(wins, losses, total, hasMore) =>
-                  setLiveStats({ wins, losses, total, hasMore })
-                }
+                fetchEnabled={expanded}
               />
             </Box>
           </Collapse>
@@ -262,14 +257,6 @@ export default function RtaPlayerOpponentsClient() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        배치 집계 기준 (
-        <Box component="span" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-          rta_agg_summoner_opponent_h2h_snap
-        </Box>
-        ) — 실시간 반영이 아니며 대전 횟수 기준 내림차순입니다.
-      </Typography>
-
       {accumulated.length === 0 && !isLoading ? (
         <Typography variant="body2" color="text.secondary">
           이 시즌에 집계된 상대 전적이 없습니다. 배치 Job 실행 후 조회해 주세요.

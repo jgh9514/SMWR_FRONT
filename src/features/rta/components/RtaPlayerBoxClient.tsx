@@ -29,7 +29,6 @@ function n(v: unknown): number {
 function rowFromApi(r: RtaPlayerOwnedBoxRow & Record<string, unknown>): RtaPlayerOwnedBoxRow {
   return {
     unit_master_id: n(r.unit_master_id),
-    copy_count: n(r.copy_count),
     monster_name: r.monster_name != null ? String(r.monster_name) : null,
     monster_image: r.monster_image != null ? String(r.monster_image) : null,
     monster_elemental: r.monster_elemental != null ? String(r.monster_elemental) : null,
@@ -72,21 +71,9 @@ export default function RtaPlayerBoxClient() {
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        SWEX 최신 임포트 기준 보유 복제 스냅입니다. 배치(
-        <Box component="span" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-          rta_agg_summoner_owned_box_snap
-        </Box>
-        )·원천(
-        <Box component="span" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
-          user_monster_owned_agg
-        </Box>
-        ).
-      </Typography>
-
       {rows.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          보유 행이 없습니다. SWEX 연동·보유 집계 배치 후 랭킹 Job(보유 박스 스냅)을 실행해 주세요.
+          보유 행이 없습니다. 수집된 RTA 리플레이에서 이 소환사가 픽·밴으로 사용한 기록이 없거나, 무거운 소환사 스냅 배치(RtaSummonerRankingAggJob) 실행 후 다시 확인해 주세요.
         </Typography>
       ) : (
         <Stack spacing={0.5}>
@@ -100,7 +87,6 @@ export default function RtaPlayerBoxClient() {
             <TableHead>
               <TableRow>
                 <TableCell>몬스터</TableCell>
-                <TableCell align="right">보유 수</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -131,9 +117,6 @@ export default function RtaPlayerBoxClient() {
                           #{row.unit_master_id}
                         </Typography>
                       </Stack>
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {row.copy_count}
                     </TableCell>
                   </TableRow>
                 );

@@ -68,6 +68,20 @@ function startOfLocalDay(d: Date): Date {
   return x;
 }
 
+/** yyyy-MM-dd 구간 양 끝 포함, 로컬 자정 기준 일자 나열 */
+function iterateLocalDaysInclusive(startYmd: string, endYmd: string): string[] {
+  const out: string[] = [];
+  const [sy, sm, sd] = startYmd.split('-').map(Number);
+  const [ey, em, ed] = endYmd.split('-').map(Number);
+  const cur = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+  while (cur.getTime() <= end.getTime()) {
+    out.push(ymdLocal(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 /** Recharts ResponsiveContainer: % 높이만 쓰면 그리드·첫 측정에서 width/height -1 → 픽셀 지정 */
 const RTA_OVERVIEW_CHART_30D_PX = 180;
@@ -221,21 +235,38 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
         t: c.date,
       }));
     }
-    const byDay = new Map<string, { last: number; date: string }>();
+    const endOfDayScore = new Map<string, number>();
+    const endOfDayLastIso = new Map<string, string>();
     for (const c of chronological) {
       const k = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
-      const cur = byDay.get(k);
-      if (!cur || parseMatchDate(c.date) >= parseMatchDate(cur.date)) {
-        byDay.set(k, { last: c.myScore, date: c.date });
+      const cur = endOfDayLastIso.get(k);
+      const curTime = cur ? parseMatchDate(cur).getTime() : -1;
+      const t = parseMatchDate(c.date).getTime();
+      if (!cur || t >= curTime) {
+        endOfDayScore.set(k, c.myScore);
+        endOfDayLastIso.set(k, c.date);
       }
     }
-    const keys = [...byDay.keys()].sort();
-    return keys.map((k, i) => ({
-      x: i + 1,
-      label: k.slice(5).replace('-', '/'),
-      score: byDay.get(k)!.last,
-      t: byDay.get(k)!.date,
-    }));
+    const sortedDays = [...endOfDayScore.keys()].sort();
+    if (sortedDays.length === 0) return [];
+    const firstDay = sortedDays[0]!;
+    const lastDay = sortedDays[sortedDays.length - 1]!;
+    const allDays = iterateLocalDaysInclusive(firstDay, lastDay);
+    let carryScore = endOfDayScore.get(firstDay)!;
+    return allDays.map((k, i) => {
+      if (endOfDayScore.has(k)) {
+        carryScore = endOfDayScore.get(k)!;
+      }
+      const iso = endOfDayLastIso.get(k);
+      /** 경기 없는 날: 툴팁용 로컬 정오 근처(타존 깨짐 방지 위해 Z 미부착) */
+      const tIso = iso ?? `${k}T12:00:00`;
+      return {
+        x: i + 1,
+        label: k.slice(5).replace('-', '/'),
+        score: carryScore,
+        t: tIso,
+      };
+    });
   }, [chronological, chartMode]);
 
   const chartDomain = useMemo(() => {
@@ -624,9 +655,6 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                     </ResponsiveContainer>
                   )}
                 </Box>
-                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', mt: 0.5 }}>
-                  로드된 경기·일자에 한해 그래프가 늘어납니다.
-                </Typography>
               </Box>
             </Collapse>
           </Box>

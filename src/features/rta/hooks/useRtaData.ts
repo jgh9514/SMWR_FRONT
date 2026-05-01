@@ -34,6 +34,7 @@ import type {
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
   RtaMonsterPickBreakdownResponse,
+  RtaMonsterPickSlotMatchesResponse,
   RtaPlayerMonsterUsageResponse,
   RtaPlayerOwnedBoxResponse,
   RtaPlayerOpponentResponse,
@@ -630,6 +631,46 @@ export const useRtaMonsterPickBreakdown = (
   );
 };
 
+/** 소환사×몬스터 특정 픽 슬롯 경기 목록 (teamSide 1=선픽/2=후픽, pickSlotNo 1~5) */
+export const useRtaMonsterPickSlotMatches = (
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null,
+  unitMasterId: number | null,
+  teamSide: number | null,
+  pickSlotNo: number | null,
+  options?: { enabled?: boolean },
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id
+    ? `/rta/player/${encodeURIComponent(id)}/monster-pick-slot-matches`
+    : '/rta/player/-/monster-pick-slot-matches';
+  const enabled =
+    Boolean(id) &&
+    seasonId != null &&
+    unitMasterId != null && unitMasterId > 0 &&
+    teamSide != null && teamSide >= 1 && teamSide <= 2 &&
+    pickSlotNo != null && pickSlotNo >= 1 && pickSlotNo <= 5 &&
+    (options?.enabled !== false);
+
+  return useApiPostQuery<RtaMonsterPickSlotMatchesResponse>(
+    path,
+    {
+      ...seasonBody(seasonCode ?? null, seasonId ?? null),
+      unit_master_id: unitMasterId ?? 0,
+      team_side: teamSide ?? 0,
+      pick_slot_no: pickSlotNo ?? 0,
+      limit: 20,
+    },
+    {
+      enabled,
+      staleTime: 120_000,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
 /** 소환사 상대 전적(H2H) — rta_agg_summoner_opponent_h2h_snap (배치, 시즌별) */
 export const useRtaPlayerOpponentRecords = (
   wizardId: string,
@@ -677,7 +718,7 @@ export const useRtaVsMatches = (
   );
 };
 
-/** SWEX 보유 스냅 rta_agg_summoner_owned_box_snap (시즌 무관) */
+/** RTA 픽·밴 스냅 rta_agg_summoner_owned_box_snap (시즌 무관, 무거운 스냅 배치 갱신) */
 export const useRtaPlayerOwnedBox = (wizardId: string, options?: { enabled?: boolean }) => {
   const id = wizardId?.trim() ?? '';
   const path = id ? `/rta/player/${encodeURIComponent(id)}/owned-box` : '/rta/player/-/owned-box';
