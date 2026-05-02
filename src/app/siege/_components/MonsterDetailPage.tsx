@@ -358,7 +358,7 @@ export default function MonsterDetailPage() {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
             gap: { xs: 2, md: 3 },
           }}
         >
@@ -670,16 +670,16 @@ export default function MonsterDetailPage() {
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
-                                  gap: 1.5,
-                                  flexWrap: 'wrap',
+                                  gap: 1,
+                                  flexWrap: { xs: 'wrap', sm: 'nowrap' },
                                 }}
                               >
                                 <Box
                                   sx={{
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: 2,
-                                    flexWrap: { xs: 'wrap', sm: 'nowrap' },
+                                    gap: { xs: 1, md: 2 },
+                                    flexWrap: 'nowrap',
                                     flex: 1,
                                     minWidth: 0,
                                   }}
@@ -742,6 +742,8 @@ export default function MonsterDetailPage() {
                                     alignItems: 'center',
                                     gap: 0.75,
                                     flexShrink: 0,
+                                    flexBasis: { xs: '100%', sm: 'auto' },
+                                    justifyContent: { xs: 'flex-end', sm: 'flex-start' },
                                   }}
                                 >
                                   {(() => {
