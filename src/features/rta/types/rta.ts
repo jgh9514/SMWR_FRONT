@@ -270,6 +270,7 @@ export interface RtaTierDailyRow {
 export interface RtaRankCutoffAnchorRow {
   sort_order?: number;
   anchor_key?: string;
+  gradeSlot?: string;
   ratingId?: number;
   cutoff_score: number;
 }

@@ -32,10 +32,10 @@ export function pivotRankCutoffAnchors(
   for (const row of rows ?? []) {
     const ak = String(row.anchor_key ?? '').trim();
     if (!ak) continue;
-    const ridRaw = row.ratingId;
-    const tk =
-      ridRaw != null && String(ridRaw).trim() !== ''
-        ? getRtaTierShortLabel(Number(ridRaw))
+    const tk = row.gradeSlot
+      ? String(row.gradeSlot).trim()
+      : row.ratingId != null
+        ? getRtaTierShortLabel(Number(row.ratingId))
         : '';
     if (!tk || !tierSet.has(tk)) continue;
     if (!byAnchor.has(ak)) byAnchor.set(ak, {});
