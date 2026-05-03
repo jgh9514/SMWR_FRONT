@@ -5,13 +5,17 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Box,
-  Button,
+  Chip,
   Container,
+  Stack,
   Tab,
   Tabs,
+  Tooltip,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { alpha } from '@mui/material/styles';
+import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import StarIcon from '@mui/icons-material/Star';
 import { AttributeElementIcon } from '@/shared/ui';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 import type {
@@ -20,7 +24,6 @@ import type {
 } from '@/features/siege/hooks/useMonsterInfo';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import type { AttributeType } from '@/features/siege/types/monster';
-import MonsterDetailHeroTxtWrap from '@/features/siege/components/MonsterDetailHeroTxtWrap';
 import { monsterAwakenStepDigit } from '@/features/siege/lib/monsterIdEvolution';
 import { MonsterInfoContext } from '@/features/siege/context/MonsterInfoContext';
 
@@ -66,11 +69,19 @@ export function getMonsterAttribute(elemental: string | undefined): AttributeTyp
 }
 
 export const HEADER_GRADIENT: Record<AttributeType, string> = {
-  fire: 'linear-gradient(135deg, #b71c1c 0%, #ff8a80 100%)',
-  water: 'linear-gradient(135deg, #1565c0 0%, #81d4fa 100%)',
-  wind: 'linear-gradient(135deg, #2e7d32 0%, #a5d6a7 100%)',
-  light: 'linear-gradient(135deg, #f9a825 0%, #fff9c4 100%)',
-  dark: 'linear-gradient(135deg, #4a148c 0%, #ce93d8 100%)',
+  fire:  'linear-gradient(135deg, #b71c1c 0%, #e53935 60%, #ff8a80 100%)',
+  water: 'linear-gradient(135deg, #0d47a1 0%, #1565c0 60%, #64b5f6 100%)',
+  wind:  'linear-gradient(135deg, #1b5e20 0%, #2e7d32 60%, #81c784 100%)',
+  light: 'linear-gradient(135deg, #e65100 0%, #f9a825 60%, #fff59d 100%)',
+  dark:  'linear-gradient(135deg, #1a0030 0%, #4a148c 60%, #ba68c8 100%)',
+};
+
+const ATTR_KO: Record<AttributeType, string> = {
+  fire: '화염', water: '물', wind: '바람', light: '빛', dark: '어둠',
+};
+
+const ARCHETYPE_TO_KO: Record<string, string> = {
+  attack: '공격형', defense: '방어형', hp: '체력형', support: '지원형',
 };
 
 export function detailContextFrom(info: MonsterInfoResponse) {
@@ -78,7 +89,21 @@ export function detailContextFrom(info: MonsterInfoResponse) {
   return (info as unknown as Record<string, unknown>)['detailContext'] as typeof info.detail_context | undefined;
 }
 
-// ── tab nav ───────────────────────────────────────────────────────────────────
+function formatUpdatedRelativeKo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const diffMs = Date.now() - d.getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days < 0) return '방금';
+  if (days === 0) {
+    const hours = Math.floor(diffMs / 3600000);
+    return hours <= 0 ? '방금' : `${hours}시간 전`;
+  }
+  if (days === 1) return '1일 전';
+  return `${days}일 전`;
+}
+
+// ── tabs ──────────────────────────────────────────────────────────────────────
 
 const TABS = [
   { label: '개요', sub: '' },
@@ -103,7 +128,7 @@ export default function MonsterDetailContent({
   infoUpdatedAt = null,
 }: MonsterDetailContentProps) {
   const pathname = usePathname();
-  const { monster_id, monster_elemental } = monsterInfo;
+  const { monster_id, monster_elemental, kr_name, un_name, image_url, archetype, natural_stars, star } = monsterInfo;
 
   const baseHref = `/monster-detail/${monster_id}`;
 
@@ -115,16 +140,25 @@ export default function MonsterDetailContent({
   }, [pathname]);
 
   const attr = getMonsterAttribute(monster_elemental);
+  const grad = attr ? HEADER_GRADIENT[attr] : 'linear-gradient(135deg, #37474f 0%, #546e7a 60%, #90a4ae 100%)';
   const awakenStep = monsterAwakenStepDigit(monster_id) ?? 0;
   const stub = infoToMonsterStub(monsterInfo);
   const dctx = detailContextFrom(monsterInfo);
-  const ev = dctx?.evolution;
-  const normalM = slimToOption(ev?.normal) ?? (awakenStep === 0 ? stub : undefined);
-  const awakenedM = slimToOption(ev?.awakened) ?? (awakenStep === 1 ? stub : undefined);
-  const secondM = slimToOption(ev?.second_awakening) ?? (awakenStep === 2 ? stub : undefined);
+
+  const starCount = natural_stars != null && natural_stars > 0
+    ? Math.min(6, natural_stars)
+    : Math.min(6, star ?? 0);
+
+  const archetypeKo = archetype
+    ? (ARCHETYPE_TO_KO[archetype] ?? ARCHETYPE_TO_KO[archetype.toLowerCase()] ?? archetype)
+    : null;
+
+  const recentSub = infoUpdatedAt?.trim()
+    ? formatUpdatedRelativeKo(infoUpdatedAt)
+    : null;
 
   const siblingElements = useMemo(() => {
-    const raw = detailContextFrom(monsterInfo)?.siblings;
+    const raw = dctx?.siblings;
     if (!raw?.length) return [];
     const out: { attr: AttributeType; monster: MonsterOption }[] = [];
     for (const s of raw) {
@@ -135,82 +169,235 @@ export default function MonsterDetailContent({
       out.push({ attr: el, monster: m });
     }
     return out;
-  }, [monsterInfo]);
-
-  const naturalStarCount = monsterInfo.natural_stars != null && monsterInfo.natural_stars > 0
-    ? Math.min(6, monsterInfo.natural_stars)
-    : Math.min(6, monsterInfo.star ?? 0);
+  }, [dctx]);
 
   return (
     <MonsterInfoContext.Provider value={{ monsterInfo, devilmonImageUrl }}>
-      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 } }}>
-        <Button
+      <Container maxWidth="lg" sx={{ pt: { xs: 1.5, md: 2 }, pb: { xs: 2, md: 3 } }}>
+
+        {/* ── back link ── */}
+        <Box
           component={Link}
           href="/monster-search"
-          variant="outlined"
-          size="small"
-          startIcon={<ArrowBackIcon />}
-          sx={{ mb: 2 }}
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.5,
+            mb: 1.5,
+            color: 'text.secondary',
+            textDecoration: 'none',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            opacity: 0.8,
+            transition: 'opacity 0.15s',
+            '&:hover': { opacity: 1, color: 'text.primary' },
+          }}
         >
+          <ArrowBackIosNewIcon sx={{ fontSize: 12 }} />
           몬스터 검색
-        </Button>
+        </Box>
 
-        <MonsterDetailHeroTxtWrap
-          imageUrl={monsterInfo.image_url}
-          krName={monsterInfo.kr_name}
-          attr={attr}
-          monsterElemental={monster_elemental}
-          archetype={monsterInfo.archetype}
-          naturalStarCount={naturalStarCount}
-          infoUpdatedAt={infoUpdatedAt}
-        />
+        {/* ── hero card ── */}
+        <Box
+          sx={{
+            mb: 0,
+            borderRadius: { xs: 2, sm: 3 },
+            overflow: 'hidden',
+            background: grad,
+            position: 'relative',
+          }}
+        >
+          {/* subtle noise/shimmer overlay */}
+          <Box
+            sx={{
+              position: 'absolute', inset: 0, pointerEvents: 'none',
+              background: 'linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.22) 100%)',
+            }}
+          />
 
-        {/* evolution quick-links in hero (stat tab shows full evolution card) */}
-        {(normalM || awakenedM || secondM) ? null : null}
+          <Box
+            sx={{
+              position: 'relative',
+              px: { xs: 2, sm: 3 },
+              pt: { xs: 2.5, sm: 3 },
+              pb: siblingElements.length > 0 ? { xs: 1.5, sm: 2 } : { xs: 2.5, sm: 3 },
+              display: 'flex',
+              gap: { xs: 2, sm: 3 },
+              alignItems: 'flex-start',
+            }}
+          >
+            {/* monster image */}
+            <Box
+              sx={{
+                flexShrink: 0,
+                width: { xs: 88, sm: 110, md: 128 },
+                height: { xs: 88, sm: 110, md: 128 },
+                borderRadius: 2.5,
+                bgcolor: 'rgba(0,0,0,0.18)',
+                border: '2px solid rgba(255,255,255,0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(2px)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+              }}
+            >
+              <Box
+                component="img"
+                src={getRenderableImageUrl(image_url)}
+                alt={kr_name}
+                sx={{
+                  width: '85%',
+                  height: '85%',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.4))',
+                }}
+              />
+            </Box>
 
-        {siblingElements.length > 0 ? (
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700, color: 'text.secondary' }}>
-              같은 몬스터 · 다른 속성
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
-              {siblingElements.map(({ attr: sAttr, monster: sm }) => (
-                <Link key={sAttr} href={`/monster-detail/${sm.monster_id}`} style={{ textDecoration: 'none' }} title={sm.kr_name}>
-                  <Box
+            {/* text info */}
+            <Box sx={{ flex: 1, minWidth: 0, pt: 0.5 }}>
+              {/* attribute + archetype chips */}
+              <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{ mb: 1 }}>
+                {attr && (
+                  <Chip
+                    size="small"
+                    icon={<AttributeElementIcon attribute={attr} size={14} />}
+                    label={`${ATTR_KO[attr]}속성`}
                     sx={{
-                      position: 'relative',
-                      width: 72,
-                      height: 72,
-                      borderRadius: 1.5,
-                      border: '2px solid',
-                      borderColor: 'divider',
-                      bgcolor: 'background.paper',
-                      backgroundImage: `url(${getRenderableImageUrl(sm.image_url)})`,
-                      backgroundSize: 'contain',
-                      backgroundPosition: 'center',
-                      backgroundRepeat: 'no-repeat',
-                      transition: 'transform 0.15s',
-                      '&:hover': { transform: 'scale(1.05)' },
+                      height: 22,
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      bgcolor: 'rgba(255,255,255,0.18)',
+                      color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      '& .MuiChip-icon': { color: 'inherit', ml: 0.5 },
                     }}
-                  >
-                    <Box sx={{ position: 'absolute', bottom: 4, right: 4, lineHeight: 0, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.35))' }}>
-                      <AttributeElementIcon attribute={sAttr} size={22} />
-                    </Box>
-                  </Box>
-                </Link>
-              ))}
+                  />
+                )}
+                {archetypeKo && (
+                  <Chip
+                    size="small"
+                    label={archetypeKo}
+                    sx={{
+                      height: 22,
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      bgcolor: 'rgba(0,0,0,0.22)',
+                      color: 'rgba(255,255,255,0.85)',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                    }}
+                  />
+                )}
+              </Stack>
+
+              {/* name */}
+              <Typography
+                variant="h5"
+                component="h1"
+                fontWeight={800}
+                sx={{
+                  color: '#fff',
+                  lineHeight: 1.15,
+                  letterSpacing: '-0.02em',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  fontSize: { xs: '1.35rem', sm: '1.65rem' },
+                  mb: 0.25,
+                }}
+              >
+                {kr_name}
+              </Typography>
+
+              {/* english name */}
+              {un_name && un_name !== kr_name && (
+                <Typography
+                  variant="body2"
+                  sx={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.8125rem', mb: 0.75, letterSpacing: 0.2 }}
+                >
+                  {un_name}
+                </Typography>
+              )}
+
+              {/* stars */}
+              <Stack direction="row" spacing={0.2} sx={{ mb: 0.75 }}>
+                {Array.from({ length: starCount }).map((_, i) => (
+                  <StarIcon key={i} sx={{ fontSize: { xs: 16, sm: 18 }, color: '#FFD740', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.4))' }} />
+                ))}
+              </Stack>
+
+              {/* updated at */}
+              {recentSub && (
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem' }}>
+                  데이터 업데이트: {recentSub}
+                </Typography>
+              )}
             </Box>
           </Box>
-        ) : null}
 
+          {/* sibling elements strip */}
+          {siblingElements.length > 0 && (
+            <Box
+              sx={{
+                position: 'relative',
+                px: { xs: 2, sm: 3 },
+                pb: { xs: 1.5, sm: 2 },
+                display: 'flex',
+                gap: 1,
+                flexWrap: 'wrap',
+                alignItems: 'center',
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: 0.5, mr: 0.5 }}
+              >
+                같은 몬스터
+              </Typography>
+              {siblingElements.map(({ attr: sAttr, monster: sm }) => (
+                <Tooltip key={sAttr} title={sm.kr_name} placement="top" arrow>
+                  <Link href={`/monster-detail/${sm.monster_id}`} style={{ textDecoration: 'none' }}>
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        width: 44,
+                        height: 44,
+                        borderRadius: 1.5,
+                        bgcolor: 'rgba(0,0,0,0.22)',
+                        border: '1.5px solid rgba(255,255,255,0.2)',
+                        backgroundImage: `url(${getRenderableImageUrl(sm.image_url)})`,
+                        backgroundSize: '80%',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        transition: 'transform 0.15s, border-color 0.15s',
+                        '&:hover': { transform: 'scale(1.1)', borderColor: 'rgba(255,255,255,0.55)' },
+                      }}
+                    >
+                      <Box sx={{ position: 'absolute', bottom: 2, right: 2, lineHeight: 0 }}>
+                        <AttributeElementIcon attribute={sAttr} size={14} />
+                      </Box>
+                    </Box>
+                  </Link>
+                </Tooltip>
+              ))}
+            </Box>
+          )}
+        </Box>
+
+        {/* ── tab nav ── */}
         <Box
           component="nav"
-          sx={{
+          sx={(t) => ({
             borderBottom: '1px solid',
             borderColor: 'divider',
-            mb: 2,
-            '& .MuiTabs-scrollButtons.Mui-disabled': { opacity: 0.35 },
-          }}
+            mb: 2.5,
+            bgcolor: 'background.paper',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
+            mx: { xs: -2, sm: 0 },
+            px: { xs: 2, sm: 0 },
+            boxShadow: `0 1px 0 ${alpha(t.palette.divider, 1)}`,
+          })}
         >
           <Tabs
             value={activeTabIndex}
@@ -218,8 +405,12 @@ export default function MonsterDetailContent({
             scrollButtons="auto"
             allowScrollButtonsMobile
             sx={{
-              minHeight: { xs: 44, sm: 48 },
-              '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' },
+              minHeight: 46,
+              '& .MuiTabs-indicator': {
+                height: 2.5,
+                borderRadius: '3px 3px 0 0',
+              },
+              '& .MuiTabs-scrollButtons.Mui-disabled': { opacity: 0.3 },
             }}
           >
             {TABS.map((t, i) => (
@@ -232,13 +423,15 @@ export default function MonsterDetailContent({
                 disableRipple
                 label={t.label}
                 sx={{
-                  minHeight: { xs: 44, sm: 48 },
+                  minHeight: 46,
                   textTransform: 'none',
-                  fontWeight: activeTabIndex === i ? 700 : 600,
-                  fontSize: { xs: '0.8125rem', sm: '0.875rem' },
+                  fontWeight: activeTabIndex === i ? 700 : 500,
+                  fontSize: '0.875rem',
+                  letterSpacing: 0,
                   color: 'text.secondary',
                   opacity: 1,
-                  '&.Mui-selected': { color: 'primary.main' },
+                  px: { xs: 1.5, sm: 2 },
+                  '&.Mui-selected': { color: 'primary.main', fontWeight: 700 },
                 }}
               />
             ))}

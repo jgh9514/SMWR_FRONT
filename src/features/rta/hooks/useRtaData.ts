@@ -756,6 +756,80 @@ export const useRtaMonsterOverview = (
   });
 };
 
+type MonsterSectionOptions = {
+  seasonId?: number | null;
+  ratingId?: number | null;
+  enabled?: boolean;
+};
+
+function monsterSectionBody(monsterId: number, opts: MonsterSectionOptions) {
+  return {
+    monster_id: monsterId,
+    ...seasonBody(null, opts.seasonId ?? null),
+    ...(opts.ratingId != null ? { rating_id: opts.ratingId } : {}),
+  };
+}
+
+export const useRtaMonsterSummaryStats = (
+  monsterId: number | null | undefined,
+  options: MonsterSectionOptions = {},
+) => {
+  const valid = monsterId != null && monsterId > 0;
+  return useApiPostQuery<{ data: RtaMonsterOverviewStats | null; seasonId?: number | null; ratingId?: number | null }>(
+    '/rta/monster/summary-stats',
+    valid ? monsterSectionBody(monsterId!, options) : {},
+    { enabled: valid && options.enabled !== false, staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false },
+  );
+};
+
+export const useRtaMonsterDailyTrend = (
+  monsterId: number | null | undefined,
+  options: MonsterSectionOptions = {},
+) => {
+  const valid = monsterId != null && monsterId > 0;
+  return useApiPostQuery<{ data: RtaMonsterDailySnapRow[] }>(
+    '/rta/monster/daily-trend',
+    valid ? monsterSectionBody(monsterId!, options) : {},
+    { enabled: valid && options.enabled !== false, staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false },
+  );
+};
+
+export const useRtaMonsterPickSlotsData = (
+  monsterId: number | null | undefined,
+  options: MonsterSectionOptions = {},
+) => {
+  const valid = monsterId != null && monsterId > 0;
+  return useApiPostQuery<{ data: RtaMonsterPickSlotRow[] }>(
+    '/rta/monster/pick-slots',
+    valid ? monsterSectionBody(monsterId!, options) : {},
+    { enabled: valid && options.enabled !== false, staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false },
+  );
+};
+
+export const useRtaMonsterTopSummonersData = (
+  monsterId: number | null | undefined,
+  options: Omit<MonsterSectionOptions, 'ratingId'> = {},
+) => {
+  const valid = monsterId != null && monsterId > 0;
+  return useApiPostQuery<{ data: RtaMonsterTopSummonerRow[] }>(
+    '/rta/monster/top-summoners',
+    valid ? { monster_id: monsterId!, ...seasonBody(null, options.seasonId ?? null) } : {},
+    { enabled: valid && options.enabled !== false, staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false },
+  );
+};
+
+export const useRtaMonsterRecentMatches = (
+  monsterId: number | null | undefined,
+  options: Omit<MonsterSectionOptions, 'ratingId'> & { limit?: number } = {},
+) => {
+  const valid = monsterId != null && monsterId > 0;
+  return useApiPostQuery<{ matches: Record<string, unknown>[]; seasonId: number | null }>(
+    '/rta/monster/recent-matches',
+    valid ? { monster_id: monsterId!, limit: options.limit ?? 10, ...seasonBody(null, options.seasonId ?? null) } : {},
+    { enabled: valid && options.enabled !== false, staleTime: 2 * 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false },
+  );
+};
+
 export const useRtaMonsterDetail = (
   monsterId: number | null,
   seasonCode?: string | null,

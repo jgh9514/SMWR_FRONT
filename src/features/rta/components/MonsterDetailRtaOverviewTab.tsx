@@ -1,26 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Avatar,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
   LinearProgress,
   Paper,
   Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
+  Stack,
   Typography,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   CartesianGrid,
   Legend,
@@ -31,16 +27,23 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { CounterMatchupRow, MonsterDetail } from '@/features/rta/types/rta';
 import {
   useRtaRatingGradeRules,
   useRtaSeasonSelect,
   useRtaSeasons,
-  useRtaMonsterOverview,
+  useRtaMonsterSummaryStats,
+  useRtaMonsterDailyTrend,
+  useRtaMonsterPickSlotsData,
+  useRtaMonsterTopSummonersData,
+  useRtaMonsterRecentMatches,
   buildMonsterStatsTierBody,
 } from '@/features/rta/hooks/useRtaData';
 import RtaSeasonTierSelectRow from '@/features/rta/components/RtaSeasonTierSelectRow';
-import { getRenderableImageUrl, getSwexPlayerImageUrl } from '@/shared/utils/image';
+import RtaMatchListCard from '@/features/rta/components/RtaMatchListCard';
+import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
+import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
+import type { RawMatchItem } from '@/types';
 
 // ── 헬퍼 ─────────────────────────────────────────────────────────────────────
 
@@ -54,7 +57,11 @@ function fmtInt(v: number | null | undefined): string {
   return Number(v).toLocaleString('ko-KR');
 }
 
-const SLOT_LABEL: Record<number, string> = { 1: '1픽', 2: '2픽', 3: '3픽', 4: '4픽', 5: '5픽' };
+function toNum(v: unknown): number {
+  if (v == null || v === '') return 0;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
 
 // ── 요약 카드 ─────────────────────────────────────────────────────────────────
 
@@ -99,61 +106,168 @@ function StatChip({
   );
 }
 
-// ── 픽 슬롯 테이블 ─────────────────────────────────────────────────────────────
+// ── 픽 슬롯 박스 (RtaPlayerPicksClient 동일 레이아웃) ─────────────────────────
 
-function PickSlotTable({
-  slots,
-  teamSide,
-  label,
+const FIRST_PICK_COLS: readonly (readonly number[])[] = [[1], [2, 3], [4, 5]];
+const SECOND_PICK_COLS: readonly (readonly number[])[] = [[1, 2], [3, 4], [5]];
+const TEAM_PICK_SLOT_LABEL: Record<number, string> = { 1: '1번', 2: '2번', 3: '3번', 4: '4번', 5: '5번' };
+
+function PickSlotBox({
+  slotNo,
+  pickSharePct,
+  winRatePct,
+  pickCnt,
+  color,
 }: {
-  slots: { pick_slot_no: number; team_side: number; pick_cnt: number; win_cnt: number; field_cnt: number; pick_share_pct?: number | null; win_rate_pct?: number | null }[];
-  teamSide: number;
-  label: string;
+  slotNo: number;
+  pickSharePct: number;
+  winRatePct: number | null;
+  pickCnt: number;
+  color: string;
 }) {
-  const rows = slots.filter((s) => s.team_side === teamSide);
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const fill = Math.min(100, Math.max(0, pickSharePct));
+  const wr = winRatePct;
+  const wrColor =
+    wr == null ? 'text.disabled' : wr >= 55 ? 'error.main' : wr >= 50 ? 'success.main' : 'text.secondary';
+  const hasData = pickCnt > 0;
+
   return (
-    <Card variant="outlined">
-      <CardContent sx={{ pb: '12px !important' }}>
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          {label}
-        </Typography>
-        <TableContainer>
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>슬롯</TableCell>
-                <TableCell align="right">픽 횟수</TableCell>
-                <TableCell align="right">픽률</TableCell>
-                <TableCell align="right">승률</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {[1, 2, 3, 4, 5].map((slot) => {
-                const r = rows.find((s) => s.pick_slot_no === slot);
-                return (
-                  <TableRow key={slot}>
-                    <TableCell>{SLOT_LABEL[slot] ?? `${slot}픽`}</TableCell>
-                    <TableCell align="right">{r ? fmtInt(r.pick_cnt) : '—'}</TableCell>
-                    <TableCell align="right">{r ? fmt1(r.pick_share_pct) : '—'}</TableCell>
-                    <TableCell align="right">
-                      {r?.win_rate_pct != null ? (
-                        <Typography
-                          component="span"
-                          variant="body2"
-                          color={Number(r.win_rate_pct) >= 50 ? 'success.main' : 'error.main'}
-                        >
-                          {fmt1(r.win_rate_pct)}
-                        </Typography>
-                      ) : '—'}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </CardContent>
-    </Card>
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          fontSize: '0.62rem',
+          fontWeight: 700,
+          color: hasData ? alpha(color, isDark ? 0.9 : 0.75) : 'text.disabled',
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {TEAM_PICK_SLOT_LABEL[slotNo] ?? '—'}
+      </Typography>
+
+      <Box
+        sx={{
+          position: 'relative',
+          width: { xs: 46, sm: 58, md: 64 },
+          height: { xs: 46, sm: 58, md: 64 },
+          borderRadius: 1.5,
+          overflow: 'hidden',
+          border: '2px solid',
+          borderColor: hasData ? alpha(color, isDark ? 0.45 : 0.3) : alpha(theme.palette.divider, 0.6),
+          bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: `${fill}%`,
+            background: `linear-gradient(180deg, ${alpha(color, isDark ? 0.55 : 0.45)}, ${alpha(color, isDark ? 0.35 : 0.25)})`,
+            transition: 'height 0.45s cubic-bezier(.4,0,.2,1)',
+          }}
+        />
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+            gap: 0.3,
+            pointerEvents: 'none',
+          }}
+        >
+          <Typography
+            sx={{
+              fontWeight: 700,
+              fontSize: { xs: '0.55rem', sm: '0.6rem' },
+              lineHeight: 1,
+              color: 'text.secondary',
+              textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 2px rgba(255,255,255,0.8)',
+            }}
+          >
+            {hasData ? `${fmtInt(pickCnt)}픽` : ''}
+          </Typography>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: { xs: '0.68rem', sm: '0.78rem' },
+              lineHeight: 1,
+              color: hasData ? 'text.primary' : 'text.disabled',
+              textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 2px rgba(255,255,255,0.8)',
+            }}
+          >
+            {hasData ? `${fill.toFixed(1)}%` : '—'}
+          </Typography>
+        </Box>
+      </Box>
+
+      <Typography
+        sx={{
+          fontWeight: 800,
+          fontSize: '0.68rem',
+          lineHeight: 1,
+          color: wrColor,
+        }}
+      >
+        {wr == null ? '—' : `${wr.toFixed(1)}%`}
+      </Typography>
+    </Box>
+  );
+}
+
+function PickSnakeGrid({
+  slots,
+  isFirstPick,
+  color,
+}: {
+  slots: RtaMonsterPickSlotRow[];
+  isFirstPick: boolean;
+  color: string;
+}) {
+  const colPattern = isFirstPick ? FIRST_PICK_COLS : SECOND_PICK_COLS;
+  const slotMap = new Map(slots.map((s) => [s.pick_slot_no, s]));
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'row',
+        gap: { xs: 0.75, sm: 1, md: 1.5 },
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {colPattern.map((colSlots, colIdx) => (
+        <Stack
+          key={colIdx}
+          direction="column"
+          gap={{ xs: 0.75, sm: 1 }}
+          sx={{ alignItems: 'center', justifyContent: 'center' }}
+        >
+          {colSlots.map((slotNo) => {
+            const row = slotMap.get(slotNo);
+            return (
+              <PickSlotBox
+                key={slotNo}
+                slotNo={slotNo}
+                pickSharePct={row ? toNum(row.pick_share_pct) : 0}
+                winRatePct={row?.win_rate_pct != null ? toNum(row.win_rate_pct) : null}
+                pickCnt={row ? toNum(row.pick_cnt) : 0}
+                color={color}
+              />
+            );
+          })}
+        </Stack>
+      ))}
+    </Box>
   );
 }
 
@@ -161,22 +275,13 @@ function PickSlotTable({
 
 interface MonsterDetailRtaOverviewTabProps {
   monsterId?: number | null;
-  rtaDetail: MonsterDetail | null;
-  rtaOverviewPending?: boolean;
-  rtaOverviewFailed?: boolean;
 }
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────────────────
 
-export default function MonsterDetailRtaOverviewTab({
-  monsterId,
-  rtaDetail,
-  rtaOverviewPending = false,
-  rtaOverviewFailed = false,
-}: MonsterDetailRtaOverviewTabProps) {
+export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetailRtaOverviewTabProps) {
   const { data: seasonsData } = useRtaSeasons();
-  const { seasonSelectValue, setSeason, seasonOptions, seasonIdForApi } =
-    useRtaSeasonSelect(seasonsData);
+  const { seasonSelectValue, setSeason, seasonOptions, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
   const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
   const [tierSelection, setTierSelection] = useState('CH_ALL');
 
@@ -185,16 +290,31 @@ export default function MonsterDetailRtaOverviewTab({
     return buildMonsterStatsTierBody(tierSelection, gradeRules).ratingId ?? null;
   }, [tierSelection, gradeRules]);
 
-  const { data: overview, isFetching: overviewFetching } = useRtaMonsterOverview(monsterId, {
+  const sectionOpts = {
     seasonId: seasonIdForApi ?? null,
     ratingId: selectedRatingId,
     enabled: monsterId != null && monsterId > 0,
+  };
+
+  const { data: summaryData, isFetching: summaryFetching } = useRtaMonsterSummaryStats(monsterId, sectionOpts);
+  const { data: trendData, isFetching: trendFetching } = useRtaMonsterDailyTrend(monsterId, sectionOpts);
+  const { data: pickSlotsData, isFetching: slotsFetching } = useRtaMonsterPickSlotsData(monsterId, sectionOpts);
+  const { data: topSummonersData, isFetching: topFetching } = useRtaMonsterTopSummonersData(monsterId, {
+    seasonId: seasonIdForApi ?? null,
+    enabled: monsterId != null && monsterId > 0,
+  });
+  const [visibleMatchCount, setVisibleMatchCount] = useState(10);
+  useEffect(() => { setVisibleMatchCount(10); }, [seasonIdForApi, monsterId]);
+  const { data: recentMatchesData, isFetching: recentFetching } = useRtaMonsterRecentMatches(monsterId, {
+    seasonId: seasonIdForApi ?? null,
+    enabled: monsterId != null && monsterId > 0,
+    limit: 20,
   });
 
-  const stats = overview?.overview_stats ?? null;
-  const dailyTrend = overview?.daily_trend ?? [];
-  const pickSlots = overview?.pick_slots ?? [];
-  const topSummoners = overview?.top_summoners ?? [];
+  const stats = summaryData?.data ?? null;
+  const dailyTrend = trendData?.data ?? [];
+  const pickSlots = pickSlotsData?.data ?? [];
+  const topSummoners = topSummonersData?.data ?? [];
 
   const chartData = useMemo(
     () =>
@@ -207,32 +327,8 @@ export default function MonsterDetailRtaOverviewTab({
     [dailyTrend],
   );
 
-  const soloCounters = useMemo(
-    () =>
-      (rtaDetail?.counter_matchups ?? [])
-        .filter((r: CounterMatchupRow) => Number(r.opponentComboSize ?? 0) === 1)
-        .slice(0, 5),
-    [rtaDetail?.counter_matchups],
-  );
-
-  if (rtaOverviewPending) {
-    return (
-      <Box sx={{ py: 2 }}>
-        <LinearProgress />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-          RTA 집계를 불러오는 중입니다…
-        </Typography>
-      </Box>
-    );
-  }
-
-  if (rtaOverviewFailed) {
-    return (
-      <Alert severity="warning" sx={{ mb: 2 }}>
-        RTA 집계를 불러오지 못했습니다.
-      </Alert>
-    );
-  }
+  const firstPickSlots = useMemo(() => pickSlots.filter((s) => s.team_side === 1), [pickSlots]);
+  const secondPickSlots = useMemo(() => pickSlots.filter((s) => s.team_side === 2), [pickSlots]);
 
   return (
     <Box>
@@ -253,43 +349,38 @@ export default function MonsterDetailRtaOverviewTab({
         sx={(t) => ({
           mb: 2,
           p: { xs: 2, sm: 3 },
-          background: t.palette.mode === 'dark'
-            ? alpha(t.palette.primary.main, 0.04)
-            : alpha(t.palette.primary.main, 0.02),
+          background: t.palette.action.hover,
         })}
       >
-        {overviewFetching ? (
+        {summaryFetching ? (
           <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} variant="rectangular" width={80} height={56} sx={{ borderRadius: 1 }} />
             ))}
           </Box>
         ) : stats ? (
-          <>
-            <Box
-              sx={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-                gap: { xs: 2, sm: 4 },
-                mb: 1,
-              }}
-            >
-              <StatChip
-                label="Win Rate"
-                value={fmt1(stats.win_rate_pct)}
-                color={stats.win_rate_pct != null && Number(stats.win_rate_pct) >= 50 ? 'success' : 'error'}
-              />
-              <StatChip
-                label="Pick Rate"
-                value={fmt1(stats.pick_rate_pct)}
-                sub={`${fmtInt(stats.pick_cnt)} / ${fmtInt(stats.field_cnt)} games`}
-                color="primary"
-              />
-              <StatChip label="Ban Rate" value={fmt1(stats.ban_rate_pct)} />
-              <StatChip label="Lead Rate" value={fmt1(stats.lead_rate_pct)} />
-            </Box>
-          </>
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: { xs: 2, sm: 4 },
+            }}
+          >
+            <StatChip
+              label="Win Rate"
+              value={fmt1(stats.win_rate_pct)}
+              color={stats.win_rate_pct != null && Number(stats.win_rate_pct) >= 50 ? 'success' : 'error'}
+            />
+            <StatChip
+              label="Pick Rate"
+              value={fmt1(stats.pick_rate_pct)}
+              sub={`${fmtInt(stats.pick_cnt)} / ${fmtInt(stats.field_cnt)} games`}
+              color="primary"
+            />
+            <StatChip label="Ban Rate" value={fmt1(stats.ban_rate_pct)} />
+            <StatChip label="Lead Rate" value={fmt1(stats.lead_rate_pct)} />
+          </Box>
         ) : (
           <Typography variant="body2" color="text.secondary" textAlign="center">
             집계 데이터가 없습니다. (배치 실행 후 표시됩니다)
@@ -302,7 +393,7 @@ export default function MonsterDetailRtaOverviewTab({
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
           최근 7일 지표 추이 (%)
         </Typography>
-        {overviewFetching ? (
+        {trendFetching ? (
           <Skeleton variant="rectangular" width="100%" height={240} sx={{ borderRadius: 1 }} />
         ) : chartData.length > 0 ? (
           <Box sx={{ width: '100%', height: 260 }}>
@@ -315,7 +406,15 @@ export default function MonsterDetailRtaOverviewTab({
                 <Legend />
                 <Line type="monotone" dataKey="픽률" stroke="#1976d2" strokeWidth={2} dot connectNulls />
                 <Line type="monotone" dataKey="승률" stroke="#2e7d32" strokeWidth={2} dot connectNulls />
-                <Line type="monotone" dataKey="밴률" stroke="#c62828" strokeWidth={2} dot connectNulls strokeDasharray="4 2" />
+                <Line
+                  type="monotone"
+                  dataKey="밴률"
+                  stroke="#c62828"
+                  strokeWidth={2}
+                  dot
+                  connectNulls
+                  strokeDasharray="4 2"
+                />
               </LineChart>
             </ResponsiveContainer>
           </Box>
@@ -326,141 +425,240 @@ export default function MonsterDetailRtaOverviewTab({
         )}
       </Paper>
 
-      {/* ── 픽 슬롯별 집계 ── */}
+      {/* ── 픽 순서별 통계 ── */}
       <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 2, mb: 1 }}>
         픽 순서별 통계
       </Typography>
-      {overviewFetching ? (
+      {slotsFetching ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-          <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1 }} />
-          <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 1 }} />
+          <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
+          <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
         </Box>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-          <PickSlotTable slots={pickSlots as any} teamSide={1} label="선픽 팀 슬롯별 픽률·승률" />
-          <PickSlotTable slots={pickSlots as any} teamSide={2} label="후픽 팀 슬롯별 픽률·승률" />
+          {/* 선픽 */}
+          <Card variant="outlined">
+            <CardContent sx={{ pb: '12px !important' }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                선픽 팀
+              </Typography>
+              {firstPickSlots.length > 0 ? (
+                <PickSnakeGrid slots={firstPickSlots} isFirstPick={true} color="#1976d2" />
+              ) : (
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  데이터 없음
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 후픽 */}
+          <Card variant="outlined">
+            <CardContent sx={{ pb: '12px !important' }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
+                후픽 팀
+              </Typography>
+              {secondPickSlots.length > 0 ? (
+                <PickSnakeGrid slots={secondPickSlots} isFirstPick={false} color="#7b1fa2" />
+              ) : (
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  데이터 없음
+                </Typography>
+              )}
+            </CardContent>
+          </Card>
         </Box>
       )}
 
-      {/* ── 상성 / 시너지 ── */}
-      <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 2, mb: 1 }}>
-        몬스터 상성
-      </Typography>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-        <Card variant="outlined">
-          <CardContent>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-              상대하기 어려운 몬스터 (카운터 · 솔로)
-            </Typography>
-            {soloCounters.length ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {soloCounters.map((r, i) => (
-                  <Box key={`${r.opponentComboKey}-${i}`} sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                    <Typography variant="body2" noWrap title={String(r.opponentLabel ?? r.opponentComboKey)}>
-                      {r.opponentLabel ?? r.opponentComboKey ?? '—'}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                      승률 {r.winRate != null ? `${Number(r.winRate).toFixed(1)}%` : '—'}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Typography variant="body2" color="text.secondary">데이터가 없습니다.</Typography>
-            )}
-          </CardContent>
-        </Card>
-        <Card variant="outlined">
-          <CardContent>
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-              함께 사용된 몬스터 (듀오 시너지)
-            </Typography>
-            {rtaDetail?.good_combos?.length ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {rtaDetail.good_combos.slice(0, 5).map((c, i) => (
-                  <Box key={`${c.monster_id}-${i}`} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Avatar src={getRenderableImageUrl(c.monster_image)} variant="rounded" sx={{ width: 32, height: 32 }}>
-                      {(c.monster_name ?? '?').charAt(0)}
-                    </Avatar>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" noWrap>{c.monster_name}</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        승률 {c.win_rate.toFixed(1)}% · {c.match_count}판
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Typography variant="body2" color="text.secondary">데이터가 없습니다.</Typography>
-            )}
-          </CardContent>
-        </Card>
-      </Box>
-
-      {/* ── 장인 랭킹 ── */}
-      <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 2, mb: 1 }}>
+      {/* ── 장인 랭킹 + 최근 전투 (2열) ── */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+          gap: 3,
+          mt: 2,
+          alignItems: 'start',
+        }}
+      >
+        {/* 왼쪽: 장인 랭킹 */}
+        <Box>
+      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
         장인 랭킹
       </Typography>
-      <Card variant="outlined" sx={{ mb: 2 }}>
-        <CardContent sx={{ pb: '12px !important' }}>
-          {overviewFetching ? (
-            <Skeleton variant="rectangular" width="100%" height={120} sx={{ borderRadius: 1 }} />
-          ) : topSummoners.length > 0 ? (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>#</TableCell>
-                    <TableCell>소환사</TableCell>
-                    <TableCell align="right">픽</TableCell>
-                    <TableCell align="right">승률</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {topSummoners.map((s, i) => (
-                    <TableRow key={s.wizard_id} hover>
-                      <TableCell>
-                        <Chip
-                          label={i + 1}
-                          size="small"
-                          sx={{ width: 28, height: 20, fontSize: '0.7rem', fontWeight: 700 }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box
-                          component={Link}
-                          href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
-                          sx={{ display: 'flex', alignItems: 'center', gap: 1, textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}
-                        >
-                          <Avatar
-                            src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
-                            sx={{ width: 28, height: 28, flexShrink: 0 }}
-                          />
-                          <Typography variant="body2" noWrap>{s.wizard_name ?? s.wizard_id}</Typography>
-                        </Box>
-                      </TableCell>
-                      <TableCell align="right">{fmtInt(s.pick_cnt)}</TableCell>
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          color={s.win_rate_pct != null && Number(s.win_rate_pct) >= 50 ? 'success.main' : 'error.main'}
-                        >
-                          {fmt1(s.win_rate_pct)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          ) : (
+      {topFetching ? (
+        <Stack spacing={1}>
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} variant="rectangular" height={56} sx={{ borderRadius: 1.5 }} />
+          ))}
+        </Stack>
+      ) : topSummoners.length > 0 ? (
+        <Stack spacing={0.75}>
+          {topSummoners.map((s, i) => {
+            const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
+            const isTop3 = i < 3;
+            const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+            const rankColor = isTop3 ? rankColors[i] : undefined;
+            const wrGood = wr != null && wr >= 50;
+
+            return (
+              <Box
+                key={s.wizard_id}
+                component={Link}
+                href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
+                sx={(t) => ({
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  px: 1.5,
+                  py: 1,
+                  borderRadius: 1.5,
+                  border: '1px solid',
+                  borderColor: isTop3
+                    ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.35 : 0.4)
+                    : 'divider',
+                  bgcolor: isTop3
+                    ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.07 : 0.05)
+                    : t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  transition: 'background-color 0.15s, border-color 0.15s',
+                  '&:hover': {
+                    bgcolor: t.palette.action.hover,
+                    borderColor: t.palette.action.focus,
+                  },
+                })}
+              >
+                {/* 순위 */}
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    bgcolor: isTop3 ? alpha(rankColor!, 0.15) : 'action.hover',
+                    border: '1.5px solid',
+                    borderColor: isTop3 ? alpha(rankColor!, 0.5) : 'divider',
+                  }}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: '0.72rem',
+                      fontWeight: 800,
+                      color: isTop3 ? rankColor : 'text.disabled',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {i + 1}
+                  </Typography>
+                </Box>
+
+                {/* 아바타 */}
+                <Avatar
+                  src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
+                  sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
+                />
+
+                {/* 닉네임 + 승률 바 */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
+                    {s.wizard_name ?? s.wizard_id}
+                  </Typography>
+                  <LinearProgress
+                    variant="determinate"
+                    value={Math.min(100, wr ?? 0)}
+                    sx={(t) => ({
+                      height: 4,
+                      borderRadius: 2,
+                      bgcolor: t.palette.action.hover,
+                      '& .MuiLinearProgress-bar': {
+                        borderRadius: 2,
+                        bgcolor: wrGood ? 'success.main' : 'error.main',
+                      },
+                    })}
+                  />
+                </Box>
+
+                {/* 픽 횟수 + 승률 */}
+                <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                  <Typography
+                    sx={{
+                      fontSize: '0.875rem',
+                      fontWeight: 800,
+                      color: wrGood ? 'success.main' : 'error.main',
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {fmt1(wr)}
+                  </Typography>
+                  <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
+                    {fmtInt(s.pick_cnt)}픽
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Stack>
+      ) : (
+        <Card variant="outlined">
+          <CardContent>
             <Typography variant="body2" color="text.secondary">
               픽 5회 이상인 소환사 데이터가 없습니다.
             </Typography>
+          </CardContent>
+        </Card>
+      )}
+        </Box>
+
+        {/* 오른쪽: 최근 전투 */}
+        <Box>
+          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
+            최근 전투
+          </Typography>
+          {recentFetching ? (
+            <Stack spacing={1}>
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} variant="rectangular" height={100} sx={{ borderRadius: 1.5 }} />
+              ))}
+            </Stack>
+          ) : (recentMatchesData?.matches?.length ?? 0) > 0 ? (
+            <>
+              <Stack spacing={1}>
+                {(recentMatchesData!.matches as unknown as RawMatchItem[])
+                  .slice(0, visibleMatchCount)
+                  .map((raw, idx) => {
+                    const match = processRawMatchToMatchItem(raw);
+                    return (
+                      <RtaMatchListCard key={raw.rid != null ? String(raw.rid) : idx} match={match} />
+                    );
+                  })}
+              </Stack>
+              {visibleMatchCount < (recentMatchesData!.matches?.length ?? 0) && (
+                <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setVisibleMatchCount((c) => c + 10)}
+                    sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}
+                  >
+                    더보기
+                  </Button>
+                </Box>
+              )}
+            </>
+          ) : (
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="body2" color="text.secondary">
+                  최근 전투 데이터가 없습니다.
+                </Typography>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </Box>
+      </Box>
     </Box>
   );
 }
