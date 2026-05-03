@@ -13,6 +13,7 @@ import {
   Button,
   Container,
   FormControl,
+  IconButton,
   InputLabel,
   MenuItem,
   Select,
@@ -270,7 +271,6 @@ export default function RtaPageClient() {
                   key={`${match.p1Id}-${match.p2Id}-${match.date}-${index}`}
                   elevation={0}
                   sx={(theme) => ({
-                    cursor: 'pointer',
                     transition: 'transform 0.25s ease, box-shadow 0.25s ease',
                     borderRadius: 3,
                     overflow: 'hidden',
@@ -283,7 +283,6 @@ export default function RtaPageClient() {
                         theme.palette.mode === 'dark' ? '0 12px 48px rgba(0,0,0,0.35)' : '0 16px 48px rgba(15,23,42,0.1)',
                     },
                   })}
-                  onClick={() => toggleMatch(index)}
                 >
                   <Box
                     sx={{
@@ -323,6 +322,9 @@ export default function RtaPageClient() {
                       />
                       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, gap: { xs: 0.5, md: 1.25 }, width: '100%', overflow: 'hidden' }}>
                         <Avatar
+                          component={Link}
+                          href={`/rta/player/${encodeURIComponent(match.p1Id)}`}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
                           src={getSwexPlayerImageUrl(match.p1ChannelUid || match.p1Id)}
                           sx={{
                             width: { xs: 40, md: 52 },
@@ -421,14 +423,22 @@ export default function RtaPageClient() {
                           }
                         })()}
                       </Box>
-                      <ExpandMoreIcon
-                        sx={(theme) => ({
-                          transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                          transition: 'transform 0.3s',
-                          color: theme.palette.text.secondary,
-                          fontSize: { xs: 22, md: 26 },
-                        })}
-                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => toggleMatch(index)}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? '접기' : '펼치기'}
+                        sx={{ p: '2px' }}
+                      >
+                        <ExpandMoreIcon
+                          sx={(theme) => ({
+                            transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                            transition: 'transform 0.3s',
+                            color: theme.palette.text.secondary,
+                            fontSize: { xs: 22, md: 26 },
+                          })}
+                        />
+                      </IconButton>
                     </Box>
 
                     <Box
@@ -461,6 +471,9 @@ export default function RtaPageClient() {
                       />
                       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row-reverse' }, alignItems: { md: 'center' }, gap: { xs: 0.5, md: 1.25 }, width: '100%', overflow: 'hidden' }}>
                         <Avatar
+                          component={Link}
+                          href={`/rta/player/${encodeURIComponent(match.p2Id)}`}
+                          onClick={(e: React.MouseEvent) => e.stopPropagation()}
                           src={getSwexPlayerImageUrl(match.p2ChannelUid || match.p2Id)}
                           sx={{
                             width: { xs: 40, md: 52 },

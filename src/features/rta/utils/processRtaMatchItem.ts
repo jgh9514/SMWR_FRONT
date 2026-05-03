@@ -38,6 +38,7 @@ function createUnits(
   leaderUnit?: number,
   unitBannedFlags?: boolean[] | (boolean | string | number)[],
   unitPickSlotNos?: unknown,
+  unitIds?: string[],
 ) {
   if (!Array.isArray(unitNames) || !Array.isArray(unitImages) || unitNames.length === 0) {
     return [];
@@ -54,6 +55,7 @@ function createUnits(
         : bannedUnit === i + 1,
     leader: leaderUnit === i + 1,
     pickSlotNo: pickSlotNoAt(unitPickSlotNos, i),
+    monsterId: unitIds?.[i] ?? undefined,
   }));
 }
 
@@ -69,6 +71,7 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p1_leader_unit,
       match.p1_unit_banned,
       match.p1_unit_pick_slot_no,
+      match.p1_units,
     ),
     p2Units: createUnits(
       match.p2_unit_names,
@@ -77,6 +80,7 @@ export function processRawMatchToMatchItem(match: RawMatchItem): MatchItem {
       match.p2_leader_unit,
       match.p2_unit_banned,
       match.p2_unit_pick_slot_no,
+      match.p2_units,
     ),
     p1Id: String(match.p1_wizard_id ?? ''),
     p2Id: String(match.p2_wizard_id ?? ''),

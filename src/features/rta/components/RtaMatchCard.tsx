@@ -62,6 +62,7 @@ export function RtaMatchCard({
   const iAmP1 = String(p.myId) === String(match.p1Id);
   const myFirstPick = (iAmP1 ? match.p1FirstPick : match.p2FirstPick) === '1';
   const oppFirstPick = (iAmP1 ? match.p2FirstPick : match.p1FirstPick) === '1';
+  const myHref = `/rta/player/${encodeURIComponent(p.myId)}`;
   const oppHref = `/rta/player/${encodeURIComponent(p.oppId)}`;
   const when = formatMatchWhen(match.date);
 
@@ -119,9 +120,10 @@ export function RtaMatchCard({
           <Box sx={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', width: '100%', gap: { xs: 0.75, md: 1.5 } }}>
             {/* 나 */}
             <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, gap: { xs: 0.5, md: 1.25 } }}>
-              <Avatar src={getSwexPlayerImageUrl(p.myChannelUid ?? p.myId)} sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, flexShrink: 0 }} />
+              <Avatar component={Link} href={myHref} onClick={(e: React.MouseEvent) => e.stopPropagation()} src={getSwexPlayerImageUrl(p.myChannelUid ?? p.myId)} sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, flexShrink: 0 }} />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
-                <Typography variant="body2" fontWeight={700} noWrap title={p.myName} sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                <Typography component={Link} href={myHref} onClick={(e: React.MouseEvent) => e.stopPropagation()} variant="body2" fontWeight={700} noWrap title={p.myName}
+                  sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}>
                   {p.myName}
                 </Typography>
                 <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap">
@@ -135,9 +137,9 @@ export function RtaMatchCard({
 
             {/* 상대 */}
             <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: { xs: 'column', md: 'row-reverse' }, alignItems: { xs: 'flex-end', md: 'center' }, gap: { xs: 0.5, md: 1.25 } }}>
-              <Avatar component={Link} href={oppHref} src={getSwexPlayerImageUrl(p.oppChannelUid ?? p.oppId)} sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, flexShrink: 0, alignSelf: { xs: 'flex-end', md: 'auto' } }} />
+              <Avatar component={Link} href={oppHref} onClick={(e: React.MouseEvent) => e.stopPropagation()} src={getSwexPlayerImageUrl(p.oppChannelUid ?? p.oppId)} sx={{ width: { xs: 40, md: 44 }, height: { xs: 40, md: 44 }, flexShrink: 0, alignSelf: { xs: 'flex-end', md: 'auto' } }} />
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0, alignItems: 'flex-end' }}>
-                <Typography component={Link} href={oppHref} variant="body2" fontWeight={700} noWrap title={p.oppName}
+                <Typography component={Link} href={oppHref} onClick={(e: React.MouseEvent) => e.stopPropagation()} variant="body2" fontWeight={700} noWrap title={p.oppName}
                   sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' }, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'right', textDecoration: 'none', color: 'inherit', '&:hover': { textDecoration: 'underline' } }}>
                   {p.oppName}
                 </Typography>

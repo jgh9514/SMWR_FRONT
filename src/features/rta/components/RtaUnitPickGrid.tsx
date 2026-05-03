@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Box, Stack, Avatar, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { getMonsterImageUrl } from '@/shared/utils/image';
@@ -10,6 +11,7 @@ type Unit = {
   banned?: boolean;
   leader?: boolean;
   pickSlotNo?: number;
+  monsterId?: string;
 };
 
 /**
@@ -164,7 +166,7 @@ function PickSlotTile({
       ? '2px solid rgba(211, 47, 47, 0.92)'
       : '2px solid rgba(255, 255, 255, 0.22)';
 
-  return (
+  const tile = (
     <Box sx={{ position: 'relative' }} title={leader ? `${unit.name} (리더)` : unit.name}>
       {showSeonPick && (
         <Box
@@ -274,6 +276,15 @@ function PickSlotTile({
       </Box>
     </Box>
   );
+
+  if (!banned && unit.monsterId) {
+    return (
+      <Link href={`/monster-detail/${unit.monsterId}`} onClick={(e) => e.stopPropagation()} style={{ display: 'contents' }}>
+        {tile}
+      </Link>
+    );
+  }
+  return tile;
 }
 
 /**

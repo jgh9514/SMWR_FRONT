@@ -518,3 +518,62 @@ export interface RtaVsMatchesResponse {
   has_more: boolean;
 }
 
+// ── 몬스터 개요 (POST /rta/monster/overview) ────────────────────────────────
+
+export interface RtaMonsterOverviewStats {
+  unit_master_id: number;
+  pick_cnt: number;
+  win_cnt: number;
+  ban_cnt: number;
+  lead_cnt: number;
+  field_cnt: number;
+  pick_rate_pct?: number | null;
+  win_rate_pct?: number | null;
+  ban_rate_pct?: number | null;
+  lead_rate_pct?: number | null;
+}
+
+export interface RtaMonsterDailySnapRow {
+  snap_date: string;
+  pick_cnt: number;
+  win_cnt: number;
+  ban_cnt: number;
+  lead_cnt: number;
+  field_cnt: number;
+  pick_rate_pct?: number | null;
+  win_rate_pct?: number | null;
+  ban_rate_pct?: number | null;
+}
+
+export interface RtaMonsterPickSlotRow {
+  team_side: number;
+  pick_slot_no: number;
+  pick_cnt: number;
+  win_cnt: number;
+  field_cnt: number;
+  pick_share_pct?: number | null;
+  win_rate_pct?: number | null;
+}
+
+export interface RtaMonsterTopSummonerRow {
+  wizard_id: string;
+  wizard_name?: string | null;
+  channel_uid?: string | null;
+  pick_cnt: number;
+  ban_cnt: number;
+  win_cnt: number;
+  lose_cnt: number;
+  actual_pick_cnt: number;
+  win_rate_pct?: number | null;
+}
+
+export interface RtaMonsterOverviewResponse {
+  seasonId?: number | null;
+  ratingId?: number | null;
+  overview_stats: RtaMonsterOverviewStats | null;
+  daily_trend: RtaMonsterDailySnapRow[];
+  pick_slots: RtaMonsterPickSlotRow[];
+  top_summoners: RtaMonsterTopSummonerRow[];
+}
+
+

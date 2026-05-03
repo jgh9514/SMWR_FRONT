@@ -44,6 +44,7 @@ import type {
   RtaSeasonsResponse,
   RtaSummonerRankingResponse,
   RtaSummonerSearchResponse,
+  RtaMonsterOverviewResponse,
 } from '@/features/rta/types/rta';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { apiClient } from '@/shared/lib/api/client';
@@ -726,6 +727,31 @@ export const useRtaPlayerOwnedBox = (wizardId: string, options?: { enabled?: boo
     enabled: Boolean(id) && (options?.enabled !== false),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useRtaMonsterOverview = (
+  monsterId: number | null | undefined,
+  options: {
+    seasonCode?: string | null;
+    seasonId?: number | null;
+    ratingId?: number | null;
+    enabled?: boolean;
+  } = {},
+) => {
+  const isValid = monsterId != null && monsterId > 0;
+  const body = isValid
+    ? {
+        monster_id: monsterId,
+        ...seasonBody(options.seasonCode, options.seasonId ?? null),
+        ...(options.ratingId != null ? { rating_id: options.ratingId } : {}),
+      }
+    : {};
+  return useApiPostQuery<RtaMonsterOverviewResponse>('/rta/monster/overview', body, {
+    enabled: isValid && options.enabled !== false,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
     refetchOnWindowFocus: false,
   });
 };
