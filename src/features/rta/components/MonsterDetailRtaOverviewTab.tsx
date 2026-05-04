@@ -42,15 +42,13 @@ import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
 
-// ?€?€ ?¬í¼ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-
 function fmt1(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(Number(v))) return '??;
+  if (v == null || !Number.isFinite(Number(v))) return 'â€”';
   return `${Number(v).toFixed(1)}%`;
 }
 
 function fmtInt(v: number | null | undefined): string {
-  if (v == null) return '??;
+  if (v == null) return 'â€”';
   return Number(v).toLocaleString('ko-KR');
 }
 
@@ -59,8 +57,6 @@ function toNum(v: unknown): number {
   const x = Number(v);
   return Number.isFinite(x) ? x : 0;
 }
-
-// ?€?€ ?”ì•½ ì¹´ë“œ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 function StatChip({
   label,
@@ -103,11 +99,9 @@ function StatChip({
   );
 }
 
-// ?€?€ ???¬ë¡¯ ë°•ìŠ¤ (RtaPlayerPicksClient ?™ì¼ ?ˆì´?„ì›ƒ) ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-
 const FIRST_PICK_COLS: readonly (readonly number[])[] = [[1], [2, 3], [4, 5]];
 const SECOND_PICK_COLS: readonly (readonly number[])[] = [[1, 2], [3, 4], [5]];
-const TEAM_PICK_SLOT_LABEL: Record<number, string> = { 1: '1ë²?, 2: '2ë²?, 3: '3ë²?, 4: '4ë²?, 5: '5ë²? };
+const TEAM_PICK_SLOT_LABEL: Record<number, string> = { 1: '1ë²ˆ', 2: '2ë²ˆ', 3: '3ë²ˆ', 4: '4ë²ˆ', 5: '5ë²ˆ' };
 
 function PickSlotBox({
   slotNo,
@@ -142,7 +136,7 @@ function PickSlotBox({
           whiteSpace: 'nowrap',
         }}
       >
-        {TEAM_PICK_SLOT_LABEL[slotNo] ?? '??}
+        {TEAM_PICK_SLOT_LABEL[slotNo] ?? 'â€”'}
       </Typography>
 
       <Box
@@ -190,7 +184,7 @@ function PickSlotBox({
               textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 2px rgba(255,255,255,0.8)',
             }}
           >
-            {hasData ? `${fmtInt(pickCnt)}?? : ''}
+            {hasData ? `${fmtInt(pickCnt)}í”½` : ''}
           </Typography>
           <Typography
             sx={{
@@ -201,7 +195,7 @@ function PickSlotBox({
               textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 2px rgba(255,255,255,0.8)',
             }}
           >
-            {hasData ? `${fill.toFixed(1)}%` : '??}
+            {hasData ? `${fill.toFixed(1)}%` : 'â€”'}
           </Typography>
         </Box>
       </Box>
@@ -214,7 +208,7 @@ function PickSlotBox({
           color: wrColor,
         }}
       >
-        {wr == null ? '?? : `${wr.toFixed(1)}%`}
+        {wr == null ? 'â€”' : `${wr.toFixed(1)}%`}
       </Typography>
     </Box>
   );
@@ -268,13 +262,9 @@ function PickSnakeGrid({
   );
 }
 
-// ?€?€ Props ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
-
 interface MonsterDetailRtaOverviewTabProps {
   monsterId?: number | null;
 }
-
-// ?€?€ ë©”ì¸ ì»´í¬?ŒíŠ¸ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetailRtaOverviewTabProps) {
   const { data: seasonsData } = useRtaSeasons();
@@ -312,8 +302,8 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
     () =>
       dailyTrend.map((r) => ({
         day: r.snap_date?.slice(5) ?? '',
-        ?½ë¥ : r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
-        ?¹ë¥ : r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
+        í”½ë¥ : r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
+        ìŠ¹ë¥ : r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
         ë°´ë¥ : r.ban_rate_pct != null ? Number(r.ban_rate_pct) : null,
       })),
     [dailyTrend],
@@ -335,7 +325,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         seasonLabelId="monster-detail-rta-overview-season"
       />
 
-      {/* ?€?€ ?ë‹¨ ?”ì•½ ì§€???€?€ */}
+      {/* ìƒë‹¨ ìš”ì•½ ì§€í‘œ */}
       <Paper
         variant="outlined"
         sx={(t) => ({
@@ -375,15 +365,15 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           </Box>
         ) : (
           <Typography variant="body2" color="text.secondary" textAlign="center">
-            ì§‘ê³„ ?°ì´?°ê? ?†ìŠµ?ˆë‹¤. (ë°°ì¹˜ ?¤í–‰ ???œì‹œ?©ë‹ˆ??
+            ì§‘ê³„ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤. (ë°°ì¹˜ ì‹¤í–‰ í›„ í‘œì‹œë©ë‹ˆë‹¤)
           </Typography>
         )}
       </Paper>
 
-      {/* ?€?€ 7??ì¶”ì´ ì°¨íŠ¸ ?€?€ */}
+      {/* 7ì¼ ì¶”ì´ ì°¨íŠ¸ */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          ìµœê·¼ 7??ì§€??ì¶”ì´ (%)
+          ìµœê·¼ 7ì¼ ì§€í‘œ ì¶”ì´ (%)
         </Typography>
         {overviewFetching ? (
           <Skeleton variant="rectangular" width="100%" height={240} sx={{ borderRadius: 1 }} />
@@ -394,10 +384,10 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-                <Tooltip formatter={(v, name) => [`${v ?? '??}%`, name]} />
+                <Tooltip formatter={(v, name) => [`${v ?? 'â€”'}%`, name]} />
                 <Legend />
-                <Line type="monotone" dataKey="?½ë¥ " stroke="#1976d2" strokeWidth={2} dot connectNulls />
-                <Line type="monotone" dataKey="?¹ë¥ " stroke="#2e7d32" strokeWidth={2} dot connectNulls />
+                <Line type="monotone" dataKey="í”½ë¥ " stroke="#1976d2" strokeWidth={2} dot connectNulls />
+                <Line type="monotone" dataKey="ìŠ¹ë¥ " stroke="#2e7d32" strokeWidth={2} dot connectNulls />
                 <Line
                   type="monotone"
                   dataKey="ë°´ë¥ "
@@ -412,14 +402,14 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           </Box>
         ) : (
           <Alert severity="info" variant="outlined" sx={{ py: 1 }}>
-            ?¼ë³„ ì§‘ê³„ ?°ì´?°ê? ?†ìŠµ?ˆë‹¤. ë°°ì¹˜ê°€ ?¤í–‰?˜ë©´ ?œì‹œ?©ë‹ˆ??
+            ì¼ë³„ ì§‘ê³„ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤. ë°°ì¹˜ê°€ ì‹¤í–‰ë˜ë©´ í‘œì‹œë©ë‹ˆë‹¤.
           </Alert>
         )}
       </Paper>
 
-      {/* ?€?€ ???œì„œë³??µê³„ ?€?€ */}
+      {/* í”½ ìˆœì„œë³„ í†µê³„ */}
       <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 2, mb: 1 }}>
-        ???œì„œë³??µê³„
+        í”½ ìˆœì„œë³„ í†µê³„
       </Typography>
       {overviewFetching ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
@@ -428,33 +418,31 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         </Box>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-          {/* ? í”½ */}
           <Card variant="outlined">
             <CardContent sx={{ pb: '12px !important' }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                ? í”½ ?€
+                ì„ í”½ íŒ€
               </Typography>
               {firstPickSlots.length > 0 ? (
                 <PickSnakeGrid slots={firstPickSlots} isFirstPick={true} color="#1976d2" />
               ) : (
                 <Typography variant="body2" color="text.secondary" textAlign="center">
-                  ?°ì´???†ìŒ
+                  ë°ì´í„° ì—†ìŒ
                 </Typography>
               )}
             </CardContent>
           </Card>
 
-          {/* ?„í”½ */}
           <Card variant="outlined">
             <CardContent sx={{ pb: '12px !important' }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                ?„í”½ ?€
+                í›„í”½ íŒ€
               </Typography>
               {secondPickSlots.length > 0 ? (
                 <PickSnakeGrid slots={secondPickSlots} isFirstPick={false} color="#7b1fa2" />
               ) : (
                 <Typography variant="body2" color="text.secondary" textAlign="center">
-                  ?°ì´???†ìŒ
+                  ë°ì´í„° ì—†ìŒ
                 </Typography>
               )}
             </CardContent>
@@ -462,7 +450,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         </Box>
       )}
 
-      {/* ?€?€ ?¥ì¸ ??‚¹ + ìµœê·¼ ?„íˆ¬ (2?? ?€?€ */}
+      {/* ì¥ì¸ ë­í‚¹ + ìµœê·¼ ì „íˆ¬ (2ì—´) */}
       <Box
         sx={{
           display: 'grid',
@@ -472,141 +460,138 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           alignItems: 'start',
         }}
       >
-        {/* ?¼ìª½: ?¥ì¸ ??‚¹ */}
-        <Box>
-      <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
-        ?¥ì¸ ??‚¹
-      </Typography>
-      {overviewFetching ? (
-        <Stack spacing={1}>
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} variant="rectangular" height={56} sx={{ borderRadius: 1.5 }} />
-          ))}
-        </Stack>
-      ) : topSummoners.length > 0 ? (
-        <Stack spacing={0.75}>
-          {topSummoners.map((s, i) => {
-            const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
-            const isTop3 = i < 3;
-            const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-            const rankColor = isTop3 ? rankColors[i] : undefined;
-            const wrGood = wr != null && wr >= 50;
-
-            return (
-              <Box
-                key={s.wizard_id}
-                component={Link}
-                href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
-                sx={(t) => ({
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 1.5,
-                  px: 1.5,
-                  py: 1,
-                  borderRadius: 1.5,
-                  border: '1px solid',
-                  borderColor: isTop3
-                    ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.35 : 0.4)
-                    : 'divider',
-                  bgcolor: isTop3
-                    ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.07 : 0.05)
-                    : t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
-                  textDecoration: 'none',
-                  color: 'inherit',
-                  transition: 'background-color 0.15s, border-color 0.15s',
-                  '&:hover': {
-                    bgcolor: t.palette.action.hover,
-                    borderColor: t.palette.action.focus,
-                  },
-                })}
-              >
-                {/* ?œìœ„ */}
-                <Box
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    bgcolor: isTop3 ? alpha(rankColor!, 0.15) : 'action.hover',
-                    border: '1.5px solid',
-                    borderColor: isTop3 ? alpha(rankColor!, 0.5) : 'divider',
-                  }}
-                >
-                  <Typography
-                    sx={{
-                      fontSize: '0.72rem',
-                      fontWeight: 800,
-                      color: isTop3 ? rankColor : 'text.disabled',
-                      lineHeight: 1,
-                    }}
-                  >
-                    {i + 1}
-                  </Typography>
-                </Box>
-
-                {/* ?„ë°”?€ */}
-                <Avatar
-                  src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
-                  sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
-                />
-
-                {/* ?‰ë„¤??+ ?¹ë¥  ë°?*/}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
-                    {s.wizard_name ?? s.wizard_id}
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={Math.min(100, wr ?? 0)}
-                    sx={(t) => ({
-                      height: 4,
-                      borderRadius: 2,
-                      bgcolor: t.palette.action.hover,
-                      '& .MuiLinearProgress-bar': {
-                        borderRadius: 2,
-                        bgcolor: wrGood ? 'success.main' : 'error.main',
-                      },
-                    })}
-                  />
-                </Box>
-
-                {/* ???Ÿìˆ˜ + ?¹ë¥  */}
-                <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                  <Typography
-                    sx={{
-                      fontSize: '0.875rem',
-                      fontWeight: 800,
-                      color: wrGood ? 'success.main' : 'error.main',
-                      lineHeight: 1.2,
-                    }}
-                  >
-                    {fmt1(wr)}
-                  </Typography>
-                  <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                    {fmtInt(s.pick_cnt)}??                  </Typography>
-                </Box>
-              </Box>
-            );
-          })}
-        </Stack>
-      ) : (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography variant="body2" color="text.secondary">
-              ??5???´ìƒ???Œí™˜???°ì´?°ê? ?†ìŠµ?ˆë‹¤.
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
-        </Box>
-
-        {/* ?¤ë¥¸ìª? ìµœê·¼ ?„íˆ¬ */}
+        {/* ì¥ì¸ ë­í‚¹ */}
         <Box>
           <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
-            ìµœê·¼ ?„íˆ¬
+            ì¥ì¸ ë­í‚¹
+          </Typography>
+          {overviewFetching ? (
+            <Stack spacing={1}>
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} variant="rectangular" height={56} sx={{ borderRadius: 1.5 }} />
+              ))}
+            </Stack>
+          ) : topSummoners.length > 0 ? (
+            <Stack spacing={0.75}>
+              {topSummoners.map((s, i) => {
+                const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
+                const isTop3 = i < 3;
+                const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+                const rankColor = isTop3 ? rankColors[i] : undefined;
+                const wrGood = wr != null && wr >= 50;
+
+                return (
+                  <Box
+                    key={s.wizard_id}
+                    component={Link}
+                    href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
+                    sx={(t) => ({
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      px: 1.5,
+                      py: 1,
+                      borderRadius: 1.5,
+                      border: '1px solid',
+                      borderColor: isTop3
+                        ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.35 : 0.4)
+                        : 'divider',
+                      bgcolor: isTop3
+                        ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.07 : 0.05)
+                        : t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                      textDecoration: 'none',
+                      color: 'inherit',
+                      transition: 'background-color 0.15s, border-color 0.15s',
+                      '&:hover': {
+                        bgcolor: t.palette.action.hover,
+                        borderColor: t.palette.action.focus,
+                      },
+                    })}
+                  >
+                    <Box
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        bgcolor: isTop3 ? alpha(rankColor!, 0.15) : 'action.hover',
+                        border: '1.5px solid',
+                        borderColor: isTop3 ? alpha(rankColor!, 0.5) : 'divider',
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: '0.72rem',
+                          fontWeight: 800,
+                          color: isTop3 ? rankColor : 'text.disabled',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {i + 1}
+                      </Typography>
+                    </Box>
+
+                    <Avatar
+                      src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
+                      sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
+                    />
+
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
+                        {s.wizard_name ?? s.wizard_id}
+                      </Typography>
+                      <LinearProgress
+                        variant="determinate"
+                        value={Math.min(100, wr ?? 0)}
+                        sx={(t) => ({
+                          height: 4,
+                          borderRadius: 2,
+                          bgcolor: t.palette.action.hover,
+                          '& .MuiLinearProgress-bar': {
+                            borderRadius: 2,
+                            bgcolor: wrGood ? 'success.main' : 'error.main',
+                          },
+                        })}
+                      />
+                    </Box>
+
+                    <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                      <Typography
+                        sx={{
+                          fontSize: '0.875rem',
+                          fontWeight: 800,
+                          color: wrGood ? 'success.main' : 'error.main',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {fmt1(wr)}
+                      </Typography>
+                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
+                        {fmtInt(s.pick_cnt)}í”½
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+            </Stack>
+          ) : (
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="body2" color="text.secondary">
+                  í”½ 5íšŒ ì´ìƒì¸ ì†Œí™˜ì‚¬ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤.
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
+        </Box>
+
+        {/* ìµœê·¼ ì „íˆ¬ */}
+        <Box>
+          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
+            ìµœê·¼ ì „íˆ¬
           </Typography>
           {recentFetching ? (
             <Stack spacing={1}>
@@ -634,7 +619,8 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                     onClick={() => setVisibleMatchCount((c) => c + 10)}
                     sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}
                   >
-                    ?”ë³´ê¸?                  </Button>
+                    ë”ë³´ê¸°
+                  </Button>
                 </Box>
               )}
             </>
@@ -642,7 +628,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="body2" color="text.secondary">
-                  ìµœê·¼ ?„íˆ¬ ?°ì´?°ê? ?†ìŠµ?ˆë‹¤.
+                  ìµœê·¼ ì „íˆ¬ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤.
                 </Typography>
               </CardContent>
             </Card>
