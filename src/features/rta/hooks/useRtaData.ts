@@ -843,9 +843,9 @@ export const useRtaMonsterDetail = (
     isValidId ? { monster_id: monsterId, ...seasonBody(seasonCode, seasonId) } : {},
     {
       enabled: isValidId,
-      staleTime: 0,
-      gcTime: 0,
-      refetchOnWindowFocus: true,
+      staleTime: 5 * 60_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
       refetchOnReconnect: false,
       retry: false,
       ...queryOptions,

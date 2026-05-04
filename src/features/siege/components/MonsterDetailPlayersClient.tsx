@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
 import {
   Alert,
@@ -17,7 +17,7 @@ import {
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import { useMonsterInfoContext } from '@/features/siege/context/MonsterInfoContext';
-import { useRtaMonsterOverview, useRtaRatingGradeRules, useRtaSeasonSelect, useRtaSeasons, buildMonsterStatsTierBody } from '@/features/rta/hooks/useRtaData';
+import { useRtaMonsterTopSummonersData, useRtaSeasonSelect, useRtaSeasons } from '@/features/rta/hooks/useRtaData';
 import RtaSeasonTierSelectRow from '@/features/rta/components/RtaSeasonTierSelectRow';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaMonsterTopSummonerRow } from '@/features/rta/types/rta';
@@ -134,21 +134,13 @@ export default function MonsterDetailPlayersClient() {
 
   const { data: seasonsData } = useRtaSeasons();
   const { seasonSelectValue, setSeason, seasonOptions, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
-  const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
-  const [tierSelection, setTierSelection] = useState('CH_ALL');
 
-  const selectedRatingId = useMemo(() => {
-    if (!tierSelection || tierSelection === 'CH_ALL') return null;
-    return buildMonsterStatsTierBody(tierSelection, gradeRules).ratingId ?? null;
-  }, [tierSelection, gradeRules]);
-
-  const { data: overview, isFetching } = useRtaMonsterOverview(rtaMonsterNumericId, {
+  const { data: topSummonersResp, isFetching } = useRtaMonsterTopSummonersData(rtaMonsterNumericId, {
     seasonId: seasonIdForApi ?? null,
-    ratingId: selectedRatingId,
     enabled: rtaMonsterNumericId != null && rtaMonsterNumericId > 0,
   });
 
-  const topSummoners = overview?.top_summoners ?? [];
+  const topSummoners = topSummonersResp?.data ?? [];
 
   return (
     <Box>
@@ -156,11 +148,12 @@ export default function MonsterDetailPlayersClient() {
         seasonSelectValue={seasonSelectValue}
         setSeason={setSeason}
         seasonOptions={seasonOptions}
-        tierSelection={tierSelection}
-        setTierSelection={setTierSelection}
-        gradeRules={gradeRules}
-        tierRulesLoading={tierRulesLoading}
+        tierSelection="CH_ALL"
+        setTierSelection={() => {}}
+        gradeRules={[]}
+        tierRulesLoading={false}
         seasonLabelId="monster-players-season"
+        hideTierSelect
       />
 
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
@@ -172,7 +165,7 @@ export default function MonsterDetailPlayersClient() {
         </Typography>
       </Stack>
 
-      {isFetching && !overview ? (
+      {isFetching && !topSummonersResp ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr' }, gap: 1.5 }}>
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} variant="rectangular" height={88} sx={{ borderRadius: 2 }} />
@@ -184,7 +177,7 @@ export default function MonsterDetailPlayersClient() {
             <SummonerCard key={s.wizard_id} summoner={s} rank={i + 1} />
           ))}
         </Box>
-      ) : overview ? (
+      ) : topSummonersResp ? (
         <Alert severity="info">픽 5회 이상인 소환사 데이터가 없습니다.</Alert>
       ) : (
         <LinearProgress sx={{ my: 2 }} />

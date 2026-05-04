@@ -39,6 +39,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
   gradeRules,
   tierRulesLoading,
   seasonLabelId = 'rta-season-tier-season-label',
+  hideTierSelect = false,
 }: {
   seasonSelectValue: string;
   setSeason: (v: string) => void;
@@ -48,6 +49,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
   gradeRules: RtaRatingGradeRule[];
   tierRulesLoading: boolean;
   seasonLabelId?: string;
+  hideTierSelect?: boolean;
 }) {
   return (
     <Box
@@ -57,7 +59,6 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
         flexDirection: 'row',
         flexWrap: { xs: 'nowrap', md: 'wrap' },
         alignItems: { xs: 'stretch', md: 'center' },
-        /** md 미만: 시즌·티어 5:5 (flex 동일), md+: 기존 고정폭 */
         gap: { xs: 1, md: 0 },
         mb: 2,
       }}
@@ -87,25 +88,27 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
           ))}
         </Select>
       </FormControl>
-      <Box
-        sx={{
-          minWidth: 0,
-          flex: { xs: '1 1 0%', md: '0 0 180px' },
-          width: { md: 180 },
-          ml: { xs: 0, md: 1 },
-          '& .MuiButton-root': {
-            minWidth: { xs: 0, md: 180 },
-            width: { xs: '100%', md: 180 },
-          },
-        }}
-      >
-        <RtaTierFilterMenu
-          value={tierSelection}
-          onChange={setTierSelection}
-          rules={gradeRules}
-          disabled={tierRulesLoading}
-        />
-      </Box>
+      {!hideTierSelect && (
+        <Box
+          sx={{
+            minWidth: 0,
+            flex: { xs: '1 1 0%', md: '0 0 180px' },
+            width: { md: 180 },
+            ml: { xs: 0, md: 1 },
+            '& .MuiButton-root': {
+              minWidth: { xs: 0, md: 180 },
+              width: { xs: '100%', md: 180 },
+            },
+          }}
+        >
+          <RtaTierFilterMenu
+            value={tierSelection}
+            onChange={setTierSelection}
+            rules={gradeRules}
+            disabled={tierRulesLoading}
+          />
+        </Box>
+      )}
     </Box>
   );
 });

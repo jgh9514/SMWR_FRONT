@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import {
   Box,
+  Card,
   CardContent,
   CircularProgress,
   Typography,
@@ -13,6 +14,7 @@ import {
   MenuItem,
   Select,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   useRtaListPage,
   useRtaRatingGradeRules,

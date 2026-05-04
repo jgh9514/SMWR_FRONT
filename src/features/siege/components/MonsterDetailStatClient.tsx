@@ -353,12 +353,6 @@ function SkillCard({ skill, isLeader = false, leaderDesc = '', leaderIcon }: { s
               <Typography variant="subtitle2" fontWeight={800} sx={{ lineHeight: 1.3 }}>{skill.skill_name}</Typography>
               {isAwaken && <Chip label="각성" size="small" color="primary" sx={{ height: 17, fontSize: '0.6rem', fontWeight: 700 }} />}
               {isPassive && <Chip label="패시브" size="small" sx={{ height: 17, fontSize: '0.6rem' }} />}
-              {skill.swarfarm_url && (
-                <Typography component="a" variant="caption" href={skill.swarfarm_url} target="_blank" rel="noopener noreferrer"
-                  sx={{ color: 'text.disabled', textDecoration: 'underline', '&:hover': { color: 'primary.main' } }}>
-                  swarfarm↗
-                </Typography>
-              )}
             </Stack>
 
             {/* description */}

@@ -31,10 +31,7 @@ import {
   useRtaRatingGradeRules,
   useRtaSeasonSelect,
   useRtaSeasons,
-  useRtaMonsterSummaryStats,
-  useRtaMonsterDailyTrend,
-  useRtaMonsterPickSlotsData,
-  useRtaMonsterTopSummonersData,
+  useRtaMonsterOverview,
   useRtaMonsterRecentMatches,
   buildMonsterStatsTierBody,
 } from '@/features/rta/hooks/useRtaData';
@@ -45,15 +42,15 @@ import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
 
-// â”€â”€ í—¬í¼ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?¬í¼ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 function fmt1(v: number | null | undefined): string {
-  if (v == null || !Number.isFinite(Number(v))) return 'â€”';
+  if (v == null || !Number.isFinite(Number(v))) return '??;
   return `${Number(v).toFixed(1)}%`;
 }
 
 function fmtInt(v: number | null | undefined): string {
-  if (v == null) return 'â€”';
+  if (v == null) return '??;
   return Number(v).toLocaleString('ko-KR');
 }
 
@@ -63,7 +60,7 @@ function toNum(v: unknown): number {
   return Number.isFinite(x) ? x : 0;
 }
 
-// â”€â”€ ìš”ì•½ ì¹´ë“œ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ?”ì•½ ì¹´ë“œ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 function StatChip({
   label,
@@ -106,11 +103,11 @@ function StatChip({
   );
 }
 
-// â”€â”€ í”½ ìŠ¬ë¡¯ ë°•ìŠ¤ (RtaPlayerPicksClient ë™ì¼ ë ˆì´ì•„ì›ƒ) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ???¬ë¡¯ ë°•ìŠ¤ (RtaPlayerPicksClient ?™ì¼ ?ˆì´?„ì›ƒ) ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 const FIRST_PICK_COLS: readonly (readonly number[])[] = [[1], [2, 3], [4, 5]];
 const SECOND_PICK_COLS: readonly (readonly number[])[] = [[1, 2], [3, 4], [5]];
-const TEAM_PICK_SLOT_LABEL: Record<number, string> = { 1: '1ë²ˆ', 2: '2ë²ˆ', 3: '3ë²ˆ', 4: '4ë²ˆ', 5: '5ë²ˆ' };
+const TEAM_PICK_SLOT_LABEL: Record<number, string> = { 1: '1ë²?, 2: '2ë²?, 3: '3ë²?, 4: '4ë²?, 5: '5ë²? };
 
 function PickSlotBox({
   slotNo,
@@ -145,7 +142,7 @@ function PickSlotBox({
           whiteSpace: 'nowrap',
         }}
       >
-        {TEAM_PICK_SLOT_LABEL[slotNo] ?? 'â€”'}
+        {TEAM_PICK_SLOT_LABEL[slotNo] ?? '??}
       </Typography>
 
       <Box
@@ -193,7 +190,7 @@ function PickSlotBox({
               textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 2px rgba(255,255,255,0.8)',
             }}
           >
-            {hasData ? `${fmtInt(pickCnt)}í”½` : ''}
+            {hasData ? `${fmtInt(pickCnt)}?? : ''}
           </Typography>
           <Typography
             sx={{
@@ -204,7 +201,7 @@ function PickSlotBox({
               textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.8)' : '0 1px 2px rgba(255,255,255,0.8)',
             }}
           >
-            {hasData ? `${fill.toFixed(1)}%` : 'â€”'}
+            {hasData ? `${fill.toFixed(1)}%` : '??}
           </Typography>
         </Box>
       </Box>
@@ -217,7 +214,7 @@ function PickSlotBox({
           color: wrColor,
         }}
       >
-        {wr == null ? 'â€”' : `${wr.toFixed(1)}%`}
+        {wr == null ? '?? : `${wr.toFixed(1)}%`}
       </Typography>
     </Box>
   );
@@ -271,13 +268,13 @@ function PickSnakeGrid({
   );
 }
 
-// â”€â”€ Props â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ Props ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 interface MonsterDetailRtaOverviewTabProps {
   monsterId?: number | null;
 }
 
-// â”€â”€ ë©”ì¸ ì»´í¬ë„ŒíŠ¸ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ?€?€ ë©”ì¸ ì»´í¬?ŒíŠ¸ ?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€?€
 
 export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetailRtaOverviewTabProps) {
   const { data: seasonsData } = useRtaSeasons();
@@ -290,38 +287,33 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
     return buildMonsterStatsTierBody(tierSelection, gradeRules).ratingId ?? null;
   }, [tierSelection, gradeRules]);
 
-  const sectionOpts = {
+  const valid = monsterId != null && monsterId > 0;
+
+  const { data: overviewData, isFetching: overviewFetching } = useRtaMonsterOverview(monsterId, {
     seasonId: seasonIdForApi ?? null,
     ratingId: selectedRatingId,
-    enabled: monsterId != null && monsterId > 0,
-  };
-
-  const { data: summaryData, isFetching: summaryFetching } = useRtaMonsterSummaryStats(monsterId, sectionOpts);
-  const { data: trendData, isFetching: trendFetching } = useRtaMonsterDailyTrend(monsterId, sectionOpts);
-  const { data: pickSlotsData, isFetching: slotsFetching } = useRtaMonsterPickSlotsData(monsterId, sectionOpts);
-  const { data: topSummonersData, isFetching: topFetching } = useRtaMonsterTopSummonersData(monsterId, {
-    seasonId: seasonIdForApi ?? null,
-    enabled: monsterId != null && monsterId > 0,
+    enabled: valid,
   });
+
   const [visibleMatchCount, setVisibleMatchCount] = useState(10);
   useEffect(() => { setVisibleMatchCount(10); }, [seasonIdForApi, monsterId]);
   const { data: recentMatchesData, isFetching: recentFetching } = useRtaMonsterRecentMatches(monsterId, {
     seasonId: seasonIdForApi ?? null,
-    enabled: monsterId != null && monsterId > 0,
+    enabled: valid,
     limit: 20,
   });
 
-  const stats = summaryData?.data ?? null;
-  const dailyTrend = trendData?.data ?? [];
-  const pickSlots = pickSlotsData?.data ?? [];
-  const topSummoners = topSummonersData?.data ?? [];
+  const stats = overviewData?.overview_stats ?? null;
+  const dailyTrend = overviewData?.daily_trend ?? [];
+  const pickSlots = overviewData?.pick_slots ?? [];
+  const topSummoners = overviewData?.top_summoners ?? [];
 
   const chartData = useMemo(
     () =>
       dailyTrend.map((r) => ({
         day: r.snap_date?.slice(5) ?? '',
-        í”½ë¥ : r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
-        ìŠ¹ë¥ : r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
+        ?½ë¥ : r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
+        ?¹ë¥ : r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
         ë°´ë¥ : r.ban_rate_pct != null ? Number(r.ban_rate_pct) : null,
       })),
     [dailyTrend],
@@ -343,7 +335,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         seasonLabelId="monster-detail-rta-overview-season"
       />
 
-      {/* â”€â”€ ìƒë‹¨ ìš”ì•½ ì§€í‘œ â”€â”€ */}
+      {/* ?€?€ ?ë‹¨ ?”ì•½ ì§€???€?€ */}
       <Paper
         variant="outlined"
         sx={(t) => ({
@@ -352,7 +344,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           background: t.palette.action.hover,
         })}
       >
-        {summaryFetching ? (
+        {overviewFetching ? (
           <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} variant="rectangular" width={80} height={56} sx={{ borderRadius: 1 }} />
@@ -383,17 +375,17 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           </Box>
         ) : (
           <Typography variant="body2" color="text.secondary" textAlign="center">
-            ì§‘ê³„ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤. (ë°°ì¹˜ ì‹¤í–‰ í›„ í‘œì‹œë©ë‹ˆë‹¤)
+            ì§‘ê³„ ?°ì´?°ê? ?†ìŠµ?ˆë‹¤. (ë°°ì¹˜ ?¤í–‰ ???œì‹œ?©ë‹ˆ??
           </Typography>
         )}
       </Paper>
 
-      {/* â”€â”€ 7ì¼ ì¶”ì´ ì°¨íŠ¸ â”€â”€ */}
+      {/* ?€?€ 7??ì¶”ì´ ì°¨íŠ¸ ?€?€ */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          ìµœê·¼ 7ì¼ ì§€í‘œ ì¶”ì´ (%)
+          ìµœê·¼ 7??ì§€??ì¶”ì´ (%)
         </Typography>
-        {trendFetching ? (
+        {overviewFetching ? (
           <Skeleton variant="rectangular" width="100%" height={240} sx={{ borderRadius: 1 }} />
         ) : chartData.length > 0 ? (
           <Box sx={{ width: '100%', height: 260 }}>
@@ -402,10 +394,10 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
-                <Tooltip formatter={(v, name) => [`${v ?? 'â€”'}%`, name]} />
+                <Tooltip formatter={(v, name) => [`${v ?? '??}%`, name]} />
                 <Legend />
-                <Line type="monotone" dataKey="í”½ë¥ " stroke="#1976d2" strokeWidth={2} dot connectNulls />
-                <Line type="monotone" dataKey="ìŠ¹ë¥ " stroke="#2e7d32" strokeWidth={2} dot connectNulls />
+                <Line type="monotone" dataKey="?½ë¥ " stroke="#1976d2" strokeWidth={2} dot connectNulls />
+                <Line type="monotone" dataKey="?¹ë¥ " stroke="#2e7d32" strokeWidth={2} dot connectNulls />
                 <Line
                   type="monotone"
                   dataKey="ë°´ë¥ "
@@ -420,49 +412,49 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           </Box>
         ) : (
           <Alert severity="info" variant="outlined" sx={{ py: 1 }}>
-            ì¼ë³„ ì§‘ê³„ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤. ë°°ì¹˜ê°€ ì‹¤í–‰ë˜ë©´ í‘œì‹œë©ë‹ˆë‹¤.
+            ?¼ë³„ ì§‘ê³„ ?°ì´?°ê? ?†ìŠµ?ˆë‹¤. ë°°ì¹˜ê°€ ?¤í–‰?˜ë©´ ?œì‹œ?©ë‹ˆ??
           </Alert>
         )}
       </Paper>
 
-      {/* â”€â”€ í”½ ìˆœì„œë³„ í†µê³„ â”€â”€ */}
+      {/* ?€?€ ???œì„œë³??µê³„ ?€?€ */}
       <Typography variant="subtitle1" fontWeight={800} sx={{ mt: 2, mb: 1 }}>
-        í”½ ìˆœì„œë³„ í†µê³„
+        ???œì„œë³??µê³„
       </Typography>
-      {slotsFetching ? (
+      {overviewFetching ? (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
           <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
           <Skeleton variant="rectangular" height={120} sx={{ borderRadius: 1 }} />
         </Box>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-          {/* ì„ í”½ */}
+          {/* ? í”½ */}
           <Card variant="outlined">
             <CardContent sx={{ pb: '12px !important' }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                ì„ í”½ íŒ€
+                ? í”½ ?€
               </Typography>
               {firstPickSlots.length > 0 ? (
                 <PickSnakeGrid slots={firstPickSlots} isFirstPick={true} color="#1976d2" />
               ) : (
                 <Typography variant="body2" color="text.secondary" textAlign="center">
-                  ë°ì´í„° ì—†ìŒ
+                  ?°ì´???†ìŒ
                 </Typography>
               )}
             </CardContent>
           </Card>
 
-          {/* í›„í”½ */}
+          {/* ?„í”½ */}
           <Card variant="outlined">
             <CardContent sx={{ pb: '12px !important' }}>
               <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1.5 }}>
-                í›„í”½ íŒ€
+                ?„í”½ ?€
               </Typography>
               {secondPickSlots.length > 0 ? (
                 <PickSnakeGrid slots={secondPickSlots} isFirstPick={false} color="#7b1fa2" />
               ) : (
                 <Typography variant="body2" color="text.secondary" textAlign="center">
-                  ë°ì´í„° ì—†ìŒ
+                  ?°ì´???†ìŒ
                 </Typography>
               )}
             </CardContent>
@@ -470,7 +462,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         </Box>
       )}
 
-      {/* â”€â”€ ì¥ì¸ ë­í‚¹ + ìµœê·¼ ì „íˆ¬ (2ì—´) â”€â”€ */}
+      {/* ?€?€ ?¥ì¸ ??‚¹ + ìµœê·¼ ?„íˆ¬ (2?? ?€?€ */}
       <Box
         sx={{
           display: 'grid',
@@ -480,12 +472,12 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
           alignItems: 'start',
         }}
       >
-        {/* ì™¼ìª½: ì¥ì¸ ë­í‚¹ */}
+        {/* ?¼ìª½: ?¥ì¸ ??‚¹ */}
         <Box>
       <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
-        ì¥ì¸ ë­í‚¹
+        ?¥ì¸ ??‚¹
       </Typography>
-      {topFetching ? (
+      {overviewFetching ? (
         <Stack spacing={1}>
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} variant="rectangular" height={56} sx={{ borderRadius: 1.5 }} />
@@ -528,7 +520,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                   },
                 })}
               >
-                {/* ìˆœìœ„ */}
+                {/* ?œìœ„ */}
                 <Box
                   sx={{
                     width: 28,
@@ -555,13 +547,13 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                   </Typography>
                 </Box>
 
-                {/* ì•„ë°”íƒ€ */}
+                {/* ?„ë°”?€ */}
                 <Avatar
                   src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
                   sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
                 />
 
-                {/* ë‹‰ë„¤ì„ + ìŠ¹ë¥  ë°” */}
+                {/* ?‰ë„¤??+ ?¹ë¥  ë°?*/}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
                     {s.wizard_name ?? s.wizard_id}
@@ -581,7 +573,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                   />
                 </Box>
 
-                {/* í”½ íšŸìˆ˜ + ìŠ¹ë¥  */}
+                {/* ???Ÿìˆ˜ + ?¹ë¥  */}
                 <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
                   <Typography
                     sx={{
@@ -594,8 +586,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                     {fmt1(wr)}
                   </Typography>
                   <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                    {fmtInt(s.pick_cnt)}í”½
-                  </Typography>
+                    {fmtInt(s.pick_cnt)}??                  </Typography>
                 </Box>
               </Box>
             );
@@ -605,17 +596,17 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         <Card variant="outlined">
           <CardContent>
             <Typography variant="body2" color="text.secondary">
-              í”½ 5íšŒ ì´ìƒì¸ ì†Œí™˜ì‚¬ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤.
+              ??5???´ìƒ???Œí™˜???°ì´?°ê? ?†ìŠµ?ˆë‹¤.
             </Typography>
           </CardContent>
         </Card>
       )}
         </Box>
 
-        {/* ì˜¤ë¥¸ìª½: ìµœê·¼ ì „íˆ¬ */}
+        {/* ?¤ë¥¸ìª? ìµœê·¼ ?„íˆ¬ */}
         <Box>
           <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
-            ìµœê·¼ ì „íˆ¬
+            ìµœê·¼ ?„íˆ¬
           </Typography>
           {recentFetching ? (
             <Stack spacing={1}>
@@ -643,8 +634,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                     onClick={() => setVisibleMatchCount((c) => c + 10)}
                     sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}
                   >
-                    ë”ë³´ê¸°
-                  </Button>
+                    ?”ë³´ê¸?                  </Button>
                 </Box>
               )}
             </>
@@ -652,7 +642,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="body2" color="text.secondary">
-                  ìµœê·¼ ì „íˆ¬ ë°ì´í„°ê°€ ì—†ìŠµë‹ˆë‹¤.
+                  ìµœê·¼ ?„íˆ¬ ?°ì´?°ê? ?†ìŠµ?ˆë‹¤.
                 </Typography>
               </CardContent>
             </Card>

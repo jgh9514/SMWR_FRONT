@@ -324,11 +324,12 @@ export default function RtaUnitPickGrid({
         maxWidth: '100%',
         minWidth: 0,
         flexWrap: 'nowrap',
-        overflow: 'auto',
+        overflow: 'hidden',
         direction: 'ltr',
         pt: 0.25,
         pb: '10px',
-        pl: '6px', /* 리더 아이콘(left:-6px) 잘림 방지 */
+        pl: '6px',
+        pr: '6px',
       }}
     >
       {groups.map((col, colIdx) => {
