@@ -157,6 +157,16 @@ export default function MonsterDetailContent({
     ? formatUpdatedRelativeKo(infoUpdatedAt)
     : null;
 
+  const evolution = useMemo(() => {
+    const ev = dctx?.evolution;
+    if (!ev) return null;
+    const normalM  = slimToOption(ev.normal)           ?? (awakenStep === 0 ? stub : undefined);
+    const awakenM  = slimToOption(ev.awakened)         ?? (awakenStep === 1 ? stub : undefined);
+    const secondM  = slimToOption(ev.second_awakening) ?? (awakenStep === 2 ? stub : undefined);
+    if (!normalM && !awakenM && !secondM) return null;
+    return { normalM, awakenM, secondM };
+  }, [dctx, awakenStep, stub]);
+
   const siblingElements = useMemo(() => {
     const raw = dctx?.siblings;
     if (!raw?.length) return [];
@@ -333,6 +343,68 @@ export default function MonsterDetailContent({
               )}
             </Box>
           </Box>
+
+          {/* evolution strip */}
+          {evolution && (
+            <Box
+              sx={{
+                position: 'relative',
+                px: { xs: 2, sm: 3 },
+                pb: { xs: 1, sm: 1.25 },
+                display: 'flex',
+                gap: 1,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ color: 'rgba(255,255,255,0.55)', fontSize: '0.7rem', fontWeight: 600, letterSpacing: 0.5, mr: 0.5 }}
+              >
+                진화
+              </Typography>
+              {[
+                evolution.normalM && { monster: evolution.normalM, label: '노말', active: awakenStep === 0 },
+                evolution.awakenM && { monster: evolution.awakenM, label: '1차', active: awakenStep === 1 },
+                evolution.secondM && { monster: evolution.secondM, label: '2차', active: awakenStep === 2 },
+              ].filter(Boolean).map((item, idx, arr) => (
+                <Box key={item!.label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Tooltip title={item!.monster.kr_name} placement="top" arrow>
+                    <Link href={`/monster-detail/${item!.monster.monster_id}`} style={{ textDecoration: 'none' }}>
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Box
+                          component="img"
+                          src={getRenderableImageUrl(item!.monster.image_url)}
+                          alt={item!.monster.kr_name}
+                          sx={{
+                            width: 40,
+                            height: 40,
+                            objectFit: 'contain',
+                            borderRadius: 1.5,
+                            bgcolor: 'rgba(0,0,0,0.22)',
+                            border: item!.active ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.2)',
+                            display: 'block',
+                            transition: 'transform 0.15s, border-color 0.15s',
+                            '&:hover': { transform: 'scale(1.1)', borderColor: 'rgba(255,255,255,0.55)' },
+                          }}
+                        />
+                        <Typography variant="caption" sx={{
+                          display: 'block', mt: 0.25, fontSize: '0.62rem',
+                          color: item!.active ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.45)',
+                          fontWeight: item!.active ? 700 : 400,
+                        }}>
+                          {item!.label}
+                        </Typography>
+                      </Box>
+                    </Link>
+                  </Tooltip>
+                  {idx < arr.length - 1 && (
+                    <Typography sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem', userSelect: 'none', mb: 1.5 }}>→</Typography>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          )}
 
           {/* sibling elements strip */}
           {siblingElements.length > 0 && (
