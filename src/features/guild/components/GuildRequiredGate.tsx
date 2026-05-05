@@ -46,15 +46,21 @@ export default function GuildRequiredGate({ children, title = '길드 가입이 
         <Alert severity="warning" sx={{ mb: 2 }}>
           <Typography fontWeight={700}>{title}</Typography>
           <Typography variant="body2" sx={{ mt: 1 }}>
-            전적·길드 기반 점령전 기능은 길드에 가입한 뒤 이용할 수 있습니다. 길드 모집 게시판에서 길드를 찾거나 길드 가입 신청을 이용해 주세요.
+            전적·길드 기반 점령전 기능은 길드에 가입한 뒤 이용할 수 있습니다.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 0.5 }}>
+            • <strong>길드 가입</strong>: 길드를 검색하거나 초대 코드로 기존 길드에 가입하세요.
+          </Typography>
+          <Typography variant="body2">
+            • <strong>길드 생성 신청</strong>: 새 길드를 직접 만들고 싶다면 길드 생성을 신청하세요.
           </Typography>
         </Alert>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          <Button component={Link} href="/guild-recruitment" variant="contained">
-            길드원 모집 보기
+          <Button component={Link} href="/guild-join" variant="contained">
+            길드 가입
           </Button>
           <Button component={Link} href="/guild-application" variant="outlined">
-            길드 가입 신청
+            길드 생성 신청
           </Button>
         </Box>
       </Box>

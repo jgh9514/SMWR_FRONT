@@ -297,6 +297,8 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   const dailyTrend = overviewData?.daily_trend ?? [];
   const pickSlots = overviewData?.pick_slots ?? [];
   const topSummoners = overviewData?.top_summoners ?? [];
+  const rankedSummoners = topSummoners.filter((s) => s.above_threshold);
+  const otherSummoners = topSummoners.filter((s) => !s.above_threshold);
 
   const chartData = useMemo(
     () =>
@@ -472,110 +474,154 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
               ))}
             </Stack>
           ) : topSummoners.length > 0 ? (
-            <Stack spacing={0.75}>
-              {topSummoners.map((s, i) => {
-                const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
-                const isTop3 = i < 3;
-                const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-                const rankColor = isTop3 ? rankColors[i] : undefined;
-                const wrGood = wr != null && wr >= 50;
+            <Stack spacing={1.5}>
+              {/* 3500점 이상 */}
+              {rankedSummoners.length > 0 && (
+                <Stack spacing={0.75}>
+                  {rankedSummoners.map((s, i) => {
+                    const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
+                    const isTop3 = i < 3;
+                    const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
+                    const rankColor = isTop3 ? rankColors[i] : undefined;
+                    const wrGood = wr != null && wr >= 50;
 
-                return (
-                  <Box
-                    key={s.wizard_id}
-                    component={Link}
-                    href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
-                    sx={(t) => ({
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1.5,
-                      px: 1.5,
-                      py: 1,
-                      borderRadius: 1.5,
-                      border: '1px solid',
-                      borderColor: isTop3
-                        ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.35 : 0.4)
-                        : 'divider',
-                      bgcolor: isTop3
-                        ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.07 : 0.05)
-                        : t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
-                      textDecoration: 'none',
-                      color: 'inherit',
-                      transition: 'background-color 0.15s, border-color 0.15s',
-                      '&:hover': {
-                        bgcolor: t.palette.action.hover,
-                        borderColor: t.palette.action.focus,
-                      },
-                    })}
-                  >
-                    <Box
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        bgcolor: isTop3 ? alpha(rankColor!, 0.15) : 'action.hover',
-                        border: '1.5px solid',
-                        borderColor: isTop3 ? alpha(rankColor!, 0.5) : 'divider',
-                      }}
-                    >
-                      <Typography
-                        sx={{
-                          fontSize: '0.72rem',
-                          fontWeight: 800,
-                          color: isTop3 ? rankColor : 'text.disabled',
-                          lineHeight: 1,
-                        }}
-                      >
-                        {i + 1}
-                      </Typography>
-                    </Box>
-
-                    <Avatar
-                      src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
-                      sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
-                    />
-
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
-                        {s.wizard_name ?? s.wizard_id}
-                      </Typography>
-                      <LinearProgress
-                        variant="determinate"
-                        value={Math.min(100, wr ?? 0)}
+                    return (
+                      <Box
+                        key={s.wizard_id}
+                        component={Link}
+                        href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
                         sx={(t) => ({
-                          height: 4,
-                          borderRadius: 2,
-                          bgcolor: t.palette.action.hover,
-                          '& .MuiLinearProgress-bar': {
-                            borderRadius: 2,
-                            bgcolor: wrGood ? 'success.main' : 'error.main',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1.5,
+                          px: 1.5,
+                          py: 1,
+                          borderRadius: 1.5,
+                          border: '1px solid',
+                          borderColor: isTop3
+                            ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.35 : 0.4)
+                            : 'divider',
+                          bgcolor: isTop3
+                            ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.07 : 0.05)
+                            : t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                          textDecoration: 'none',
+                          color: 'inherit',
+                          transition: 'background-color 0.15s, border-color 0.15s',
+                          '&:hover': {
+                            bgcolor: t.palette.action.hover,
+                            borderColor: t.palette.action.focus,
                           },
                         })}
-                      />
-                    </Box>
-
-                    <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                      <Typography
-                        sx={{
-                          fontSize: '0.875rem',
-                          fontWeight: 800,
-                          color: wrGood ? 'success.main' : 'error.main',
-                          lineHeight: 1.2,
-                        }}
                       >
-                        {fmt1(wr)}
-                      </Typography>
-                      <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                        {fmtInt(s.pick_cnt)}픽
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              })}
+                        <Box
+                          sx={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            bgcolor: isTop3 ? alpha(rankColor!, 0.15) : 'action.hover',
+                            border: '1.5px solid',
+                            borderColor: isTop3 ? alpha(rankColor!, 0.5) : 'divider',
+                          }}
+                        >
+                          <Typography
+                            sx={{ fontSize: '0.72rem', fontWeight: 800, color: isTop3 ? rankColor : 'text.disabled', lineHeight: 1 }}
+                          >
+                            {i + 1}
+                          </Typography>
+                        </Box>
+
+                        <Avatar
+                          src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
+                          sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
+                        />
+
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
+                            {s.wizard_name ?? s.wizard_id}
+                          </Typography>
+                          <LinearProgress
+                            variant="determinate"
+                            value={Math.min(100, wr ?? 0)}
+                            sx={(t) => ({
+                              height: 4,
+                              borderRadius: 2,
+                              bgcolor: t.palette.action.hover,
+                              '& .MuiLinearProgress-bar': { borderRadius: 2, bgcolor: wrGood ? 'success.main' : 'error.main' },
+                            })}
+                          />
+                        </Box>
+
+                        <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 800, color: wrGood ? 'success.main' : 'error.main', lineHeight: 1.2 }}>
+                            {fmt1(wr)}
+                          </Typography>
+                          <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
+                            {fmtInt(s.pick_cnt)}픽
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              )}
+
+              {/* 3500점 미만 별도 */}
+              {otherSummoners.length > 0 && (
+                <Box>
+                  <Stack spacing={0.75}>
+                    {otherSummoners.map((s) => {
+                      const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
+                      const wrGood = wr != null && wr >= 50;
+
+                      return (
+                        <Box
+                          key={s.wizard_id}
+                          component={Link}
+                          href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
+                          sx={(t) => ({
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1.5,
+                            px: 1.5,
+                            py: 1,
+                            borderRadius: 1.5,
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            bgcolor: t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
+                            opacity: 0.75,
+                            textDecoration: 'none',
+                            color: 'inherit',
+                            transition: 'background-color 0.15s',
+                            '&:hover': { bgcolor: t.palette.action.hover },
+                          })}
+                        >
+                          <Avatar
+                            src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
+                            sx={{ width: 28, height: 28, flexShrink: 0, border: '1px solid', borderColor: 'divider' }}
+                          />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight={500} noWrap sx={{ lineHeight: 1.3 }}>
+                              {s.wizard_name ?? s.wizard_id}
+                            </Typography>
+                          </Box>
+                          <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: wrGood ? 'success.main' : 'error.main', lineHeight: 1.2 }}>
+                              {fmt1(wr)}
+                            </Typography>
+                            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
+                              {fmtInt(s.pick_cnt)}픽
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              )}
             </Stack>
           ) : (
             <Card variant="outlined">

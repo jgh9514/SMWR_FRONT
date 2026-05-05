@@ -559,12 +559,14 @@ export interface RtaMonsterTopSummonerRow {
   wizard_id: string;
   wizard_name?: string | null;
   channel_uid?: string | null;
+  ladder_score?: number | null;
   pick_cnt: number;
   ban_cnt: number;
   win_cnt: number;
   lose_cnt: number;
   actual_pick_cnt: number;
   win_rate_pct?: number | null;
+  above_threshold: boolean;
 }
 
 export interface RtaMonsterOverviewResponse {

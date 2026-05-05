@@ -34,12 +34,10 @@ export default function RtaMatchListCard({ match }: { match: MatchItem }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   const p1Wins = match.winnerPosition === '1';
-  const expLeftUnits = p1Wins ? (match.p1Units ?? []) : (match.p2Units ?? []);
-  const expLeftSide: 'p1' | 'p2' = p1Wins ? 'p1' : 'p2';
-  const expRightUnits = p1Wins ? (match.p2Units ?? []) : (match.p1Units ?? []);
-  const expRightSide: 'p1' | 'p2' = p1Wins ? 'p2' : 'p1';
-  const expLeftFirstPick = (expLeftSide === 'p1' ? match.p1FirstPick : match.p2FirstPick) === '1';
-  const expRightFirstPick = (expRightSide === 'p1' ? match.p1FirstPick : match.p2FirstPick) === '1';
+  const expLeftUnits = match.p1Units ?? [];
+  const expRightUnits = match.p2Units ?? [];
+  const expLeftFirstPick = match.p1FirstPick === '1';
+  const expRightFirstPick = match.p2FirstPick === '1';
 
   return (
     <Card
@@ -251,9 +249,9 @@ export default function RtaMatchListCard({ match }: { match: MatchItem }) {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: { xs: 0.5, md: 1 } }}>
             <Box>
               <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Box sx={{ width: '100%', background: RTA_BADGE_WIN, clipPath: 'polygon(0% 0%, 80% 0%, 100% 100%, 0% 100%)', px: { xs: 1, md: 1.5 }, py: { xs: 0.35, md: 0.45 }, boxShadow: '0 4px 12px rgba(0,0,0,0.18)' }}>
+                <Box sx={{ width: '100%', background: p1Wins ? RTA_BADGE_WIN : RTA_BADGE_LOSE, clipPath: 'polygon(0% 0%, 80% 0%, 100% 100%, 0% 100%)', px: { xs: 1, md: 1.5 }, py: { xs: 0.35, md: 0.45 }, boxShadow: '0 4px 12px rgba(0,0,0,0.18)' }}>
                   <Typography sx={{ color: '#fff', fontSize: { xs: '0.65rem', md: '0.72rem' }, fontWeight: 800, letterSpacing: '0.08em', lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.35)', textAlign: 'left' }}>
-                    WIN
+                    {p1Wins ? 'WIN' : 'LOSE'}
                   </Typography>
                 </Box>
               </Box>
@@ -264,9 +262,9 @@ export default function RtaMatchListCard({ match }: { match: MatchItem }) {
             </Typography>
             <Box>
               <Box sx={{ mb: 0.5, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
-                <Box sx={{ width: '100%', background: RTA_BADGE_LOSE, clipPath: 'polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%)', px: { xs: 1, md: 1.5 }, py: { xs: 0.35, md: 0.45 }, boxShadow: '0 4px 12px rgba(0,0,0,0.18)' }}>
+                <Box sx={{ width: '100%', background: !p1Wins ? RTA_BADGE_WIN : RTA_BADGE_LOSE, clipPath: 'polygon(20% 0%, 100% 0%, 100% 100%, 0% 100%)', px: { xs: 1, md: 1.5 }, py: { xs: 0.35, md: 0.45 }, boxShadow: '0 4px 12px rgba(0,0,0,0.18)' }}>
                   <Typography sx={{ color: '#fff', fontSize: { xs: '0.65rem', md: '0.72rem' }, fontWeight: 800, letterSpacing: '0.08em', lineHeight: 1, textShadow: '0 1px 2px rgba(0,0,0,0.35)', textAlign: 'right' }}>
-                    LOSE
+                    {!p1Wins ? 'WIN' : 'LOSE'}
                   </Typography>
                 </Box>
               </Box>

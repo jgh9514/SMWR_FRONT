@@ -276,7 +276,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
 
   const isGuildRequiredPath = useMemo(() => {
     const currentPath = pathname || '';
-    const guildRequiredPrefixes = ['/siege', '/recent-siege', '/guild-management'];
+    const guildRequiredPrefixes = ['/recent-siege', '/guild-management'];
     return guildRequiredPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
   }, [pathname]);
 

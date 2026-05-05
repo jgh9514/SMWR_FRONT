@@ -40,6 +40,7 @@ import type { MonsterItem, SiegeSearchParams } from '@/types';
 import type { GuildInfo } from '@/features/siege/types/siege';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
 import { SiegeManualDefenseDeckDialog } from '@/features/siege/components/SiegeManualDefenseDeckDialog';
+import GuildRequiredGate from '@/features/guild/components/GuildRequiredGate';
 
 const LEADER_INDEX = 0;
 const MAX_MONSTERS = 3;
@@ -1229,12 +1230,14 @@ function SiegeContent() {
 
 export default function SiegePage() {
   return (
-    <Suspense fallback={
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Typography>로딩 중...</Typography>
-      </Container>
-    }>
-      <SiegeContent />
-    </Suspense>
+    <GuildRequiredGate>
+      <Suspense fallback={
+        <Container maxWidth="lg" sx={{ py: 4 }}>
+          <Typography>로딩 중...</Typography>
+        </Container>
+      }>
+        <SiegeContent />
+      </Suspense>
+    </GuildRequiredGate>
   );
 }

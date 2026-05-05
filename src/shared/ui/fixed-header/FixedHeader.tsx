@@ -147,7 +147,14 @@ function getNavGroups(
       { title: '길드원 모집', path: '/guild-recruitment', icon: <GroupIcon /> },
       { title: '1대1 문의', path: '/inquiry', icon: <QuestionAnswerIcon /> },
       {
-        title: '길드 가입 신청',
+        title: '길드 가입',
+        path: '/guild-join',
+        icon: <GroupIcon />,
+        requiresLogin: true,
+        requiresNoGuild: true,
+      },
+      {
+        title: '길드 생성 신청',
         path: '/guild-application',
         icon: <GroupIcon />,
         requiresLogin: true,
