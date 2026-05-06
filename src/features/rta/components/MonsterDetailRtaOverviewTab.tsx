@@ -39,6 +39,7 @@ import RtaSeasonTierSelectRow from '@/features/rta/components/RtaSeasonTierSelec
 import RtaMatchListCard from '@/features/rta/components/RtaMatchListCard';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
+import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
 
@@ -272,9 +273,11 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
   const [tierSelection, setTierSelection] = useState('CH_ALL');
 
-  const selectedRatingId = useMemo(() => {
-    if (!tierSelection || tierSelection === 'CH_ALL') return null;
-    return buildMonsterStatsTierBody(tierSelection, gradeRules).ratingId ?? null;
+  const { selectedRatingId, selectedRatingIds } = useMemo(() => {
+    if (!tierSelection || tierSelection === 'CH_ALL') return { selectedRatingId: null, selectedRatingIds: null };
+    const body = buildMonsterStatsTierBody(tierSelection, gradeRules);
+    if (body.ratingIds && body.ratingIds.length > 0) return { selectedRatingId: null, selectedRatingIds: body.ratingIds };
+    return { selectedRatingId: body.ratingId ?? null, selectedRatingIds: null };
   }, [tierSelection, gradeRules]);
 
   const valid = monsterId != null && monsterId > 0;
@@ -282,6 +285,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   const { data: overviewData, isFetching: overviewFetching } = useRtaMonsterOverview(monsterId, {
     seasonId: seasonIdForApi ?? null,
     ratingId: selectedRatingId,
+    ratingIds: selectedRatingIds,
     enabled: valid,
   });
 
@@ -295,21 +299,48 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
 
   const stats = overviewData?.overview_stats ?? null;
   const dailyTrend = overviewData?.daily_trend ?? [];
+  const dailyTrendPerRating = overviewData?.daily_trend_per_rating ?? [];
   const pickSlots = overviewData?.pick_slots ?? [];
   const topSummoners = overviewData?.top_summoners ?? [];
   const rankedSummoners = topSummoners.filter((s) => s.above_threshold);
   const otherSummoners = topSummoners.filter((s) => !s.above_threshold);
 
-  const chartData = useMemo(
-    () =>
-      dailyTrend.map((r) => ({
-        day: r.snap_date?.slice(5) ?? '',
-        픽률: r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
-        승률: r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
-        밴률: r.ban_rate_pct != null ? Number(r.ban_rate_pct) : null,
-      })),
-    [dailyTrend],
-  );
+  const usePerRatingChart = dailyTrendPerRating.length > 0;
+
+  const { chartData, perRatingKeys } = useMemo(() => {
+    if (!usePerRatingChart) {
+      return {
+        chartData: dailyTrend.map((r) => ({
+          day: r.snap_date?.slice(5) ?? '',
+          픽률: r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
+          승률: r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
+          밴률: r.ban_rate_pct != null ? Number(r.ban_rate_pct) : null,
+        })),
+        perRatingKeys: [] as string[],
+      };
+    }
+
+    // 등급별 라인: rating_id 추출 → 라벨 생성
+    const ratingIds = [...new Set(dailyTrendPerRating.map((r) => r.rating_id))].sort((a, b) => b - a);
+    const keys = ratingIds.map((rid) => getRtaTierShortLabel(rid));
+
+    // snap_date 기준으로 피벗
+    const byDate = new Map<string, Record<string, number | null>>();
+    for (const r of dailyTrendPerRating) {
+      const day = r.snap_date?.slice(5) ?? '';
+      if (!byDate.has(day)) byDate.set(day, { day });
+      const label = getRtaTierShortLabel(r.rating_id);
+      const row = byDate.get(day)!;
+      row[`${label} 픽률`] = r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null;
+      row[`${label} 승률`] = r.win_rate_pct != null ? Number(r.win_rate_pct) : null;
+    }
+
+    const perRatingLineKeys = keys.flatMap((k) => [`${k} 픽률`, `${k} 승률`]);
+    return {
+      chartData: [...byDate.values()].sort((a, b) => String(a.day).localeCompare(String(b.day))),
+      perRatingKeys: perRatingLineKeys,
+    };
+  }, [dailyTrend, dailyTrendPerRating, usePerRatingChart]);
 
   const firstPickSlots = useMemo(() => pickSlots.filter((s) => s.team_side === 1), [pickSlots]);
   const secondPickSlots = useMemo(() => pickSlots.filter((s) => s.team_side === 2), [pickSlots]);
@@ -380,25 +411,47 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         {overviewFetching ? (
           <Skeleton variant="rectangular" width="100%" height={240} sx={{ borderRadius: 1 }} />
         ) : chartData.length > 0 ? (
-          <Box sx={{ width: '100%', height: 260 }}>
+          <Box sx={{ width: '100%', height: usePerRatingChart ? 300 : 260 }}>
             <ResponsiveContainer>
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
                 <Tooltip formatter={(v, name) => [`${v ?? '—'}%`, name]} />
-                <Legend />
-                <Line type="monotone" dataKey="픽률" stroke="#1976d2" strokeWidth={2} dot connectNulls />
-                <Line type="monotone" dataKey="승률" stroke="#2e7d32" strokeWidth={2} dot connectNulls />
-                <Line
-                  type="monotone"
-                  dataKey="밴률"
-                  stroke="#c62828"
-                  strokeWidth={2}
-                  dot
-                  connectNulls
-                  strokeDasharray="4 2"
-                />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {usePerRatingChart ? (
+                  perRatingKeys.map((key, i) => {
+                    const isPick = key.endsWith('픽률');
+                    const tierColors = ['#1976d2', '#7b1fa2', '#2e7d32', '#e65100', '#c62828', '#00695c'];
+                    const tierIdx = Math.floor(i / 2) % tierColors.length;
+                    return (
+                      <Line
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        stroke={tierColors[tierIdx]}
+                        strokeWidth={2}
+                        dot={false}
+                        connectNulls
+                        strokeDasharray={isPick ? undefined : '4 2'}
+                      />
+                    );
+                  })
+                ) : (
+                  <>
+                    <Line type="monotone" dataKey="픽률" stroke="#1976d2" strokeWidth={2} dot connectNulls />
+                    <Line type="monotone" dataKey="승률" stroke="#2e7d32" strokeWidth={2} dot connectNulls />
+                    <Line
+                      type="monotone"
+                      dataKey="밴률"
+                      stroke="#c62828"
+                      strokeWidth={2}
+                      dot
+                      connectNulls
+                      strokeDasharray="4 2"
+                    />
+                  </>
+                )}
               </LineChart>
             </ResponsiveContainer>
           </Box>

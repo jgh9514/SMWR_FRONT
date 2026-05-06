@@ -77,6 +77,7 @@ export default function BatchManagementPage() {
   const streamEsRef = useRef<EventSource | null>(null);
   const streamRunStartedRef = useRef(false);
   const streamLogPreRef = useRef<HTMLPreElement | null>(null);
+  const runConfirmOpenRef = useRef(false);
   const incident = searchParams.get('incident');
   const historyFilter = searchParams.get('filter');
   const incidentMessage = useMemo(() => {
@@ -102,6 +103,10 @@ export default function BatchManagementPage() {
 
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
+  const sortedBatchConfigList = useMemo(
+    () => [...batchConfigList].sort((a, b) => a.bat_id.localeCompare(b.bat_id)),
+    [batchConfigList],
+  );
 
   // 배치 실행 이력 조회
   const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory({
@@ -233,7 +238,10 @@ export default function BatchManagementPage() {
 
   const handleRowRun = useCallback(
     async (config: BatchConfigItem) => {
+      if (runConfirmOpenRef.current) return;
+      runConfirmOpenRef.current = true;
       const res = await confirm('해당 배치를 실행하시겠습니까?', `배치ID: ${config.bat_id}\n배치명: ${config.bat_nm}`);
+      runConfirmOpenRef.current = false;
       if (!res) return;
 
       const streamId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -389,7 +397,7 @@ export default function BatchManagementPage() {
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                   <CircularProgress />
                 </Box>
-              ) : batchConfigList.length === 0 ? (
+              ) : sortedBatchConfigList.length === 0 ? (
                 <Alert severity="info" sx={{ m: 2 }}>배치 설정이 없습니다.</Alert>
               ) : (
                 <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
@@ -406,7 +414,7 @@ export default function BatchManagementPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {batchConfigList.map((config) => (
+                      {sortedBatchConfigList.map((config) => (
                         <TableRow key={config.bat_id} hover>
                           <TableCell>{config.bat_id}</TableCell>
                           <TableCell>

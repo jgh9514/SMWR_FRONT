@@ -545,6 +545,10 @@ export interface RtaMonsterDailySnapRow {
   ban_rate_pct?: number | null;
 }
 
+export interface RtaMonsterDailySnapPerRatingRow extends RtaMonsterDailySnapRow {
+  rating_id: number;
+}
+
 export interface RtaMonsterPickSlotRow {
   team_side: number;
   pick_slot_no: number;
@@ -574,6 +578,7 @@ export interface RtaMonsterOverviewResponse {
   ratingId?: number | null;
   overview_stats: RtaMonsterOverviewStats | null;
   daily_trend: RtaMonsterDailySnapRow[];
+  daily_trend_per_rating: RtaMonsterDailySnapPerRatingRow[];
   pick_slots: RtaMonsterPickSlotRow[];
   top_summoners: RtaMonsterTopSummonerRow[];
 }

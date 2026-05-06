@@ -737,6 +737,7 @@ export const useRtaMonsterOverview = (
     seasonCode?: string | null;
     seasonId?: number | null;
     ratingId?: number | null;
+    ratingIds?: number[] | null;
     enabled?: boolean;
   } = {},
 ) => {
@@ -745,7 +746,11 @@ export const useRtaMonsterOverview = (
     ? {
         monster_id: monsterId,
         ...seasonBody(options.seasonCode, options.seasonId ?? null),
-        ...(options.ratingId != null ? { rating_id: options.ratingId } : {}),
+        ...(options.ratingIds != null && options.ratingIds.length > 0
+          ? { rating_ids: options.ratingIds }
+          : options.ratingId != null
+            ? { rating_id: options.ratingId }
+            : {}),
       }
     : {};
   return useApiPostQuery<RtaMonsterOverviewResponse>('/rta/monster/overview', body, {
