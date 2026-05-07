@@ -14,6 +14,12 @@ import {
   RtaMatchListParams,
   RtaListPageResponse,
 } from '@/types';
+import type {
+  RtaMonsterOverviewStats,
+  RtaMonsterDailySnapRow,
+  RtaMonsterPickSlotRow,
+  RtaMonsterTopSummonerRow,
+} from '@/features/rta/types/rta';
 
 function ratingIdBody(ratingId?: number | null): Record<string, number> {
   if (ratingId == null || ratingId <= 0) return {};

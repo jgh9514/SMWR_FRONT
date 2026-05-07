@@ -14,7 +14,7 @@ import {
   MenuItem,
   Select,
 } from '@mui/material';
-import { alpha } from '@mui/material/styles';
+import { alpha, type Theme } from '@mui/material/styles';
 import {
   useRtaListPage,
   useRtaRatingGradeRules,
