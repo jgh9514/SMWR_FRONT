@@ -18,6 +18,7 @@ import {
 } from '@mui/material';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRankCutoffsSection from '@/features/rta/components/RtaRankCutoffsSection';
 import RtaDashboardLinkListsGrid from '@/features/rta/components/RtaDashboardLinkListsGrid';
@@ -97,12 +98,10 @@ function addCalendarDaysYmd(startYmd: string, deltaDays: number): string {
   return `${y}-${m}-${day}`;
 }
 
-function todayYmdLocal(): string {
-  const n = new Date();
-  const y = n.getFullYear();
-  const m = String(n.getMonth() + 1).padStart(2, '0');
-  const d = String(n.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+function todayYmdKst(): string {
+  return toYmdKst(new Date()) ?? new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date());
 }
 
 /** 특정 일(bucket_date)의 티어별 인원 합산 — 슬롯 문자열 키(getRtaTierShortLabel 과 동일) */
@@ -168,7 +167,7 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
    */
   const selectableEndYmd = useMemo(() => {
     if (!seasonStartYmd || !seasonLastInclusiveYmd) return null;
-    const today = todayYmdLocal();
+    const today = todayYmdKst();
     if (today < seasonStartYmd) {
       return seasonStartYmd;
     }
@@ -236,9 +235,44 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
     [seasonStartYmd],
   );
 
-  const handlePlay = () => {
-    setDayOffset((prev) => (prev >= maxDayIndex ? 0 : prev + 1));
-  };
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPlay = useCallback(() => {
+    if (playIntervalRef.current != null) {
+      clearInterval(playIntervalRef.current);
+      playIntervalRef.current = null;
+    }
+    setIsPlaying(false);
+  }, []);
+
+  const handlePlay = useCallback(() => {
+    if (isPlaying) {
+      stopPlay();
+      return;
+    }
+    // 끝에 있으면 처음부터 시작
+    setDayOffset((prev) => (prev >= maxDayIndex ? 0 : prev));
+    setIsPlaying(true);
+    playIntervalRef.current = setInterval(() => {
+      setDayOffset((prev) => {
+        if (prev >= maxDayIndex) {
+          stopPlay();
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 400);
+  }, [isPlaying, maxDayIndex, stopPlay]);
+
+  // 시즌 바뀌거나 maxDayIndex 바뀌면 재생 중단
+  useEffect(() => {
+    stopPlay();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seasonSelectValue, maxDayIndex]);
+
+  // 언마운트 시 정리
+  useEffect(() => () => stopPlay(), [stopPlay]);
 
   return (
     <Box
@@ -354,22 +388,25 @@ export default function RtaDashboardClient({ embedded = false }: { embedded?: bo
               <IconButton
                 size="small"
                 onClick={handlePlay}
-                title="하루씩 (끝에서 다시 처음)"
+                title={isPlaying ? '일시정지' : '처음부터 자동 재생'}
                 sx={{
                   width: 28,
                   height: 28,
-                  bgcolor: 'action.hover',
-                  '&:hover': { bgcolor: 'action.selected' },
+                  bgcolor: isPlaying ? 'primary.main' : 'action.hover',
+                  color: isPlaying ? 'primary.contrastText' : 'inherit',
+                  '&:hover': { bgcolor: isPlaying ? 'primary.dark' : 'action.selected' },
                 }}
               >
-                <PlayArrowIcon sx={{ fontSize: 18, ml: 0.25 }} />
+                {isPlaying
+                  ? <PauseIcon sx={{ fontSize: 18 }} />
+                  : <PlayArrowIcon sx={{ fontSize: 18, ml: 0.25 }} />}
               </IconButton>
               <Slider
                 size="small"
                 value={dayOffset}
                 min={0}
                 max={Math.max(0, maxDayIndex)}
-                onChange={(_, v) => setDayOffset(v as number)}
+                onChange={(_, v) => { stopPlay(); setDayOffset(v as number); }}
                 valueLabelDisplay="auto"
                 valueLabelFormat={sliderValueLabelFormat}
                 sx={{
