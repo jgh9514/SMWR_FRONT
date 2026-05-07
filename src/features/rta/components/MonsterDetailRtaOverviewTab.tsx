@@ -325,7 +325,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
     const keys = ratingIds.map((rid) => getRtaTierShortLabel(rid));
 
     // snap_date 기준으로 피벗
-    const byDate = new Map<string, Record<string, number | null>>();
+    const byDate = new Map<string, Record<string, string | number | null>>();
     for (const r of dailyTrendPerRating) {
       const day = r.snap_date?.slice(5) ?? '';
       if (!byDate.has(day)) byDate.set(day, { day });
