@@ -264,7 +264,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     const anchors = rankCutData?.rank_cutoff_anchors;
     const snapshots = rankCutData?.snapshot_rank_cut;
 
-    let rows: { ratingId: number; cutoff: number; tierSort: number }[];
+    let rows: { ratingId: number; cutoff: number; tierSort: number }[] | undefined;
 
     if (anchors && anchors.length > 0) {
       // rank_cutoff_anchors: 6개 시점×전 티어가 혼재 → 'now'(anchorSort=0)을 우선, 없으면 가장 최신(최솟값) 사용
