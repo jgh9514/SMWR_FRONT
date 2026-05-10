@@ -1,22 +1,19 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Chip,
-  LinearProgress,
   Paper,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material';
-import { alpha, useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import {
   CartesianGrid,
   Legend,
@@ -38,9 +35,7 @@ import {
 import RtaSeasonTierSelectRow from '@/features/rta/components/RtaSeasonTierSelectRow';
 import RtaMatchListCard from '@/features/rta/components/RtaMatchListCard';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
-import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
-import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
 
@@ -336,10 +331,6 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   const dailyTrend = overviewData?.daily_trend ?? [];
   const dailyTrendPerRating = overviewData?.daily_trend_per_rating ?? [];
   const pickSlots = overviewData?.pick_slots ?? [];
-  const topSummoners = overviewData?.top_summoners ?? [];
-  const rankedSummoners = topSummoners.filter((s) => s.above_threshold);
-  const otherSummoners = topSummoners.filter((s) => !s.above_threshold);
-
   const usePerRatingChart = dailyTrendPerRating.length > 0;
 
   const { chartData, perRatingKeys } = useMemo(() => {
@@ -528,264 +519,51 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         </Box>
       )}
 
-      {/* 장인 랭킹 + 최근 전투 (2열) */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
-          gap: 3,
-          mt: 2,
-          alignItems: 'start',
-        }}
-      >
-        {/* 장인 랭킹 */}
-        <Box>
-          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
-            장인 랭킹
-          </Typography>
-          {overviewFetching ? (
+      {/* 최근 전투 */}
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
+          최근 전투
+        </Typography>
+        {recentFetching ? (
+          <Stack spacing={1}>
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} variant="rectangular" height={100} sx={{ borderRadius: 1.5 }} />
+            ))}
+          </Stack>
+        ) : (recentMatchesData?.matches?.length ?? 0) > 0 ? (
+          <>
             <Stack spacing={1}>
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} variant="rectangular" height={56} sx={{ borderRadius: 1.5 }} />
-              ))}
+              {(recentMatchesData!.matches as unknown as RawMatchItem[])
+                .slice(0, visibleMatchCount)
+                .map((raw, idx) => {
+                  const match = processRawMatchToMatchItem(raw);
+                  return (
+                    <RtaMatchListCard key={raw.rid != null ? String(raw.rid) : idx} match={match} />
+                  );
+                })}
             </Stack>
-          ) : topSummoners.length > 0 ? (
-            <Stack spacing={1.5}>
-              {/* 3500점 이상 */}
-              {rankedSummoners.length > 0 && (
-                <Stack spacing={0.75}>
-                  {rankedSummoners.map((s, i) => {
-                    const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
-                    const isTop3 = i < 3;
-                    const rankColors = ['#FFD700', '#C0C0C0', '#CD7F32'];
-                    const rankColor = isTop3 ? rankColors[i] : undefined;
-                    const wrGood = wr != null && wr >= 50;
-
-                    return (
-                      <Box
-                        key={s.wizard_id}
-                        component={Link}
-                        href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
-                        sx={(t) => ({
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 1.5,
-                          px: 1.5,
-                          py: 1,
-                          borderRadius: 1.5,
-                          border: '1px solid',
-                          borderColor: isTop3
-                            ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.35 : 0.4)
-                            : 'divider',
-                          bgcolor: isTop3
-                            ? alpha(rankColor!, t.palette.mode === 'dark' ? 0.07 : 0.05)
-                            : t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
-                          textDecoration: 'none',
-                          color: 'inherit',
-                          transition: 'background-color 0.15s, border-color 0.15s',
-                          '&:hover': {
-                            bgcolor: t.palette.action.hover,
-                            borderColor: t.palette.action.focus,
-                          },
-                        })}
-                      >
-                        <Box
-                          sx={{
-                            width: 28,
-                            height: 28,
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0,
-                            bgcolor: isTop3 ? alpha(rankColor!, 0.15) : 'action.hover',
-                            border: '1.5px solid',
-                            borderColor: isTop3 ? alpha(rankColor!, 0.5) : 'divider',
-                          }}
-                        >
-                          <Typography
-                            sx={{ fontSize: '0.72rem', fontWeight: 800, color: isTop3 ? rankColor : 'text.disabled', lineHeight: 1 }}
-                          >
-                            {i + 1}
-                          </Typography>
-                        </Box>
-
-                        <Avatar
-                          src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
-                          sx={{ width: 34, height: 34, flexShrink: 0, border: '1.5px solid', borderColor: 'divider' }}
-                        />
-
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography variant="body2" fontWeight={600} noWrap sx={{ lineHeight: 1.3, mb: 0.3 }}>
-                            {s.wizard_name ?? s.wizard_id}
-                          </Typography>
-                          <LinearProgress
-                            variant="determinate"
-                            value={Math.min(100, wr ?? 0)}
-                            sx={(t) => ({
-                              height: 4,
-                              borderRadius: 2,
-                              bgcolor: t.palette.action.hover,
-                              '& .MuiLinearProgress-bar': { borderRadius: 2, bgcolor: wrGood ? 'success.main' : 'error.main' },
-                            })}
-                          />
-                        </Box>
-
-                        <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                          {s.rating_id != null && (
-                            <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.4} sx={{ mb: 0.2 }}>
-                              <RtaRatingStarIcons rating={s.rating_id} size={11} gap={0.5} />
-                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.secondary', lineHeight: 1 }}>
-                                {getRtaTierShortLabel(s.rating_id)}
-                              </Typography>
-                            </Stack>
-                          )}
-                          <Typography sx={{ fontSize: '0.875rem', fontWeight: 800, color: wrGood ? 'success.main' : 'error.main', lineHeight: 1.2 }}>
-                            {fmt1(wr)}
-                          </Typography>
-                          <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5}>
-                            {s.ladder_score != null && (
-                              <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
-                                {fmtInt(s.ladder_score)}점
-                              </Typography>
-                            )}
-                            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem' }}>
-                              {fmtInt(s.pick_cnt)}픽
-                            </Typography>
-                          </Stack>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              )}
-
-              {/* 3500점 미만 별도 */}
-              {otherSummoners.length > 0 && (
-                <Box>
-                  <Stack spacing={0.75}>
-                    {otherSummoners.map((s) => {
-                      const wr = s.win_rate_pct != null ? Number(s.win_rate_pct) : null;
-                      const wrGood = wr != null && wr >= 50;
-
-                      return (
-                        <Box
-                          key={s.wizard_id}
-                          component={Link}
-                          href={`/rta/player/${encodeURIComponent(s.wizard_id)}`}
-                          sx={(t) => ({
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            px: 1.5,
-                            py: 1,
-                            borderRadius: 1.5,
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            bgcolor: t.palette.mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.01)',
-                            opacity: 0.75,
-                            textDecoration: 'none',
-                            color: 'inherit',
-                            transition: 'background-color 0.15s',
-                            '&:hover': { bgcolor: t.palette.action.hover },
-                          })}
-                        >
-                          <Avatar
-                            src={getSwexPlayerImageUrl(s.channel_uid ?? s.wizard_id)}
-                            sx={{ width: 28, height: 28, flexShrink: 0, border: '1px solid', borderColor: 'divider' }}
-                          />
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Typography variant="body2" fontWeight={500} noWrap sx={{ lineHeight: 1.3 }}>
-                              {s.wizard_name ?? s.wizard_id}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-                            {s.rating_id != null && (
-                              <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.4} sx={{ mb: 0.2 }}>
-                                <RtaRatingStarIcons rating={s.rating_id} size={10} gap={0.5} />
-                                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'text.secondary', lineHeight: 1 }}>
-                                  {getRtaTierShortLabel(s.rating_id)}
-                                </Typography>
-                              </Stack>
-                            )}
-                            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: wrGood ? 'success.main' : 'error.main', lineHeight: 1.2 }}>
-                              {fmt1(wr)}
-                            </Typography>
-                            <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5}>
-                              {s.ladder_score != null && (
-                                <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
-                                  {fmtInt(s.ladder_score)}점
-                                </Typography>
-                              )}
-                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
-                                {fmtInt(s.pick_cnt)}픽
-                              </Typography>
-                            </Stack>
-                          </Box>
-                        </Box>
-                      );
-                    })}
-                  </Stack>
-                </Box>
-              )}
-            </Stack>
-          ) : (
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="body2" color="text.secondary">
-                  픽 5회 이상인 소환사 데이터가 없습니다.
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
-        </Box>
-
-        {/* 최근 전투 */}
-        <Box>
-          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1 }}>
-            최근 전투
-          </Typography>
-          {recentFetching ? (
-            <Stack spacing={1}>
-              {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} variant="rectangular" height={100} sx={{ borderRadius: 1.5 }} />
-              ))}
-            </Stack>
-          ) : (recentMatchesData?.matches?.length ?? 0) > 0 ? (
-            <>
-              <Stack spacing={1}>
-                {(recentMatchesData!.matches as unknown as RawMatchItem[])
-                  .slice(0, visibleMatchCount)
-                  .map((raw, idx) => {
-                    const match = processRawMatchToMatchItem(raw);
-                    return (
-                      <RtaMatchListCard key={raw.rid != null ? String(raw.rid) : idx} match={match} />
-                    );
-                  })}
-              </Stack>
-              {visibleMatchCount < (recentMatchesData!.matches?.length ?? 0) && (
-                <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => setVisibleMatchCount((c) => c + 10)}
-                    sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}
-                  >
-                    더보기
-                  </Button>
-                </Box>
-              )}
-            </>
-          ) : (
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="body2" color="text.secondary">
-                  최근 전투 데이터가 없습니다.
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
-        </Box>
+            {visibleMatchCount < (recentMatchesData!.matches?.length ?? 0) && (
+              <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setVisibleMatchCount((c) => c + 10)}
+                  sx={{ borderRadius: 2, px: 4, fontWeight: 700 }}
+                >
+                  더보기
+                </Button>
+              </Box>
+            )}
+          </>
+        ) : (
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="body2" color="text.secondary">
+                최근 전투 데이터가 없습니다.
+              </Typography>
+            </CardContent>
+          </Card>
+        )}
       </Box>
     </Box>
   );

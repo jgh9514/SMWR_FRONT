@@ -42,8 +42,9 @@ import {
 } from '@/features/rta/utils/rtaRankCutoffChart';
 import { RtaRankCutoffSectionSkeleton } from '@/features/rta/components/RtaDashboardSkeletons';
 
-/** 표시 순서·라벨 (서버 anchorKey 와 동일) */
+/** 표시 순서·라벨 (서버 anchorKey 와 동일). 'now'(현재)가 첫 항목 → 요약 카드 + 테이블 첫 행 */
 const ANCHOR_ROWS: { key: string; label: string }[] = [
+  { key: 'now', label: '현재' },
   { key: '3h', label: '3시간 전' },
   { key: '6h', label: '6시간 전' },
   { key: '12h', label: '12시간 전' },
@@ -205,12 +206,16 @@ export default function RtaRankCutoffsSection({
           deltas[k] = c - o;
         }
       }
-      tableRows.push({
-        anchorKey: key,
-        label,
-        scores: { ...cur },
-        deltas,
-      });
+      // 해당 시점에 유효한 컷 점수가 하나라도 있을 때만 행 추가
+      const hasScore = CUT_TIER_ORDER.some((k) => !isRtaCutoffMissing(cur[k]));
+      if (hasScore) {
+        tableRows.push({
+          anchorKey: key,
+          label,
+          scores: { ...cur },
+          deltas,
+        });
+      }
     }
 
     const summaryLabel = ANCHOR_ROWS[0]?.label ?? '—';
@@ -343,7 +348,7 @@ export default function RtaRankCutoffsSection({
       {showTrendChart && hasCutChartData ? (
         <Box sx={{ mb: 2.5 }}>
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            앵커별 컷 추이 (7일 전 → 3시간 전, 과거 → 현재)
+            앵커별 컷 추이 (7일 전 → 현재, 과거 → 현재)
           </Typography>
           <Box sx={{ width: '100%', minHeight: 260 }}>
             <ResponsiveContainer width="100%" height={240}>

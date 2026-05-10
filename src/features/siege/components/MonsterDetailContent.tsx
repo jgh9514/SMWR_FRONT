@@ -116,7 +116,6 @@ const TABS = [
   { label: '개요', sub: '' },
   { label: '스탯', sub: 'stat' },
   { label: '상성', sub: 'matchup' },
-  { label: '상위 플레이어', sub: 'players' },
 ];
 
 // ── component ─────────────────────────────────────────────────────────────────

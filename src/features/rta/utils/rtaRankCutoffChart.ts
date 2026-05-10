@@ -6,7 +6,7 @@ import { getRtaTierShortLabel } from '@/shared/utils/util';
 export const CUT_TIER_ORDER = ['P2', 'P3', 'G1', 'G2', 'G3'] as const;
 
 /** X축: 좌=과거(앵커가 더 옛날) → 우=현재에 가까움 */
-export const ANCHOR_CHART_KEYS = ['7d', '3d', '12h', '6h', '3h'] as const;
+export const ANCHOR_CHART_KEYS = ['7d', '3d', '12h', '6h', '3h', 'now'] as const;
 
 export const CUT_CHART_Y_MARGIN = 100;
 
@@ -16,6 +16,7 @@ export const ANCHOR_CHART_LABELS: Record<string, string> = {
   '12h': '12시간 전',
   '6h': '6시간 전',
   '3h': '3시간 전',
+  'now': '현재',
 };
 
 function toNum(v: unknown): number {
@@ -32,10 +33,12 @@ export function pivotRankCutoffAnchors(
   for (const row of rows ?? []) {
     const ak = String(row.anchorKey ?? '').trim();
     if (!ak) continue;
-    const tk = row.gradeSlot
-      ? String(row.gradeSlot).trim()
-      : row.ratingId != null
-        ? getRtaTierShortLabel(Number(row.ratingId))
+    // ratingId가 있으면 우선 사용(gradeSlot 포맷 불일치 방어), 없으면 gradeSlot 직접 사용
+    const ridNum = row.ratingId != null ? Number(row.ratingId) : NaN;
+    const tk = Number.isFinite(ridNum) && ridNum > 0
+      ? getRtaTierShortLabel(ridNum)
+      : row.gradeSlot
+        ? String(row.gradeSlot).trim()
         : '';
     if (!tk || !tierSet.has(tk)) continue;
     if (!byAnchor.has(ak)) byAnchor.set(ak, {});
