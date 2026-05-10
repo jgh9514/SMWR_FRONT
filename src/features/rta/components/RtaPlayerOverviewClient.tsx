@@ -35,7 +35,7 @@ import {
 } from 'recharts';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
-import { useRtaDashboardRankCutoff, useRtaPlayerSummary } from '@/features/rta/hooks/useRtaData';
+import { useRtaDashboardRankCutoff, useRtaPlayerSummary, useRtaPlayerMonsterUsage, useRtaPlayerOpponentRecords } from '@/features/rta/hooks/useRtaData';
 import { isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
@@ -118,6 +118,18 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     hasNextPage,
   } = useRtaPlayerMatchesInfinite(wizardId, true, seasonCode, seasonId);
 
+  const { data: monsterUsageData } = useRtaPlayerMonsterUsage(wizardId, seasonCode, {
+    seasonId,
+    enabled: Boolean(wizardId),
+  });
+
+  const { data: opponentData } = useRtaPlayerOpponentRecords(wizardId, seasonCode, {
+    seasonId,
+    limit: 5,
+    offset: 0,
+    enabled: Boolean(wizardId),
+  });
+
   /** ‘전체 점수 추이’ 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
   const [chartOpen, setChartOpen] = useState(false);
   const [chartMode, setChartMode] = useState<ChartMode>('daily');
@@ -162,69 +174,28 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     maxSeasonScoreAgg > 0 ? maxSeasonScoreAgg : summaryScore > 0 ? summaryScore : 0;
 
   const topMonsters = useMemo(() => {
-    const acc = new Map<string, { name: string; image: string; wins: number; games: number }>();
-    for (const c of chronological) {
-      for (const u of c.p.myUnits) {
-        if (u.banned) continue;
-        const key = u.name;
-        if (!acc.has(key)) acc.set(key, { name: u.name, image: u.image, wins: 0, games: 0 });
-        const g = acc.get(key)!;
-        g.games += 1;
-        if (c.won) g.wins += 1;
-      }
-    }
-    return [...acc.values()]
-      .filter((x) => x.games > 0)
-      .sort((a, b) => b.games - a.games)
-      .slice(0, 5);
-  }, [chronological]);
+    const rows = monsterUsageData?.rows ?? [];
+    return rows
+      .filter((r) => (r.actual_pick_cnt ?? (r.pick_cnt + r.ban_cnt)) > 0)
+      .slice(0, 5)
+      .map((r) => ({
+        name: r.monster_name ?? String(r.unit_master_id),
+        image: r.monster_image ?? '',
+        games: r.actual_pick_cnt ?? (r.pick_cnt + r.ban_cnt),
+        winRatePct: r.win_rate_pct,
+      }));
+  }, [monsterUsageData?.rows]);
 
-  const LAST_N_GAMES = 20;
-  /** 직전 N경기 구간에서 상대별 대전 수(판수) 상위만 표시 */
-  const LAST20_TOP_OPPONENTS = 5;
-  const last20VsOpponents = useMemo(() => {
-    if (chronological.length === 0) {
-      return {
-        sampleSize: 0,
-        rows: [] as { oppId: string; oppName: string; wins: number; losses: number; channelUid?: string }[],
-      };
-    }
-    const slice = chronological.slice(-LAST_N_GAMES);
-    const sampleSize = slice.length;
-    const byKey = new Map<
-      string,
-      { oppId: string; oppName: string; wins: number; losses: number; channelUid?: string }
-    >();
-    for (const c of slice) {
-      const oid = String(c.p.oppId ?? '').trim();
-      const key = oid || String(c.p.oppName ?? '').trim();
-      if (!key) continue;
-      if (!byKey.has(key)) {
-        byKey.set(key, {
-          oppId: oid || key,
-          oppName: String(c.p.oppName ?? key).trim() || key,
-          wins: 0,
-          losses: 0,
-          channelUid: c.p.oppChannelUid,
-        });
-      } else {
-        const g = byKey.get(key)!;
-        if (c.p.oppChannelUid) g.channelUid = c.p.oppChannelUid;
-      }
-      const g = byKey.get(key)!;
-      if (c.won) g.wins += 1;
-      else g.losses += 1;
-    }
-    const rows = [...byKey.values()]
-      .sort((a, b) => {
-        const ta = a.wins + a.losses;
-        const tb = b.wins + b.losses;
-        if (tb !== ta) return tb - ta;
-        return a.oppName.localeCompare(b.oppName, 'ko');
-      })
-      .slice(0, LAST20_TOP_OPPONENTS);
-    return { sampleSize, rows };
-  }, [chronological]);
+  const topOpponents = useMemo(() => {
+    const rows = opponentData?.rows ?? [];
+    return rows.slice(0, 5).map((r) => ({
+      oppId: r.opponent_wizard_id,
+      oppName: r.opponent_wizard_name?.trim() || `소환사 ${r.opponent_wizard_id}`,
+      wins: r.win_cnt,
+      losses: r.lose_cnt,
+      channelUid: r.opponent_channel_uid ?? undefined,
+    }));
+  }, [opponentData?.rows]);
 
   const chartData = useMemo(() => {
     if (chartMode === 'match') {
@@ -287,23 +258,36 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
         ? (winCount / matchCount) * 100
         : null;
 
-  /**
-   * 랭크컷 구간: POST /rta/dashboard/rank-cutoff → `snapshot_rank_cut` = WAS `getRtaSnapshotRankCutLatest` = 테이블 `rta_snapshot_rank_cut` 최신 스냅(등급별 최저).
-   * 왼쪽=현재 티어 하한, 오른쪽=바로 윗 티어 하한(배열에서 i+1). `ratingId`로 재정렬하지 않음 — API가 tier_sort·rating_id 순과 동일.
-   */
   const tierBand = useMemo(() => {
     const rid = ratingId;
     if (rid == null || !Number.isFinite(rid) || rid <= 0) return { type: 'scoreOnly' as const };
-    const raw = rankCutData?.snapshot_rank_cut ?? [];
-    const rows = raw
-      .map((r) => {
-        const rec = r as { ratingId?: number; rating_id?: number; cutoffScore?: number; cutoff_score?: number };
-        const id = rec.ratingId ?? rec.rating_id;
-        const c = rec.cutoffScore ?? rec.cutoff_score;
-        return { ratingId: Number(id), cutoff: Number(c) };
-      })
-      .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
-      .filter((x) => !isRtaCutoffMissing(x.cutoff));
+    const anchors = rankCutData?.rank_cutoff_anchors;
+    const snapshots = rankCutData?.snapshot_rank_cut;
+
+    let rows: { ratingId: number; cutoff: number; tierSort: number }[];
+
+    if (anchors && anchors.length > 0) {
+      // rank_cutoff_anchors: 6개 시점×전 티어가 혼재 → 'now'(anchorSort=0)만 추려서 tierSort 오름차순 정렬
+      rows = anchors
+        .map((r) => ({
+          ratingId: Number(r.ratingId),
+          cutoff: Number(r.cutoffScore),
+          anchorSort: r.anchorSort ?? -1,
+          tierSort: r.tierSort ?? 0,
+        }))
+        .filter((x) => x.anchorSort === 0)
+        .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
+        .filter((x) => !isRtaCutoffMissing(x.cutoff))
+        .sort((a, b) => a.tierSort - b.tierSort);
+    } else if (snapshots && snapshots.length > 0) {
+      rows = snapshots
+        .map((r) => ({ ratingId: Number(r.ratingId), cutoff: Number(r.cutoffScore), tierSort: 0 }))
+        .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
+        .filter((x) => !isRtaCutoffMissing(x.cutoff));
+    } else {
+      return { type: 'scoreOnly' as const };
+    }
+
     if (rows.length < 1) return { type: 'scoreOnly' as const };
     const i = rows.findIndex((r) => r.ratingId === rid);
     if (i < 0) return { type: 'scoreOnly' as const };
@@ -314,10 +298,8 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       if (min > 0) return { type: 'highest' as const };
       return { type: 'scoreOnly' as const };
     }
-    const currentTierRatingId = rows[i]!.ratingId;
-    const nextRatingId = rows[i + 1]!.ratingId;
-    return { type: 'range' as const, min, max, currentTierRatingId, nextRatingId };
-  }, [rankCutData?.snapshot_rank_cut, ratingId]);
+    return { type: 'range' as const, min, max, currentTierRatingId: rows[i]!.ratingId, nextRatingId: rows[i + 1]!.ratingId };
+  }, [rankCutData?.rank_cutoff_anchors, rankCutData?.snapshot_rank_cut, ratingId]);
 
   const tierBarPct = useMemo(() => {
     if (tierBand.type !== 'range' || !Number.isFinite(summaryScore)) return 0;
@@ -674,7 +656,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
               </Typography>
             ) : (
               topMonsters.map((m) => {
-                const pct = Math.round((m.wins / m.games) * 100);
+                const pct = m.winRatePct != null ? Math.round(m.winRatePct) : null;
                 return (
                   <Stack
                     key={m.name}
@@ -692,7 +674,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         <Box component="span" color="success.main">
-                          {pct}%
+                          {pct != null ? `${pct}%` : '—'}
                         </Box>
                         {' · '}
                         {m.games}경기
@@ -713,26 +695,17 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
         <Card variant="outlined" sx={{ p: 2.5, borderRadius: 2 }}>
           <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 2 }}>
             <GroupsIcon color="primary" fontSize="small" />
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} component="div">
-                라이벌
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                최근 {LAST_N_GAMES}판 상대
-              </Typography>
-            </Box>
+            <Typography variant="subtitle2" fontWeight={700} component="div">
+              라이벌
+            </Typography>
           </Stack>
           <Stack spacing={1}>
-            {last20VsOpponents.sampleSize === 0 ? (
+            {topOpponents.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
-                로드된 경기가 없습니다.
-              </Typography>
-            ) : last20VsOpponents.rows.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                상대 정보가 없는 경기만 있습니다.
+                집계된 상대 전적이 없습니다.
               </Typography>
             ) : (
-              last20VsOpponents.rows.map((r) => {
+              topOpponents.map((r) => {
                 const href = `/rta/player/${encodeURIComponent(r.oppId)}`;
                 return (
                   <Stack

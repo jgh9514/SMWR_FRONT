@@ -128,7 +128,7 @@ function PickSlotBox({
     : wr >= 55 ? 'error.main'
     : wr >= 50 ? 'success.main'
     : 'text.secondary';
-  const hasData = eventCnt > 0 || matchCnt > 0;
+  const hasData = matchCnt > 0;
   const textColor = hasData
     ? (isDark ? '#fff' : theme.palette.getContrastText(alpha(color, 0.35)))
     : 'text.disabled';

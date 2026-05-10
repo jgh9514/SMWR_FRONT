@@ -383,50 +383,86 @@ export default function MonsterDetailContent({
               )}
             </Box>
 
-            {/* 우측: 형제 속성만 — 가로 */}
-            {siblingElements.length > 0 && (
-              <Box
+          </Box>
+
+          {/* 형제 속성 — 히어로 카드 하단 (xs/sm 공통) */}
+          {siblingElements.length > 0 && (
+            <Box
+              sx={{
+                px: { xs: 2, sm: 3 },
+                pt: 0,
+                pb: { xs: 1.5, sm: 2 },
+                borderTop: '1px solid rgba(255,255,255,0.07)',
+              }}
+            >
+              <Typography
                 sx={{
-                  flexShrink: 0,
-                  display: 'flex',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'flex-end',
-                  flexWrap: 'wrap',
-                  gap: 0.5,
-                  pl: { xs: 1.5, sm: 2 },
-                  borderLeft: '1px solid rgba(255,255,255,0.08)',
+                  color: 'rgba(255,255,255,0.3)',
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                  mb: 1,
+                  mt: 1.25,
                 }}
               >
+                속성별
+              </Typography>
+              <Stack direction="row" flexWrap="wrap" gap={{ xs: 1, sm: 1.5 }}>
                 {siblingElements.map(({ attr: sAttr, monster: sm }) => (
-                  <Tooltip key={sAttr} title={sm.kr_name} placement="left" arrow>
-                    <Link href={`/monster-detail/${sm.monster_id}`} style={{ textDecoration: 'none' }}>
+                  <Link key={sAttr} href={`/monster-detail/${sm.monster_id}`} style={{ textDecoration: 'none' }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 0.75,
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1.5,
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        bgcolor: 'rgba(0,0,0,0.25)',
+                        transition: 'background-color 0.15s, border-color 0.15s',
+                        '&:hover': {
+                          bgcolor: 'rgba(255,255,255,0.07)',
+                          borderColor: 'rgba(255,255,255,0.22)',
+                        },
+                      }}
+                    >
                       <Box
                         sx={{
                           position: 'relative',
-                          width: { xs: 34, sm: 38 },
-                          height: { xs: 34, sm: 38 },
-                          borderRadius: 1.5,
-                          bgcolor: 'rgba(0,0,0,0.3)',
-                          border: '1.5px solid rgba(255,255,255,0.12)',
+                          width: { xs: 36, sm: 40 },
+                          height: { xs: 36, sm: 40 },
+                          borderRadius: 1,
+                          flexShrink: 0,
                           backgroundImage: `url(${getRenderableImageUrl(sm.image_url)})`,
-                          backgroundSize: '78%',
+                          backgroundSize: '80%',
                           backgroundPosition: 'center',
                           backgroundRepeat: 'no-repeat',
-                          transition: 'transform 0.15s',
-                          '&:hover': { transform: 'scale(1.1)' },
                         }}
                       >
-                        <Box sx={{ position: 'absolute', bottom: 1, right: 1, lineHeight: 0 }}>
+                        <Box sx={{ position: 'absolute', bottom: 0, right: 0, lineHeight: 0 }}>
                           <AttributeElementIcon attribute={sAttr} size={12} titleAccess={ATTR_KO[sAttr]} />
                         </Box>
                       </Box>
-                    </Link>
-                  </Tooltip>
+                      <Typography
+                        noWrap
+                        sx={{
+                          color: 'rgba(255,255,255,0.75)',
+                          fontSize: { xs: '0.72rem', sm: '0.8rem' },
+                          fontWeight: 500,
+                          maxWidth: { xs: 56, sm: 72 },
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {sm.kr_name}
+                      </Typography>
+                    </Box>
+                  </Link>
                 ))}
-              </Box>
-            )}
-          </Box>
+              </Stack>
+            </Box>
+          )}
         </Box>
 
         {/* ── tab nav ── */}

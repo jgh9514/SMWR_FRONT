@@ -104,7 +104,7 @@ export default function BatchManagementPage() {
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
   const sortedBatchConfigList = useMemo(
-    () => [...batchConfigList].sort((a, b) => a.bat_id.localeCompare(b.bat_id)),
+    () => [...batchConfigList].sort((a, b) => String(a.bat_id).localeCompare(String(b.bat_id))),
     [batchConfigList],
   );
 

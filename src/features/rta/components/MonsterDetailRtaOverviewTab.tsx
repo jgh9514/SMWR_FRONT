@@ -40,6 +40,7 @@ import RtaMatchListCard from '@/features/rta/components/RtaMatchListCard';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
+import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
 
@@ -70,29 +71,61 @@ function StatChip({
   sub?: string;
   color?: 'success' | 'error' | 'primary' | 'default';
 }) {
+  const valueColor =
+    color === 'success'
+      ? 'success.main'
+      : color === 'error'
+        ? 'error.main'
+        : color === 'primary'
+          ? 'primary.main'
+          : 'text.primary';
+
   return (
-    <Box sx={{ textAlign: 'center', px: 1 }}>
+    <Box
+      sx={(t) => ({
+        flex: '1 1 0%',
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 0.25,
+        py: { xs: 1.5, sm: 2 },
+        px: 1,
+        borderRadius: 2,
+        bgcolor: t.palette.background.paper,
+        border: `1px solid ${t.palette.divider}`,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+        textAlign: 'center',
+      })}
+    >
       <Typography
         variant="h5"
         fontWeight={800}
-        color={
-          color === 'success'
-            ? 'success.main'
-            : color === 'error'
-              ? 'error.main'
-              : color === 'primary'
-                ? 'primary.main'
-                : 'text.primary'
-        }
-        sx={{ lineHeight: 1.1 }}
+        color={valueColor}
+        sx={{ lineHeight: 1, fontSize: { xs: '1.35rem', sm: '1.6rem' } }}
       >
         {value}
       </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'text.secondary',
+          fontWeight: 600,
+          fontSize: { xs: '0.65rem', sm: '0.72rem' },
+          letterSpacing: '0.04em',
+          textTransform: 'uppercase',
+          mt: 0.25,
+        }}
+      >
         {label}
       </Typography>
       {sub && (
-        <Typography variant="caption" color="text.disabled" sx={{ display: 'block', fontSize: '0.65rem' }}>
+        <Typography
+          variant="caption"
+          color="text.disabled"
+          sx={{ display: 'block', fontSize: '0.6rem', lineHeight: 1.3, mt: 0.25 }}
+        >
           {sub}
         </Typography>
       )}
@@ -271,10 +304,10 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   const { data: seasonsData } = useRtaSeasons();
   const { seasonSelectValue, setSeason, seasonOptions, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
   const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
-  const [tierSelection, setTierSelection] = useState('CH_ALL');
+  const [tierSelection, setTierSelection] = useState('');
 
   const { selectedRatingId, selectedRatingIds } = useMemo(() => {
-    if (!tierSelection || tierSelection === 'CH_ALL') return { selectedRatingId: null, selectedRatingIds: null };
+    if (!tierSelection) return { selectedRatingId: null, selectedRatingIds: null };
     const body = buildMonsterStatsTierBody(tierSelection, gradeRules);
     if (body.ratingIds && body.ratingIds.length > 0) return { selectedRatingId: null, selectedRatingIds: body.ratingIds };
     return { selectedRatingId: body.ratingId ?? null, selectedRatingIds: null };
@@ -290,9 +323,11 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   });
 
   const [visibleMatchCount, setVisibleMatchCount] = useState(10);
-  useEffect(() => { setVisibleMatchCount(10); }, [seasonIdForApi, monsterId]);
+  useEffect(() => { setVisibleMatchCount(10); }, [seasonIdForApi, monsterId, tierSelection]);
   const { data: recentMatchesData, isFetching: recentFetching } = useRtaMonsterRecentMatches(monsterId, {
     seasonId: seasonIdForApi ?? null,
+    ratingId: selectedRatingId,
+    ratingIds: selectedRatingIds,
     enabled: valid,
     limit: 20,
   });
@@ -358,30 +393,16 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         seasonLabelId="monster-detail-rta-overview-season"
       />
 
-      {/* 상단 요약 지표 */}
-      <Paper
-        variant="outlined"
-        sx={(t) => ({
-          mb: 2,
-          p: { xs: 2, sm: 3 },
-          background: t.palette.action.hover,
-        })}
-      >
+      {/* 상단 요약 지표 — 4분할 */}
+      <Box sx={{ mb: 2 }}>
         {overviewFetching ? (
-          <Box sx={{ display: 'flex', gap: 3, justifyContent: 'center' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5 }}>
             {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} variant="rectangular" width={80} height={56} sx={{ borderRadius: 1 }} />
+              <Skeleton key={i} variant="rectangular" height={80} sx={{ borderRadius: 2 }} />
             ))}
           </Box>
         ) : stats ? (
-          <Box
-            sx={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: { xs: 2, sm: 4 },
-            }}
-          >
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
             <StatChip
               label="Win Rate"
               value={fmt1(stats.win_rate_pct)}
@@ -397,11 +418,13 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
             <StatChip label="Lead Rate" value={fmt1(stats.lead_rate_pct)} />
           </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary" textAlign="center">
-            집계 데이터가 없습니다. (배치 실행 후 표시됩니다)
-          </Typography>
+          <Paper variant="outlined" sx={{ p: 3 }}>
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              집계 데이터가 없습니다. (배치 실행 후 표시됩니다)
+            </Typography>
+          </Paper>
         )}
-      </Paper>
+      </Box>
 
       {/* 7일 추이 차트 */}
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
@@ -609,12 +632,27 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                         </Box>
 
                         <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                          {s.rating_id != null && (
+                            <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.4} sx={{ mb: 0.2 }}>
+                              <RtaRatingStarIcons rating={s.rating_id} size={11} gap={0.5} />
+                              <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.secondary', lineHeight: 1 }}>
+                                {getRtaTierShortLabel(s.rating_id)}
+                              </Typography>
+                            </Stack>
+                          )}
                           <Typography sx={{ fontSize: '0.875rem', fontWeight: 800, color: wrGood ? 'success.main' : 'error.main', lineHeight: 1.2 }}>
                             {fmt1(wr)}
                           </Typography>
-                          <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                            {fmtInt(s.pick_cnt)}픽
-                          </Typography>
+                          <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5}>
+                            {s.ladder_score != null && (
+                              <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
+                                {fmtInt(s.ladder_score)}점
+                              </Typography>
+                            )}
+                            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.68rem' }}>
+                              {fmtInt(s.pick_cnt)}픽
+                            </Typography>
+                          </Stack>
                         </Box>
                       </Box>
                     );
@@ -662,12 +700,27 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                             </Typography>
                           </Box>
                           <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+                            {s.rating_id != null && (
+                              <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.4} sx={{ mb: 0.2 }}>
+                                <RtaRatingStarIcons rating={s.rating_id} size={10} gap={0.5} />
+                                <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, color: 'text.secondary', lineHeight: 1 }}>
+                                  {getRtaTierShortLabel(s.rating_id)}
+                                </Typography>
+                              </Stack>
+                            )}
                             <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: wrGood ? 'success.main' : 'error.main', lineHeight: 1.2 }}>
                               {fmt1(wr)}
                             </Typography>
-                            <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                              {fmtInt(s.pick_cnt)}픽
-                            </Typography>
+                            <Stack direction="row" alignItems="center" justifyContent="flex-end" gap={0.5}>
+                              {s.ladder_score != null && (
+                                <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'text.primary', lineHeight: 1 }}>
+                                  {fmtInt(s.ladder_score)}점
+                                </Typography>
+                              )}
+                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                {fmtInt(s.pick_cnt)}픽
+                              </Typography>
+                            </Stack>
                           </Box>
                         </Box>
                       );

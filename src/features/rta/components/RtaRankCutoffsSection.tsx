@@ -42,7 +42,7 @@ import {
 } from '@/features/rta/utils/rtaRankCutoffChart';
 import { RtaRankCutoffSectionSkeleton } from '@/features/rta/components/RtaDashboardSkeletons';
 
-/** 표시 순서·라벨 (서버 anchor_key 와 동일) */
+/** 표시 순서·라벨 (서버 anchorKey 와 동일) */
 const ANCHOR_ROWS: { key: string; label: string }[] = [
   { key: '3h', label: '3시간 전' },
   { key: '6h', label: '6시간 전' },

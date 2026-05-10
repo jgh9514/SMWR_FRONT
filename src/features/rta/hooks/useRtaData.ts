@@ -831,12 +831,30 @@ export const useRtaMonsterTopSummonersData = (
 
 export const useRtaMonsterRecentMatches = (
   monsterId: number | null | undefined,
-  options: Omit<MonsterSectionOptions, 'ratingId'> & { limit?: number } = {},
+  options: {
+    seasonId?: number | null;
+    ratingId?: number | null;
+    ratingIds?: number[] | null;
+    enabled?: boolean;
+    limit?: number;
+  } = {},
 ) => {
   const valid = monsterId != null && monsterId > 0;
+  const body = valid
+    ? {
+        monster_id: monsterId!,
+        limit: options.limit ?? 10,
+        ...seasonBody(null, options.seasonId ?? null),
+        ...(options.ratingIds != null && options.ratingIds.length > 0
+          ? { rating_ids: options.ratingIds }
+          : options.ratingId != null
+            ? { rating_id: options.ratingId }
+            : {}),
+      }
+    : {};
   return useApiPostQuery<{ matches: Record<string, unknown>[]; seasonId: number | null }>(
     '/rta/monster/recent-matches',
-    valid ? { monster_id: monsterId!, limit: options.limit ?? 10, ...seasonBody(null, options.seasonId ?? null) } : {},
+    body,
     { enabled: valid && options.enabled !== false, staleTime: 2 * 60_000, gcTime: 5 * 60_000, refetchOnWindowFocus: false },
   );
 };

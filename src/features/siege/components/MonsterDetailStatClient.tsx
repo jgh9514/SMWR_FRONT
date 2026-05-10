@@ -152,7 +152,7 @@ function SkillCard({ skill, isLeader = false, leaderDesc = '', leaderIcon }: {
   if (isLeader) {
     const iconSrc = leaderIcon ? getRenderableImageUrl(leaderIcon) : '/images/default-monster.png';
     return (
-      <Card variant="outlined" sx={{ borderRadius: 2, height: '100%' }}>
+      <Card variant="outlined" sx={(t) => ({ borderRadius: 2, height: '100%', bgcolor: t.palette.mode === 'dark' ? 'transparent' : 'common.white' })}>
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start">
             <Box component="img" src={iconSrc} alt=""
@@ -190,9 +190,9 @@ function SkillCard({ skill, isLeader = false, leaderDesc = '', leaderIcon }: {
         borderRadius: 2,
         height: '100%',
         borderColor: isAwaken ? alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.4 : 0.35) : 'divider',
-        bgcolor: isAwaken
-          ? alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.05 : 0.02)
-          : 'transparent',
+        bgcolor: t.palette.mode === 'dark'
+          ? (isAwaken ? alpha(t.palette.primary.main, 0.05) : 'transparent')
+          : 'common.white',
       })}
     >
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -419,16 +419,6 @@ export default function MonsterDetailStatClient() {
 
         {/* 오른쪽: Skills */}
         <Box>
-          <Stack direction="row" alignItems="baseline" spacing={0.75} sx={{ mb: 1.5 }}>
-            <Typography variant="subtitle1" fontWeight={800}>스킬</Typography>
-            {(() => {
-              const n = (leader_skill_description ? 1 : 0) + sortedSkills.length;
-              return n > 0
-                ? <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>{n}개</Typography>
-                : null;
-            })()}
-          </Stack>
-
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1.5 }}>
             {leader_skill_description && (
               <SkillCard isLeader leaderDesc={leader_skill_description} leaderIcon={leader_icon ?? undefined} />

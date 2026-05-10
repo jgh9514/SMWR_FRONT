@@ -30,7 +30,7 @@ export function pivotRankCutoffAnchors(
   const byAnchor = new Map<string, Record<string, number>>();
   const tierSet = new Set(tierOrder);
   for (const row of rows ?? []) {
-    const ak = String(row.anchor_key ?? '').trim();
+    const ak = String(row.anchorKey ?? '').trim();
     if (!ak) continue;
     const tk = row.gradeSlot
       ? String(row.gradeSlot).trim()
@@ -40,7 +40,7 @@ export function pivotRankCutoffAnchors(
     if (!tk || !tierSet.has(tk)) continue;
     if (!byAnchor.has(ak)) byAnchor.set(ak, {});
     const rec = byAnchor.get(ak)!;
-    rec[tk] = toNum(row.cutoff_score);
+    rec[tk] = toNum(row.cutoffScore);
   }
   return byAnchor;
 }

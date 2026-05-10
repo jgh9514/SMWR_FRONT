@@ -268,11 +268,12 @@ export interface RtaTierDailyRow {
 
 /** 앵커 시각(3h·6h·12h·3d·7d) × 티어별 최저 점수 — WAS `getRtaRankCutoffAnchorsFromAgg` */
 export interface RtaRankCutoffAnchorRow {
-  sort_order?: number;
-  anchor_key?: string;
+  anchorSort?: number;
+  anchorKey?: string;
   gradeSlot?: string;
+  tierSort?: number;
   ratingId?: number;
-  cutoff_score: number;
+  cutoffScore: number;
 }
 
 /** 배치 적재 시 rta_snapshot_rank_cut 최신 스냅샷 — WAS `getRtaSnapshotRankCutLatest` */
@@ -564,6 +565,7 @@ export interface RtaMonsterTopSummonerRow {
   wizard_name?: string | null;
   channel_uid?: string | null;
   ladder_score?: number | null;
+  rating_id?: number | null;
   pick_cnt: number;
   ban_cnt: number;
   win_cnt: number;
