@@ -304,6 +304,7 @@ export interface RtaDashboardTierDistributionResponse {
 export interface RtaDashboardRankCutoffResponse {
   rank_cutoff_anchors?: RtaRankCutoffAnchorRow[];
   snapshot_rank_cut?: RtaSnapshotRankCutRow[];
+  top1Score?: number | null;
   seasonId?: number | null;
 }
 

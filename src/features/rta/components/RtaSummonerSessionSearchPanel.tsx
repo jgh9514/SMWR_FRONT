@@ -206,6 +206,7 @@ export default function RtaSummonerSessionSearchPanel({
                     onBookmark={(e) => {
                       e.stopPropagation();
                       onToggleFavorite(entry);
+                      onSessionListTabChange(1);
                     }}
                     onRemove={(e) => {
                       e.stopPropagation();

@@ -267,39 +267,49 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     let rows: { ratingId: number; cutoff: number; tierSort: number }[];
 
     if (anchors && anchors.length > 0) {
-      // rank_cutoff_anchors: 6개 시점×전 티어가 혼재 → 'now'(anchorSort=0)만 추려서 tierSort 오름차순 정렬
-      rows = anchors
-        .map((r) => ({
-          ratingId: Number(r.ratingId),
-          cutoff: Number(r.cutoffScore),
-          anchorSort: r.anchorSort ?? -1,
-          tierSort: r.tierSort ?? 0,
-        }))
-        .filter((x) => x.anchorSort === 0)
-        .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
-        .filter((x) => !isRtaCutoffMissing(x.cutoff))
+      // rank_cutoff_anchors: 6개 시점×전 티어가 혼재 → 'now'(anchorSort=0)을 우선, 없으면 가장 최신(최솟값) 사용
+      const mapped = anchors.map((r) => ({
+        ratingId: Number(r.ratingId),
+        cutoff: Number(r.cutoffScore),
+        anchorSort: r.anchorSort ?? 999,
+        tierSort: r.tierSort ?? 0,
+      }));
+      const minAnchorSort = Math.min(...mapped.map((x) => x.anchorSort));
+      rows = mapped
+        .filter((x) => x.anchorSort === minAnchorSort)
+        .filter((x) => Number.isFinite(x.ratingId) && x.ratingId > 0 && Number.isFinite(x.cutoff))
         .sort((a, b) => a.tierSort - b.tierSort);
-    } else if (snapshots && snapshots.length > 0) {
+    }
+    if ((!rows || rows.length === 0) && snapshots && snapshots.length > 0) {
       rows = snapshots
         .map((r) => ({ ratingId: Number(r.ratingId), cutoff: Number(r.cutoffScore), tierSort: 0 }))
-        .filter((x) => Number.isFinite(x.ratingId) && Number.isFinite(x.cutoff))
-        .filter((x) => !isRtaCutoffMissing(x.cutoff));
-    } else {
-      return { type: 'scoreOnly' as const };
+        .filter((x) => Number.isFinite(x.ratingId) && x.ratingId > 0 && Number.isFinite(x.cutoff));
     }
+    if (!rows || rows.length === 0) return { type: 'scoreOnly' as const };
 
-    if (rows.length < 1) return { type: 'scoreOnly' as const };
     const i = rows.findIndex((r) => r.ratingId === rid);
     if (i < 0) return { type: 'scoreOnly' as const };
-    if (i >= rows.length - 1) return { type: 'highest' as const };
+
+    let nextRow = rows[i + 1];
+    let nextRatingId = nextRow?.ratingId ?? 0;
+
+    // 다음 티어가 없으면 (G3) 백엔드에서 내려준 랭킹 1위 점수를 max로 사용
+    if (!nextRow) {
+      const top1Score = rankCutData?.top1Score;
+      const rank1Score = top1Score != null && top1Score > 0 ? top1Score : 0;
+      if (rank1Score <= 0) return { type: 'highest' as const };
+      nextRow = { ratingId: 5001, cutoff: rank1Score, tierSort: 999 };
+      nextRatingId = 5001;
+    }
+
     const min = rows[i]!.cutoff;
-    const max = rows[i + 1]!.cutoff;
+    const max = nextRow.cutoff;
     if (isRtaCutoffMissing(max) || min >= max) {
       if (min > 0) return { type: 'highest' as const };
       return { type: 'scoreOnly' as const };
     }
-    return { type: 'range' as const, min, max, currentTierRatingId: rows[i]!.ratingId, nextRatingId: rows[i + 1]!.ratingId };
-  }, [rankCutData?.rank_cutoff_anchors, rankCutData?.snapshot_rank_cut, ratingId]);
+    return { type: 'range' as const, min, max, currentTierRatingId: rows[i]!.ratingId, nextRatingId };
+  }, [rankCutData?.rank_cutoff_anchors, rankCutData?.snapshot_rank_cut, rankCutData?.top1Score, ratingId]);
 
   const tierBarPct = useMemo(() => {
     if (tierBand.type !== 'range' || !Number.isFinite(summaryScore)) return 0;
@@ -408,59 +418,69 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
           <Box sx={{ mt: 2 }}>
             {tierBand.type === 'range' ? (
               <>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                  {tierBand.currentTierRatingId > 0 && (
-                    <RtaRatingStarIcons rating={tierBand.currentTierRatingId} size={14} gap={0.5} />
-                  )}
-                  {tierBand.nextRatingId > 0 && (
-                    <RtaRatingStarIcons rating={tierBand.nextRatingId} size={14} gap={0.5} />
-                  )}
-                </Stack>
-                <Box
-                  sx={{
-                    position: 'relative',
-                    height: 8,
-                    borderRadius: 1,
-                    background: `linear-gradient(90deg, ${theme.palette.info.dark}22 0%, ${theme.palette.success.main}33 50%, ${theme.palette.warning.main}55 100%)`,
-                    overflow: 'visible',
-                  }}
-                >
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: 0,
-                      right: 0,
-                      height: 1,
-                      transform: 'translateY(-50%)',
-                      borderTop: `1px dashed ${theme.palette.divider}`,
-                      opacity: 0.6,
-                    }}
-                  />
-                  <Box
-                    sx={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: `clamp(0px, ${tierBarPct}%, calc(100% - 10px))`,
-                      width: 10,
-                      height: 10,
-                      borderRadius: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      bgcolor: 'background.paper',
-                      border: `2px solid ${theme.palette.warning.main}`,
-                      boxShadow: 1,
-                    }}
-                    title="현재 LP"
-                  />
-                </Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
-                  <Typography variant="body2" fontWeight={800} color="text.primary" component="span">
-                    {Math.round(tierBand.min).toLocaleString()} LP
-                  </Typography>
-                  <Typography variant="body2" fontWeight={800} color="text.primary" component="span" textAlign="right">
-                    {Math.round(tierBand.max).toLocaleString()} LP
-                  </Typography>
-                </Stack>
+              {(() => {
+                const rid = tierBand.currentTierRatingId;
+                const accentColor =
+                  rid >= 3500 && rid < 4000 ? '#3cd3cf' :
+                  rid >= 4000 && rid < 5000 ? '#ef4444' :
+                  theme.palette.primary.main;
+                return (
+                  <>
+                    {/* 현재 LP — 바 위 */}
+                    <Box sx={{ position: 'relative', mb: 0.5 }}>
+                      <Typography
+                        sx={{
+                          position: 'absolute',
+                          left: `clamp(0px, ${tierBarPct}%, calc(100% - 48px))`,
+                          transform: 'translateX(-50%)',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          color: accentColor,
+                          whiteSpace: 'nowrap',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {summaryScore > 0 ? `${Math.round(summaryScore).toLocaleString()} LP` : '—'}
+                      </Typography>
+                      <Box sx={{ height: 16 }} />
+                    </Box>
+                    {/* 프로그레스바 */}
+                    <Box sx={{ position: 'relative', height: 8, borderRadius: 5, bgcolor: 'action.hover', overflow: 'hidden' }}>
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          height: '100%',
+                          width: `${tierBarPct}%`,
+                          bgcolor: accentColor,
+                          borderRadius: 5,
+                          transition: 'width 0.4s ease',
+                        }}
+                      />
+                    </Box>
+                    {/* 현티어 최소 / 다음티어 최소컷 */}
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 0.5 }}>
+                      <Stack direction="row" alignItems="center" gap={0.4}>
+                        {tierBand.currentTierRatingId > 0 && (
+                          <RtaRatingStarIcons rating={tierBand.currentTierRatingId} size={11} gap={0.4} />
+                        )}
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem' }}>
+                          {Math.round(tierBand.min).toLocaleString()} LP
+                        </Typography>
+                      </Stack>
+                      <Stack direction="row" alignItems="center" gap={0.4}>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.68rem' }}>
+                          {Math.round(tierBand.max).toLocaleString()} LP
+                        </Typography>
+                        {tierBand.nextRatingId > 0 && (
+                          <RtaRatingStarIcons rating={tierBand.nextRatingId} size={11} gap={0.4} />
+                        )}
+                      </Stack>
+                    </Stack>
+                  </>
+                );
+              })()}
               </>
             ) : (
               <Typography variant="body2" fontWeight={800} textAlign="center" sx={{ py: 0.5 }}>

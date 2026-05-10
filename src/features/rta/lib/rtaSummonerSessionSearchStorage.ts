@@ -8,8 +8,8 @@ const PREFIX = 'smw:rta:home:sess:';
 
 const RECENT_KEY = `${PREFIX}recent:v${STORAGE_VERSION}`;
 const FAV_KEY = `${PREFIX}fav:v${STORAGE_VERSION}`;
-/** `useSyncExternalStore` 스냅샷 — 모듈 인스턴스가 여러 개여도 sessionStorage 한 곳만 본다 */
-const STORE_REV_KEY = `${PREFIX}storeRev:v${STORAGE_VERSION}`;
+
+let _storeRev = 0;
 
 export type RtaSummonerSessionBookmark = {
   wizardId: string;
@@ -21,28 +21,12 @@ export type RtaSummonerSessionBookmark = {
 
 type StoredV1 = { v: number; list: RtaSummonerSessionBookmark[] };
 
-function readStoreRevision(): number {
-  const s = getStorage();
-  if (!s) return 0;
-  const raw = s.getItem(STORE_REV_KEY);
-  const n = raw != null ? parseInt(raw, 10) : 0;
-  return Number.isFinite(n) && n >= 0 ? n : 0;
-}
-
 function bumpStoreRevision(): void {
-  const s = getStorage();
-  if (!s) return;
-  const next = readStoreRevision() + 1;
-  try {
-    s.setItem(STORE_REV_KEY, String(next));
-  } catch {
-    // quota
-  }
+  _storeRev += 1;
 }
 
-/** `useSyncExternalStore` getSnapshot — 번들 청크별 전역 변수 대신 sessionStorage 기준 */
 export function getRtaSessionSearchStoreRevision(): number {
-  return readStoreRevision();
+  return _storeRev;
 }
 
 function notifyRtaSessionSearchStorageChanged() {
@@ -52,7 +36,7 @@ function notifyRtaSessionSearchStorageChanged() {
 
 function getStorage(): Storage | null {
   if (typeof window === 'undefined') return null;
-  return window.sessionStorage;
+  return window.localStorage;
 }
 
 function readList(key: string): RtaSummonerSessionBookmark[] {

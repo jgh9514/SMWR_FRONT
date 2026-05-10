@@ -8,6 +8,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { ThemeProvider as MuiThemeProvider, CssBaseline, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import ClientOnlyToaster from './ClientOnlyToaster';
+import { RtaSearchStoreProvider } from '@/features/rta/context/RtaSearchStoreContext';
 import { isAuthenticated, isForceLoggedOut } from '@/shared/utils/auth';
 import type { AuthCheckResponse } from '@/features/auth/types/auth';
 
@@ -393,6 +394,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
     <MuiThemeProvider theme={muiTheme}>
       <CssBaseline />
       <RecoilRoot>
+        <RtaSearchStoreProvider>
         <QueryClientProvider client={queryClient}>
           <AuthGuard>
             <ClientOnlyToaster />
@@ -411,6 +413,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
             </>
           </AuthGuard>
         </QueryClientProvider>
+        </RtaSearchStoreProvider>
       </RecoilRoot>
     </MuiThemeProvider>
   );
