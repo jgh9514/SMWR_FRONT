@@ -865,13 +865,16 @@ export const useRtaMonsterDetail = (
   seasonId?: number | null,
   /** 서버에서 prefetch한 값 — 클라이언트 첫 페인트에 사용 */
   queryOptions?: Omit<UseQueryOptions<MonsterDetail, Error>, 'queryKey' | 'queryFn'>,
+  ratingId?: number | null,
 ) => {
   const isValidId = monsterId !== null && !isNaN(monsterId) && monsterId > 0;
+  const isValidRating = ratingId != null && ratingId > 0;
+  const enabled = isValidId && isValidRating;
   return useApiPostQuery<MonsterDetail>(
     '/rta/monster-detail',
-    isValidId ? { monster_id: monsterId, ...seasonBody(seasonCode, seasonId) } : {},
+    enabled ? { monster_id: monsterId, ratingId, ...seasonBody(seasonCode, seasonId) } : {},
     {
-      enabled: isValidId,
+      enabled,
       staleTime: 5 * 60_000,
       gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,

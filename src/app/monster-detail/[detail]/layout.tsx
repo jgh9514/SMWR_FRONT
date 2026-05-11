@@ -6,7 +6,6 @@ import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl } from '@/sh
 import JsonLd from '@/shared/ui/seo/JsonLd';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 
-export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
 
 interface LayoutParams {

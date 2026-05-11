@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, LinearProgress } from '@mui/material';
 import { useMonsterInfoContext } from '@/features/siege/context/MonsterInfoContext';
 import RtaMonsterDetailContent from '@/features/rta/components/RtaMonsterDetailContent';
@@ -10,7 +10,9 @@ import {
   useRtaSeasons,
   useRtaSeasonSelect,
   useRtaRatingGradeRules,
+  buildMonsterStatsTierBody,
 } from '@/features/rta/hooks/useRtaData';
+import { getRtaTierShortLabel } from '@/shared/utils/util';
 
 export default function MonsterDetailMatchupClient() {
   const { monsterInfo } = useMonsterInfoContext();
@@ -23,12 +25,27 @@ export default function MonsterDetailMatchupClient() {
   const { data: seasonsData } = useRtaSeasons();
   const { seasonSelectValue, setSeason, seasonOptions, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
   const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
+  const [tierSelection, setTierSelection] = useState('');
+
+  useEffect(() => {
+    if (gradeRules.length > 0 && !tierSelection) {
+      const rule = gradeRules.find((r) => r.ratingId === 4003) ?? gradeRules[0];
+      setTierSelection(getRtaTierShortLabel(rule.ratingId));
+    }
+  }, [gradeRules, tierSelection]);
+
+  const ratingId = useMemo(() => {
+    if (!tierSelection) return null;
+    const body = buildMonsterStatsTierBody(tierSelection, gradeRules);
+    return body.ratingId ?? null;
+  }, [tierSelection, gradeRules]);
 
   const { data: rtaDetail, isLoading, isFetching, isError } = useRtaMonsterDetail(
     rtaMonsterNumericId,
     null,
     seasonIdForApi ?? null,
     {},
+    ratingId,
   );
 
   return (
@@ -37,12 +54,12 @@ export default function MonsterDetailMatchupClient() {
         seasonSelectValue={seasonSelectValue}
         setSeason={setSeason}
         seasonOptions={seasonOptions}
-        tierSelection="CH_ALL"
-        setTierSelection={() => {}}
+        tierSelection={tierSelection}
+        setTierSelection={setTierSelection}
         gradeRules={gradeRules}
         tierRulesLoading={tierRulesLoading}
-        hideTierSelect
         seasonLabelId="monster-detail-matchup-season"
+        hideBulkTierOptions
       />
 
       {(isLoading || isFetching) && <LinearProgress sx={{ my: 2 }} />}

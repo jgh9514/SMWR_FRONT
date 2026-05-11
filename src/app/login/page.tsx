@@ -18,7 +18,6 @@ import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { containsSqlInjection } from '@/shared/utils/validation';
 import { clearForceLoggedOut, getAuthTokenFromCookie } from '@/shared/utils/auth';
-import { COOKIE_CHECK_RETRY_DELAY_MS, COOKIE_CHECK_MAX_RETRIES } from '@/shared/constants/validation';
 import LoginIcon from '@mui/icons-material/Login';
 import FindAccountPopup from '@/components/popup/FindAccountPopup';
 import type { LoginParams } from '@/types';
@@ -125,28 +124,8 @@ export default function LoginPage() {
         }
 
         await saveLoginInfo();
-        // 로그인 성공 시 토스트 메시지 제거 (조용히 처리)
 
-        // 쿠키가 설정될 때까지 대기
-        let retryCount = 0;
-        const checkCookie = () => {
-          const cookies = document.cookie.split(';');
-          const tokenCookie = cookies.find((c) => {
-            const trimmed = c.trim();
-            return trimmed.startsWith('SMW-Authorization=') || trimmed.startsWith('SMW_AUTHORIZATION=');
-          });
-          
-          if (tokenCookie || retryCount >= COOKIE_CHECK_MAX_RETRIES) {
-            setTimeout(() => {
-              router.push(MAIN_PATH);
-            }, COOKIE_CHECK_RETRY_DELAY_MS);
-          } else {
-            retryCount++;
-            setTimeout(checkCookie, COOKIE_CHECK_RETRY_DELAY_MS);
-          }
-        };
-        
-        checkCookie();
+        router.push(MAIN_PATH);
       } else {
         let errorMessage = '로그인에 실패했습니다.';
         if (res && res.result === 'NOUSRINFO') {

@@ -1,19 +1,22 @@
 'use client';
 
+import { useState } from 'react';
 import {
+  Avatar,
   Box,
   Card,
   CardContent,
-  Typography,
-  Avatar,
   Container,
-  Chip,
+  Stack,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
+  Tabs,
+  Typography,
 } from '@mui/material';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import { getRenderableImageUrl } from '@/shared/utils/image';
@@ -21,15 +24,193 @@ import type { CounterMatchupRow, MonsterDetail } from '@/features/rta/types/rta'
 
 interface RtaMonsterDetailContentProps {
   data: MonsterDetail;
-  /**
-   * true: `/monster-detail` 본문에 삽입 — 상단 PageHeader·대형 히어로 생략, 섹션 제목만 표시.
-   * false(기본): 단독 RTA 상세(리다이렉트 전 URL 등)용.
-   */
   embedded?: boolean;
-  /**
-   * embedded일 때만 적용. `full`: 요약 지표 + 전체 테이블(기본). `tables`: 강한 상대·콤비·카운터 등 상성 테이블만.
-   */
   embeddedPart?: 'full' | 'tables';
+}
+
+function MonsterAvatar({ image, name, size = 32 }: { image?: string; name: string; size?: number }) {
+  return (
+    <Avatar
+      src={getRenderableImageUrl(image)}
+      alt={name}
+      sx={{ width: size, height: size }}
+      variant="rounded"
+    >
+      {name.charAt(0)}
+    </Avatar>
+  );
+}
+
+function WinRateText({ value }: { value: number | null | undefined }) {
+  const v = value != null && Number.isFinite(Number(value)) ? Number(value) : null;
+  if (v == null) return <Typography variant="body2" color="text.secondary">—</Typography>;
+  return (
+    <Typography variant="body2" fontWeight={600} color={v >= 50 ? 'success.main' : 'error.main'}>
+      {v.toFixed(2)}%
+    </Typography>
+  );
+}
+
+function SynergyDuoTab({ data }: { data: MonsterDetail }) {
+  const combos = data.good_combos ?? [];
+  if (!combos.length) return <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>데이터가 없습니다.</Typography>;
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>조합</TableCell>
+            <TableCell align="right">승률</TableCell>
+            <TableCell align="right">경기 수</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {combos.slice(0, 20).map((c, i) => (
+            <TableRow key={`${c.monster_id}-${i}`}>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <MonsterAvatar image={data.monster_image} name={data.monster_name} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mx: 0.25 }}>+</Typography>
+                  <MonsterAvatar image={c.monster_image} name={c.monster_name} />
+                  <Typography variant="body2" sx={{ ml: 0.75 }}>{c.monster_name}</Typography>
+                </Box>
+              </TableCell>
+              <TableCell align="right"><WinRateText value={c.win_rate} /></TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" color="text.secondary">{c.match_count?.toLocaleString()}</Typography>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+function SynergyTrioTab({ data }: { data: MonsterDetail }) {
+  const combos = data.good_triple_combos ?? [];
+  if (!combos.length) return <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>데이터가 없습니다.</Typography>;
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>조합</TableCell>
+            <TableCell align="right">승률</TableCell>
+            <TableCell align="right">경기 수</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {combos.slice(0, 20).map((c, i) => (
+            <TableRow key={`${c.monster1_id}-${c.monster2_id}-${i}`}>
+              <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <MonsterAvatar image={data.monster_image} name={data.monster_name} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mx: 0.25 }}>+</Typography>
+                  <MonsterAvatar image={c.monster1_image} name={c.monster1_name} />
+                  <Typography variant="body2" color="text.secondary" sx={{ mx: 0.25 }}>+</Typography>
+                  <MonsterAvatar image={c.monster2_image} name={c.monster2_name} />
+                  <Typography variant="body2" sx={{ ml: 0.75 }}>{c.monster1_name} · {c.monster2_name}</Typography>
+                </Box>
+              </TableCell>
+              <TableCell align="right"><WinRateText value={c.win_rate} /></TableCell>
+              <TableCell align="right">
+                <Typography variant="body2" color="text.secondary">{c.match_count?.toLocaleString()}</Typography>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3 }) {
+  const filtered = rows.filter((r) => r.opponentComboSize === size);
+  if (!filtered.length) return <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>데이터가 없습니다.</Typography>;
+  return (
+    <TableContainer>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>상대 조합</TableCell>
+            <TableCell align="right">승률</TableCell>
+            <TableCell align="right">승 / 패</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {filtered.slice(0, 30).map((r, i) => {
+            const wr = r.winRate != null && Number.isFinite(Number(r.winRate)) ? Number(r.winRate) : null;
+            const total = Number(r.winCnt ?? 0) + Number(r.loseCnt ?? 0);
+            const monsters = r.opponentMonsters ?? [];
+            return (
+              <TableRow key={`${r.opponentComboKey}-${i}`}>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                    {monsters.length > 0 ? monsters.map((m, mi) => (
+                      <Box key={m.monsterId} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        {mi > 0 && <Typography variant="body2" color="text.secondary">+</Typography>}
+                        <MonsterAvatar image={m.monsterImage ?? undefined} name={m.monsterName} />
+                        <Typography variant="body2">{m.monsterName}</Typography>
+                      </Box>
+                    )) : (
+                      <Typography variant="body2">{r.opponentLabel ?? r.opponentComboKey ?? '—'}</Typography>
+                    )}
+                  </Box>
+                </TableCell>
+                <TableCell align="right"><WinRateText value={wr} /></TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">
+                    {r.winCnt ?? 0} / {r.loseCnt ?? 0}{total > 0 ? ` (${total.toLocaleString()})` : ''}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+}
+
+function TablesSection({ data }: { data: MonsterDetail }) {
+  const [mainTab, setMainTab] = useState(0);
+  const [synergyTab, setSynergyTab] = useState(0);
+  const [counterTab, setCounterTab] = useState(0);
+  const counterRows: CounterMatchupRow[] = data.counter_matchups ?? [];
+
+  return (
+    <Box>
+      <Tabs value={mainTab} onChange={(_, v) => setMainTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}>
+        <Tab label="시너지" />
+        <Tab label="카운터" />
+      </Tabs>
+
+      {mainTab === 0 && (
+        <Box>
+          <Tabs value={synergyTab} onChange={(_, v) => setSynergyTab(v)} sx={{ mb: 1.5 }} variant="scrollable" scrollButtons="auto">
+            <Tab label="듀오" />
+            <Tab label="트리오" />
+          </Tabs>
+          {synergyTab === 0 && <SynergyDuoTab data={data} />}
+          {synergyTab === 1 && <SynergyTrioTab data={data} />}
+        </Box>
+      )}
+
+      {mainTab === 1 && (
+        <Box>
+          <Tabs value={counterTab} onChange={(_, v) => setCounterTab(v)} sx={{ mb: 1.5 }} variant="scrollable" scrollButtons="auto">
+            <Tab label="솔로" />
+            <Tab label="듀오" />
+            <Tab label="트리오" />
+          </Tabs>
+          {counterTab === 0 && <CounterTab rows={counterRows} size={1} />}
+          {counterTab === 1 && <CounterTab rows={counterRows} size={2} />}
+          {counterTab === 2 && <CounterTab rows={counterRows} size={3} />}
+        </Box>
+      )}
+    </Box>
+  );
 }
 
 export default function RtaMonsterDetailContent({
@@ -38,76 +219,30 @@ export default function RtaMonsterDetailContent({
   embeddedPart = 'full',
 }: RtaMonsterDetailContentProps) {
   const formatPercentage = (value: number) => `${value.toFixed(2)}%`;
-  const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  const recentMatches = data.recent_matches || [];
-  const counterRows: CounterMatchupRow[] = data.counter_matchups ?? [];
-
-  const comboLabel = (r: CounterMatchupRow) => String(r.opponentLabel ?? r.opponentComboKey ?? '—');
-  const winRate = (r: CounterMatchupRow) => {
-    const v = r.winRate;
-    return v != null && Number.isFinite(Number(v)) ? Number(v) : null;
-  };
-  const totalGames = (r: CounterMatchupRow) => {
-    const w = Number(r.winCnt ?? 0);
-    const l = Number(r.loseCnt ?? 0);
-    return w + l;
-  };
 
   const statsGrid = (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
-        gap: 2,
-      }}
-    >
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: 2 }}>
       <Box>
-        <Typography variant="caption" color="text.secondary">
-          픽횟수
-        </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {data.pick_count.toLocaleString()}
-        </Typography>
+        <Typography variant="caption" color="text.secondary">픽횟수</Typography>
+        <Typography variant="h6" fontWeight={600}>{data.pick_count.toLocaleString()}</Typography>
       </Box>
       <Box>
-        <Typography variant="caption" color="text.secondary">
-          픽률
-        </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {formatPercentage(data.pick_rate)}
-        </Typography>
+        <Typography variant="caption" color="text.secondary">픽률</Typography>
+        <Typography variant="h6" fontWeight={600}>{formatPercentage(data.pick_rate)}</Typography>
       </Box>
       <Box>
-        <Typography variant="caption" color="text.secondary">
-          승률
-        </Typography>
+        <Typography variant="caption" color="text.secondary">승률</Typography>
         {data.win_rate != null && Number.isFinite(Number(data.win_rate)) ? (
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 600, color: Number(data.win_rate) >= 50 ? 'success.main' : 'error.main' }}
-          >
+          <Typography variant="h6" fontWeight={600} color={Number(data.win_rate) >= 50 ? 'success.main' : 'error.main'}>
             {formatPercentage(Number(data.win_rate))}
           </Typography>
         ) : (
-          <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-            —
-          </Typography>
+          <Typography variant="h6" fontWeight={600} color="text.secondary">—</Typography>
         )}
       </Box>
       <Box>
-        <Typography variant="caption" color="text.secondary">
-          벤율
-        </Typography>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {formatPercentage(data.ban_rate)}
-        </Typography>
+        <Typography variant="caption" color="text.secondary">벤율</Typography>
+        <Typography variant="h6" fontWeight={600}>{formatPercentage(data.ban_rate)}</Typography>
       </Box>
     </Box>
   );
@@ -122,28 +257,19 @@ export default function RtaMonsterDetailContent({
       {!embedded && (
         <>
           <PageHeader title={data.monster_name} backPath="/rta/monster-stats/solo" />
-
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
                 <Avatar
                   src={getRenderableImageUrl(data.monster_image)}
                   alt={data.monster_name}
-                  sx={{
-                    width: { xs: 100, md: 150 },
-                    height: { xs: 100, md: 150 },
-                    boxShadow: 2,
-                    border: '2px solid',
-                    borderColor: 'divider',
-                  }}
+                  sx={{ width: { xs: 100, md: 150 }, height: { xs: 100, md: 150 }, boxShadow: 2, border: '2px solid', borderColor: 'divider' }}
                   variant="rounded"
                 >
                   {data.monster_name.charAt(0)}
                 </Avatar>
                 <Box sx={{ flex: 1 }}>
-                  <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>
-                    {data.monster_name}
-                  </Typography>
+                  <Typography variant="h4" sx={{ mb: 2, fontWeight: 700 }}>{data.monster_name}</Typography>
                   {statsGrid}
                 </Box>
               </Box>
@@ -154,34 +280,18 @@ export default function RtaMonsterDetailContent({
 
       {embedded && embeddedPart === 'full' && (
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 800 }}>
-            RTA 실시간 통계
-          </Typography>
-          <Card variant="outlined">
-            <CardContent>{statsGrid}</CardContent>
-          </Card>
+          <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 800 }}>RTA 실시간 통계</Typography>
+          <Card variant="outlined"><CardContent>{statsGrid}</CardContent></Card>
         </Box>
       )}
 
-      {embedded && embeddedPart === 'tables' && (
-        <Typography variant="h5" component="h2" sx={{ mb: 2, fontWeight: 800 }}>
-          RTA 상성
-        </Typography>
-      )}
-
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
-          gap: 3,
-        }}
-      >
-        <Box>
+      {(embedded && embeddedPart === 'tables') ? (
+        <TablesSection data={data} />
+      ) : (
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
           <Card>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                강한 상대
-              </Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>강한 상대</Typography>
               {data.strong_against?.length ? (
                 <TableContainer>
                   <Table size="small">
@@ -193,33 +303,17 @@ export default function RtaMonsterDetailContent({
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {data.strong_against.slice(0, 10).map((opponent, index) => (
-                        <TableRow key={`${opponent.monster_id}-${index}`}>
+                      {data.strong_against.slice(0, 10).map((o, i) => (
+                        <TableRow key={`${o.monster_id}-${i}`}>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Avatar
-                                src={getRenderableImageUrl(opponent.monster_image)}
-                                alt={opponent.monster_name}
-                                sx={{ width: 32, height: 32 }}
-                                variant="rounded"
-                              >
-                                {opponent.monster_name.charAt(0)}
-                              </Avatar>
-                              <Typography variant="body2">{opponent.monster_name}</Typography>
+                              <MonsterAvatar image={o.monster_image} name={o.monster_name} />
+                              <Typography variant="body2">{o.monster_name}</Typography>
                             </Box>
                           </TableCell>
+                          <TableCell align="right"><WinRateText value={o.win_rate} /></TableCell>
                           <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600, color: opponent.win_rate >= 50 ? 'success.main' : 'error.main' }}
-                            >
-                              {formatPercentage(opponent.win_rate)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" color="text.secondary">
-                              {opponent.match_count}
-                            </Typography>
+                            <Typography variant="body2" color="text.secondary">{o.match_count}</Typography>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -227,20 +321,13 @@ export default function RtaMonsterDetailContent({
                   </Table>
                 </TableContainer>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  데이터가 없습니다.
-                </Typography>
+                <Typography variant="body2" color="text.secondary">데이터가 없습니다.</Typography>
               )}
             </CardContent>
           </Card>
-        </Box>
-
-        <Box>
           <Card>
             <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                좋은 콤비
-              </Typography>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>좋은 콤비</Typography>
               {data.good_combos?.length ? (
                 <TableContainer>
                   <Table size="small">
@@ -252,33 +339,17 @@ export default function RtaMonsterDetailContent({
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {data.good_combos.slice(0, 10).map((combo, index) => (
-                        <TableRow key={`${combo.monster_id}-${index}`}>
+                      {data.good_combos.slice(0, 10).map((c, i) => (
+                        <TableRow key={`${c.monster_id}-${i}`}>
                           <TableCell>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Avatar
-                                src={getRenderableImageUrl(combo.monster_image)}
-                                alt={combo.monster_name}
-                                sx={{ width: 32, height: 32 }}
-                                variant="rounded"
-                              >
-                                {combo.monster_name.charAt(0)}
-                              </Avatar>
-                              <Typography variant="body2">{combo.monster_name}</Typography>
+                              <MonsterAvatar image={c.monster_image} name={c.monster_name} />
+                              <Typography variant="body2">{c.monster_name}</Typography>
                             </Box>
                           </TableCell>
+                          <TableCell align="right"><WinRateText value={c.win_rate} /></TableCell>
                           <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600, color: combo.win_rate >= 50 ? 'success.main' : 'error.main' }}
-                            >
-                              {formatPercentage(combo.win_rate)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" color="text.secondary">
-                              {combo.match_count}
-                            </Typography>
+                            <Typography variant="body2" color="text.secondary">{c.match_count}</Typography>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -286,246 +357,12 @@ export default function RtaMonsterDetailContent({
                   </Table>
                 </TableContainer>
               ) : (
-                <Typography variant="body2" color="text.secondary">
-                  데이터가 없습니다.
-                </Typography>
+                <Typography variant="body2" color="text.secondary">데이터가 없습니다.</Typography>
               )}
             </CardContent>
           </Card>
         </Box>
-
-        <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                카운터 매치업
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                상대 팀 조합 대비 승·패 집계입니다. 카운터 집계 배치가 돌아간 뒤에 채워집니다.
-              </Typography>
-              {counterRows.length ? (
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>상대 조합</TableCell>
-                        <TableCell align="right">승률</TableCell>
-                        <TableCell align="right">승 / 패</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {counterRows.slice(0, 20).map((r, index) => (
-                        <TableRow key={`${comboLabel(r)}-${index}`}>
-                          <TableCell>
-                            <Typography variant="body2">{comboLabel(r)}</Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                fontWeight: 600,
-                                color:
-                                  (winRate(r) ?? 0) >= 50 ? 'success.main' : 'error.main',
-                              }}
-                            >
-                              {winRate(r) != null ? formatPercentage(winRate(r)!) : '—'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" color="text.secondary">
-                              {r.winCnt ?? 0} / {r.loseCnt ?? 0}
-                              {totalGames(r) > 0 ? ` (${totalGames(r)})` : ''}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  데이터가 없습니다.
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-
-        <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                좋은 3체인 콤비
-              </Typography>
-              {data.good_triple_combos?.length ? (
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>몬스터 1</TableCell>
-                        <TableCell>몬스터 2</TableCell>
-                        <TableCell align="right">승률</TableCell>
-                        <TableCell align="right">경기 수</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.good_triple_combos.slice(0, 10).map((combo, index) => (
-                        <TableRow key={`${combo.monster1_id}-${combo.monster2_id}-${index}`}>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Avatar
-                                src={getRenderableImageUrl(combo.monster1_image)}
-                                alt={combo.monster1_name}
-                                sx={{ width: 32, height: 32 }}
-                                variant="rounded"
-                              >
-                                {combo.monster1_name.charAt(0)}
-                              </Avatar>
-                              <Typography variant="body2">{combo.monster1_name}</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Avatar
-                                src={getRenderableImageUrl(combo.monster2_image)}
-                                alt={combo.monster2_name}
-                                sx={{ width: 32, height: 32 }}
-                                variant="rounded"
-                              >
-                                {combo.monster2_name.charAt(0)}
-                              </Avatar>
-                              <Typography variant="body2">{combo.monster2_name}</Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600, color: combo.win_rate >= 50 ? 'success.main' : 'error.main' }}
-                            >
-                              {formatPercentage(combo.win_rate)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" color="text.secondary">
-                              {combo.match_count}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  데이터가 없습니다.
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-
-        <Box sx={{ gridColumn: { xs: '1', md: '1 / -1' } }}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                최근 경기
-              </Typography>
-              {recentMatches.length ? (
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  {recentMatches.slice(0, 10).map((match) => {
-                    const myTeam = Array.isArray(match.my_team) ? match.my_team : [];
-                    const opponentTeam = Array.isArray(match.opponent_team) ? match.opponent_team : [];
-
-                    return (
-                      <Box
-                        key={match.match_id}
-                        sx={{
-                          p: 2,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          borderRadius: 1,
-                          bgcolor: match.win_lose === 'WIN' ? 'success.light' : 'error.light',
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                          <Typography variant="body2" color="text.secondary">
-                            {dateFormatter.format(new Date(match.match_date))}
-                          </Typography>
-                          <Chip
-                            label={match.win_lose === 'WIN' ? '승리' : '패배'}
-                            color={match.win_lose === 'WIN' ? 'success' : 'error'}
-                            size="small"
-                          />
-                        </Box>
-                        <Box
-                          sx={{
-                            display: 'grid',
-                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                            gap: 2,
-                          }}
-                        >
-                          <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                              내 팀
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                              {myTeam.length ? (
-                                myTeam.map((monster, index) => (
-                                  <Avatar
-                                    key={monster.monster_id || index}
-                                    src={getRenderableImageUrl(monster.monster_image)}
-                                    alt={monster.monster_name || ''}
-                                    sx={{ width: 32, height: 32 }}
-                                    variant="rounded"
-                                  >
-                                    {monster.monster_name?.charAt(0) || '?'}
-                                  </Avatar>
-                                ))
-                              ) : (
-                                <Typography variant="caption" color="text.secondary">
-                                  데이터 없음
-                                </Typography>
-                              )}
-                            </Box>
-                          </Box>
-                          <Box>
-                            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                              상대 팀
-                            </Typography>
-                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-                              {opponentTeam.length ? (
-                                opponentTeam.map((monster, index) => (
-                                  <Avatar
-                                    key={monster.monster_id || index}
-                                    src={getRenderableImageUrl(monster.monster_image)}
-                                    alt={monster.monster_name || ''}
-                                    sx={{ width: 32, height: 32 }}
-                                    variant="rounded"
-                                  >
-                                    {monster.monster_name?.charAt(0) || '?'}
-                                  </Avatar>
-                                ))
-                              ) : (
-                                <Typography variant="caption" color="text.secondary">
-                                  데이터 없음
-                                </Typography>
-                              )}
-                            </Box>
-                          </Box>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Box>
-              ) : (
-                <Typography variant="body2" color="text.secondary">
-                  데이터가 없습니다.
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-        </Box>
-      </Box>
+      )}
     </Container>
   );
 }

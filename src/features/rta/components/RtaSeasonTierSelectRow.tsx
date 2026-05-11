@@ -40,6 +40,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
   tierRulesLoading,
   seasonLabelId = 'rta-season-tier-season-label',
   hideTierSelect = false,
+  hideBulkTierOptions = false,
 }: {
   seasonSelectValue: string;
   setSeason: (v: string) => void;
@@ -50,6 +51,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
   tierRulesLoading: boolean;
   seasonLabelId?: string;
   hideTierSelect?: boolean;
+  hideBulkTierOptions?: boolean;
 }) {
   return (
     <Box
@@ -106,6 +108,7 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
             onChange={setTierSelection}
             rules={gradeRules}
             disabled={tierRulesLoading}
+            hideBulkOptions={hideBulkTierOptions}
           />
         </Box>
       )}

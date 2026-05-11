@@ -246,6 +246,11 @@ export interface CounterMatchupRow {
   loseCnt?: number;
   winRate?: number | null;
   opponentLabel?: string | null;
+  opponentMonsters?: Array<{
+    monsterId: string;
+    monsterName: string;
+    monsterImage?: string | null;
+  }>;
 }
 
 /** RTA 대시보드 티어 분포 (rating_id 기반) */

@@ -52,11 +52,13 @@ export default function RtaTierFilterMenu({
   onChange,
   rules,
   disabled,
+  hideBulkOptions = false,
 }: {
   value: string;
   onChange: (next: string) => void;
   rules: RtaRatingGradeRule[];
   disabled?: boolean;
+  hideBulkOptions?: boolean;
 }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
@@ -112,17 +114,19 @@ export default function RtaTierFilterMenu({
         }}
       >
         <Box sx={{ px: 1.5, pb: 1.5, pt: 0.5 }}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 0.75 }}>
-            <Box sx={{ gridColumn: '1 / -1' }}>
-              <Button
-                fullWidth
-                size="small"
-                variant={value === '' ? 'contained' : 'outlined'}
-                onClick={() => handleSelect('')}
-              >
-                전체 티어 합산
-              </Button>
-            </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${hideBulkOptions ? 3 : 4}, minmax(0, 1fr))`, gap: 0.75 }}>
+            {!hideBulkOptions && (
+              <Box sx={{ gridColumn: '1 / -1' }}>
+                <Button
+                  fullWidth
+                  size="small"
+                  variant={value === '' ? 'contained' : 'outlined'}
+                  onClick={() => handleSelect('')}
+                >
+                  전체 티어 합산
+                </Button>
+              </Box>
+            )}
             {TIER_MENU_BLOCKS.map((block) => (
               <Fragment key={block.allKey}>
                 {block.slots.map((k) => {
@@ -148,14 +152,16 @@ export default function RtaTierFilterMenu({
                     </Button>
                   );
                 })}
-                <Button
-                  size="small"
-                  variant={value === block.allKey ? 'contained' : 'outlined'}
-                  onClick={() => handleSelect(block.allKey)}
-                  sx={{ minHeight: 56, flexDirection: 'column', justifyContent: 'center', py: 0.75, fontSize: '0.7rem' }}
-                >
-                  {block.allLabel}
-                </Button>
+                {!hideBulkOptions && (
+                  <Button
+                    size="small"
+                    variant={value === block.allKey ? 'contained' : 'outlined'}
+                    onClick={() => handleSelect(block.allKey)}
+                    sx={{ minHeight: 56, flexDirection: 'column', justifyContent: 'center', py: 0.75, fontSize: '0.7rem' }}
+                  >
+                    {block.allLabel}
+                  </Button>
+                )}
               </Fragment>
             ))}
           </Box>

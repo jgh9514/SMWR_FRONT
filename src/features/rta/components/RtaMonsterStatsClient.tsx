@@ -526,9 +526,13 @@ const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
 });
 
 const SoloStatCard = memo(function SoloStatCard({ rank, stat }: { rank: number; stat: MonsterStats }) {
+  const href = rtaMonsterDetailHref(stat.monster_id);
   return (
     <Paper
       elevation={0}
+      component={href ? Link : 'div'}
+      href={href}
+      prefetch={false}
       sx={{
         borderRadius: 2.5,
         border: '1px solid',
@@ -537,6 +541,10 @@ const SoloStatCard = memo(function SoloStatCard({ rank, stat }: { rank: number; 
         background: (t) =>
           `linear-gradient(120deg, ${alpha(t.palette.primary.main, 0.03)} 0%, ${alpha(t.palette.background.paper, 1)} 45%)`,
         transition: 'border-color 0.2s, box-shadow 0.2s',
+        textDecoration: 'none',
+        color: 'inherit',
+        display: 'block',
+        cursor: href ? 'pointer' : 'default',
         '&:hover': {
           borderColor: 'primary.light',
           boxShadow: (t) => `0 6px 22px ${alpha(t.palette.common.black, 0.07)}`,
@@ -564,7 +572,7 @@ const SoloStatCard = memo(function SoloStatCard({ rank, stat }: { rank: number; 
               name={stat.monster_name}
               image={stat.monster_image}
               elemental={stat.monster_elemental}
-              monsterId={stat.monster_id}
+              monsterId={undefined}
             />
           </Box>
         </Stack>

@@ -407,7 +407,13 @@ export default function MonsterDetailContent({
               >
                 속성별
               </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={{ xs: 1, sm: 1.5 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(auto-fill, minmax(120px, 1fr))' },
+                  gap: { xs: 1, sm: 1.5 },
+                }}
+              >
                 {siblingElements.map(({ attr: sAttr, monster: sm }) => (
                   <Link key={sAttr} href={`/monster-detail/${sm.monster_id}`} style={{ textDecoration: 'none' }}>
                     <Box
@@ -459,7 +465,7 @@ export default function MonsterDetailContent({
                     </Box>
                   </Link>
                 ))}
-              </Stack>
+              </Box>
             </Box>
           )}
         </Box>
