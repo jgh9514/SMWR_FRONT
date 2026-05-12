@@ -19,6 +19,7 @@ import type {
   RtaMonsterDailySnapRow,
   RtaMonsterPickSlotRow,
   RtaMonsterTopSummonerRow,
+  RtaRankCutDetailResponse,
 } from '@/features/rta/types/rta';
 
 function ratingIdBody(ratingId?: number | null): Record<string, number> {
@@ -344,6 +345,19 @@ export const useRtaDashboardTierDistribution = (seasonCode?: string | null, seas
 export const useRtaDashboardRankCutoff = (seasonCode?: string | null, seasonId?: number | null) => {
   return useApiPostQuery<RtaDashboardRankCutoffResponse>(
     '/rta/dashboard/rank-cutoff',
+    seasonBody(seasonCode, seasonId),
+    {
+      enabled: true,
+      staleTime: RTA_READ_STALE_MS,
+      gcTime: RTA_READ_GC_MS,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
+export const useRtaRankCutDetail = (seasonCode?: string | null, seasonId?: number | null) => {
+  return useApiPostQuery<RtaRankCutDetailResponse>(
+    '/rta/rank-cutoff/detail',
     seasonBody(seasonCode, seasonId),
     {
       enabled: true,

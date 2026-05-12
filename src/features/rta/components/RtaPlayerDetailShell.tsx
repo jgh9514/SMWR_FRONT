@@ -24,7 +24,6 @@ import StarIcon from '@mui/icons-material/Star';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
-import Diversity3Icon from '@mui/icons-material/Diversity3';
 import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
@@ -72,8 +71,7 @@ function buildNavItems(wizardId: string): NavItem[] {
   return [
     { href: base, label: '개요', icon: VisibilityIcon },
     { href: `${base}/picks`, label: '사용 몬스터', icon: GpsFixedIcon },
-    { href: `${base}/synergies`, label: '시너지', icon: Diversity3Icon, premium: true },
-    { href: `${base}/opponents`, label: '라이벌', icon: SportsMmaIcon, premium: true },
+{ href: `${base}/opponents`, label: '라이벌', icon: SportsMmaIcon, premium: true },
     { href: `${base}/box`, label: '보유 몬스터', icon: Inventory2Icon, premium: true },
   ];
 }

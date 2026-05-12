@@ -313,6 +313,19 @@ export interface RtaDashboardRankCutoffResponse {
   seasonId?: number | null;
 }
 
+/** POST /api/v1/rta/rank-cutoff/detail — 일별 랭크 컷 히스토리 한 행 */
+export interface RtaRankCutDailyRow {
+  snappedDay: string;    // 'YYYY-MM-DD' KST
+  gradeSlot: string;     // 'P2'|'P3'|'G1'|'G2'|'G3'
+  tierSort?: number;
+  cutoffScore: number;
+}
+
+export interface RtaRankCutDetailResponse {
+  daily: RtaRankCutDailyRow[];
+  seasonId?: number | null;
+}
+
 /** DB rta_season (POST /api/v1/rta/seasons) */
 export interface RtaSeasonRow {
   /** rta_season.season_id — API 필터에 권장 */

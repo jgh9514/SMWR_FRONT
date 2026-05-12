@@ -65,7 +65,7 @@ import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 import { SITE_NAME_DISPLAY } from '@/shared/lib/seo';
-import RtaSummonerSearchHeader from '@/features/rta/components/RtaSummonerSearchHeader';
+import RtaSummonerSearchDialog from '@/features/rta/components/RtaSummonerSearchDialog';
 
 interface NavLeaf {
   title: string;
@@ -230,6 +230,7 @@ export default function FixedHeader() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [notificationAnchor, setNotificationAnchor] = useState<null | HTMLElement>(null);
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -786,9 +787,39 @@ export default function FixedHeader() {
               </IconButton>
             )}
 
-            <Box sx={{ minWidth: 0, flexShrink: 1 }}>
-              <RtaSummonerSearchHeader />
+            <Box
+              onClick={() => setSearchDialogOpen(true)}
+              role="button"
+              aria-label="소환사 검색"
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.75,
+                px: 1.5,
+                py: 0.5,
+                minWidth: { xs: 120, sm: 200 },
+                maxWidth: 280,
+                flexShrink: 1,
+                bgcolor: 'rgba(255,255,255,0.12)',
+                borderRadius: 2,
+                cursor: 'pointer',
+                border: '1px solid rgba(255,255,255,0.18)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' },
+              }}
+            >
+              <SearchIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.7)', flexShrink: 0 }} />
+              <Typography
+                variant="body2"
+                noWrap
+                sx={{ color: 'rgba(255,255,255,0.5)', flex: 1, minWidth: 0, userSelect: 'none' }}
+              >
+                소환사 검색
+              </Typography>
             </Box>
+            <RtaSummonerSearchDialog
+              open={searchDialogOpen}
+              onClose={() => setSearchDialogOpen(false)}
+            />
 
             <IconButton
               color="inherit"
