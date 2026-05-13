@@ -91,17 +91,20 @@ export default function AdminHeader() {
   return (
     <AppBar
       position="fixed"
+      elevation={0}
       sx={{
         zIndex: (theme) => theme.zIndex.drawer + 1,
-        bgcolor: 'primary.main',
-        boxShadow: 2,
+        bgcolor: 'background.paper',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
         width: `calc(100% - ${280}px)`,
         ml: `${280}px`,
+        backgroundImage: 'none',
       }}
     >
       <Toolbar>
-        <DashboardIcon sx={{ mr: 2 }} />
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 600 }}>
+        <DashboardIcon sx={{ mr: 2, color: 'primary.main' }} />
+        <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700, color: 'text.primary' }}>
           관리자 시스템
         </Typography>
 
@@ -115,7 +118,7 @@ export default function AdminHeader() {
             onClick={handleMenuOpen}
             color="inherit"
           >
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}>
+            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', color: 'primary.contrastText', fontWeight: 700 }}>
               {userInfo?.user_name?.[0]?.toUpperCase() || 'A'}
             </Avatar>
           </IconButton>

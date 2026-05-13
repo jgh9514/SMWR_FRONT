@@ -170,11 +170,24 @@ export default function AdminSidebar() {
           minHeight: '64px !important',
           borderBottom: '1px solid',
           borderColor: 'divider',
+          background: (t) => `linear-gradient(135deg, ${alpha(t.palette.primary.main, 0.12)} 0%, transparent 60%)`,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <DashboardIcon color="primary" />
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: 1.5,
+              bgcolor: 'primary.main',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <DashboardIcon sx={{ fontSize: 18, color: 'primary.contrastText' }} />
+          </Box>
+          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '0.95rem', color: 'text.primary' }}>
             관리 메뉴
           </Typography>
         </Box>
@@ -225,29 +238,28 @@ export default function AdminSidebar() {
               </ListItemButton>
               <Collapse in={openCategories[category.title]} timeout="auto" unmountOnExit>
                 <List component="div" disablePadding>
-                  {category.items.map((item) => (
+                  {category.items.map((item) => {
+                    const isActive = pathname === item.path;
+                    return (
                     <ListItemButton
                       key={item.path}
-                      selected={pathname === item.path}
+                      selected={isActive}
                       onClick={() => handleMenuItemClick(item.path)}
                       sx={{
-                        pl: 4,
+                        pl: 3,
                         py: 1,
+                        mx: 1,
+                        mb: 0.5,
+                        borderRadius: 1.5,
                         '&.Mui-selected': {
-                          bgcolor: alpha(theme.palette.primary.main, 0.1),
-                          borderLeft: '3px solid',
-                          borderColor: 'primary.main',
-                          '&:hover': {
-                            bgcolor: alpha(theme.palette.primary.main, 0.15),
-                          },
+                          bgcolor: alpha(theme.palette.primary.main, 0.15),
+                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
                         },
-                        '&:hover': {
-                          bgcolor: 'action.hover',
-                        },
+                        '&:hover': { bgcolor: 'action.hover' },
                       }}
                     >
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        <Box sx={{ color: pathname === item.path ? item.color : 'action.main' }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        <Box sx={{ color: isActive ? 'primary.main' : 'action.active', display: 'flex' }}>
                           {item.icon}
                         </Box>
                       </ListItemIcon>
@@ -255,30 +267,20 @@ export default function AdminSidebar() {
                         primary={
                           <Typography
                             variant="body2"
-                            sx={{
-                              fontWeight: pathname === item.path ? 600 : 400,
-                              fontSize: '0.875rem',
-                            }}
+                            sx={{ fontWeight: isActive ? 700 : 400, fontSize: '0.875rem', color: isActive ? 'primary.main' : 'text.primary' }}
                           >
                             {item.title}
                           </Typography>
                         }
                         secondary={
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontSize: '0.75rem',
-                              color: 'text.secondary',
-                              display: 'block',
-                              mt: 0.5,
-                            }}
-                          >
+                          <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary', display: 'block' }}>
                             {item.description}
                           </Typography>
                         }
                       />
                     </ListItemButton>
-                  ))}
+                    );
+                  })}
                 </List>
               </Collapse>
             </Box>
@@ -304,7 +306,8 @@ export default function AdminSidebar() {
           left: 0,
           borderRight: '1px solid',
           borderColor: 'divider',
-          bgcolor: 'background.paper',
+          bgcolor: 'background.default',
+          backgroundImage: 'none',
           overflowY: 'auto',
         },
       }}

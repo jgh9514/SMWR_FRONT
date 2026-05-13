@@ -168,56 +168,57 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        bgcolor: 'background.default',
+        background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56,189,248,0.12) 0%, transparent 70%), #0f172a',
         p: 2.5,
       }}
     >
       <Card
+        elevation={0}
         sx={{
           width: '100%',
-          maxWidth: 450,
-          borderRadius: 2.5,
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          maxWidth: 440,
+          borderRadius: 4,
+          border: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'rgba(30,41,59,0.7)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
         }}
       >
-        <CardContent sx={{ p: 5 }}>
-          {/* 로고 또는 타이틀 영역 */}
-          <Box sx={{ textAlign: 'center', mb: 5 }}>
+        <CardContent sx={{ p: { xs: 3.5, sm: 5 } }}>
+          {/* 타이틀 영역 */}
+          <Box sx={{ textAlign: 'center', mb: 4.5 }}>
             <Box
               sx={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 80,
-                height: 80,
+                width: 72,
+                height: 72,
                 mb: 2.5,
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                 borderRadius: '50%',
-                animation: 'pulse 2s ease-in-out infinite',
-                '@keyframes pulse': {
-                  '0%, 100%': {
-                    transform: 'scale(1)',
-                    boxShadow: '0 0 0 0 rgba(102, 126, 234, 0.7)',
-                  },
-                  '50%': {
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 0 0 20px rgba(102, 126, 234, 0)',
-                  },
+                background: 'linear-gradient(135deg, #38bdf8 0%, #06b6d4 100%)',
+                boxShadow: '0 0 32px rgba(56,189,248,0.35)',
+                animation: 'pulse-ring 2.5s ease-in-out infinite',
+                '@keyframes pulse-ring': {
+                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(56,189,248,0.4)' },
+                  '50%': { boxShadow: '0 0 0 14px rgba(56,189,248,0)' },
                 },
               }}
             >
-              <LoginIcon sx={{ color: 'white', fontSize: 40 }} />
+              <LoginIcon sx={{ color: '#0f172a', fontSize: 34 }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: '#2d3748', mb: 1 }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', mb: 0.75, letterSpacing: '-0.02em' }}>
               환영합니다
             </Typography>
-            <Typography sx={{ color: '#718096', fontSize: 16 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
               계정에 로그인하세요
             </Typography>
           </Box>
 
           {/* 로그인 폼 */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <TextField
               label="아이디"
               placeholder="아이디를 입력하세요"
@@ -225,6 +226,7 @@ export default function LoginPage() {
               onChange={(e) => setFrmDatas({ ...frmDatas, user_id: e.target.value })}
               disabled={loginMutation.isPending}
               fullWidth
+              size="medium"
             />
 
             <TextField
@@ -233,40 +235,30 @@ export default function LoginPage() {
               type="password"
               value={frmDatas.user_pw}
               onChange={(e) => setFrmDatas({ ...frmDatas, user_pw: e.target.value })}
-              onKeyUp={(e) => {
-                if (e.key === 'Enter') {
-                  login();
-                }
-              }}
+              onKeyUp={(e) => { if (e.key === 'Enter') login(); }}
               disabled={loginMutation.isPending}
               fullWidth
+              size="medium"
             />
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: -0.5 }}>
               <FormControlLabel
                 control={
                   <Checkbox
                     checked={rememberLogin}
                     onChange={(e) => setRememberLogin(e.target.checked)}
                     disabled={loginMutation.isPending}
+                    size="small"
                   />
                 }
-                label="자동 로그인"
+                label={<Typography variant="body2" color="text.secondary">자동 로그인</Typography>}
               />
               <Button
                 variant="text"
+                size="small"
                 onClick={() => setFindAccountPopupOpen(true)}
                 disabled={loginMutation.isPending}
-                sx={{
-                  textTransform: 'none',
-                  color: '#718096',
-                  fontSize: 14,
-                  p: 0,
-                  minWidth: 'auto',
-                  '&:hover': {
-                    color: '#667eea',
-                  },
-                }}
+                sx={{ color: 'text.secondary', fontSize: '0.8rem', p: 0, minWidth: 'auto', '&:hover': { color: 'primary.main', bgcolor: 'transparent' } }}
               >
                 아이디/비밀번호 찾기
               </Button>
@@ -279,10 +271,16 @@ export default function LoginPage() {
               onClick={login}
               disabled={loginMutation.isPending}
               sx={{
-                mt: 1,
-                height: 48,
-                fontWeight: 600,
-                textTransform: 'none',
+                mt: 0.5,
+                height: 50,
+                fontWeight: 700,
+                fontSize: '1rem',
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #38bdf8 0%, #06b6d4 100%)',
+                color: '#0f172a',
+                boxShadow: '0 4px 20px rgba(56,189,248,0.3)',
+                '&:hover': { background: 'linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%)', boxShadow: '0 6px 28px rgba(56,189,248,0.45)' },
+                '&:disabled': { opacity: 0.6 },
               }}
             >
               {loginMutation.isPending ? '로그인 중...' : '로그인'}
@@ -291,18 +289,13 @@ export default function LoginPage() {
 
           {/* 회원가입 링크 */}
           <Box sx={{ textAlign: 'center', mt: 3 }}>
-            <Typography sx={{ color: '#718096', fontSize: 14 }}>
+            <Typography variant="body2" color="text.secondary">
               계정이 없으신가요?{' '}
               <Button
                 variant="text"
+                size="small"
                 onClick={() => router.push('/signup')}
-                sx={{
-                  textTransform: 'none',
-                  color: '#667eea',
-                  fontWeight: 600,
-                  p: 0,
-                  minWidth: 'auto',
-                }}
+                sx={{ color: 'primary.main', fontWeight: 700, p: 0, minWidth: 'auto', fontSize: '0.875rem', '&:hover': { bgcolor: 'transparent', color: 'primary.light' } }}
               >
                 회원가입
               </Button>
@@ -311,7 +304,6 @@ export default function LoginPage() {
         </CardContent>
       </Card>
 
-      {/* 아이디/비밀번호 찾기 팝업 */}
       <FindAccountPopup open={findAccountPopupOpen} onClose={() => setFindAccountPopupOpen(false)} />
     </Box>
   );

@@ -10,7 +10,7 @@ import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 const iconQ = getPwaIconCacheQuery();
 
 export const viewport: Viewport = {
-  themeColor: '#16213e',
+  themeColor: '#0f172a',
 };
 
 export const metadata: Metadata = {
@@ -64,6 +64,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://cdn.jsdelivr.net" crossOrigin="anonymous" />
+      </head>
       <body suppressHydrationWarning>
         <ErrorBoundary>
           <AppProviders>{children}</AppProviders>

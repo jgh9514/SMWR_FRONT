@@ -250,17 +250,6 @@ function pickComboMonsterImage(row: DuoComboStat | TrioComboStat, slot: number):
   return undefined;
 }
 
-function sortCombo<T extends { match_count: number; win_rate: number }>(
-  data: T[], field: ComboSortField, order: SortOrder,
-): T[] {
-  if (data.length === 0) return [];
-  return [...data].sort((a, b) => {
-    const diff = (field === 'match_count' ? a.match_count : a.win_rate)
-               - (field === 'match_count' ? b.match_count : b.win_rate);
-    return order === 'asc' ? diff : -diff;
-  });
-}
-
 // ─── MonsterCell ──────────────────────────────────────────────────────────────
 
 interface MonsterCellProps {
@@ -480,48 +469,36 @@ const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
   );
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        mb: 2,
-        borderRadius: 2.5,
-        px: { xs: 1.25, sm: 1.5 },
-        py: 1.25,
-        borderColor: 'divider',
-        bgcolor: 'common.white',
-      }}
-    >
-      <FormControl size="small" fullWidth>
-        <InputLabel id={MONSTER_STATS_SORT_ID}>정렬</InputLabel>
-        <Select<MonsterStatsSortKey>
-          labelId={MONSTER_STATS_SORT_ID}
-          label="정렬"
-          value={value}
-          onChange={handle}
-          renderValue={(v) => monsterStatsSortOptionContent(v as MonsterStatsSortKey)}
-          sx={RTA_OUTLINED_SELECT_FIELD_SX}
-          slotProps={{
-            input: {
-              sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX,
-              'aria-label': `정렬: ${MONSTER_STATS_SORT_LABEL[value]}`,
-            },
-          }}
-          MenuProps={{
-            ...RTA_SELECT_MENU_PROPS,
-            slotProps: {
-              ...RTA_SELECT_MENU_PROPS.slotProps,
-              paper: { sx: { maxHeight: 360, bgcolor: 'common.white' } },
-            },
-          }}
-        >
-          {MONSTER_STATS_SORT_KEYS.map((k) => (
-            <MenuItem key={k} value={k} aria-label={MONSTER_STATS_SORT_LABEL[k]}>
-              {monsterStatsSortOptionContent(k)}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </Paper>
+    <FormControl size="small" sx={{ minWidth: { xs: '100%', md: 150 } }}>
+      <InputLabel id={MONSTER_STATS_SORT_ID}>정렬</InputLabel>
+      <Select<MonsterStatsSortKey>
+        labelId={MONSTER_STATS_SORT_ID}
+        label="정렬"
+        value={value}
+        onChange={handle}
+        renderValue={(v) => monsterStatsSortOptionContent(v as MonsterStatsSortKey)}
+        sx={{ borderRadius: 1, bgcolor: 'background.paper' }}
+        slotProps={{
+          input: {
+            sx: RTA_OUTLINED_SELECT_INPUT_SLOT_SX,
+            'aria-label': `정렬: ${MONSTER_STATS_SORT_LABEL[value]}`,
+          },
+        }}
+        MenuProps={{
+          ...RTA_SELECT_MENU_PROPS,
+          slotProps: {
+            ...RTA_SELECT_MENU_PROPS.slotProps,
+            paper: { sx: { maxHeight: 360 } },
+          },
+        }}
+      >
+        {MONSTER_STATS_SORT_KEYS.map((k) => (
+          <MenuItem key={k} value={k} aria-label={MONSTER_STATS_SORT_LABEL[k]}>
+            {monsterStatsSortOptionContent(k)}
+          </MenuItem>
+        ))}
+      </Select>
+    </FormControl>
   );
 });
 
@@ -795,7 +772,7 @@ export default function RtaMonsterStatsClient() {
   // 솔로·듀오·트리오 공통: 픽횟수(듀오·트리오는 경기 수)·승률 × 오름·내림
   const [monsterStatsSort, setMonsterStatsSort] = useState<MonsterStatsSortKey>('pick_count_desc');
 
-  // Reset all on filter change
+  // Reset all on filter/sort change
   useEffect(() => {
     setStatsOffset(0);
     setDuoOffset(0);
@@ -806,7 +783,7 @@ export default function RtaMonsterStatsClient() {
     setStatsHasMore(false);
     setDuoHasMore(false);
     setTrioHasMore(false);
-  }, [tierSelection, seasonSelectValue]);
+  }, [tierSelection, seasonSelectValue, monsterStatsSort]);
 
   // Data
   const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
@@ -829,11 +806,16 @@ export default function RtaMonsterStatsClient() {
     [tierSelection, gradeRules],
   );
 
+  const { field: sortFieldParam, order: sortOrderParam } = monsterStatsSortToSoloField(monsterStatsSort);
+  const comboSortParam = monsterStatsSortToComboField(monsterStatsSort);
+
   const commonParams = {
     limit: PAGE_SIZE,
     seasonCode: seasonSelectValue,
     seasonId: seasonIdForApi,
     ...tierFilterBody,
+    sortField: sortFieldParam,
+    sortOrder: sortOrderParam,
   };
 
   /** 몬스터 통계 화면에서 시즌·티어가 정해지면 듀오·트리오 1페이지를 200ms 후 백그라운드 prefetch */
@@ -867,9 +849,11 @@ export default function RtaMonsterStatsClient() {
     };
   }, [queryClient, seasonSelectValue, seasonIdForApi, tierFilterBody]);
 
+  const comboParams = { ...commonParams, sortField: comboSortParam.field, sortOrder: comboSortParam.order };
+
   const { data: soloData, isLoading: soloLoading, isFetching: soloFetching, error: soloError } = useRtaMonsterStats({ ...commonParams, type: 'solo', offset: statsOffset, enabled: tab === 0 });
-  const { data: duoData,  isLoading: duoLoading,  isFetching: duoFetching  } = useRtaMonsterStats({ ...commonParams, type: 'duo',  offset: duoOffset,  enabled: tab === 1 });
-  const { data: trioData, isLoading: trioLoading, isFetching: trioFetching } = useRtaMonsterStats({ ...commonParams, type: 'trio', offset: trioOffset, enabled: tab === 2 });
+  const { data: duoData,  isLoading: duoLoading,  isFetching: duoFetching  } = useRtaMonsterStats({ ...comboParams, type: 'duo',  offset: duoOffset,  enabled: tab === 1 });
+  const { data: trioData, isLoading: trioLoading, isFetching: trioFetching } = useRtaMonsterStats({ ...comboParams, type: 'trio', offset: trioOffset, enabled: tab === 2 });
 
   const isLoading = tab === 0 ? soloLoading : tab === 1 ? duoLoading : trioLoading;
   const isFetching = tab === 0 ? soloFetching : tab === 1 ? duoFetching : trioFetching;
@@ -914,17 +898,8 @@ export default function RtaMonsterStatsClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trioData]);
 
-  // Sorted data (솔로: 픽횟수 또는 승률만)
-  const sortedStats = useMemo(() => {
-    if (allSoloStats.length === 0) return [];
-    const { field, order } = monsterStatsSortToSoloField(monsterStatsSort);
-    const mul = order === 'asc' ? 1 : -1;
-    return [...allSoloStats].sort((a, b) => {
-      const aVal = (a as unknown as Record<string, number>)[field] ?? 0;
-      const bVal = (b as unknown as Record<string, number>)[field] ?? 0;
-      return mul * (aVal - bVal);
-    });
-  }, [allSoloStats, monsterStatsSort]);
+  // DB에서 정렬된 결과를 그대로 사용
+  const sortedStats = allSoloStats;
 
   /** 전체 몬스터 마스터(노말·각성·2각 등 전 행) — 검색·속성만 목록용 (테이블과 무관). 표시는 역순. */
   const soloCatalogFiltered = useMemo(() => {
@@ -938,15 +913,9 @@ export default function RtaMonsterStatsClient() {
     return rows.slice().reverse();
   }, [monsterCatalog, soloSearch, elementFilter]);
 
-  const sortedDuo = useMemo(() => {
-    const { field, order } = monsterStatsSortToComboField(monsterStatsSort);
-    return sortCombo(allDuoStats, field, order);
-  }, [allDuoStats, monsterStatsSort]);
-
-  const sortedTrio = useMemo(() => {
-    const { field, order } = monsterStatsSortToComboField(monsterStatsSort);
-    return sortCombo(allTrioStats, field, order);
-  }, [allTrioStats, monsterStatsSort]);
+  // DB에서 정렬된 결과를 그대로 사용
+  const sortedDuo = allDuoStats;
+  const sortedTrio = allTrioStats;
 
   const handleTabChange = useCallback(
     (_e: SyntheticEvent, v: number) => {
@@ -1242,18 +1211,29 @@ export default function RtaMonsterStatsClient() {
 
           {/* 우측: 시즌·티어 → 표 */}
           <Box id="popular-hero-list" sx={{ flex: '1 1 auto', minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
-            <RtaSeasonTierSelectRow
-              seasonSelectValue={seasonSelectValue}
-              setSeason={setSeason}
-              seasonOptions={seasonOptions}
-              tierSelection={tierSelection}
-              setTierSelection={setTierSelection}
-              gradeRules={gradeRules}
-              tierRulesLoading={tierRulesLoading}
-              seasonLabelId="monster-stats-season-label"
-            />
-
-            <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
+            <Box
+              sx={{
+                display: 'flex',
+                flexWrap: { xs: 'wrap', md: 'nowrap' },
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 1.5,
+                mb: 2,
+              }}
+            >
+              <RtaSeasonTierSelectRow
+                seasonSelectValue={seasonSelectValue}
+                setSeason={setSeason}
+                seasonOptions={seasonOptions}
+                tierSelection={tierSelection}
+                setTierSelection={setTierSelection}
+                gradeRules={gradeRules}
+                tierRulesLoading={tierRulesLoading}
+                seasonLabelId="monster-stats-season-label"
+                mb={0}
+              />
+              <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
+            </Box>
 
             {sortedStats.length === 0 ? (
               <StatsEmptyState
@@ -1343,17 +1323,29 @@ export default function RtaMonsterStatsClient() {
       {/* ── Duo Tab ── */}
       {tab === 1 && (
         <>
-          <RtaSeasonTierSelectRow
-            seasonSelectValue={seasonSelectValue}
-            setSeason={setSeason}
-            seasonOptions={seasonOptions}
-            tierSelection={tierSelection}
-            setTierSelection={setTierSelection}
-            gradeRules={gradeRules}
-            tierRulesLoading={tierRulesLoading}
-            seasonLabelId="monster-stats-season-label"
-          />
-          <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: { xs: 'wrap', md: 'nowrap' },
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1.5,
+              mb: 2,
+            }}
+          >
+            <RtaSeasonTierSelectRow
+              seasonSelectValue={seasonSelectValue}
+              setSeason={setSeason}
+              seasonOptions={seasonOptions}
+              tierSelection={tierSelection}
+              setTierSelection={setTierSelection}
+              gradeRules={gradeRules}
+              tierRulesLoading={tierRulesLoading}
+              seasonLabelId="monster-stats-season-label"
+              mb={0}
+            />
+            <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
+          </Box>
 
           {sortedDuo.length === 0 ? (
             <StatsEmptyState
@@ -1407,17 +1399,29 @@ export default function RtaMonsterStatsClient() {
       {/* ── Trio Tab ── */}
       {tab === 2 && (
         <>
-          <RtaSeasonTierSelectRow
-            seasonSelectValue={seasonSelectValue}
-            setSeason={setSeason}
-            seasonOptions={seasonOptions}
-            tierSelection={tierSelection}
-            setTierSelection={setTierSelection}
-            gradeRules={gradeRules}
-            tierRulesLoading={tierRulesLoading}
-            seasonLabelId="monster-stats-season-label"
-          />
-          <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
+          <Box
+            sx={{
+              display: 'flex',
+              flexWrap: { xs: 'wrap', md: 'nowrap' },
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1.5,
+              mb: 2,
+            }}
+          >
+            <RtaSeasonTierSelectRow
+              seasonSelectValue={seasonSelectValue}
+              setSeason={setSeason}
+              seasonOptions={seasonOptions}
+              tierSelection={tierSelection}
+              setTierSelection={setTierSelection}
+              gradeRules={gradeRules}
+              tierRulesLoading={tierRulesLoading}
+              seasonLabelId="monster-stats-season-label"
+              mb={0}
+            />
+            <MonsterStatsSortSelect value={monsterStatsSort} onChange={setMonsterStatsSort} />
+          </Box>
 
           {sortedTrio.length === 0 ? (
             <StatsEmptyState

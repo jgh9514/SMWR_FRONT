@@ -135,32 +135,64 @@ function getQueryClient() {
 // MUI theme은 컴포넌트 외부에서 생성 (한 번만 생성)
 const muiTheme = createTheme({
   palette: {
+    mode: 'dark',
     primary: {
-      main: '#0064FF',
+      main: '#38bdf8',
+      light: '#7dd3fc',
+      dark: '#0ea5e9',
+      contrastText: '#0f172a',
     },
     secondary: {
-      main: '#4E5968',
+      main: '#94a3b8',
+      light: '#cbd5e1',
+      dark: '#64748b',
+    },
+    success: {
+      main: '#10b981',
+      light: '#34d399',
+      dark: '#059669',
+    },
+    error: {
+      main: '#f43f5e',
+      light: '#fb7185',
+      dark: '#e11d48',
+    },
+    warning: {
+      main: '#f59e0b',
+    },
+    info: {
+      main: '#06b6d4',
     },
     background: {
-      default: '#f2f4f6',
-      paper: '#ffffff',
+      default: '#0f172a',
+      paper: '#1e293b',
     },
     text: {
-      primary: '#191F28',
-      secondary: '#4E5968',
+      primary: '#f1f5f9',
+      secondary: '#94a3b8',
     },
+    divider: 'rgba(148, 163, 184, 0.12)',
   },
   typography: {
     fontFamily: [
+      '"Pretendard Variable"',
+      'Pretendard',
+      'Inter',
       'system-ui',
       '-apple-system',
       'BlinkMacSystemFont',
       '"Segoe UI"',
-      'Roboto',
-      '"Helvetica Neue"',
-      'Arial',
       'sans-serif',
     ].join(','),
+    h1: { fontWeight: 800, letterSpacing: '-0.02em' },
+    h2: { fontWeight: 800, letterSpacing: '-0.02em' },
+    h3: { fontWeight: 700, letterSpacing: '-0.015em' },
+    h4: { fontWeight: 700, letterSpacing: '-0.015em' },
+    h5: { fontWeight: 600 },
+    h6: { fontWeight: 600 },
+  },
+  shape: {
+    borderRadius: 12,
   },
   components: {
     MuiCssBaseline: {
@@ -168,6 +200,55 @@ const muiTheme = createTheme({
         body: {
           margin: 0,
           padding: 0,
+          backgroundColor: '#0f172a',
+          color: '#f1f5f9',
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+          backgroundColor: 'rgba(30, 41, 59, 0.55)',
+          border: '1px solid rgba(148, 163, 184, 0.12)',
+          backdropFilter: 'blur(16px)',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+          fontWeight: 600,
+          textTransform: 'none',
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiSelect: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8,
+        },
+      },
+    },
+    MuiOutlinedInput: {
+      styleOverrides: {
+        notchedOutline: {
+          borderColor: 'rgba(148, 163, 184, 0.2)',
         },
       },
     },

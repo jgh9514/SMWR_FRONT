@@ -174,9 +174,9 @@ function buildRow(row: RtaSummonerRankingRow) {
 type SummonerRankingRowView = ReturnType<typeof buildRow>;
 
 const RTA_OUTLINED_SELECT_SX = {
-  bgcolor: '#ffffff',
-  '&:hover': { bgcolor: '#ffffff' },
-  '&.Mui-focused': { bgcolor: '#ffffff' },
+  bgcolor: 'background.paper',
+  '&:hover': { bgcolor: 'action.hover' },
+  '&.Mui-focused': { bgcolor: 'background.paper' },
   '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
 } as const;
 

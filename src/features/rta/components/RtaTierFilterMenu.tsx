@@ -95,8 +95,9 @@ export default function RtaTierFilterMenu({
           minWidth: { xs: '100%', sm: 280 },
           maxWidth: '100%',
           borderColor: 'divider',
-          bgcolor: 'common.white',
-          '&:hover': { bgcolor: 'common.white' },
+          bgcolor: 'background.paper',
+          color: 'text.primary',
+          '&:hover': { bgcolor: 'action.hover' },
         }}
       >
         <Box sx={{ minWidth: 0, overflow: 'hidden' }}>{tierSelectionSummary(value, byTier)}</Box>

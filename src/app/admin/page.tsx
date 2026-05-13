@@ -46,30 +46,28 @@ interface StatCardPropsLocal {
 function StatCard({ title, value, icon, color, trend, subtitle }: StatCardPropsLocal) {
   return (
     <Card
+      elevation={0}
       sx={{
         height: '100%',
-        background: `linear-gradient(135deg, ${color}15 0%, ${color}05 100%)`,
-        border: `1px solid ${color}30`,
-        transition: 'all 0.3s ease',
+        border: '1px solid',
+        borderColor: 'divider',
+        background: (t) => `linear-gradient(135deg, ${t.palette.background.paper} 0%, ${t.palette.background.default} 100%)`,
+        transition: 'border-color 0.2s, box-shadow 0.2s',
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 4,
+          borderColor: color,
+          boxShadow: `0 0 0 1px ${color}40, 0 8px 32px rgba(0,0,0,0.3)`,
         },
       }}
     >
       <CardContent sx={{ p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontWeight: 500 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block' }}>
               {title}
             </Typography>
             <Typography
               variant="h4"
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: '24px', md: '32px' },
-                color: color,
-              }}
+              sx={{ fontWeight: 800, fontSize: { xs: '1.6rem', md: '2rem' }, color, fontVariantNumeric: 'tabular-nums' }}
             >
               {typeof value === 'number' ? value.toLocaleString('ko-KR') : value}
             </Typography>
@@ -80,38 +78,27 @@ function StatCard({ title, value, icon, color, trend, subtitle }: StatCardPropsL
             )}
             {trend !== undefined && (
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                <TrendingUpIcon
-                  sx={{
-                    fontSize: 16,
-                    color: trend >= 0 ? 'success.main' : 'error.main',
-                    mr: 0.5,
-                  }}
-                />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: trend >= 0 ? 'success.main' : 'error.main',
-                    fontWeight: 600,
-                  }}
-                >
-                  {trend >= 0 ? '+' : ''}
-                  {trend}%
+                <TrendingUpIcon sx={{ fontSize: 14, color: trend >= 0 ? 'success.main' : 'error.main', mr: 0.5 }} />
+                <Typography variant="caption" sx={{ color: trend >= 0 ? 'success.main' : 'error.main', fontWeight: 700 }}>
+                  {trend >= 0 ? '+' : ''}{trend}%
                 </Typography>
               </Box>
             )}
           </Box>
           <Box
             sx={{
-              width: { xs: 48, md: 56 },
-              height: { xs: 48, md: 56 },
+              width: { xs: 44, md: 52 },
+              height: { xs: 44, md: 52 },
               borderRadius: 2,
-              background: `${color}20`,
+              bgcolor: `${color}1a`,
+              border: `1px solid ${color}30`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              flexShrink: 0,
             }}
           >
-            <Box sx={{ color, fontSize: { xs: 28, md: 32 } }}>{icon}</Box>
+            <Box sx={{ color, fontSize: { xs: 24, md: 28 }, display: 'flex' }}>{icon}</Box>
           </Box>
         </Box>
       </CardContent>
@@ -187,28 +174,28 @@ export default function AdminPage() {
                 title="오늘 가입자"
                 value={dashboardData.stats.todaySignups ?? 0}
                 icon={<PersonAddIcon />}
-                color="#1976d2"
+                color="#38bdf8"
                 subtitle={`전체: ${(dashboardData.stats.totalUsers ?? 0).toLocaleString('ko-KR')}명`}
               />
               <StatCard
                 title="오늘 로그인"
                 value={dashboardData.stats.todayLogins ?? 0}
                 icon={<TrafficIcon />}
-                color="#2e7d32"
+                color="#10b981"
                 subtitle={`전체 사용자: ${(dashboardData.stats.totalUsers ?? 0).toLocaleString('ko-KR')}명`}
               />
               <StatCard
                 title="오늘 게시글"
                 value={dashboardData.stats.todayPosts ?? 0}
                 icon={<ArticleIcon />}
-                color="#ed6c02"
+                color="#f59e0b"
                 subtitle="공지사항 + 문의"
               />
               <StatCard
                 title="오늘 길드 신청"
                 value={dashboardData.stats.todayGuildApplications ?? 0}
                 icon={<AssignmentIcon />}
-                color="#9c27b0"
+                color="#a855f7"
                 subtitle="오늘 생성된 신청"
               />
             </Box>
@@ -227,19 +214,23 @@ export default function AdminPage() {
                     <Table>
                       <TableHead>
                         <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>날짜</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
-                            가입자
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
-                            로그인
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
-                            게시글
-                          </TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>
-                            길드 신청
-                          </TableCell>
+                          {['날짜', '가입자', '로그인', '게시글', '길드 신청'].map((h, i) => (
+                            <TableCell
+                              key={h}
+                              align={i === 0 ? 'left' : 'right'}
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: '0.75rem',
+                                letterSpacing: '0.04em',
+                                color: 'text.secondary',
+                                bgcolor: 'action.hover',
+                                borderBottom: '2px solid',
+                                borderColor: 'divider',
+                              }}
+                            >
+                              {h}
+                            </TableCell>
+                          ))}
                         </TableRow>
                       </TableHead>
                       <TableBody>

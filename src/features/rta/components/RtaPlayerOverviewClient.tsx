@@ -705,10 +705,24 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
               })
             )}
           </Stack>
-          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
-            <Button component={Link} href={picksHref} variant="outlined" size="small">
-              더보기
-            </Button>
+          <Box
+            component={Link}
+            href={picksHref}
+            sx={{
+              mt: 1.5,
+              display: 'flex',
+              justifyContent: 'center',
+              py: 0.75,
+              borderRadius: 1,
+              textDecoration: 'none',
+              color: 'primary.main',
+              fontWeight: 700,
+              fontSize: '0.8125rem',
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            더보기
           </Box>
         </Card>
 
@@ -770,10 +784,24 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
               })
             )}
           </Stack>
-          <Box sx={{ mt: 1.5, display: 'flex', justifyContent: 'center' }}>
-            <Button component={Link} href={opponentsHref} variant="outlined" size="small">
-              더보기
-            </Button>
+          <Box
+            component={Link}
+            href={opponentsHref}
+            sx={{
+              mt: 1.5,
+              display: 'flex',
+              justifyContent: 'center',
+              py: 0.75,
+              borderRadius: 1,
+              textDecoration: 'none',
+              color: 'primary.main',
+              fontWeight: 700,
+              fontSize: '0.8125rem',
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            더보기
           </Box>
         </Card>
       </Stack>

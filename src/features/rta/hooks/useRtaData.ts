@@ -249,17 +249,22 @@ export type RtaMonsterStatsQueryParams = {
   ratingId?: number | null;
   /** 복수 rating_id (구간 합산) */
   ratingIds?: number[] | null;
+  /** 정렬 기준 컬럼 */
+  sortField?: string | null;
+  /** 정렬 방향 */
+  sortOrder?: 'asc' | 'desc' | null;
   enabled?: boolean;
 };
 
 function buildRtaMonsterStatsRequestBody(params: RtaMonsterStatsQueryParams) {
-  const { limit = 20, offset = 0, type = 'solo', seasonCode, seasonId, ratingId, ratingIds } = params;
+  const { limit = 20, offset = 0, type = 'solo', seasonCode, seasonId, ratingId, ratingIds, sortField, sortOrder } = params;
   return {
     limit,
     offset,
     type,
     ...seasonBody(seasonCode, seasonId),
     ...monsterStatsTierBody(ratingId, ratingIds),
+    ...(sortField ? { sortField, sortOrder: sortOrder ?? 'desc' } : {}),
   };
 }
 

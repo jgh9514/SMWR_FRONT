@@ -123,9 +123,9 @@ export default function RtaRankCutoffsPageClient() {
               onChange={(e) => { blurFocusedMenuItem(); setSeason(String(e.target.value)); }}
               MenuProps={RTA_SELECT_MENU_PROPS}
               sx={{
-                bgcolor: '#ffffff',
-                '&:hover': { bgcolor: '#ffffff' },
-                '&.Mui-focused': { bgcolor: '#ffffff' },
+                bgcolor: 'background.paper',
+                '&:hover': { bgcolor: 'action.hover' },
+                '&.Mui-focused': { bgcolor: 'background.paper' },
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
               }}
             >

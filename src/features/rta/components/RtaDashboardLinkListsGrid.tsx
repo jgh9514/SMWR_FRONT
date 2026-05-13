@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { Avatar, Box, Button, Link as MuiLink, Paper, Skeleton, Stack, Typography } from '@mui/material';
+import { Avatar, Box, Link as MuiLink, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
   useRtaDashboardPreviewSolo,
@@ -176,6 +176,8 @@ function DashboardPreviewPanel({ title, detailHref, children }: PanelProps) {
         {children}
       </Box>
       <Box
+        component={Link}
+        href={detailHref}
         sx={{
           px: 1.75,
           py: 1,
@@ -185,18 +187,16 @@ function DashboardPreviewPanel({ title, detailHref, children }: PanelProps) {
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
+          textDecoration: 'none',
+          color: 'primary.main',
+          fontWeight: 700,
+          fontSize: '0.8125rem',
+          cursor: 'pointer',
+          '&:hover': { bgcolor: 'action.hover' },
         }}
       >
-        <Button
-          component={Link}
-          href={detailHref}
-          size="small"
-          variant="text"
-          endIcon={<ChevronRightIcon sx={{ fontSize: 18 }} />}
-          sx={{ fontWeight: 700, px: 0.5 }}
-        >
-          더보기
-        </Button>
+        더보기
+        <ChevronRightIcon sx={{ fontSize: 18, ml: 0.5 }} />
       </Box>
     </Paper>
   );
