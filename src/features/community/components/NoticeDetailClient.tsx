@@ -63,19 +63,24 @@ export default function NoticeDetailClient({ notice }: NoticeDetailClientProps) 
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 } }}>
-      <PageHeader title={notice.title || '공지사항'} backPath="/notice" />
+      <PageHeader title="공지사항" backPath="/notice" />
 
-      <Card>
+      <Card sx={{ mt: 2 }}>
         <CardContent sx={{ p: { xs: 2, md: 4 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
-            {notice.is_important && <Chip label="중요" color="error" size="small" />}
-            {notice.is_popup && <Chip label="팝업" color="warning" size="small" />}
-          </Box>
+          {/* 배지 */}
+          {(notice.is_important || notice.is_popup) && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 1.5 }}>
+              {notice.is_important && <Chip label="중요" color="error" size="small" />}
+              {notice.is_popup && <Chip label="팝업" color="warning" size="small" />}
+            </Box>
+          )}
 
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1.5, fontSize: { xs: '1.75rem', md: '2.25rem' } }}>
+          {/* 제목 */}
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 700, mb: 1.5, wordBreak: 'break-word' }}>
             {notice.title || '공지사항'}
           </Typography>
 
+          {/* 메타 정보 */}
           <Box sx={{ display: 'flex', gap: 2, color: 'text.secondary', flexWrap: 'wrap', mb: 2 }}>
             <Typography variant="body2">작성자: {notice.user_name || '-'}</Typography>
             <Typography variant="body2">
@@ -86,21 +91,17 @@ export default function NoticeDetailClient({ notice }: NoticeDetailClientProps) 
 
           <Divider sx={{ mb: 3 }} />
 
+          {/* 본문 */}
           {notice.content ? (
-            <RichTextDisplay
-              content={notice.content}
-              sx={{
-                minHeight: 240,
-                lineHeight: 1.8,
-              }}
-            />
+            <RichTextDisplay content={notice.content} sx={{ lineHeight: 1.8 }} />
           ) : (
             <Alert severity="info">표시할 공지사항 내용이 없습니다.</Alert>
           )}
 
+          {/* 댓글 */}
           {notice.notice_id && (
             <>
-              <Divider sx={{ my: 4 }} />
+              <Divider sx={{ mt: 4, mb: 3 }} />
               <CommentSection
                 boardType="NOTICE"
                 boardId={notice.notice_id}

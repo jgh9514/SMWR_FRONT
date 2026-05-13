@@ -259,6 +259,9 @@ function PickSnakeGrid({
   const colPattern = isFirstPick ? FIRST_PICK_COLS : SECOND_PICK_COLS;
   const slotMap = new Map(slots.map((s) => [s.pick_slot_no ?? 0, s]));
 
+  // 벤 제외: field_cnt(논벤 실픽) 합계를 분모로 픽 비중 재계산
+  const totalFieldCnt = slots.reduce((acc, s) => acc + Math.max(0, toNum(s.field_cnt)), 0);
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'row', gap: { xs: 0.75, sm: 1, md: 1.5 }, alignItems: 'center', justifyContent: 'center' }}>
       {colPattern.map((colSlots, colIdx) => (
@@ -270,14 +273,16 @@ function PickSnakeGrid({
         >
           {colSlots.map((slotNo) => {
             const row = slotMap.get(slotNo);
+            const fieldCnt = row ? toNum(row.field_cnt) : 0;
+            const pickSharePct = totalFieldCnt > 0 ? (fieldCnt / totalFieldCnt) * 100 : 0;
             return (
               <PickSlotBox
                 key={slotNo}
                 slotNo={slotNo}
-                pickSharePct={row ? toNum(row.pick_share_pct) : 0}
+                pickSharePct={pickSharePct}
                 winRatePct={row?.win_rate_pct != null ? toNum(row.win_rate_pct) : null}
                 eventCnt={row ? toNum(row.event_cnt) : 0}
-                matchCnt={row ? toNum(row.field_cnt) : 0}
+                matchCnt={fieldCnt}
                 color={color}
                 selected={selectedSlotNo === slotNo}
                 onClick={() => onSlotClick(slotNo)}

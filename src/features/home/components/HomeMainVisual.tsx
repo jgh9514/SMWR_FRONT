@@ -352,7 +352,7 @@ export default function HomeMainVisual() {
                         ...params.InputProps,
                         startAdornment: (
                           <>
-                            <SearchIcon sx={{ color: 'action.active', mr: 0.5, ml: 0.25, fontSize: 24 }} />
+                            <SearchIcon sx={{ color: 'rgba(255,255,255,0.6)', mr: 0.5, ml: 0.25, fontSize: 24 }} />
                             {params.InputProps.startAdornment}
                           </>
                         ),
@@ -365,12 +365,16 @@ export default function HomeMainVisual() {
                       }}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          bgcolor: 'rgba(255,255,255,0.98)',
+                          bgcolor: 'rgba(15,23,42,0.65)',
                           borderRadius: 1,
                           fontSize: '0.95rem',
+                          color: 'rgba(255,255,255,0.92)',
                         },
-                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,0,0,0.12)' },
-                        '& .MuiInputBase-input::placeholder': { opacity: 0.55 },
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.25)' },
+                        '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.45)' },
+                        '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,0.5)', opacity: 1 },
+                        '& .MuiInputBase-input': { color: 'rgba(255,255,255,0.92)' },
+                        '& .MuiAutocomplete-endAdornment .MuiIconButton-root': { color: 'rgba(255,255,255,0.5)' },
                       }}
                     />
                   )}

@@ -108,20 +108,25 @@ export default function RichTextEditor({
   // 에디터 스타일
   const editorSx = useMemo(
     () => ({
+      bgcolor: 'background.paper',
+      color: 'text.primary',
       '& .ProseMirror': {
         fontSize: '16px',
         fontFamily: 'inherit',
         minHeight: `${minHeight}px`,
         padding: '12px',
         outline: 'none',
-        borderBottom: '1px solid #e0e0e0',
-        borderLeft: '1px solid #e0e0e0',
-        borderRight: '1px solid #e0e0e0',
+        backgroundColor: 'inherit',
+        color: 'inherit',
+        borderBottom: '1px solid',
+        borderLeft: '1px solid',
+        borderRight: '1px solid',
+        borderColor: 'divider',
         borderRadius: readOnly ? '4px' : '0 0 4px 4px',
         '&.is-editor-empty:first-child::before': {
           content: `"${placeholder}"`,
           float: 'left',
-          color: 'rgba(0, 0, 0, 0.6)',
+          color: 'text.secondary',
           pointerEvents: 'none',
           height: 0,
         },
@@ -148,14 +153,16 @@ export default function RichTextEditor({
         }),
       },
       '& .tiptap-toolbar': {
-        borderTop: '1px solid #e0e0e0',
-        borderLeft: '1px solid #e0e0e0',
-        borderRight: '1px solid #e0e0e0',
+        borderTop: '1px solid',
+        borderLeft: '1px solid',
+        borderRight: '1px solid',
+        borderColor: 'divider',
         borderRadius: '4px 4px 0 0',
         padding: '8px',
         display: 'flex',
         gap: '4px',
         flexWrap: 'wrap',
+        backgroundColor: 'inherit',
         ...(readOnly && {
           display: 'none',
         }),
@@ -168,34 +175,20 @@ export default function RichTextEditor({
   // 서버 사이드에서는 placeholder만 렌더링 (Hydration 오류 방지)
   if (!isClient || !editor) {
     return (
-      <Box
-        sx={{
-          ...editorSx,
-          '& .ProseMirror': {
-            ...editorSx['& .ProseMirror'],
+      <Box sx={editorSx}>
+        {!readOnly && <div className="tiptap-toolbar" />}
+        <Box
+          sx={{
             minHeight: `${minHeight}px`,
             padding: '12px',
-            border: '1px solid #e0e0e0',
-            color: 'rgba(0, 0, 0, 0.6)',
-          },
-        }}
-      >
-        {!readOnly && (
-          <div
-            className="tiptap-toolbar"
-            style={{
-              borderTop: '1px solid #e0e0e0',
-              borderLeft: '1px solid #e0e0e0',
-              borderRight: '1px solid #e0e0e0',
-              borderRadius: '4px 4px 0 0',
-              padding: '8px',
-              display: 'flex',
-              gap: '4px',
-              flexWrap: 'wrap',
-            }}
-          />
-        )}
-        <div style={{ minHeight: `${minHeight}px`, padding: '12px' }}>{placeholder}</div>
+            color: 'text.secondary',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: readOnly ? '4px' : '0 0 4px 4px',
+          }}
+        >
+          {placeholder}
+        </Box>
       </Box>
     );
   }
@@ -212,7 +205,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('heading', { level: 1 }) ? '#e0e0e0' : 'white',
+              background: editor.isActive('heading', { level: 1 }) ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -226,7 +219,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('heading', { level: 2 }) ? '#e0e0e0' : 'white',
+              background: editor.isActive('heading', { level: 2 }) ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -240,7 +233,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('heading', { level: 3 }) ? '#e0e0e0' : 'white',
+              background: editor.isActive('heading', { level: 3 }) ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -254,7 +247,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('bold') ? '#e0e0e0' : 'white',
+              background: editor.isActive('bold') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
               fontWeight: 'bold',
             }}
@@ -269,7 +262,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('italic') ? '#e0e0e0' : 'white',
+              background: editor.isActive('italic') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
               fontStyle: 'italic',
             }}
@@ -284,7 +277,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('underline') ? '#e0e0e0' : 'white',
+              background: editor.isActive('underline') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
               textDecoration: 'underline',
             }}
@@ -299,7 +292,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('strike') ? '#e0e0e0' : 'white',
+              background: editor.isActive('strike') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
               textDecoration: 'line-through',
             }}
@@ -314,7 +307,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('bulletList') ? '#e0e0e0' : 'white',
+              background: editor.isActive('bulletList') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -328,7 +321,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('orderedList') ? '#e0e0e0' : 'white',
+              background: editor.isActive('orderedList') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -342,7 +335,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive({ textAlign: 'left' }) ? '#e0e0e0' : 'white',
+              background: editor.isActive({ textAlign: 'left' }) ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -356,7 +349,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive({ textAlign: 'center' }) ? '#e0e0e0' : 'white',
+              background: editor.isActive({ textAlign: 'center' }) ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -370,7 +363,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive({ textAlign: 'right' }) ? '#e0e0e0' : 'white',
+              background: editor.isActive({ textAlign: 'right' }) ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -391,7 +384,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: editor.isActive('link') ? '#e0e0e0' : 'white',
+              background: editor.isActive('link') ? 'rgba(128,128,128,0.3)' : 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -411,7 +404,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: 'white',
+              background: 'transparent',
               cursor: 'pointer',
             }}
           >
@@ -424,7 +417,7 @@ export default function RichTextEditor({
               padding: '4px 8px',
               border: '1px solid #ccc',
               borderRadius: '4px',
-              background: 'white',
+              background: 'transparent',
               cursor: 'pointer',
             }}
           >

@@ -154,7 +154,7 @@ export default function NoticeBoardClient({ initialData }: NoticeBoardClientProp
         />
       </Box>
 
-      {noticeListQuery.isLoading ? (
+      {noticeListQuery.isLoading || (noticeListQuery.isFetching && noticeList.length === 0) ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
           <CircularProgress />
         </Box>

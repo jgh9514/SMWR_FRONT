@@ -404,13 +404,32 @@ export default function BatchManagementPage() {
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 100 }}>배치 ID</TableCell>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>배치명</TableCell>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>Cron</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }} align="center">사용여부</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 70 }} align="center">정렬</TableCell>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>설명</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 100 }} align="center">실행</TableCell>
+                        {[
+                          { label: '배치 ID', sx: { minWidth: 100 } },
+                          { label: '배치명', sx: { minWidth: 120 } },
+                          { label: 'Cron', sx: { minWidth: 150 } },
+                          { label: '사용여부', sx: { width: 90 }, align: 'center' as const },
+                          { label: '정렬', sx: { width: 70 }, align: 'center' as const },
+                          { label: '설명', sx: { minWidth: 150 } },
+                          { label: '실행', sx: { width: 100 }, align: 'center' as const },
+                        ].map(({ label, sx, align }) => (
+                          <TableCell
+                            key={label}
+                            align={align}
+                            sx={{
+                              ...sx,
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              letterSpacing: '0.04em',
+                              color: 'text.secondary',
+                              bgcolor: 'action.hover',
+                              borderBottom: '2px solid',
+                              borderColor: 'divider',
+                            }}
+                          >
+                            {label}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -495,12 +514,31 @@ export default function BatchManagementPage() {
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600, width: 80 }}>실행 ID</TableCell>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 100 }}>배치 ID</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 90 }} align="center">상태</TableCell>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>시작 시간</TableCell>
-                        <TableCell sx={{ fontWeight: 600, minWidth: 150 }}>종료 시간</TableCell>
-                        <TableCell sx={{ fontWeight: 600, width: 120 }} align="center">결과</TableCell>
+                        {[
+                          { label: '실행 ID', sx: { width: 80 } },
+                          { label: '배치 ID', sx: { minWidth: 100 } },
+                          { label: '상태', sx: { width: 90 }, align: 'center' as const },
+                          { label: '시작 시간', sx: { minWidth: 150 } },
+                          { label: '종료 시간', sx: { minWidth: 150 } },
+                          { label: '결과', sx: { width: 120 }, align: 'center' as const },
+                        ].map(({ label, sx, align }) => (
+                          <TableCell
+                            key={label}
+                            align={align}
+                            sx={{
+                              ...sx,
+                              fontWeight: 700,
+                              fontSize: '0.75rem',
+                              letterSpacing: '0.04em',
+                              color: 'text.secondary',
+                              bgcolor: 'action.hover',
+                              borderBottom: '2px solid',
+                              borderColor: 'divider',
+                            }}
+                          >
+                            {label}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>

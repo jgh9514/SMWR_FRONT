@@ -33,6 +33,14 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from '@mui/material';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
 import { useRtaDashboardRankCutoff, useRtaPlayerSummary, useRtaPlayerMonsterUsage, useRtaPlayerOpponentRecords } from '@/features/rta/hooks/useRtaData';
@@ -102,6 +110,7 @@ function formatMatchDateTime(iso: string): string {
 }
 
 type ChartMode = 'daily' | 'match';
+type TrendViewMode = 'chart' | 'table';
 
 export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string }) {
   const theme = useTheme();
@@ -130,10 +139,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     enabled: Boolean(wizardId),
   });
 
-  /** ‘전체 점수 추이’ 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
+  /** '전체 점수 추이' 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
   const [chartOpen, setChartOpen] = useState(false);
   const [chartMode, setChartMode] = useState<ChartMode>('daily');
-  /** 30일·‘N일 전’ 기준 시각(마운트 시 1회) — render 순수성 */
+  const [trendViewMode, setTrendViewMode] = useState<TrendViewMode>('chart');
+  /** 30일·'N일 전' 기준 시각(마운트 시 1회) — render 순수성 */
   const [asOfTime] = useState(() => Date.now());
 
   const allMatches = useMemo(() => {
@@ -369,6 +379,31 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const handleChartMode = useCallback((_e: unknown, v: ChartMode | null) => {
     if (v) setChartMode(v);
   }, []);
+
+  const handleTrendViewMode = useCallback((_e: unknown, v: TrendViewMode | null) => {
+    if (v) setTrendViewMode(v);
+  }, []);
+
+  /** 일별 테이블 데이터: 날짜별 마지막 점수·승패·경기수·전일 대비 변화 */
+  const dailyTableRows = useMemo(() => {
+    const byDay = new Map<string, { score: number; wins: number; losses: number; games: number }>();
+    for (const c of chronological) {
+      const k = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
+      const prev = byDay.get(k) ?? { score: 0, wins: 0, losses: 0, games: 0 };
+      byDay.set(k, {
+        score: c.myScore,
+        wins: prev.wins + (c.won ? 1 : 0),
+        losses: prev.losses + (c.won ? 0 : 1),
+        games: prev.games + 1,
+      });
+    }
+    const sorted = [...byDay.entries()].sort(([a], [b]) => b.localeCompare(a));
+    return sorted.map(([day, data], i, arr) => {
+      const olderEntry = arr[i + 1];
+      const delta = olderEntry != null ? data.score - olderEntry[1].score : null;
+      return { day, ...data, delta };
+    });
+  }, [chronological]);
 
   const accent = theme.palette.mode === 'dark' ? '#c8aa6e' : theme.palette.primary.main;
 
@@ -612,51 +647,127 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
             </Stack>
             <Collapse in={chartOpen}>
               <Box sx={{ pt: 1.5 }}>
-                <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
-                  <ToggleButtonGroup size="small" value={chartMode} exclusive onChange={handleChartMode}>
-                    <ToggleButton value="daily">일별</ToggleButton>
-                    <ToggleButton value="match">경기별</ToggleButton>
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1, gap: 1, flexWrap: 'wrap' }}>
+                  <ToggleButtonGroup size="small" value={trendViewMode} exclusive onChange={handleTrendViewMode}>
+                    <ToggleButton value="chart">차트</ToggleButton>
+                    <ToggleButton value="table">테이블</ToggleButton>
                   </ToggleButtonGroup>
-                </Stack>
-                <Box sx={{ width: '100%', minWidth: 0, height: RTA_OVERVIEW_CHART_SCORE_PX }}>
-                  {chartData.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 5 }}>
-                      차트 데이터가 없습니다.
-                    </Typography>
-                  ) : (
-                    <ResponsiveContainer width="100%" height={RTA_OVERVIEW_CHART_SCORE_PX}>
-                      <AreaChart data={chartData} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="rtaScoreGrad2" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={accent} stopOpacity={0.22} />
-                            <stop offset="100%" stopColor={accent} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} opacity={0.5} />
-                        <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} />
-                        <YAxis domain={chartDomain} tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} width={44} />
-                        <RechartsTooltip
-                          formatter={(value) => {
-                            const n = typeof value === 'number' ? value : Number(value);
-                            return [Number.isFinite(n) ? Math.round(n).toLocaleString() : '—', '점수'];
-                          }}
-                          labelFormatter={(_l, payload) => {
-                            const p = payload?.[0]?.payload as { t?: string } | undefined;
-                            return p?.t ? formatMatchDateTime(p.t) : '';
-                          }}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="score"
-                          stroke={accent}
-                          strokeWidth={2}
-                          fill="url(#rtaScoreGrad2)"
-                          dot={{ r: 2.5 }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                  {trendViewMode === 'chart' && (
+                    <ToggleButtonGroup size="small" value={chartMode} exclusive onChange={handleChartMode}>
+                      <ToggleButton value="daily">일별</ToggleButton>
+                      <ToggleButton value="match">경기별</ToggleButton>
+                    </ToggleButtonGroup>
                   )}
-                </Box>
+                </Stack>
+
+                {trendViewMode === 'chart' ? (
+                  <Box sx={{ width: '100%', minWidth: 0, height: RTA_OVERVIEW_CHART_SCORE_PX }}>
+                    {chartData.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 5 }}>
+                        차트 데이터가 없습니다.
+                      </Typography>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={RTA_OVERVIEW_CHART_SCORE_PX}>
+                        <AreaChart data={chartData} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="rtaScoreGrad2" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={accent} stopOpacity={0.22} />
+                              <stop offset="100%" stopColor={accent} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} opacity={0.5} />
+                          <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} />
+                          <YAxis domain={chartDomain} tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} width={44} />
+                          <RechartsTooltip
+                            formatter={(value) => {
+                              const n = typeof value === 'number' ? value : Number(value);
+                              return [Number.isFinite(n) ? Math.round(n).toLocaleString() : '—', '점수'];
+                            }}
+                            labelFormatter={(_l, payload) => {
+                              const p = payload?.[0]?.payload as { t?: string } | undefined;
+                              return p?.t ? formatMatchDateTime(p.t) : '';
+                            }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="score"
+                            stroke={accent}
+                            strokeWidth={2}
+                            fill="url(#rtaScoreGrad2)"
+                            dot={{ r: 2.5 }}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                  </Box>
+                ) : (
+                  <TableContainer sx={{ maxHeight: 280, overflowY: 'auto' }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          {['날짜', '점수', '변화', '경기', '승', '패'].map((h, i) => (
+                            <TableCell
+                              key={h}
+                              align={i === 0 ? 'left' : 'right'}
+                              sx={{
+                                fontWeight: 700,
+                                fontSize: '0.7rem',
+                                letterSpacing: '0.04em',
+                                color: 'text.secondary',
+                                bgcolor: 'action.hover',
+                                borderBottom: '2px solid',
+                                borderColor: 'divider',
+                                py: 1,
+                                px: { xs: 0.75, sm: 1.5 },
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {h}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {dailyTableRows.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
+                              데이터가 없습니다.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          dailyTableRows.map((row) => {
+                            const deltaColor = row.delta == null ? 'text.secondary' : row.delta > 0 ? 'success.main' : row.delta < 0 ? 'error.main' : 'text.secondary';
+                            const deltaText = row.delta == null ? '—' : (row.delta > 0 ? '+' : '') + Math.round(row.delta).toLocaleString();
+                            const parts = row.day.split('-');
+                            const dateLabel = parts.length === 3 ? `${parts[0]!.slice(2)}.${parts[1]}.${parts[2]}` : row.day;
+                            return (
+                              <TableRow key={row.day} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+                                <TableCell sx={{ py: 0.75, px: { xs: 0.75, sm: 1.5 }, fontVariantNumeric: 'tabular-nums', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                                  {dateLabel}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, px: { xs: 0.75, sm: 1.5 }, fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>
+                                  {Math.round(row.score).toLocaleString()}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, px: { xs: 0.75, sm: 1.5 }, fontWeight: 700, fontVariantNumeric: 'tabular-nums', fontSize: '0.8rem', color: deltaColor, whiteSpace: 'nowrap' }}>
+                                  {deltaText}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, px: { xs: 0.75, sm: 1.5 }, fontSize: '0.75rem' }}>
+                                  {row.games}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, px: { xs: 0.75, sm: 1.5 }, fontSize: '0.75rem', color: 'success.main', fontWeight: 600 }}>
+                                  {row.wins}
+                                </TableCell>
+                                <TableCell align="right" sx={{ py: 0.75, px: { xs: 0.75, sm: 1.5 }, fontSize: '0.75rem', color: 'error.main', fontWeight: 600 }}>
+                                  {row.losses}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
               </Box>
             </Collapse>
           </Box>

@@ -1,13 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Box,
   Typography,
   Button,
-  Paper,
-  IconButton,
   Avatar,
   Stack,
   CircularProgress,
@@ -16,24 +13,27 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  TextField,
+  IconButton,
+  Collapse,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
+import ThumbUpOutlinedIcon from '@mui/icons-material/ThumbUpOutlined';
+import ThumbDownOutlinedIcon from '@mui/icons-material/ThumbDownOutlined';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ReplyIcon from '@mui/icons-material/Reply';
-import SendIcon from '@mui/icons-material/Send';
 import { useCommentList, useSaveComment, useUpdateComment, useDeleteComment } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import type { Comment, BoardType, CommentSaveParams } from '@/features/community/types/comment';
-import { RichTextDisplay } from '@/shared/ui/editor/RichTextDisplay';
-import { validateAndSanitizeInput } from '@/shared/utils/validation';
 import { MAX_COMMENT_LENGTH } from '@/shared/constants/validation';
 import type { UserInfo } from '@/features/auth/types/auth';
-
-const RichTextEditor = dynamic(() => import('@/shared/ui/editor/RichTextEditor'), {
-  ssr: false,
-  loading: () => <Box sx={{ minHeight: 180 }} />,
-});
 
 interface CommentSectionProps {
   boardType: BoardType;
@@ -41,348 +41,510 @@ interface CommentSectionProps {
   userInfo?: UserInfo;
 }
 
-export default function CommentSection({ boardType, boardId, userInfo }: CommentSectionProps) {
-  const [newComment, setNewComment] = useState('');
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
-  const [replyContent, setReplyContent] = useState('');
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
+type CommentWithReplies = Comment & { replies: Comment[] };
 
-  // 댓글 목록 조회
-  const commentListQuery = useCommentList(
-    { board_type: boardType, board_id: boardId },
-    {
-      refetchOnWindowFocus: false,
-    },
-  );
+function getPlainText(content: string): string {
+  if (!/<[a-z][\s\S]*>/i.test(content)) return content;
+  return content.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+}
 
-  // 댓글 등록 Mutation
-  const saveCommentMutation = useSaveComment({
-    onSuccess: () => {
-      showToast.success('댓글이 등록되었습니다.');
-      setNewComment('');
-      setReplyingToCommentId(null);
-      setReplyContent('');
-      commentListQuery.refetch();
-    },
-    onError: (error: Error) => {
-      logger.error('댓글 등록 실패', error);
-      showToast.error(error.message || '댓글 등록에 실패했습니다.');
-    },
-  });
+function getAvatarLetter(comment: Comment): string {
+  return (comment.user_name?.[0] || comment.user_id?.[0] || 'U').toUpperCase();
+}
 
-  // 댓글 수정 Mutation
-  const updateCommentMutation = useUpdateComment({
-    onSuccess: () => {
-      showToast.success('댓글이 수정되었습니다.');
-      setEditingCommentId(null);
-      setEditContent('');
-      commentListQuery.refetch();
-    },
-    onError: (error: Error) => {
-      logger.error('댓글 수정 실패', error);
-      showToast.error(error.message || '댓글 수정에 실패했습니다.');
-    },
-  });
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return '';
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return '방금 전';
+  if (mins < 60) return `${mins}분 전`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}시간 전`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}일 전`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}주 전`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}개월 전`;
+  return `${Math.floor(months / 12)}년 전`;
+}
 
-  // 댓글 삭제 Mutation
-  const deleteCommentMutation = useDeleteComment({
-    onSuccess: () => {
-      showToast.success('댓글이 삭제되었습니다.');
-      setDeleteDialogOpen(false);
-      setCommentToDelete(null);
-      commentListQuery.refetch();
-    },
-    onError: (error: Error) => {
-      logger.error('댓글 삭제 실패', error);
-      showToast.error(error.message || '댓글 삭제에 실패했습니다.');
-    },
-  });
+// ── 댓글 입력창 ──────────────────────────────────────────────
+interface CommentInputProps {
+  userInfo?: UserInfo;
+  placeholder?: string;
+  initialValue?: string;
+  submitLabel?: string;
+  cancelLabel?: string;
+  autoFocus?: boolean;
+  isLoading?: boolean;
+  onSubmit: (text: string) => void;
+  onCancel?: () => void;
+  compact?: boolean;
+}
 
-  // 댓글 목록을 계층 구조로 변환
-  const organizedComments = useMemo(() => {
-    if (!commentListQuery.data?.list) return [];
+function CommentInput({
+  userInfo,
+  placeholder = '댓글 추가...',
+  initialValue = '',
+  submitLabel = '등록',
+  cancelLabel = '취소',
+  autoFocus = false,
+  isLoading = false,
+  onSubmit,
+  onCancel,
+  compact = false,
+}: CommentInputProps) {
+  const [text, setText] = useState(initialValue);
+  const [focused, setFocused] = useState(autoFocus);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-    const comments = commentListQuery.data.list;
-    const commentMap = new Map<string, Comment & { replies: Comment[] }>();
-    const rootComments: (Comment & { replies: Comment[] })[] = [];
-
-    // 모든 댓글을 맵에 추가
-    comments.forEach((comment) => {
-      commentMap.set(comment.comment_id, { ...comment, replies: [] });
-    });
-
-    // 댓글을 부모-자식 관계로 구성
-    comments.forEach((comment) => {
-      const commentWithReplies = commentMap.get(comment.comment_id)!;
-      if (comment.parent_comment_id) {
-        const parent = commentMap.get(comment.parent_comment_id);
-        if (parent) {
-          parent.replies.push(commentWithReplies);
-        }
-      } else {
-        rootComments.push(commentWithReplies);
-      }
-    });
-
-    return rootComments;
-  }, [commentListQuery.data]);
-
-  // 댓글 등록 핸들러
-  const handleSaveComment = () => {
-    try {
-      const sanitizedContent = validateAndSanitizeInput(newComment.trim(), MAX_COMMENT_LENGTH);
-      if (!sanitizedContent || sanitizedContent === '<p><br></p>') {
-        showToast.error('댓글 내용을 입력해주세요.');
-        return;
-      }
-
-      const params: CommentSaveParams = {
-        board_type: boardType,
-        board_id: boardId,
-        content: sanitizedContent,
-      };
-
-      saveCommentMutation.mutate(params);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '입력값 검증에 실패했습니다.';
-      showToast.error(errorMessage);
+  useEffect(() => {
+    if (autoFocus && inputRef.current) {
+      inputRef.current.focus();
+      // 커서를 텍스트 끝으로 이동
+      const len = inputRef.current.value.length;
+      inputRef.current.setSelectionRange(len, len);
     }
-  };
+  }, [autoFocus]);
 
-  // 대댓글 등록 핸들러
-  const handleSaveReply = (parentCommentId: string) => {
-    try {
-      const sanitizedContent = validateAndSanitizeInput(replyContent.trim(), 1000);
-      if (!sanitizedContent || sanitizedContent === '<p><br></p>') {
-        showToast.error('댓글 내용을 입력해주세요.');
-        return;
-      }
-
-      const params: CommentSaveParams = {
-        board_type: boardType,
-        board_id: boardId,
-        parent_comment_id: parentCommentId,
-        content: sanitizedContent,
-      };
-
-      saveCommentMutation.mutate(params);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '입력값 검증에 실패했습니다.';
-      showToast.error(errorMessage);
+  const handleSubmit = () => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      showToast.error('내용을 입력해주세요.');
+      return;
     }
-  };
-
-  // 댓글 수정 핸들러
-  const handleUpdateComment = () => {
-    if (!editingCommentId) return;
-
-    try {
-      const sanitizedContent = validateAndSanitizeInput(editContent.trim(), 1000);
-      if (!sanitizedContent || sanitizedContent === '<p><br></p>') {
-        showToast.error('댓글 내용을 입력해주세요.');
-        return;
-      }
-
-      updateCommentMutation.mutate({
-        comment_id: editingCommentId,
-        content: sanitizedContent,
-      });
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : '입력값 검증에 실패했습니다.';
-      showToast.error(errorMessage);
+    if (trimmed.length > MAX_COMMENT_LENGTH) {
+      showToast.error(`${MAX_COMMENT_LENGTH}자 이내로 입력해주세요.`);
+      return;
     }
+    onSubmit(trimmed);
+    setText('');
+    setFocused(false);
   };
 
-  // 댓글 삭제 핸들러
-  const handleDeleteComment = () => {
-    if (!commentToDelete) return;
-    deleteCommentMutation.mutate({ comment_id: commentToDelete });
-  };
-
-  // 수정 모드 시작
-  const handleStartEdit = (comment: Comment) => {
-    setEditingCommentId(comment.comment_id);
-    setEditContent(comment.content);
-  };
-
-  // 수정 취소
-  const handleCancelEdit = () => {
-    setEditingCommentId(null);
-    setEditContent('');
-  };
-
-  // 댓글 아이템 렌더링
-  const renderComment = (comment: Comment & { replies?: Comment[] }, isReply = false) => {
-    const isOwner = userInfo?.user_id === comment.user_id;
-    const isEditing = editingCommentId === comment.comment_id;
-    const isReplying = replyingToCommentId === comment.comment_id;
-
-    return (
-      <Box key={comment.comment_id} sx={{ ml: isReply ? 4 : 0, mb: 2 }}>
-        <Paper elevation={1} sx={{ p: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="flex-start">
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-              {comment.user_name?.[0] || comment.user_id[0] || 'U'}
-            </Avatar>
-            <Box sx={{ flex: 1 }}>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <Typography variant="subtitle2" fontWeight="bold">
-                  {comment.user_name || comment.user_id}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {comment.crt_date
-                    ? new Date(comment.crt_date).toLocaleString('ko-KR', {
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })
-                    : ''}
-                </Typography>
-              </Stack>
-
-              {isEditing ? (
-                <Box sx={{ mb: 2 }}>
-                  <RichTextEditor
-                    value={editContent}
-                    onChange={setEditContent}
-                    placeholder="댓글을 수정하세요..."
-                  />
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Button size="small" variant="contained" onClick={handleUpdateComment}>
-                      수정
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={handleCancelEdit}>
-                      취소
-                    </Button>
-                  </Stack>
-                </Box>
-              ) : (
-                <>
-                  <RichTextDisplay content={comment.content} />
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    {!isReply && (
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          setReplyingToCommentId(comment.comment_id);
-                          setReplyContent('');
-                        }}
-                      >
-                        <ReplyIcon fontSize="small" />
-                      </IconButton>
-                    )}
-                    {isOwner && (
-                      <>
-                        <IconButton size="small" onClick={() => handleStartEdit(comment)}>
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setCommentToDelete(comment.comment_id);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </>
-                    )}
-                  </Stack>
-                </>
-              )}
-
-              {/* 대댓글 입력 폼 */}
-              {isReplying && (
-                <Box sx={{ mt: 2, ml: 2 }}>
-                  <RichTextEditor
-                    value={replyContent}
-                    onChange={setReplyContent}
-                    placeholder="대댓글을 입력하세요..."
-                  />
-                  <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                    <Button size="small" variant="contained" onClick={() => handleSaveReply(comment.comment_id)}>
-                      등록
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        setReplyingToCommentId(null);
-                        setReplyContent('');
-                      }}
-                    >
-                      취소
-                    </Button>
-                  </Stack>
-                </Box>
-              )}
-
-              {/* 대댓글 목록 */}
-              {comment.replies && comment.replies.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  {comment.replies.map((reply) => renderComment(reply, true))}
-                </Box>
-              )}
-            </Box>
-          </Stack>
-        </Paper>
-      </Box>
-    );
+  const handleCancel = () => {
+    setText('');
+    setFocused(false);
+    onCancel?.();
   };
 
   return (
-    <Box sx={{ mt: 4 }}>
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        댓글 ({commentListQuery.data?.list?.length || 0})
-      </Typography>
-
-      {/* 댓글 입력 폼 */}
-      {userInfo ? (
-        <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
-          <RichTextEditor
-            value={newComment}
-            onChange={setNewComment}
-            placeholder="댓글을 입력하세요..."
-          />
-          <Stack direction="row" justifyContent="flex-end" sx={{ mt: 2 }}>
-            <Button variant="contained" startIcon={<SendIcon />} onClick={handleSaveComment}>
-              등록
-            </Button>
-          </Stack>
-        </Paper>
-      ) : (
-        <Alert severity="info" sx={{ mb: 3 }}>
-          댓글을 작성하려면 로그인이 필요합니다.
-        </Alert>
+    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+      {!compact && (
+        <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', flexShrink: 0, mt: 0.5 }}>
+          {userInfo ? (userInfo.user_name?.[0] || userInfo.user_id?.[0] || 'U').toUpperCase() : '?'}
+        </Avatar>
       )}
+      <Box sx={{ flex: 1 }}>
+        <TextField
+          inputRef={inputRef}
+          multiline
+          minRows={focused ? 3 : 1}
+          maxRows={8}
+          fullWidth
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onFocus={() => setFocused(true)}
+          placeholder={placeholder}
+          inputProps={{ maxLength: MAX_COMMENT_LENGTH }}
+          variant="standard"
+          size="small"
+          sx={{
+            '& .MuiInputBase-root': { fontSize: '0.9rem' },
+            '& .MuiInput-underline:before': { borderBottomColor: 'divider' },
+          }}
+        />
+        <Collapse in={focused || !!text.trim()}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              {text.length} / {MAX_COMMENT_LENGTH}
+            </Typography>
+            <Stack direction="row" spacing={1}>
+              <Button size="small" onClick={handleCancel} disabled={isLoading}>
+                {cancelLabel}
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={isLoading || !text.trim()}
+                startIcon={isLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+                sx={{ borderRadius: 5, px: 2 }}
+              >
+                {submitLabel}
+              </Button>
+            </Stack>
+          </Stack>
+        </Collapse>
+      </Box>
+    </Stack>
+  );
+}
 
-      {/* 댓글 목록 */}
-      {commentListQuery.isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-          <CircularProgress />
+// ── MoreVert 메뉴 ─────────────────────────────────────────────
+interface CommentMenuProps {
+  isOwner: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function CommentMenu({ isOwner, onEdit, onDelete }: CommentMenuProps) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+
+  if (!isOwner) return null;
+
+  return (
+    <>
+      <IconButton
+        size="small"
+        sx={{ color: 'text.secondary', flexShrink: 0 }}
+        onClick={(e) => setAnchor(e.currentTarget)}
+      >
+        <MoreVertIcon sx={{ fontSize: 18 }} />
+      </IconButton>
+      <Menu
+        anchorEl={anchor}
+        open={Boolean(anchor)}
+        onClose={() => setAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            onEdit();
+          }}
+        >
+          <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
+          <ListItemText>수정</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setAnchor(null);
+            onDelete();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon><DeleteIcon fontSize="small" color="error" /></ListItemIcon>
+          <ListItemText>삭제</ListItemText>
+        </MenuItem>
+      </Menu>
+    </>
+  );
+}
+
+// ── 단일 댓글 아이템 ──────────────────────────────────────────
+interface CommentItemProps {
+  comment: CommentWithReplies;
+  userInfo?: UserInfo;
+  isReply?: boolean;
+  parentCommentId?: string;
+  // 대댓글에서 답글 제출 완료 시 부모에게 replies 펼치기 요청
+  onReplySaved?: () => void;
+  onSaveReply: (parentId: string, text: string) => void;
+  onUpdate: (commentId: string, text: string) => void;
+  onDelete: (commentId: string) => void;
+  isMutating?: boolean;
+}
+
+function CommentItem({
+  comment,
+  userInfo,
+  isReply = false,
+  parentCommentId,
+  onReplySaved,
+  onSaveReply,
+  onUpdate,
+  onDelete,
+  isMutating = false,
+}: CommentItemProps) {
+  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyInitial, setReplyInitial] = useState('');
+  const [showReplies, setShowReplies] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const isOwner = userInfo?.user_id === comment.user_id;
+  const replyCount = comment.replies?.length ?? 0;
+  const displayName = comment.user_name || comment.user_id || '익명';
+
+  const handleReplyClick = () => {
+    setReplyInitial(`@${displayName} `);
+    setShowReplyInput(true);
+    if (!isReply) setShowReplies(true);
+  };
+
+  const handleReplySubmit = (text: string) => {
+    const targetParentId = isReply ? (parentCommentId ?? comment.comment_id) : comment.comment_id;
+    onSaveReply(targetParentId, text);
+    setShowReplyInput(false);
+    setReplyInitial('');
+    if (isReply) {
+      onReplySaved?.();   // 부모에게 replies 펼치기 요청
+    } else {
+      setShowReplies(true);
+    }
+  };
+
+  const handleUpdateSubmit = (text: string) => {
+    onUpdate(comment.comment_id, text);
+    setIsEditing(false);
+  };
+
+  const avatarSize = isReply ? 28 : 36;
+  const hasSubThread = !isReply && (replyCount > 0 || showReplyInput);
+  const hasReplies = !isReply && replyCount > 0;
+  const connH = 22;
+  const connW = avatarSize / 2 + 14;
+
+  return (
+    <Box>
+      {/* ── 댓글 본문 행 ── */}
+      <Stack direction="row" spacing={1.5}>
+
+        {/* #author-thumbnail: 아바타 + continuation */}
+        <Box
+          sx={{
+            width: avatarSize,
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <Avatar
+            sx={{ width: avatarSize, height: avatarSize, bgcolor: 'primary.main', mt: 0.25 }}
+          >
+            {getAvatarLetter(comment)}
+          </Avatar>
+
+          {/* div.threadline > div.continuation */}
+          {hasReplies && (
+            <Box
+              sx={(theme) => ({
+                flex: 1,
+                width: 2,
+                bgcolor: theme.palette.divider,
+              })}
+            />
+          )}
         </Box>
-      ) : commentListQuery.isError ? (
-        <Alert severity="error">댓글을 불러오는 중 오류가 발생했습니다.</Alert>
-      ) : organizedComments.length === 0 ? (
-        <Alert severity="info">아직 댓글이 없습니다.</Alert>
-      ) : (
-        <Box>{organizedComments.map((comment) => renderComment(comment))}</Box>
+
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* 작성자 / 날짜 */}
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
+              {displayName}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {formatDate(comment.crt_date)}
+            </Typography>
+          </Stack>
+
+          {/* 본문 / 수정 입력 */}
+          {isEditing ? (
+            <Box sx={{ mt: 0.5 }}>
+              <CommentInput
+                userInfo={userInfo}
+                placeholder="댓글 수정..."
+                initialValue={getPlainText(comment.content)}
+                submitLabel="저장"
+                autoFocus
+                compact
+                isLoading={isMutating}
+                onSubmit={handleUpdateSubmit}
+                onCancel={() => setIsEditing(false)}
+              />
+            </Box>
+          ) : (
+            <Typography
+              variant="body2"
+              sx={{ mt: 0.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}
+            >
+              {getPlainText(comment.content)}
+            </Typography>
+          )}
+
+          {/* 액션 버튼 */}
+          {!isEditing && (
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
+              <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+              <IconButton size="small" sx={{ color: 'text.secondary' }}>
+                <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />
+              </IconButton>
+              {userInfo && (
+                <Button
+                  size="small"
+                  sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700, minWidth: 0, px: 1, borderRadius: 5 }}
+                  onClick={handleReplyClick}
+                >
+                  답글
+                </Button>
+              )}
+            </Stack>
+          )}
+
+          {/* 대댓글에서만 인라인 답글 입력창 표시 */}
+          {isReply && (
+            <Collapse in={showReplyInput}>
+              <Box sx={{ mt: 1.5 }}>
+                <CommentInput
+                  userInfo={userInfo}
+                  placeholder={`@${displayName}에게 답글...`}
+                  initialValue={replyInitial}
+                  submitLabel="답글 등록"
+                  autoFocus
+                  isLoading={isMutating}
+                  onSubmit={handleReplySubmit}
+                  onCancel={() => {
+                    setShowReplyInput(false);
+                    setReplyInitial('');
+                  }}
+                />
+              </Box>
+            </Collapse>
+          )}
+
+        </Box>
+
+        <CommentMenu
+          isOwner={isOwner}
+          onEdit={() => setIsEditing(true)}
+          onDelete={() => setShowDeleteDialog(true)}
+        />
+      </Stack>
+
+      {/* ── yt-sub-thread ──
+          ytSubThreadThreadline(왼쪽) + ytSubThreadSubThreadContent(오른쪽) 형제 구조.
+          threadline은 content 전체 높이에 걸쳐 하나의 선을 그린다.
+      */}
+      {hasSubThread && (
+        <Box sx={{ display: 'flex' }}>
+
+          {/* ytSubThreadThreadline */}
+          <Box
+            sx={{
+              width: avatarSize,
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'flex-start',
+              pl: `${avatarSize / 2 - 1}px`,
+            }}
+          >
+            {/* ytSubThreadConnection — L-curve */}
+            <Box
+              sx={(theme) => ({
+                width: `${connW}px`,
+                height: `${connH}px`,
+                flexShrink: 0,
+                borderLeft: `2px solid ${theme.palette.divider}`,
+                borderBottom: `2px solid ${theme.palette.divider}`,
+                borderBottomLeftRadius: '12px',
+              })}
+            />
+
+            {/* ytSubThreadContinuation — 펼침 시 대댓글 옆으로 세로선 */}
+            {(showReplies || showReplyInput) && (
+              <Box
+                sx={(theme) => ({
+                  width: 2,
+                  flex: 1,
+                  minHeight: 8,
+                  bgcolor: theme.palette.divider,
+                })}
+              />
+            )}
+
+            {/* ytSubThreadShadow — 펼쳤을 때만 하단 페이드 */}
+            {(showReplies || showReplyInput) && (
+              <Box
+                sx={(theme) => ({
+                  width: 2,
+                  height: '20px',
+                  flexShrink: 0,
+                  background: `linear-gradient(to bottom, ${theme.palette.divider}, transparent)`,
+                })}
+              />
+            )}
+          </Box>
+
+          {/* ytSubThreadSubThreadContent */}
+          <Box sx={{ flex: 1, pl: 1.5 }}>
+            {/* 대댓글 목록 */}
+            <Collapse in={showReplies}>
+              <Stack spacing={2.5} sx={{ mb: 1 }}>
+                {comment.replies.map((reply) => (
+                  <CommentItem
+                    key={reply.comment_id}
+                    comment={{ ...reply, replies: [] }}
+                    userInfo={userInfo}
+                    isReply
+                    parentCommentId={comment.comment_id}
+                    onReplySaved={() => setShowReplies(true)}
+                    onSaveReply={onSaveReply}
+                    onUpdate={onUpdate}
+                    onDelete={onDelete}
+                    isMutating={isMutating}
+                  />
+                ))}
+              </Stack>
+            </Collapse>
+
+            {/* 답글 토글 버튼 (replies가 있을 때만) — replies 아래 */}
+            {hasReplies && (
+              <Button
+                size="small"
+                startIcon={showReplies ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                onClick={() => setShowReplies((v) => !v)}
+                sx={{ fontSize: '0.8rem', color: 'primary.main', fontWeight: 700, px: 1, borderRadius: 5 }}
+              >
+                답글 {replyCount}개
+              </Button>
+            )}
+
+            {/* 최상위 댓글 답글 입력창 — replies 아래 */}
+            <Collapse in={showReplyInput}>
+              <Box sx={{ mt: 1.5 }}>
+                <CommentInput
+                  userInfo={userInfo}
+                  placeholder={`@${displayName}에게 답글...`}
+                  initialValue={replyInitial}
+                  submitLabel="답글 등록"
+                  autoFocus
+                  isLoading={isMutating}
+                  onSubmit={handleReplySubmit}
+                  onCancel={() => {
+                    setShowReplyInput(false);
+                    setReplyInitial('');
+                  }}
+                />
+              </Box>
+            </Collapse>
+          </Box>
+        </Box>
       )}
 
       {/* 삭제 확인 다이얼로그 */}
-      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
         <DialogTitle>댓글 삭제</DialogTitle>
         <DialogContent>
-          <Typography>정말 이 댓글을 삭제하시겠습니까?</Typography>
+          <Typography>이 댓글을 삭제하시겠습니까?</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialogOpen(false)}>취소</Button>
-          <Button onClick={handleDeleteComment} color="error" variant="contained">
+          <Button onClick={() => setShowDeleteDialog(false)}>취소</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={isMutating}
+            onClick={() => {
+              onDelete(comment.comment_id);
+              setShowDeleteDialog(false);
+            }}
+          >
             삭제
           </Button>
         </DialogActions>
@@ -391,3 +553,142 @@ export default function CommentSection({ boardType, boardId, userInfo }: Comment
   );
 }
 
+// ── 메인 CommentSection ───────────────────────────────────────
+export default function CommentSection({ boardType, boardId, userInfo }: CommentSectionProps) {
+  const commentListQuery = useCommentList(
+    { board_type: boardType, board_id: boardId },
+    { refetchOnWindowFocus: false },
+  );
+
+  const saveCommentMutation = useSaveComment({
+    onSuccess: () => {
+      showToast.success('댓글이 등록되었습니다.');
+      commentListQuery.refetch();
+    },
+    onError: (error: Error) => {
+      logger.error('댓글 등록 실패', error);
+      showToast.error(error.message || '댓글 등록에 실패했습니다.');
+    },
+  });
+
+  const updateCommentMutation = useUpdateComment({
+    onSuccess: () => {
+      showToast.success('댓글이 수정되었습니다.');
+      commentListQuery.refetch();
+    },
+    onError: (error: Error) => {
+      logger.error('댓글 수정 실패', error);
+      showToast.error(error.message || '댓글 수정에 실패했습니다.');
+    },
+  });
+
+  const deleteCommentMutation = useDeleteComment({
+    onSuccess: () => {
+      showToast.success('댓글이 삭제되었습니다.');
+      commentListQuery.refetch();
+    },
+    onError: (error: Error) => {
+      logger.error('댓글 삭제 실패', error);
+      showToast.error(error.message || '댓글 삭제에 실패했습니다.');
+    },
+  });
+
+  const organizedComments = useMemo((): CommentWithReplies[] => {
+    if (!commentListQuery.data?.list) return [];
+    const comments = commentListQuery.data.list;
+    const map = new Map<string, CommentWithReplies>();
+    const roots: CommentWithReplies[] = [];
+
+    comments.forEach((c) => map.set(c.comment_id, { ...c, replies: [] }));
+    comments.forEach((c) => {
+      const node = map.get(c.comment_id)!;
+      if (c.parent_comment_id) {
+        map.get(c.parent_comment_id)?.replies.push(node);
+      } else {
+        roots.push(node);
+      }
+    });
+    return roots;
+  }, [commentListQuery.data]);
+
+  const isMutating =
+    saveCommentMutation.isPending ||
+    updateCommentMutation.isPending ||
+    deleteCommentMutation.isPending;
+
+  const handleNewComment = (text: string) => {
+    saveCommentMutation.mutate({
+      board_type: boardType,
+      board_id: boardId,
+      content: text,
+    } as CommentSaveParams);
+  };
+
+  const handleSaveReply = (parentId: string, text: string) => {
+    saveCommentMutation.mutate({
+      board_type: boardType,
+      board_id: boardId,
+      parent_comment_id: parentId,
+      content: text,
+    } as CommentSaveParams);
+  };
+
+  const handleUpdate = (commentId: string, text: string) => {
+    updateCommentMutation.mutate({ comment_id: commentId, content: text });
+  };
+
+  const handleDelete = (commentId: string) => {
+    deleteCommentMutation.mutate({ comment_id: commentId });
+  };
+
+  const totalCount = commentListQuery.data?.list?.length ?? 0;
+
+  return (
+    <Box>
+      <Typography variant="h6" sx={{ mb: 3, fontWeight: 700 }}>
+        댓글 {totalCount > 0 ? totalCount : ''}
+      </Typography>
+
+      {userInfo ? (
+        <Box sx={{ mb: 4 }}>
+          <CommentInput
+            userInfo={userInfo}
+            placeholder="댓글 추가..."
+            isLoading={saveCommentMutation.isPending}
+            onSubmit={handleNewComment}
+          />
+        </Box>
+      ) : (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          댓글을 작성하려면 로그인이 필요합니다.
+        </Alert>
+      )}
+
+      {commentListQuery.isLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : commentListQuery.isError ? (
+        <Alert severity="error">댓글을 불러오는 중 오류가 발생했습니다.</Alert>
+      ) : organizedComments.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>
+          아직 댓글이 없습니다. 첫 댓글을 남겨보세요!
+        </Typography>
+      ) : (
+        <Stack spacing={3}>
+          {organizedComments.map((comment) => (
+            <CommentItem
+              key={comment.comment_id}
+              comment={comment}
+              userInfo={userInfo}
+              onSaveReply={handleSaveReply}
+              onUpdate={handleUpdate}
+              onDelete={handleDelete}
+              isMutating={isMutating}
+            />
+          ))}
+        </Stack>
+      )}
+    </Box>
+  );
+}

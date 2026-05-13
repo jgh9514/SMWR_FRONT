@@ -311,10 +311,10 @@ export default function FixedHeader() {
     }
   }, [isClient, userGuildQuery.data, userInfo]);
 
-  // 알림 목록 조회
+  // 알림 목록 조회 (로그인 상태일 때 자동 조회 — 배지 카운트 표시용)
   const notificationListQuery = useNotificationList({
-    // 초기 화면 진입 때 매번 가져오지 않음 (메뉴 열 때만 조회)
-    enabled: false,
+    enabled: isClient && isAuthenticated() && !!storedUserInfo,
+    refetchOnWindowFocus: true,
   });
 
   const markReadMutation = useMarkNotificationRead({
