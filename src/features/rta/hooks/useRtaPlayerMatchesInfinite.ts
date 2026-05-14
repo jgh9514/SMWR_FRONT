@@ -34,7 +34,7 @@ export function useRtaPlayerMatchesInfinite(
       return allPages.reduce((acc, p) => acc + p.length, 0);
     },
     enabled: enabled && id.length > 0,
-    staleTime: 0,
-    gcTime: 0,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
   });
 }

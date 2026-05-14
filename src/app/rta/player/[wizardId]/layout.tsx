@@ -19,18 +19,13 @@ export async function generateMetadata({
   params: Promise<{ wizardId: string }>;
 }): Promise<Metadata> {
   const { wizardId } = await params;
-  const summary = await getRtaPlayerSummaryData(wizardId);
-  const name = displayNameFromSummary(summary, wizardId);
-  const desc =
-    summary?.found && (summary.score != null || summary.rank_position != null)
-      ? `${name}의 RTA 점수·순위·승률(수집 리플레이 기준)을 확인합니다.`
-      : `${name}의 RTA 픽·통계·기록을 확인합니다.`;
+  const name = `소환사 ${wizardId}`;
 
   return buildPublicMetadata({
     title: `${name} · RTA 소환사`,
-    description: sanitizeMetaDescription(desc),
+    description: sanitizeMetaDescription(`${name}의 RTA 픽·통계·기록을 확인합니다.`),
     path: `/rta/player/${wizardId}`,
-    keywords: ['RTA', '실레나', '소환사', name, wizardId],
+    keywords: ['RTA', '실레나', '소환사', wizardId],
     noIndex: true,
   });
 }

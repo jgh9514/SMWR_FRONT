@@ -40,6 +40,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Skeleton,
 } from '@mui/material';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
@@ -466,8 +467,8 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                       <Typography
                         sx={{
                           position: 'absolute',
-                          left: `clamp(0px, ${tierBarPct}%, calc(100% - 48px))`,
-                          transform: 'translateX(-50%)',
+                          left: `${tierBarPct}%`,
+                          transform: `translateX(${tierBarPct < 5 ? '0%' : tierBarPct > 95 ? '-100%' : '-50%'})`,
                           fontSize: '0.75rem',
                           fontWeight: 800,
                           color: accentColor,
@@ -952,7 +953,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
           </Stack>
 
           {isLoading ? (
-            <Typography color="text.secondary">경기를 불러오는 중…</Typography>
+            <Stack spacing={1.5}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} variant="rounded" height={72} sx={{ borderRadius: 2 }} />
+              ))}
+            </Stack>
           ) : (
             <Stack spacing={1.5}>
               {[...chronological]
