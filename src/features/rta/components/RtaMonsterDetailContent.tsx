@@ -134,6 +134,7 @@ function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3
         <TableHead>
           <TableRow>
             <TableCell>상대 조합</TableCell>
+            <TableCell align="right">경기수</TableCell>
             <TableCell align="right">승률</TableCell>
             <TableCell align="right">승 / 패</TableCell>
           </TableRow>
@@ -141,7 +142,7 @@ function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3
         <TableBody>
           {filtered.slice(0, 30).map((r, i) => {
             const wr = r.winRate != null && Number.isFinite(Number(r.winRate)) ? Number(r.winRate) : null;
-            const total = Number(r.winCnt ?? 0) + Number(r.loseCnt ?? 0);
+            const matchCnt = r.matchCnt ?? (Number(r.winCnt ?? 0) + Number(r.loseCnt ?? 0));
             const monsters = r.opponentMonsters ?? [];
             return (
               <TableRow key={`${r.opponentComboKey}-${i}`}>
@@ -158,10 +159,15 @@ function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3
                     )}
                   </Box>
                 </TableCell>
+                <TableCell align="right">
+                  <Typography variant="body2" color="text.secondary">
+                    {matchCnt > 0 ? matchCnt.toLocaleString() : '—'}
+                  </Typography>
+                </TableCell>
                 <TableCell align="right"><WinRateText value={wr} /></TableCell>
                 <TableCell align="right">
                   <Typography variant="body2" color="text.secondary">
-                    {r.winCnt ?? 0} / {r.loseCnt ?? 0}{total > 0 ? ` (${total.toLocaleString()})` : ''}
+                    {r.winCnt ?? 0} / {r.loseCnt ?? 0}
                   </Typography>
                 </TableCell>
               </TableRow>

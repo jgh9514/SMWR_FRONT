@@ -333,13 +333,21 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
 
   const last30dSeries = useMemo(() => {
     const t30 = asOfTime - THIRTY_DAYS_MS;
-    return chronological
-      .filter((c) => parseMatchDate(c.date).getTime() >= t30)
-      .map((c, idx) => {
-        const t = parseMatchDate(c.date).getTime();
-        const daysAgo = Math.max(0, Math.floor((asOfTime - t) / 86400000));
-        return { idx, score: c.myScore, t: c.date, daysAgo };
-      });
+    // 일별 마지막 점수만 집계 (당일 최신 경기 기준)
+    const byDay = new Map<string, { score: number; t: string; daysAgo: number }>();
+    for (const c of chronological) {
+      const ms = parseMatchDate(c.date).getTime();
+      if (ms < t30) continue;
+      const key = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
+      const daysAgo = Math.max(0, Math.floor((asOfTime - ms) / 86400000));
+      const prev = byDay.get(key);
+      if (!prev || ms > parseMatchDate(prev.t).getTime()) {
+        byDay.set(key, { score: c.myScore, t: c.date, daysAgo });
+      }
+    }
+    return [...byDay.values()]
+      .sort((a, b) => parseMatchDate(a.t).getTime() - parseMatchDate(b.t).getTime())
+      .map((d, idx) => ({ idx, ...d }));
   }, [asOfTime, chronological]);
 
   const chart30dDomain = useMemo((): [number, number] => {

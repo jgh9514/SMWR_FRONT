@@ -34,6 +34,39 @@ const withPWA = withPWAInit({
     disableDevLogs: true,
     runtimeCaching: [
       /**
+       * Next.js 이미지 최적화 엔드포인트 — WebP 변환 결과를 SW에 30일 캐시.
+       */
+      {
+        urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
+          sameOrigin !== false && url.pathname.startsWith('/_next/image'),
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'next-image-optimized',
+          expiration: {
+            maxEntries: 2000,
+            maxAgeSeconds: 60 * 60 * 24 * 30,
+          },
+          cacheableResponse: { statuses: [0, 200] },
+        },
+      },
+      /**
+       * CloudFront 몬스터 이미지 — 신규 몬스터가 몇 달에 한 번 추가되므로 30일 CacheFirst.
+       * 첫 로드 후 모든 컴포넌트(Avatar, Image 등)에서 SW 캐시 즉시 반환(1ms).
+       */
+      {
+        urlPattern: ({ url }: { url: URL }) =>
+          url.hostname === 'dyjduzi8vf2k4.cloudfront.net',
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'cdn-monster-images',
+          expiration: {
+            maxEntries: 3000,
+            maxAgeSeconds: 60 * 60 * 24 * 30,
+          },
+          cacheableResponse: { statuses: [0, 200] },
+        },
+      },
+      /**
        * 기본 규칙의 `*.png` StaleWhileRevalidate(최대 30일) 때문에 배포 후에도 로고/아이콘이 안 바뀌는 현상 방지.
        */
       {
@@ -94,6 +127,13 @@ const nextConfig: NextConfig = {
   },
   // Docker를 위한 standalone 출력 모드 활성화
   output: 'standalone',
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'dyjduzi8vf2k4.cloudfront.net' },
+    ],
+    formats: ['image/webp'],
+    minimumCacheTTL: 60 * 60 * 24 * 30, // 30일 캐시
+  },
   async headers() {
     return [
       {

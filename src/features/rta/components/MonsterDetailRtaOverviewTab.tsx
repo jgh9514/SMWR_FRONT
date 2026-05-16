@@ -336,7 +336,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
   const { chartData, perRatingKeys } = useMemo(() => {
     if (!usePerRatingChart) {
       return {
-        chartData: dailyTrend.map((r) => ({
+        chartData: dailyTrend.slice(-7).map((r) => ({
           day: r.snap_date?.slice(5) ?? '',
           픽률: r.pick_rate_pct != null ? Number(r.pick_rate_pct) : null,
           승률: r.win_rate_pct != null ? Number(r.win_rate_pct) : null,
@@ -362,8 +362,9 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
     }
 
     const perRatingLineKeys = keys.flatMap((k) => [`${k} 픽률`, `${k} 승률`]);
+    const sorted = [...byDate.values()].sort((a, b) => String(a.day).localeCompare(String(b.day)));
     return {
-      chartData: [...byDate.values()].sort((a, b) => String(a.day).localeCompare(String(b.day))),
+      chartData: sorted.slice(-7),
       perRatingKeys: perRatingLineKeys,
     };
   }, [dailyTrend, dailyTrendPerRating, usePerRatingChart]);
@@ -429,7 +430,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
             <ResponsiveContainer>
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} ticks={chartData.map((d) => d.day as string)} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickFormatter={(v) => `${v}%`} />
                 <Tooltip formatter={(v, name) => [`${v ?? '—'}%`, name]} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />

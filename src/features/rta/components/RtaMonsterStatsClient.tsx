@@ -8,7 +8,8 @@ import {
   useState,
   type ReactNode,
   type SyntheticEvent,
-} from 'react'; // useEffect는 페이지 리셋용으로 유지
+} from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
@@ -264,16 +265,33 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
   const displayName = name?.trim() || '—';
   const href = rtaMonsterDetailHref(monsterId);
 
+  const imgSrc = getRenderableImageUrl(image);
+
   const inner = (
     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0, width: '100%' }}>
-      <Avatar
-        src={getRenderableImageUrl(image)}
-        alt={displayName}
-        variant="rounded"
-        sx={{ width: 40, height: 40, flexShrink: 0, border: '1px solid', borderColor: 'divider' }}
+      <Box
+        sx={{
+          width: 40, height: 40, flexShrink: 0,
+          border: '1px solid', borderColor: 'divider',
+          borderRadius: 1, overflow: 'hidden', position: 'relative',
+          bgcolor: 'action.hover',
+        }}
       >
-        {displayName.charAt(0)}
-      </Avatar>
+        {imgSrc ? (
+          <Image
+            src={imgSrc}
+            alt={displayName}
+            fill
+            sizes="40px"
+            style={{ objectFit: 'cover' }}
+            unoptimized={!imgSrc.startsWith('https://')}
+          />
+        ) : (
+          <Box sx={{ width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Typography variant="caption" fontWeight={700}>{displayName.charAt(0)}</Typography>
+          </Box>
+        )}
+      </Box>
       <Box sx={{ minWidth: 0, flex: 1, overflow: { xs: 'visible', md: 'hidden' } }}>
         <Typography
           variant="body2"
@@ -699,39 +717,65 @@ const ComboStatRow = memo(function ComboStatRow({
   );
 });
 
-// ─── LoadMoreButton ───────────────────────────────────────────────────────────
+// ─── SoloTable ────────────────────────────────────────────────────────────────
 
-const LoadMoreButton = memo(function LoadMoreButton({
-  hasMore,
-  isFetching,
-  onLoadMore,
-  isNarrow,
-}: {
-  hasMore: boolean;
-  isFetching: boolean;
-  onLoadMore: () => void;
-  isNarrow: boolean;
-}) {
-  if (!hasMore && !isFetching) return null;
+const SoloTable = memo(function SoloTable({ stats, pageOffset }: { stats: MonsterStats[]; pageOffset: number }) {
   return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', pt: 2 }}>
-      <Button
-        variant="outlined"
-        size={isNarrow ? 'small' : 'medium'}
-        onClick={onLoadMore}
-        disabled={isFetching}
-        startIcon={isFetching ? <CircularProgress size={16} thickness={4} /> : undefined}
-        sx={(theme) => ({
-          px: 5,
-          borderRadius: 2,
-          fontWeight: 700,
-          borderColor: `${theme.palette.primary.main}80`,
-          '&:hover': { borderColor: theme.palette.primary.main },
-        })}
-      >
-        {isFetching ? '불러오는 중…' : '더보기'}
-      </Button>
-    </Box>
+    <TableContainer
+      component={Paper}
+      elevation={0}
+      sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider' }}
+    >
+      <Table size="small" sx={{ minWidth: 720 }}>
+        <TableHead>
+          <TableRow>
+            <TableCell align="center" sx={{ ...TABLE_HEAD_CELL_SX, width: 52 }}>#</TableCell>
+            <TableCell align="left" sx={TABLE_HEAD_CELL_SX}>몬스터</TableCell>
+            <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>픽횟수</TableCell>
+            <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>픽률</TableCell>
+            <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>승률</TableCell>
+            <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>벤율</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {stats.map((stat, i) => (
+            <TableRow
+              key={stat.monster_id ?? i}
+              hover
+              sx={{ '&:last-child td': { borderBottom: 0 } }}
+            >
+              <TableCell align="center" sx={{ ...NUMERIC_CELL_SX, color: 'text.secondary', fontWeight: 700, fontSize: '0.8rem' }}>
+                {pageOffset + i + 1}
+              </TableCell>
+              <TableCell sx={{ minWidth: 200, maxWidth: 280 }}>
+                <MonsterCell
+                  name={stat.monster_name}
+                  image={stat.monster_image}
+                  elemental={stat.monster_elemental}
+                  monsterId={stat.monster_id}
+                />
+              </TableCell>
+              <TableCell align="right" sx={NUMERIC_CELL_SX}>{toNum(stat.pick_count).toLocaleString()}</TableCell>
+              <TableCell align="right" sx={NUMERIC_CELL_SX}>{formatPercentage(stat.pick_rate)}</TableCell>
+              <TableCell align="right" sx={NUMERIC_CELL_SX}>{formatPercentage(stat.win_rate)}</TableCell>
+              <TableCell align="right" sx={NUMERIC_CELL_SX}>{formatPercentage(stat.ban_rate)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+});
+
+// ─── SoloCardList ─────────────────────────────────────────────────────────────
+
+const SoloCardList = memo(function SoloCardList({ stats, pageOffset }: { stats: MonsterStats[]; pageOffset: number }) {
+  return (
+    <Stack spacing={1.5}>
+      {stats.map((stat, i) => (
+        <SoloStatCard key={stat.monster_id ?? i} rank={pageOffset + i + 1} stat={stat} />
+      ))}
+    </Stack>
   );
 });
 
@@ -759,7 +803,7 @@ export default function RtaMonsterStatsClient() {
   const [allDuoStats, setAllDuoStats] = useState<DuoComboStat[]>([]);
   const [allTrioStats, setAllTrioStats] = useState<TrioComboStat[]>([]);
 
-  // Persisted hasMore (prevents button flash during fetch)
+  // Persisted hasMore
   const [statsHasMore, setStatsHasMore] = useState(false);
   const [duoHasMore, setDuoHasMore] = useState(false);
   const [trioHasMore, setTrioHasMore] = useState(false);
@@ -898,7 +942,6 @@ export default function RtaMonsterStatsClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trioData]);
 
-  // DB에서 정렬된 결과를 그대로 사용
   const sortedStats = allSoloStats;
 
   /** 전체 몬스터 마스터(노말·각성·2각 등 전 행) — 검색·속성만 목록용 (테이블과 무관). 표시는 역순. */
@@ -913,7 +956,6 @@ export default function RtaMonsterStatsClient() {
     return rows.slice().reverse();
   }, [monsterCatalog, soloSearch, elementFilter]);
 
-  // DB에서 정렬된 결과를 그대로 사용
   const sortedDuo = allDuoStats;
   const sortedTrio = allTrioStats;
 
@@ -940,8 +982,6 @@ export default function RtaMonsterStatsClient() {
     return '—';
   }, []);
 
-  // ── Loading state ──────────────────────────────────────────────────────────
-  // 더보기(load-more) 중에는 누적 데이터가 있으므로 전체 스피너를 띄우지 않는다.
   const hasAnyAccumulatedData = allSoloStats.length > 0 || allDuoStats.length > 0 || allTrioStats.length > 0;
 
   if (isLoading && !hasAnyAccumulatedData) {
@@ -1241,81 +1281,24 @@ export default function RtaMonsterStatsClient() {
                 description="경기 수가 100판 미만인 몬스터는 목록에서 제외합니다. 리플레이가 부족하거나 집계가 아직 반영되지 않았을 수 있습니다. 잠시 후 다시 확인해 주세요."
               />
             ) : isNarrow ? (
-              <Stack spacing={1.5}>
-                {sortedStats.map((stat, idx) => (
-                  <SoloStatCard
-                    key={stat.monster_id ?? stat.monster_name}
-                    rank={idx + 1}
-                    stat={stat}
-                  />
-                ))}
-              </Stack>
+              <SoloCardList stats={sortedStats} pageOffset={0} />
             ) : (
-              <TableContainer
-                component={Paper}
-                elevation={0}
-                sx={{
-                  borderRadius: 2.5,
-                  border: '1px solid',
-                  borderColor: 'divider',
-                  overflow: 'auto',
-                }}
-              >
-                <Table size="small" stickyHeader sx={{ minWidth: 720 }}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell align="center" sx={{ ...TABLE_HEAD_CELL_SX, width: 52 }}>#</TableCell>
-                      <TableCell align="left" sx={{ ...TABLE_HEAD_CELL_SX }}>
-                        몬스터
-                      </TableCell>
-                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
-                        픽횟수
-                      </TableCell>
-                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
-                        픽률
-                      </TableCell>
-                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
-                        승률
-                      </TableCell>
-                      <TableCell align="right" sx={TABLE_HEAD_CELL_SX}>
-                        벤율
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {sortedStats.map((stat, idx) => {
-                      const rank = idx + 1;
-                      return (
-                        <TableRow key={stat.monster_id ?? stat.monster_name} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
-                          <TableCell align="center" sx={{ ...NUMERIC_CELL_SX, color: 'text.secondary', fontWeight: 700, fontSize: '0.8rem' }}>
-                            {rank}
-                          </TableCell>
-                          <TableCell sx={{ minWidth: 200, maxWidth: 280 }}>
-                            <MonsterCell
-                              name={stat.monster_name}
-                              image={stat.monster_image}
-                              elemental={stat.monster_elemental}
-                              monsterId={stat.monster_id}
-                            />
-                          </TableCell>
-                          <TableCell align="right" sx={NUMERIC_CELL_SX}>{toNum(stat.pick_count).toLocaleString()}</TableCell>
-                          <TableCell align="right" sx={NUMERIC_CELL_SX}>{formatPercentage(stat.pick_rate)}</TableCell>
-                          <TableCell align="right" sx={NUMERIC_CELL_SX}>{formatPercentage(stat.win_rate)}</TableCell>
-                          <TableCell align="right" sx={NUMERIC_CELL_SX}>{formatPercentage(stat.ban_rate)}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <SoloTable stats={sortedStats} pageOffset={0} />
             )}
 
-            <LoadMoreButton
-              hasMore={statsHasMore}
-              isFetching={soloFetching}
-              onLoadMore={() => setStatsOffset((prev) => prev + PAGE_SIZE)}
-              isNarrow={isNarrow}
-            />
+            {statsHasMore && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  size="medium"
+                  disabled={soloFetching}
+                  onClick={() => setStatsOffset((prev) => prev + PAGE_SIZE)}
+                >
+                  {soloFetching ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                  더보기
+                </Button>
+              </Box>
+            )}
           </Box>
         </Stack>
       )}
@@ -1387,12 +1370,19 @@ export default function RtaMonsterStatsClient() {
             </Stack>
           )}
 
-          <LoadMoreButton
-              hasMore={duoHasMore}
-              isFetching={duoFetching}
-              onLoadMore={() => setDuoOffset((prev) => prev + PAGE_SIZE)}
-              isNarrow={isNarrow}
-            />
+          {duoHasMore && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button
+                variant="outlined"
+                size="medium"
+                disabled={duoFetching}
+                onClick={() => setDuoOffset((prev) => prev + PAGE_SIZE)}
+              >
+                {duoFetching ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                더보기
+              </Button>
+            </Box>
+          )}
         </>
       )}
 
@@ -1469,12 +1459,19 @@ export default function RtaMonsterStatsClient() {
             </Stack>
           )}
 
-          <LoadMoreButton
-              hasMore={trioHasMore}
-              isFetching={trioFetching}
-              onLoadMore={() => setTrioOffset((prev) => prev + PAGE_SIZE)}
-              isNarrow={isNarrow}
-            />
+          {trioHasMore && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button
+                variant="outlined"
+                size="medium"
+                disabled={trioFetching}
+                onClick={() => setTrioOffset((prev) => prev + PAGE_SIZE)}
+              >
+                {trioFetching ? <CircularProgress size={20} sx={{ mr: 1 }} /> : null}
+                더보기
+              </Button>
+            </Box>
+          )}
         </>
       )}
     </Container>

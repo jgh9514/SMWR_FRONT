@@ -244,6 +244,7 @@ export interface CounterMatchupRow {
   opponentComboSize?: number;
   winCnt?: number;
   loseCnt?: number;
+  matchCnt?: number;
   winRate?: number | null;
   opponentLabel?: string | null;
   opponentMonsters?: Array<{
