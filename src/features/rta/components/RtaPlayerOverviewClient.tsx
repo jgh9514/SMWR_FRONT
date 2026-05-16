@@ -190,6 +190,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       .filter((r) => (r.actual_pick_cnt ?? (r.pick_cnt + r.ban_cnt)) > 0)
       .slice(0, 5)
       .map((r) => ({
+        unitMasterId: r.unit_master_id,
         name: r.monster_name ?? String(r.unit_master_id),
         image: r.monster_image ?? '',
         games: r.actual_pick_cnt ?? (r.pick_cnt + r.ban_cnt),
@@ -792,10 +793,12 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                 return (
                   <Stack
                     key={m.name}
+                    component={Link}
+                    href={`/monster-detail/${m.unitMasterId}`}
                     direction="row"
                     alignItems="center"
                     gap={1.5}
-                    sx={{ py: 0.5, borderRadius: 1, '&:hover': { bgcolor: 'action.hover' } }}
+                    sx={{ py: 0.5, borderRadius: 1, textDecoration: 'none', color: 'inherit', cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
                   >
                     <Box sx={{ position: 'relative', width: 32, height: 32, borderRadius: 1, overflow: 'hidden', flexShrink: 0 }}>
                       <Image src={m.image} alt="" fill sizes="32px" style={{ objectFit: 'cover' }} unoptimized />
