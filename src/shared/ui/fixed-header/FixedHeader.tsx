@@ -50,6 +50,8 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PersonIcon from '@mui/icons-material/Person';
 import Diversity3Icon from '@mui/icons-material/Diversity3';
 import GroupsIcon from '@mui/icons-material/Groups';
+import HandymanIcon from '@mui/icons-material/Handyman';
+import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
 import { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
@@ -80,7 +82,7 @@ interface NavLeaf {
 }
 
 export interface NavGroup {
-  id: 'rta' | 'siege' | 'community' | 'guide';
+  id: 'rta' | 'siege' | 'community' | 'guide' | 'tools';
   /** 대분류 라벨 (예: RTA, Siege) */
   label: string;
   /** 괄호 안 부제 (예: 실레나, 점령전) */
@@ -194,7 +196,15 @@ function getNavGroups(
 
   const guideGroup: NavGroup = { id: 'guide', label: '가이드', items: guideItemsFinal };
 
-  const groups: NavGroup[] = [rta, siege, community, guideGroup];
+  const toolsGroup: NavGroup = {
+    id: 'tools',
+    label: '도구',
+    items: [
+      { title: '티어 리스트 메이커', path: '/tier-list', icon: <FormatListNumberedIcon /> },
+    ],
+  };
+
+  const groups: NavGroup[] = [rta, siege, community, guideGroup, toolsGroup];
 
   return groups
     .map((g) => ({
