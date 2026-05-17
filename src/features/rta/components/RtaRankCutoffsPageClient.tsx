@@ -84,9 +84,20 @@ function buildDailyRows(rows: RtaRankCutDailyRow[]) {
     const v = Number(row.cutoffScore);
     if (Number.isFinite(v)) rec[row.gradeSlot] = v;
   }
-  return Array.from(byDay.entries())
+  const sorted = Array.from(byDay.entries())
     .sort(([a], [b]) => b.localeCompare(a))
     .map(([day, scores]) => ({ day, scores }));
+  // 전일 대비 델타 계산 — sorted는 최신→과거 순이므로 i+1이 전날
+  return sorted.map(({ day, scores }, i) => {
+    const prevScores = sorted[i + 1]?.scores;
+    const deltas: Record<string, number | null> = {};
+    for (const tier of CUT_TIER_ORDER) {
+      const cur = scores[tier];
+      const prev = prevScores?.[tier];
+      deltas[tier] = cur != null && prev != null ? cur - prev : null;
+    }
+    return { day, scores, deltas };
+  });
 }
 
 function formatDay(d: string) {
@@ -159,7 +170,7 @@ export default function RtaRankCutoffsPageClient() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {dailyRows.map(({ day, scores }) => (
+                  {dailyRows.map(({ day, scores, deltas }) => (
                     <TableRow key={day} hover sx={{ '&:last-child td': { borderBottom: 0 }, borderColor: 'divider' }}>
                       <TableCell sx={{ py: { xs: 1, sm: 1.25 }, px: { xs: 1, sm: 2 } }}>
                         <Typography variant="caption" sx={{ fontWeight: 600, fontSize: { xs: '0.65rem', sm: '0.75rem' }, whiteSpace: 'nowrap' }}>
@@ -168,11 +179,24 @@ export default function RtaRankCutoffsPageClient() {
                       </TableCell>
                       {CUT_TIER_ORDER.map((k) => {
                         const sc = scores[k];
+                        const delta = deltas[k];
                         return (
-                          <TableCell key={k} align="center" sx={{ py: { xs: 1, sm: 1.25 }, px: { xs: 0.5, sm: 1 }, whiteSpace: 'nowrap' }}>
-                            <Typography component="span" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: tierAccent(k), fontSize: { xs: '0.75rem', sm: '0.85rem' } }}>
+                          <TableCell key={k} align="center" sx={{ py: { xs: 0.75, sm: 1 }, px: { xs: 0.5, sm: 1 }, whiteSpace: 'nowrap' }}>
+                            <Typography component="span" sx={{ fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: tierAccent(k), fontSize: { xs: '0.75rem', sm: '0.85rem' }, display: 'block' }}>
                               {sc != null && !isRtaCutoffMissing(sc) ? formatRtaCutoffScore(sc) : '—'}
                             </Typography>
+                            {delta != null && !isRtaCutoffMissing(sc ?? 0) && (
+                              <Typography component="span" sx={{
+                                display: 'block',
+                                fontVariantNumeric: 'tabular-nums',
+                                fontSize: { xs: '0.6rem', sm: '0.68rem' },
+                                fontWeight: 600,
+                                lineHeight: 1.2,
+                                color: delta > 0 ? '#43a047' : delta < 0 ? '#e53935' : 'text.disabled',
+                              }}>
+                                {delta > 0 ? `+${delta}` : delta < 0 ? `${delta}` : '±0'}
+                              </Typography>
+                            )}
                           </TableCell>
                         );
                       })}

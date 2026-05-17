@@ -417,6 +417,27 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
 
   const accent = theme.palette.mode === 'dark' ? '#c8aa6e' : theme.palette.primary.main;
 
+  /** Recharts 기본 툴팁(흰 배경) + 다크 테마 글자색 상속 시 일자(label) 대비 부족 방지 */
+  const chartTooltipProps = useMemo(
+    () => ({
+      contentStyle: {
+        backgroundColor: theme.palette.background.paper,
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: typeof theme.shape.borderRadius === 'number' ? theme.shape.borderRadius : 8,
+        boxShadow: theme.shadows[4],
+      },
+      labelStyle: {
+        color: theme.palette.text.primary,
+        fontWeight: 600,
+        marginBottom: 4,
+      },
+      itemStyle: {
+        color: theme.palette.text.secondary,
+      },
+    }),
+    [theme],
+  );
+
   return (
     <Box
       sx={{
@@ -611,6 +632,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                       tickFormatter={(v) => (Number.isFinite(v) ? String(Math.round(v)) : '')}
                     />
                     <RechartsTooltip
+                      {...chartTooltipProps}
                       formatter={(v) => {
                         const n = typeof v === 'number' ? v : Number(v);
                         return [Number.isFinite(n) ? `${Math.round(n).toLocaleString()} LP` : '—', '점수'];
@@ -689,6 +711,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                           <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} />
                           <YAxis domain={chartDomain} tick={{ fontSize: 10 }} stroke={theme.palette.text.disabled} width={44} />
                           <RechartsTooltip
+                            {...chartTooltipProps}
                             formatter={(value) => {
                               const n = typeof value === 'number' ? value : Number(value);
                               return [Number.isFinite(n) ? Math.round(n).toLocaleString() : '—', '점수'];
