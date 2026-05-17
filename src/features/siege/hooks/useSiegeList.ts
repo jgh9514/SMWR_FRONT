@@ -34,10 +34,12 @@ export type MonsterOption = {
   obtainable?: boolean;
   /** RTA 통계 집계 키(콜라보는 원본 monster_id, 비콜라보는 monster_id와 동일) — WAS `rta_stats_monster_id` */
   rta_stats_monster_id?: string;
+  /** 각성 단계: 0=노말, 1=1차각성, 2=2차각성 — WAS `awaken_level` */
+  awaken_level?: number;
 };
 
-const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v13';
-const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60; // 1일
+const MONSTER_LIST_CACHE_KEY = 'smwr:monster-list:v14';
+const MONSTER_LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7일
 
 type MonsterListCachePayload = {
   v: 2;
