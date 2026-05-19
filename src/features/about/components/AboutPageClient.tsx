@@ -48,6 +48,8 @@ const SERVICES: ServiceBlock[] = [
     links: [
       { label: '점령전', href: '/siege' },
       { label: '최근 점령전', href: '/recent-siege' },
+      { label: '점령전 지도', href: '/siege/map' },
+      { label: '지도 히스토리', href: '/siege/map/history' },
     ],
   },
   {

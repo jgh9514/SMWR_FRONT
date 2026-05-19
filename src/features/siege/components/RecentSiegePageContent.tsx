@@ -5,9 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
   Container,
   Select,
   MenuItem,
@@ -16,11 +13,10 @@ import {
   Typography,
   Skeleton,
 } from '@mui/material';
-import StarIcon from '@mui/icons-material/Star';
-import { searchDataExtraction, getRatingColor, getRatingStars } from '@/shared/utils';
-import { formatSiegeDateLabel } from '@/shared/utils/format';
+import { searchDataExtraction } from '@/shared/utils';
 import { PAGINATION_OPTIONS, DEFAULT_PAGE_OFFSET } from '@/shared/constants';
-import { PageBanner, PageHeader } from '@/shared/ui';
+import { PageHeader } from '@/shared/ui';
+import RecentSiegeMatchCard from '@/features/siege/components/RecentSiegeMatchCard';
 import { useResponsive } from '@/shared/hooks';
 import { isAuthenticated } from '@/shared/utils/auth';
 import { logger } from '@/shared/lib/logger';
@@ -254,8 +250,6 @@ export default function RecentSiegePageContent() {
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 2, md: 6 } }}>
-      <PageBanner />
-
       {hasNoData && (
         <Container sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 3 } }}>
           <PageHeader title="최근 점령전" />
@@ -307,233 +301,12 @@ export default function RecentSiegePageContent() {
           <PageHeader title="최근 점령전" />
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, md: 3 }, mt: { xs: 2, md: 3 } }}>
             {siegeList.map((item) => (
-              <Card
+              <RecentSiegeMatchCard
                 key={item.match_id}
-                sx={{
-                  cursor: 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                  boxShadow: 2,
-                  borderRadius: 2,
-                  overflow: 'visible',
-                  '&:hover': {
-                    boxShadow: 6,
-                    transform: 'translateY(-4px)',
-                  },
-                }}
-                onClick={() => showMatchDetail(item)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    showMatchDetail(item);
-                  }
-                }}
-                aria-label={`${formatSiegeDateLabel(item.match_id) || item.match_id} 점령전 상세 보기`}
-              >
-                <CardHeader
-                  sx={{
-                    px: { xs: 2.5, md: 3 },
-                    py: { xs: 2, md: 2.5 },
-                    bgcolor: 'primary.main',
-                    color: 'white',
-                    '& .MuiCardHeader-title': {
-                      color: 'white',
-                    },
-                  }}
-                  title={
-                    <Typography
-                      align="center"
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: { xs: '1rem', md: '1.25rem' },
-                      }}
-                    >
-                      {formatSiegeDateLabel(item.match_id) || item.match_id}
-                    </Typography>
-                  }
-                />
-                <CardContent sx={{ px: { xs: 1.5, md: 2.5 }, py: { xs: 1.5, md: 2 }, overflow: 'visible' }}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      gap: { xs: 0.75, md: 1.5 },
-                      flexWrap: 'nowrap',
-                    }}
-                  >
-                    {/* 자기 길드가 몇 등인지 확인 */}
-                    {(() => {
-                      const id1st = item.guild_id_1st != null ? String(item.guild_id_1st) : '';
-                      const id2nd = item.guild_id_2nd != null ? String(item.guild_id_2nd) : '';
-                      const id3rd = item.guild_id_3rd != null ? String(item.guild_id_3rd) : '';
-                      
-                      // 타입 변환하여 비교
-                      const myGuildIdStr = myGuildId ? String(myGuildId) : '';
-                      
-                      const myGuildRank = 
-                        myGuildIdStr && id1st === myGuildIdStr ? '1st' :
-                        myGuildIdStr && id2nd === myGuildIdStr ? '2nd' :
-                        myGuildIdStr && id3rd === myGuildIdStr ? '3rd' : null;
-                      
-                      // 1등 길드 */}
-                      const renderGuildBox = (rank: '1st' | '2nd' | '3rd', isMyGuild: boolean) => {
-                        const is1st = rank === '1st';
-                        const is2nd = rank === '2nd';
-                        
-                        const guildName = is1st ? item.guild_1st : is2nd ? item.guild_2nd : item.guild_3rd;
-                        const rating = is1st ? item.rating_1st : is2nd ? item.rating_2nd : item.rating_3rd;
-                        
-                        // 통계 데이터 가져오기
-                        const attackWinCount = is1st ? item.attack_win_count_1st : is2nd ? item.attack_win_count_2nd : item.attack_win_count_3rd;
-                        const totalAttackCount = is1st ? item.total_attack_count_1st : is2nd ? item.total_attack_count_2nd : item.total_attack_count_3rd;
-                        const attackRate = is1st ? item.attack_rate_1st : is2nd ? item.attack_rate_2nd : item.attack_rate_3rd;
-                        const defenseWinCount = is1st ? item.defense_win_count_1st : is2nd ? item.defense_win_count_2nd : item.defense_win_count_3rd;
-                        const totalDefenseCount = is1st ? item.total_defense_count_1st : is2nd ? item.total_defense_count_2nd : item.total_defense_count_3rd;
-                        const defenseRate = is1st ? item.defense_rate_1st : is2nd ? item.defense_rate_2nd : item.defense_rate_3rd;
-                        const monsterCount = is1st ? item.unique_monster_deck_count_1st : is2nd ? item.unique_monster_deck_count_2nd : item.unique_monster_deck_count_3rd;
-                        
-                        // 통계는 자기 길드 것만 표시 (통계 데이터가 있는 경우에만)
-                        const hasStats = (attackWinCount != null && attackWinCount !== undefined) || 
-                                        (defenseWinCount != null && defenseWinCount !== undefined) || 
-                                        (monsterCount != null && monsterCount !== undefined);
-                        const showStats = isMyGuild && hasStats;
-                        
-                        return (
-                          <Box
-                            key={rank}
-                            sx={{
-                              flex: 1,
-                              minWidth: 0,
-                              p: { xs: 1.5, md: 2 },
-                              borderRadius: 2,
-                              background: is1st 
-                                ? 'linear-gradient(135deg, #ffd700 0%, #ffed4e 100%)'
-                                : is2nd
-                                ? 'linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 100%)'
-                                : 'linear-gradient(135deg, #cd7f32 0%, #daa520 100%)',
-                              textAlign: 'center',
-                              minHeight: { xs: 90, md: 110 },
-                              position: 'relative',
-                              boxShadow: is1st
-                                ? '0 2px 8px rgba(255, 215, 0, 0.3)'
-                                : is2nd
-                                ? '0 2px 8px rgba(192, 192, 192, 0.3)'
-                                : '0 2px 8px rgba(205, 127, 50, 0.3)',
-                              transition: 'all 0.2s ease',
-                              border: isMyGuild ? '2px solid #1976d2' : 'none',
-                              '&:hover': {
-                                transform: 'scale(1.02)',
-                                boxShadow: is1st
-                                  ? '0 4px 12px rgba(255, 215, 0, 0.4)'
-                                  : is2nd
-                                  ? '0 4px 12px rgba(192, 192, 192, 0.4)'
-                                  : '0 4px 12px rgba(205, 127, 50, 0.4)',
-                              },
-                            }}
-                          >
-                            {/* 메달 아이콘 - 좌측 위 */}
-                            <Box
-                              sx={{
-                                position: 'absolute',
-                                top: { xs: -8, md: -12 },
-                                left: { xs: -8, md: -12 },
-                                fontSize: { xs: '20px', md: '28px' },
-                                background: 'white',
-                                borderRadius: '50%',
-                                width: { xs: 32, md: 40 },
-                                height: { xs: 32, md: 40 },
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-                                zIndex: 1,
-                              }}
-                            >
-                              {is1st ? '🥇' : is2nd ? '🥈' : '🥉'}
-                            </Box>
-                            {/* 별 아이콘 - 길드명 위 */}
-                            <Box
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                gap: 0.25,
-                                mb: { xs: 0.5, md: 0.75 },
-                                mt: { xs: 0.25, md: 0 },
-                              }}
-                            >
-                              {Array.from({ length: getRatingStars(rating) }).map((_, i) => (
-                                <StarIcon
-                                  key={i}
-                                  sx={{
-                                    fontSize: { xs: 11, md: 14 },
-                                    color: getRatingColor(rating),
-                                  }}
-                                />
-                              ))}
-                            </Box>
-                            <Typography
-                              sx={{
-                                fontWeight: 700,
-                                fontSize: { xs: '0.8rem', md: '1rem' },
-                                lineHeight: 1.2,
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                wordBreak: 'break-word',
-                                color: 'rgba(0, 0, 0, 0.85)',
-                                mb: { xs: 0.25, md: 0.5 },
-                              }}
-                            >
-                              {guildName || '-'}
-                            </Typography>
-                            {/* 통계 정보 - 자기 길드 것만 표시 */}
-                            {showStats && (
-                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 0.25, md: 0.4 }, mt: { xs: 0.5, md: 0.75 }, alignItems: 'flex-start' }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, md: 0.5 }, width: '100%' }}>
-                                  <Box sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, lineHeight: 1, flexShrink: 0, display: 'flex', alignItems: 'center' }}>⚔️</Box>
-                                  <Typography variant="caption" sx={{ fontSize: { xs: '0.65rem', md: '0.75rem' }, color: 'rgba(0, 0, 0, 0.8)', fontWeight: 500, lineHeight: 1.2, flex: 1 }}>
-                                    <Box component="span" sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.9)' }}>
-                                      {attackWinCount ?? 0}/{totalAttackCount ?? 0}
-                                    </Box> ({attackRate?.toFixed(1) || '0.0'}%)
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, md: 0.5 }, width: '100%' }}>
-                                  <Box sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, lineHeight: 1, flexShrink: 0, display: 'flex', alignItems: 'center' }}>🛡️</Box>
-                                  <Typography variant="caption" sx={{ fontSize: { xs: '0.65rem', md: '0.75rem' }, color: 'rgba(0, 0, 0, 0.8)', fontWeight: 500, lineHeight: 1.2, flex: 1 }}>
-                                    <Box component="span" sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.9)' }}>
-                                      {defenseWinCount ?? 0}/{totalDefenseCount ?? 0}
-                                    </Box> ({defenseRate?.toFixed(1) || '0.0'}%)
-                                  </Typography>
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.25, md: 0.5 }, width: '100%' }}>
-                                  <Box sx={{ fontSize: { xs: '0.8rem', md: '0.9rem' }, lineHeight: 1, flexShrink: 0, display: 'flex', alignItems: 'center' }}>👾</Box>
-                                  <Typography variant="caption" sx={{ fontSize: { xs: '0.65rem', md: '0.75rem' }, color: 'rgba(0, 0, 0, 0.8)', fontWeight: 500, lineHeight: 1.2, flex: 1 }}>
-                                    <Box component="span" sx={{ fontWeight: 600, color: 'rgba(0, 0, 0, 0.9)' }}>
-                                      {monsterCount ?? 0}
-                                    </Box>마리
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            )}
-                          </Box>
-                        );
-                      };
-                      
-                      return (
-                        <>
-                          {renderGuildBox('1st', myGuildRank === '1st')}
-                          {renderGuildBox('2nd', myGuildRank === '2nd')}
-                          {/* 1대1 레전드 토너먼트(guild_count=2)일 때는 3번째 박스 숨김 */}
-                          {(item.guild_count ?? 3) >= 3 && renderGuildBox('3rd', myGuildRank === '3rd')}
-                        </>
-                      );
-                    })()}
-                  </Box>
-                </CardContent>
-              </Card>
+                item={item}
+                myGuildId={myGuildId}
+                onSelect={showMatchDetail}
+              />
             ))}
           </Box>
 

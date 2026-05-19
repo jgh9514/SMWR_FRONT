@@ -28,6 +28,7 @@ import {
 import MenuIcon from '@mui/icons-material/Menu';
 import HomeIcon from '@mui/icons-material/Home';
 import CastleIcon from '@mui/icons-material/Castle';
+import MapIcon from '@mui/icons-material/Map';
 import HistoryIcon from '@mui/icons-material/History';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
@@ -137,6 +138,8 @@ function getNavGroups(
     items: [
       { title: '전체 점령전', path: '/siege', icon: <CastleIcon /> },
       { title: '최근 점령전', path: '/recent-siege', icon: <HistoryIcon />, requiresGuild: true },
+      { title: '점령전 지도', path: '/siege/map', icon: <MapIcon />, requiresGuild: true },
+      { title: '지도 히스토리', path: '/siege/map/history', icon: <HistoryIcon />, requiresGuild: true },
       { title: '전적 조회', path: '/battle-history', icon: <BarChartIcon />, requiresGuild: true },
     ],
   };
@@ -223,6 +226,12 @@ function isNavLeafActive(itemPath: string, pathname: string): boolean {
   if (itemPath === '/') return pathname === '/';
   if (pathname === itemPath) return true;
   if (itemPath === '/rta' || itemPath === '/siege') return false;
+  if (itemPath === '/siege/map') {
+    return (
+      pathname === '/siege/map' ||
+      (pathname.startsWith('/siege/map/') && !pathname.startsWith('/siege/map/history'))
+    );
+  }
   return pathname.startsWith(`${itemPath}/`);
 }
 

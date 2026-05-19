@@ -408,6 +408,37 @@ export interface RtaSummonerSearchResponse {
   seasonCode?: string | null;
 }
 
+/** POST /rta/player/:wizardId/score-daily — rta_agg_summoner_score_daily_snap */
+export interface RtaPlayerScoreDailyRow {
+  snap_date: string;
+  score: number;
+  score_delta?: number | null;
+  match_cnt: number;
+  win_cnt: number;
+  lose_cnt: number;
+}
+
+export interface RtaPlayerScoreDailyResponse {
+  seasonId?: number | null;
+  wizardId?: string;
+  rows: RtaPlayerScoreDailyRow[];
+}
+
+/** POST /rta/player/:wizardId/name-history — rta_match_participant DISTINCT wizard_name */
+export interface RtaPlayerNameHistoryRow {
+  wizard_name?: string;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  match_count?: number;
+}
+
+export interface RtaPlayerNameHistoryResponse {
+  wizardId?: string;
+  /** null 이면 전 시즌 */
+  seasonId?: number | null;
+  rows: RtaPlayerNameHistoryRow[];
+}
+
 /** POST /rta/player/:wizardId/summary — 집계 행(snake_case) + 서버가 넣는 found·seasonId */
 export interface RtaPlayerSummary {
   found: boolean;

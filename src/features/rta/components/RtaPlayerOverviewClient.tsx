@@ -44,7 +44,14 @@ import {
 } from '@mui/material';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
-import { useRtaDashboardRankCutoff, useRtaPlayerSummary, useRtaPlayerMonsterUsage, useRtaPlayerOpponentRecords } from '@/features/rta/hooks/useRtaData';
+import {
+  useRtaDashboardRankCutoff,
+  useRtaPlayerSummary,
+  useRtaPlayerScoreDaily,
+  useRtaPlayerMonsterUsage,
+  useRtaPlayerOpponentRecords,
+} from '@/features/rta/hooks/useRtaData';
+import type { RtaPlayerScoreDailyRow } from '@/features/rta/types/rta';
 import { isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
@@ -140,6 +147,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     enabled: Boolean(wizardId),
   });
 
+  const { data: scoreDailyData, isLoading: scoreDailyLoading } = useRtaPlayerScoreDaily(wizardId, seasonCode, {
+    seasonId,
+    enabled: Boolean(wizardId),
+  });
+
   /** '전체 점수 추이' 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
   const [chartOpen, setChartOpen] = useState(false);
   const [chartMode, setChartMode] = useState<ChartMode>('daily');
@@ -209,6 +221,22 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     }));
   }, [opponentData?.rows]);
 
+  const scoreDailyAsc = useMemo(() => {
+    const raw = scoreDailyData?.rows ?? [];
+    const norm = (r: RtaPlayerScoreDailyRow) => ({
+      snap_date: String(r.snap_date ?? '').slice(0, 10),
+      score: num(r.score),
+      score_delta:
+        r.score_delta != null && r.score_delta !== undefined && String(r.score_delta) !== ''
+          ? num(r.score_delta)
+          : null,
+      match_cnt: num(r.match_cnt),
+      win_cnt: num(r.win_cnt),
+      lose_cnt: num(r.lose_cnt),
+    });
+    return raw.map(norm).filter((r) => r.snap_date.length === 10).sort((a, b) => a.snap_date.localeCompare(b.snap_date));
+  }, [scoreDailyData?.rows]);
+
   const chartData = useMemo(() => {
     if (chartMode === 'match') {
       return chronological.map((c, i) => ({
@@ -218,20 +246,9 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
         t: c.date,
       }));
     }
-    const endOfDayScore = new Map<string, number>();
-    const endOfDayLastIso = new Map<string, string>();
-    for (const c of chronological) {
-      const k = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
-      const cur = endOfDayLastIso.get(k);
-      const curTime = cur ? parseMatchDate(cur).getTime() : -1;
-      const t = parseMatchDate(c.date).getTime();
-      if (!cur || t >= curTime) {
-        endOfDayScore.set(k, c.myScore);
-        endOfDayLastIso.set(k, c.date);
-      }
-    }
-    const sortedDays = [...endOfDayScore.keys()].sort();
-    if (sortedDays.length === 0) return [];
+    if (scoreDailyAsc.length === 0) return [];
+    const endOfDayScore = new Map(scoreDailyAsc.map((r) => [r.snap_date, r.score]));
+    const sortedDays = scoreDailyAsc.map((r) => r.snap_date);
     const firstDay = sortedDays[0]!;
     const lastDay = sortedDays[sortedDays.length - 1]!;
     const allDays = iterateLocalDaysInclusive(firstDay, lastDay);
@@ -240,17 +257,14 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
       if (endOfDayScore.has(k)) {
         carryScore = endOfDayScore.get(k)!;
       }
-      const iso = endOfDayLastIso.get(k);
-      /** 경기 없는 날: 툴팁용 로컬 정오 근처(타존 깨짐 방지 위해 Z 미부착) */
-      const tIso = iso ?? `${k}T12:00:00`;
       return {
         x: i + 1,
         label: k.slice(5).replace('-', '/'),
         score: carryScore,
-        t: tIso,
+        t: `${k}T12:00:00`,
       };
     });
-  }, [chronological, chartMode]);
+  }, [chronological, chartMode, scoreDailyAsc]);
 
   const chartDomain = useMemo(() => {
     const scores = chartData.map((d) => d.score).filter((n) => Number.isFinite(n));
@@ -333,22 +347,18 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
 
   const last30dSeries = useMemo(() => {
     const t30 = asOfTime - THIRTY_DAYS_MS;
-    // 일별 마지막 점수만 집계 (당일 최신 경기 기준)
-    const byDay = new Map<string, { score: number; t: string; daysAgo: number }>();
-    for (const c of chronological) {
-      const ms = parseMatchDate(c.date).getTime();
-      if (ms < t30) continue;
-      const key = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
-      const daysAgo = Math.max(0, Math.floor((asOfTime - ms) / 86400000));
-      const prev = byDay.get(key);
-      if (!prev || ms > parseMatchDate(prev.t).getTime()) {
-        byDay.set(key, { score: c.myScore, t: c.date, daysAgo });
-      }
-    }
-    return [...byDay.values()]
-      .sort((a, b) => parseMatchDate(a.t).getTime() - parseMatchDate(b.t).getTime())
-      .map((d, idx) => ({ idx, ...d }));
-  }, [asOfTime, chronological]);
+    return scoreDailyAsc
+      .filter((r) => parseMatchDate(`${r.snap_date}T12:00:00`).getTime() >= t30)
+      .map((r, idx) => {
+        const ms = parseMatchDate(`${r.snap_date}T12:00:00`).getTime();
+        return {
+          idx,
+          score: r.score,
+          t: `${r.snap_date}T12:00:00`,
+          daysAgo: Math.max(0, Math.floor((asOfTime - ms) / 86400000)),
+        };
+      });
+  }, [asOfTime, scoreDailyAsc]);
 
   const chart30dDomain = useMemo((): [number, number] => {
     const s = last30dSeries.map((d) => d.score).filter((n) => Number.isFinite(n));
@@ -362,18 +372,18 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const lpChange30d = useMemo(() => {
     const t30 = asOfTime - THIRTY_DAYS_MS;
     let lastBefore: number | null = null;
-    for (const c of chronological) {
-      if (parseMatchDate(c.date).getTime() < t30) {
-        lastBefore = c.myScore;
+    for (const r of scoreDailyAsc) {
+      if (parseMatchDate(`${r.snap_date}T12:00:00`).getTime() < t30) {
+        lastBefore = r.score;
       }
     }
-    const last = chronological.length > 0 ? chronological[chronological.length - 1]!.myScore : null;
+    const last = scoreDailyAsc.length > 0 ? scoreDailyAsc[scoreDailyAsc.length - 1]!.score : null;
     if (last == null) return { delta: null as number | null, hasBoth: false };
     if (lastBefore != null) return { delta: last - lastBefore, hasBoth: true };
-    const firstIn = chronological.find((c) => parseMatchDate(c.date).getTime() >= t30);
-    if (firstIn) return { delta: last - firstIn.myScore, hasBoth: true };
+    const firstIn = scoreDailyAsc.find((r) => parseMatchDate(`${r.snap_date}T12:00:00`).getTime() >= t30);
+    if (firstIn) return { delta: last - firstIn.score, hasBoth: true };
     return { delta: 0, hasBoth: true };
-  }, [asOfTime, chronological]);
+  }, [asOfTime, scoreDailyAsc]);
 
   const chart30dTicks = useMemo(() => {
     const n = last30dSeries.length;
@@ -394,26 +404,19 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     if (v) setTrendViewMode(v);
   }, []);
 
-  /** 일별 테이블 데이터: 날짜별 마지막 점수·승패·경기수·전일 대비 변화 */
+  /** 일별 테이블 — rta_agg_summoner_score_daily_snap (score_delta는 서버 LAG) */
   const dailyTableRows = useMemo(() => {
-    const byDay = new Map<string, { score: number; wins: number; losses: number; games: number }>();
-    for (const c of chronological) {
-      const k = ymdLocal(startOfLocalDay(parseMatchDate(c.date)));
-      const prev = byDay.get(k) ?? { score: 0, wins: 0, losses: 0, games: 0 };
-      byDay.set(k, {
-        score: c.myScore,
-        wins: prev.wins + (c.won ? 1 : 0),
-        losses: prev.losses + (c.won ? 0 : 1),
-        games: prev.games + 1,
-      });
-    }
-    const sorted = [...byDay.entries()].sort(([a], [b]) => b.localeCompare(a));
-    return sorted.map(([day, data], i, arr) => {
-      const olderEntry = arr[i + 1];
-      const delta = olderEntry != null ? data.score - olderEntry[1].score : null;
-      return { day, ...data, delta };
-    });
-  }, [chronological]);
+    return [...scoreDailyAsc]
+      .sort((a, b) => b.snap_date.localeCompare(a.snap_date))
+      .map((r) => ({
+        day: r.snap_date,
+        score: r.score,
+        delta: r.score_delta,
+        games: r.match_cnt,
+        wins: r.win_cnt,
+        losses: r.lose_cnt,
+      }));
+  }, [scoreDailyAsc]);
 
   const accent = theme.palette.mode === 'dark' ? '#c8aa6e' : theme.palette.primary.main;
 
@@ -602,9 +605,11 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                 mx: 'auto',
               }}
             >
-              {last30dSeries.length === 0 ? (
+              {scoreDailyLoading ? (
+                <Skeleton variant="rounded" height={RTA_OVERVIEW_CHART_30D_PX} sx={{ borderRadius: 1 }} />
+              ) : last30dSeries.length === 0 ? (
                 <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 4 }}>
-                  최근 30일 내 로드된 경기가 없습니다.
+                  최근 30일 일별 집계가 없습니다.
                 </Typography>
               ) : (
                 <ResponsiveContainer width="100%" height={RTA_OVERVIEW_CHART_30D_PX}>
@@ -670,7 +675,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                   전체 점수 추이
                 </Typography>
                 <Typography variant="caption" color="text.disabled">
-                  (로드된 전체 {chartMode === 'daily' ? '일별' : '경기별'})
+                  ({chartMode === 'daily' ? '시즌 전체 일별' : '로드된 경기별'})
                 </Typography>
               </Stack>
               <IconButton size="small" aria-label="접기">
@@ -694,9 +699,13 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
 
                 {trendViewMode === 'chart' ? (
                   <Box sx={{ width: '100%', minWidth: 0, height: RTA_OVERVIEW_CHART_SCORE_PX }}>
-                    {chartData.length === 0 ? (
+                    {chartMode === 'daily' && scoreDailyLoading ? (
+                      <Skeleton variant="rounded" height={RTA_OVERVIEW_CHART_SCORE_PX} sx={{ borderRadius: 1 }} />
+                    ) : chartData.length === 0 ? (
                       <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ py: 5 }}>
-                        차트 데이터가 없습니다.
+                        {chartMode === 'daily'
+                          ? '일별 집계 데이터가 없습니다. 배치 적재 후 표시됩니다.'
+                          : '차트 데이터가 없습니다. 경기를 더 불러오세요.'}
                       </Typography>
                     ) : (
                       <ResponsiveContainer width="100%" height={RTA_OVERVIEW_CHART_SCORE_PX}>
@@ -761,10 +770,16 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {dailyTableRows.length === 0 ? (
+                        {scoreDailyLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                              <Skeleton width="80%" sx={{ mx: 'auto' }} />
+                            </TableCell>
+                          </TableRow>
+                        ) : dailyTableRows.length === 0 ? (
                           <TableRow>
                             <TableCell colSpan={6} align="center" sx={{ py: 3, color: 'text.secondary' }}>
-                              데이터가 없습니다.
+                              일별 집계 데이터가 없습니다.
                             </TableCell>
                           </TableRow>
                         ) : (

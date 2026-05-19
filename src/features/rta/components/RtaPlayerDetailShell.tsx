@@ -8,9 +8,14 @@ import {
   Box,
   Button,
   Chip,
+  CircularProgress,
   Container,
   FormControl,
   IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  Menu,
   MenuItem,
   Select,
   Stack,
@@ -18,8 +23,7 @@ import {
   Tabs,
   Typography,
 } from '@mui/material';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import HistoryIcon from '@mui/icons-material/History';
 import StarIcon from '@mui/icons-material/Star';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -30,6 +34,7 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import {
   resolveDefaultRtaSeasonCode,
   resolveRtaSeasonIdForApi,
+  useRtaPlayerNameHistory,
   useRtaPlayerSummary,
   useRtaSeasonSelect,
 } from '@/features/rta/hooks/useRtaData';
@@ -64,6 +69,13 @@ function countryFlagSrc(country: string | undefined): string | null {
   if (!c || c === '—') return null;
   if (!/^[a-z]{2}$/i.test(c)) return null;
   return `https://flagcdn.com/w40/${c.toLowerCase()}.png`;
+}
+
+function formatNameHistoryWhen(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 function buildNavItems(wizardId: string): NavItem[] {
@@ -167,7 +179,13 @@ export default function RtaPlayerDetailShell({
   const countryLabel = (summary?.country || '').trim() || '—';
   const countryFlag = countryFlagSrc(summary?.country);
 
-  const [fav, setFav] = useState(false);
+  const [nameHistoryAnchor, setNameHistoryAnchor] = useState<null | HTMLElement>(null);
+  const nameHistoryOpen = Boolean(nameHistoryAnchor);
+  const { data: nameHistoryData, isLoading: nameHistoryLoading } = useRtaPlayerNameHistory(wizardId, {
+    enabled: nameHistoryOpen,
+  });
+  const nameHistoryRows = nameHistoryData?.rows ?? [];
+  const currentWizardName = summary?.found ? summary.wizard_name?.trim() : '';
 
   const navItems = useMemo(() => buildNavItems(wizardId), [wizardId]);
 
@@ -253,6 +271,79 @@ export default function RtaPlayerDetailShell({
                 <Typography variant="h5" component="h1" fontWeight={800} noWrap sx={{ maxWidth: '100%' }}>
                   {displayName}
                 </Typography>
+                <IconButton
+                  size="small"
+                  onClick={(e) => setNameHistoryAnchor(e.currentTarget)}
+                  aria-label="이전 닉네임 보기"
+                  title="이전 닉네임"
+                  sx={{ color: 'text.secondary', flexShrink: 0 }}
+                >
+                  <HistoryIcon fontSize="small" />
+                </IconButton>
+                <Menu
+                  anchorEl={nameHistoryAnchor}
+                  open={nameHistoryOpen}
+                  onClose={() => {
+                    blurFocusedMenuItem();
+                    setNameHistoryAnchor(null);
+                  }}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                  {...RTA_SELECT_MENU_PROPS}
+                  slotProps={{
+                    ...RTA_SELECT_MENU_PROPS.slotProps,
+                    paper: { sx: { maxWidth: 'min(100vw - 24px, 360px)', width: 320 } },
+                  }}
+                >
+                  <Box sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      이전 닉네임
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      수집된 RTA 리플레이 기준
+                    </Typography>
+                  </Box>
+                  {nameHistoryLoading ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                      <CircularProgress size={24} aria-label="닉네임 목록 불러오는 중" />
+                    </Box>
+                  ) : nameHistoryRows.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 2 }}>
+                      기록된 닉네임이 없습니다.
+                    </Typography>
+                  ) : (
+                    <List dense disablePadding sx={{ pb: 1, maxHeight: 320, overflow: 'auto' }}>
+                      {nameHistoryRows.map((row) => {
+                        const name = row.wizard_name?.trim() || '—';
+                        const isCurrent = Boolean(currentWizardName && name === currentWizardName);
+                        return (
+                          <ListItem key={name} sx={{ py: 0.75, px: 2 }}>
+                            <ListItemText
+                              primary={
+                                <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+                                  <Typography component="span" variant="body2" fontWeight={isCurrent ? 700 : 500}>
+                                    {name}
+                                  </Typography>
+                                  {isCurrent ? (
+                                    <Chip label="현재" size="small" color="primary" sx={{ height: 20, fontSize: '0.7rem' }} />
+                                  ) : null}
+                                </Stack>
+                              }
+                              secondary={
+                                <Typography variant="caption" color="text.secondary" component="span">
+                                  {formatNameHistoryWhen(row.first_seen_at)} ~ {formatNameHistoryWhen(row.last_seen_at)}
+                                  {row.match_count != null && row.match_count > 0
+                                    ? ` · ${row.match_count.toLocaleString()}경기`
+                                    : ''}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  )}
+                </Menu>
                 {countryFlag ? (
                   <Box
                     component="img"
@@ -280,16 +371,6 @@ export default function RtaPlayerDetailShell({
                     color: 'primary.main',
                   }}
                 />
-
-                <IconButton
-                  size="small"
-                  color={fav ? 'error' : 'default'}
-                  onClick={() => setFav((v) => !v)}
-                  aria-label="플레이어 추적"
-                  title="플레이어 추적"
-                >
-                  {fav ? <FavoriteIcon fontSize="small" /> : <FavoriteBorderIcon fontSize="small" />}
-                </IconButton>
               </Stack>
 
               <Stack

@@ -43,7 +43,7 @@
     "react-dom": "latest",
     "react-hot-toast": "^2.6.0",
     "react-is": "^19.2.4",
-    "recharts": "^3.5.1",
+    "recharts": "^3.8.1",
     "recoil": "^0.7.7",
     "server-only": "^0.0.1",
     "smarteditor2": "^2.10.0"

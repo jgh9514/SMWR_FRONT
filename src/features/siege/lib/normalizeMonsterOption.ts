@@ -27,6 +27,7 @@ export function normalizeMonsterOption(row: Record<string, unknown>): MonsterOpt
     return Math.trunc(n);
   };
   const com2us_id = parseOptInt(row.com2us_id ?? row.com2usId);
+  const awaken_level = parseOptInt(row.awaken_level ?? row.awakenLevel);
   const awakens_from_id = parseOptInt(row.awakens_from_id ?? row.awakensFromId);
   const awakens_to_id = parseOptInt(row.awakens_to_id ?? row.awakensToId);
   const family_id = parseOptInt(row.family_id ?? row.familyId);
@@ -59,6 +60,7 @@ export function normalizeMonsterOption(row: Record<string, unknown>): MonsterOpt
     awakens_to_id,
     family_id,
     obtainable,
+    awaken_level,
   };
 }
 

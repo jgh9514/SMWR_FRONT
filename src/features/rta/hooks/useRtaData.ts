@@ -40,6 +40,8 @@ import type {
   RtaDashboardTierDistributionResponse,
   RtaMonsterStatsResponse,
   RtaPlayerSummary,
+  RtaPlayerNameHistoryResponse,
+  RtaPlayerScoreDailyResponse,
   RtaMonsterPickBreakdownResponse,
   RtaMonsterPickSlotMatchesResponse,
   RtaPlayerMonsterUsageResponse,
@@ -593,9 +595,49 @@ export const useRtaPlayerSummary = (
   );
 };
 
+const RTA_PLAYER_NAME_HISTORY_STALE_MS = 120_000;
+
+/** 수집 리플레이 기준 과거 닉네임(전 시즌). body 비우면 seasonId 미전달. */
+export const useRtaPlayerNameHistory = (
+  wizardId: string,
+  options?: { enabled?: boolean },
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/name-history` : '/rta/player/-/name-history';
+  return useApiPostQuery<RtaPlayerNameHistoryResponse>(path, {}, {
+    enabled: Boolean(id) && (options?.enabled !== false),
+    staleTime: RTA_PLAYER_NAME_HISTORY_STALE_MS,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+};
+
 /** RSC `getRtaPlayerSummaryData` 직후 하이드레이션 — staleTime 0이면 동일 API가 즉시 한 번 더 나간다. */
 const RTA_PLAYER_SUMMARY_RSC_STALE_MS = 2 * 60 * 1000;
 const RTA_PLAYER_SUMMARY_RSC_GC_MS = 10 * 60 * 1000;
+
+const RTA_PLAYER_SCORE_DAILY_STALE_MS = 60_000;
+
+/**
+ * 소환사 시즌 일별 점수·승패 — 배치 rta_agg_summoner_score_daily_snap (스냅 only).
+ */
+export const useRtaPlayerScoreDaily = (
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  options: {
+    seasonId: number | null;
+    enabled?: boolean;
+  },
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/score-daily` : '/rta/player/-/score-daily';
+  return useApiPostQuery<RtaPlayerScoreDailyResponse>(path, seasonBody(seasonCode ?? null, options.seasonId), {
+    enabled: Boolean(id) && (options.enabled !== false),
+    staleTime: RTA_PLAYER_SCORE_DAILY_STALE_MS,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+};
 
 const RTA_PLAYER_MONSTER_USAGE_STALE_MS = 60_000;
 

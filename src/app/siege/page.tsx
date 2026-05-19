@@ -18,7 +18,6 @@ import {
   Collapse,
   Checkbox,
   FormControlLabel,
-  Divider,
   Select,
   FormControl,
   InputLabel,
@@ -27,9 +26,8 @@ import {
 } from '@mui/material';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import StarIcon from '@mui/icons-material/Star';
 import { useEnemyTeamListSuspense, useMonsterList, type MonsterOption } from '@/hooks/api';
-import { searchDataExtraction, getRatingColor, getRatingStars } from '@/shared/utils';
+import { searchDataExtraction } from '@/shared/utils';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { PAGINATION_OPTIONS } from '@/shared/constants';
@@ -40,6 +38,7 @@ import type { MonsterItem, SiegeSearchParams } from '@/types';
 import type { GuildInfo } from '@/features/siege/types/siege';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
 import { SiegeManualDefenseDeckDialog } from '@/features/siege/components/SiegeManualDefenseDeckDialog';
+import { SiegeOpponentGuildPicker } from '@/features/siege/components/SiegeOpponentGuildPicker';
 import GuildRequiredGate from '@/features/guild/components/GuildRequiredGate';
 
 const LEADER_INDEX = 0;
@@ -838,91 +837,11 @@ function SiegeContent() {
               </Card>
 
               {/* 길드 선택 섹션 */}
-              {availableGuilds.length > 0 && (
-                <Card sx={{ boxShadow: 2 }}>
-                  <Box
-                    sx={{
-                      background: 'linear-gradient(135deg, rgb(25, 118, 210) 0%, rgba(25, 118, 210, 0.85) 100%)',
-                      color: 'white',
-                      px: 3,
-                      py: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      상대 길드 선택
-                    </Typography>
-                  </Box>
-                  <Divider />
-                  <CardContent sx={{ p: 0 }}>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                      }}
-                    >
-                      {availableGuilds.map((guild) => {
-                        const isSelected = selectedGuilds.includes(guild.guild_name);
-                        return (
-                          <Box
-                            key={guild.guild_name}
-                            onClick={() => toggleGuildSelection(guild.guild_name)}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              p: 2,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              borderRight: '1px solid',
-                              borderBottom: '1px solid',
-                              borderColor: 'divider',
-                              background: isSelected
-                                ? 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)'
-                                : 'white',
-                              borderLeft: isSelected ? '4px solid' : 'none',
-                              borderLeftColor: isSelected ? 'primary.main' : 'transparent',
-                              '&:hover': {
-                                backgroundColor: isSelected ? '#e3f2fd' : '#f5f7fa',
-                              },
-                            }}
-                          >
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => toggleGuildSelection(guild.guild_name)}
-                              color="primary"
-                              size="small"
-                              sx={{ mr: 1.5 }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 700, mb: 0.75, fontSize: '0.875rem' }}
-                                noWrap
-                              >
-                                {guild.guild_name}
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
-                                {Array.from({ length: getRatingStars(guild.rating) }).map((_, i) => (
-                                  <StarIcon
-                                    key={i}
-                                    sx={{
-                                      fontSize: 14,
-                                      color: getRatingColor(guild.rating),
-                                    }}
-                                  />
-                                ))}
-                              </Box>
-                            </Box>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </CardContent>
-                </Card>
-              )}
+              <SiegeOpponentGuildPicker
+                guilds={availableGuilds}
+                selectedGuilds={selectedGuilds}
+                onToggle={toggleGuildSelection}
+              />
             </Box>
           </Box>
 
@@ -970,89 +889,12 @@ function SiegeContent() {
             {/* 모바일: 길드 선택 섹션 */}
             {availableGuilds.length > 0 && (
               <Box sx={{ display: { xs: 'block', md: 'none' }, mb: 3 }}>
-                <Card sx={{ boxShadow: 2 }}>
-                  <Box
-                    sx={{
-                      background: 'linear-gradient(135deg, rgb(25, 118, 210) 0%, rgba(25, 118, 210, 0.85) 100%)',
-                      color: 'white',
-                      px: 3,
-                      py: 2,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 1,
-                    }}
-                  >
-                    <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                      상대 길드 선택
-                    </Typography>
-                  </Box>
-                  <Divider />
-                  <CardContent sx={{ p: 0 }}>
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(2, 1fr)',
-                      }}
-                    >
-                      {availableGuilds.map((guild) => {
-                        const isSelected = selectedGuilds.includes(guild.guild_name);
-                        return (
-                          <Box
-                            key={guild.guild_name}
-                            onClick={() => toggleGuildSelection(guild.guild_name)}
-                            sx={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              p: 1.5,
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              borderRight: '1px solid',
-                              borderBottom: '1px solid',
-                              borderColor: 'divider',
-                              background: isSelected
-                                ? 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)'
-                                : 'white',
-                              borderLeft: isSelected ? '4px solid' : 'none',
-                              borderLeftColor: isSelected ? 'primary.main' : 'transparent',
-                              '&:hover': {
-                                backgroundColor: isSelected ? '#e3f2fd' : '#f5f7fa',
-                              },
-                            }}
-                          >
-                            <Checkbox
-                              checked={isSelected}
-                              onChange={() => toggleGuildSelection(guild.guild_name)}
-                              color="primary"
-                              size="small"
-                              sx={{ mr: 1.5 }}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.875rem' }}
-                                noWrap
-                              >
-                                {guild.guild_name}
-                              </Typography>
-                              <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
-                                {Array.from({ length: getRatingStars(guild.rating) }).map((_, i) => (
-                                  <StarIcon
-                                    key={i}
-                                    sx={{
-                                      fontSize: 12,
-                                      color: getRatingColor(guild.rating),
-                                    }}
-                                  />
-                                ))}
-                              </Box>
-                            </Box>
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </CardContent>
-                </Card>
+                <SiegeOpponentGuildPicker
+                  guilds={availableGuilds}
+                  selectedGuilds={selectedGuilds}
+                  onToggle={toggleGuildSelection}
+                  compact
+                />
               </Box>
             )}
 

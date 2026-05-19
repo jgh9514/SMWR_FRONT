@@ -5,10 +5,10 @@ import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMonsterList } from '@/features/siege/hooks/useSiegeList';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
-import { useApiPostMutation, useApiDeleteMutation } from '@/hooks/api/useApiMutation';
+import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { apiClient } from '@/shared/lib/api/client';
 import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
-import { getRenderableImageUrl } from '@/shared/utils/image';
+import { getRenderableImageUrl, inlineImagesForHtml2Canvas } from '@/shared/utils/image';
 import { monsterAwakenStepDigit } from '@/features/siege/lib/monsterIdEvolution';
 import { isAuthenticated } from '@/shared/utils/auth';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
@@ -27,6 +27,54 @@ interface DragInfo {
   monsterId: string;
   from: 'pool' | 'tier';
   fromTierId?: string;
+}
+
+type DropTarget = { type: 'tier'; tierId: string } | { type: 'pool' };
+
+interface TouchPending {
+  monsterId: string;
+  from: 'pool' | 'tier';
+  fromTierId?: string;
+  startX: number;
+  startY: number;
+  monster: MonsterOption;
+}
+
+interface TouchGhost {
+  monster: MonsterOption;
+  x: number;
+  y: number;
+}
+
+const TOUCH_DRAG_THRESHOLD_PX = 10;
+const TIER_DROP_ZONE_ATTR = 'data-tier-drop-zone';
+
+function findTierDropTarget(clientX: number, clientY: number): DropTarget | null {
+  const el = document.elementFromPoint(clientX, clientY);
+  if (!el) return null;
+  const zone = el.closest(`[${TIER_DROP_ZONE_ATTR}]`);
+  if (!zone) return null;
+  const value = zone.getAttribute(TIER_DROP_ZONE_ATTR);
+  if (value === 'pool') return { type: 'pool' };
+  if (value?.startsWith('tier:')) return { type: 'tier', tierId: value.slice(5) };
+  return null;
+}
+
+function applyMonsterMove(prev: TierRow[], info: DragInfo, target: DropTarget): TierRow[] {
+  if (target.type === 'pool') {
+    if (info.from === 'pool') return prev;
+    return prev.map((t) =>
+      t.id === info.fromTierId ? { ...t, monsterIds: t.monsterIds.filter((id) => id !== info.monsterId) } : t,
+    );
+  }
+  const next = prev.map((t) => ({ ...t, monsterIds: [...t.monsterIds] }));
+  if (info.from === 'tier' && info.fromTierId) {
+    const src = next.find((t) => t.id === info.fromTierId);
+    if (src) src.monsterIds = src.monsterIds.filter((id) => id !== info.monsterId);
+  }
+  const dst = next.find((t) => t.id === target.tierId);
+  if (dst && !dst.monsterIds.includes(info.monsterId)) dst.monsterIds.push(info.monsterId);
+  return next;
 }
 
 interface SavedTierList {
@@ -115,23 +163,29 @@ function jsonToTiers(json: string): TierRow[] | null {
 // ─── MonsterIcon ──────────────────────────────────────────────────────────────
 
 function MonsterIcon({
-  monster, size = 44, draggable = false, onDragStart, onRemove,
+  monster, size = 44, draggable = false, onDragStart, onTouchDragStart, onRemove, dimmed = false,
 }: {
   monster: MonsterOption;
   size?: number;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;
+  onTouchDragStart?: (e: React.TouchEvent) => void;
   onRemove?: () => void;
+  dimmed?: boolean;
 }) {
   const imgUrl = getRenderableImageUrl(monster.image_url);
   return (
     <div
       draggable={draggable}
       onDragStart={onDragStart}
+      onTouchStart={onTouchDragStart}
       title={monster.kr_name || monster.un_name}
       style={{
         position: 'relative', width: size, height: size, flexShrink: 0,
         cursor: draggable ? 'grab' : 'default',
+        touchAction: draggable ? 'none' : undefined,
+        opacity: dimmed ? 0.35 : 1,
+        transition: 'opacity 0.12s',
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -267,6 +321,8 @@ function HistoryPanel({
   onLoad: (tiers: TierRow[]) => void;
 }) {
   const qc = useQueryClient();
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   const { data: historyItems = [], isLoading } = useApiQuery<SavedTierList[]>({
     queryKey: HISTORY_QUERY_KEY,
@@ -275,7 +331,7 @@ function HistoryPanel({
     staleTime: 30_000,
   });
 
-  const deleteMutation = useApiDeleteMutation<unknown, { id: number }>(
+  const deleteMutation = useApiPostMutation<unknown, { id: number }>(
     '/summonerswar/tier-list/delete',
     {
       onSuccess: () => {
@@ -283,6 +339,18 @@ function HistoryPanel({
         toast.success('삭제되었습니다.');
       },
       onError: () => toast.error('삭제에 실패했습니다.'),
+    },
+  );
+
+  const renameMutation = useApiPostMutation<unknown, { id: number; title: string; tier_data: string }>(
+    '/summonerswar/tier-list/update',
+    {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+        setRenamingId(null);
+        toast.success('이름이 변경되었습니다.');
+      },
+      onError: () => toast.error('이름 변경에 실패했습니다.'),
     },
   );
 
@@ -296,6 +364,17 @@ function HistoryPanel({
   const handleDelete = (id: number) => {
     if (!confirm('삭제하시겠습니까?')) return;
     deleteMutation.mutate({ id });
+  };
+
+  const startRename = (item: SavedTierList) => {
+    setRenamingId(item.id);
+    setRenameValue(item.title);
+  };
+
+  const commitRename = (item: SavedTierList) => {
+    const title = renameValue.trim();
+    if (!title || title === item.title) { setRenamingId(null); return; }
+    renameMutation.mutate({ id: item.id, title, tier_data: item.tier_data });
   };
 
   const formatDate = (s: string) => {
@@ -342,35 +421,84 @@ function HistoryPanel({
             <div
               key={item.id}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10,
+                display: 'flex', alignItems: 'center', gap: 8,
                 padding: '9px 14px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
               }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {item.title}
-                </div>
+                {renamingId === item.id ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename(item);
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    maxLength={200}
+                    style={{
+                      width: '100%', fontSize: 13, background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(59,130,246,0.5)', borderRadius: 6,
+                      color: '#e2e8f0', padding: '2px 8px', outline: 'none',
+                    }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 13, color: '#e2e8f0', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.title}
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: '#475569', marginTop: 2 }}>
                   {formatDate(item.updated_at)}
                 </div>
               </div>
-              <button
-                onClick={() => handleLoad(item)}
-                style={{
-                  padding: '4px 10px', fontSize: 12, borderRadius: 6,
-                  border: '1px solid rgba(59,130,246,0.4)', background: 'rgba(59,130,246,0.1)',
-                  color: '#60a5fa', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                }}
-              >불러오기</button>
-              <button
-                onClick={() => handleDelete(item.id)}
-                style={{
-                  padding: '4px 8px', fontSize: 12, borderRadius: 6,
-                  border: '1px solid rgba(239,68,68,0.3)', background: 'transparent',
-                  color: '#f87171', cursor: 'pointer', flexShrink: 0,
-                }}
-              >삭제</button>
+              {renamingId === item.id ? (
+                <>
+                  <button
+                    onClick={() => commitRename(item)}
+                    style={{
+                      padding: '4px 10px', fontSize: 12, borderRadius: 6,
+                      border: '1px solid rgba(34,197,94,0.4)', background: 'rgba(34,197,94,0.1)',
+                      color: '#4ade80', cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >확인</button>
+                  <button
+                    onClick={() => setRenamingId(null)}
+                    style={{
+                      padding: '4px 8px', fontSize: 12, borderRadius: 6,
+                      border: '1px solid rgba(255,255,255,0.15)', background: 'transparent',
+                      color: '#64748b', cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >취소</button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleLoad(item)}
+                    style={{
+                      padding: '4px 10px', fontSize: 12, borderRadius: 6,
+                      border: '1px solid rgba(59,130,246,0.4)', background: 'rgba(59,130,246,0.1)',
+                      color: '#60a5fa', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                    }}
+                  >불러오기</button>
+                  <button
+                    onClick={() => startRename(item)}
+                    style={{
+                      padding: '4px 8px', fontSize: 12, borderRadius: 6,
+                      border: '1px solid rgba(255,255,255,0.15)', background: 'transparent',
+                      color: '#94a3b8', cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >수정</button>
+                  <button
+                    onClick={() => handleDelete(item.id)}
+                    style={{
+                      padding: '4px 8px', fontSize: 12, borderRadius: 6,
+                      border: '1px solid rgba(239,68,68,0.3)', background: 'transparent',
+                      color: '#f87171', cursor: 'pointer', flexShrink: 0,
+                    }}
+                  >삭제</button>
+                </>
+              )}
             </div>
           ))
         )}
@@ -400,6 +528,8 @@ interface TierRowItemProps {
   onMoveDown: () => void;
   onRemoveMonster: (id: string) => void;
   onDragStart: (e: React.DragEvent, monsterId: string, from: 'pool' | 'tier', tierId?: string) => void;
+  onTouchDragStart: (e: React.TouchEvent, monsterId: string, from: 'pool' | 'tier', tierId?: string) => void;
+  touchDraggingId: string | null;
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent) => void;
@@ -411,7 +541,7 @@ function TierRowItem({
   onEditLabelChange, onEditColorChange,
   onStartEdit, onApplyEdit, onCancelEdit,
   onDelete, onMoveUp, onMoveDown,
-  onRemoveMonster, onDragStart, onDragOver, onDragLeave, onDrop,
+  onRemoveMonster, onDragStart, onTouchDragStart, touchDraggingId, onDragOver, onDragLeave, onDrop,
 }: TierRowItemProps) {
   const [hovered, setHovered] = useState(false);
 
@@ -419,6 +549,7 @@ function TierRowItem({
     <div
       style={{
         display: 'flex',
+        alignItems: 'stretch',
         border: `1px solid ${isDragOver ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
         borderRadius: 8,
         background: isDragOver ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
@@ -430,10 +561,10 @@ function TierRowItem({
     >
       {/* Label column */}
       <div style={{
-        position: 'relative', minWidth: 80, width: 80, flexShrink: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', minWidth: 80, width: 80, flexShrink: 0, alignSelf: 'stretch',
+        display: 'grid', placeItems: 'center',
         borderRight: '1px solid rgba(255,255,255,0.06)',
-        backgroundColor: tier.color, padding: '4px 6px',
+        backgroundColor: tier.color, padding: '0 6px',
       }}>
         {isEditing ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', width: '100%', padding: 4 }}>
@@ -465,8 +596,12 @@ function TierRowItem({
         ) : (
           <>
             <span style={{
-              fontWeight: 700, color: '#fff', fontSize: 16, letterSpacing: '0.05em',
-              textShadow: '0 1px 3px rgba(0,0,0,0.5)', textAlign: 'center', wordBreak: 'break-all',
+              position: 'absolute', inset: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 700, color: '#fff', fontSize: 16, lineHeight: 1,
+              letterSpacing: '0.05em', textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+              textAlign: 'center', wordBreak: 'break-all', margin: 0, padding: '0 6px',
+              pointerEvents: 'none',
             }}>{tier.label}</span>
             {hovered && (
               <div style={{
@@ -506,6 +641,7 @@ function TierRowItem({
 
       {/* Drop zone */}
       <div
+        {...{ [TIER_DROP_ZONE_ATTR]: `tier:${tier.id}` }}
         onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
         style={{
           flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center',
@@ -523,7 +659,9 @@ function TierRowItem({
             return (
               <MonsterIcon
                 key={mid} monster={monster} size={44} draggable
+                dimmed={touchDraggingId === mid}
                 onDragStart={(e) => onDragStart(e, mid, 'tier', tier.id)}
+                onTouchDragStart={(e) => onTouchDragStart(e, mid, 'tier', tier.id)}
                 onRemove={() => onRemoveMonster(mid)}
               />
             );
@@ -546,11 +684,16 @@ export default function TierListClient() {
   const [editLabel, setEditLabel] = useState('');
   const [editColor, setEditColor] = useState('');
   const [dragOverTierId, setDragOverTierId] = useState<string | null>(null);
+  const [dragOverPool, setDragOverPool] = useState(false);
+  const [touchGhost, setTouchGhost] = useState<TouchGhost | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
 
   const dragInfo = useRef<DragInfo | null>(null);
+  const touchPendingRef = useRef<TouchPending | null>(null);
+  const touchGhostRef = useRef<TouchGhost | null>(null);
   const tierListRef = useRef<HTMLDivElement>(null);
   const qc = useQueryClient();
 
@@ -597,10 +740,14 @@ export default function TierListClient() {
       if (placedIds.has(m.monster_id)) return false;
       if (elementFilter && parseMonsterElemental(m.monster_elemental) !== elementFilter) return false;
       if (starFilter !== null && m.star !== starFilter) return false;
-      if (only2A && monsterAwakenStepDigit(m.monster_id) !== 2) return false;
+      if (only2A && (m.awaken_level ?? monsterAwakenStepDigit(m.monster_id) ?? 0) < 2) return false;
       if (searchText) {
         const q = searchText.toLowerCase();
-        if (!m.kr_name?.toLowerCase().includes(q) && !m.un_name?.toLowerCase().includes(q)) return false;
+        if (
+          !m.kr_name?.toLowerCase().includes(q) &&
+          !m.un_name?.toLowerCase().includes(q) &&
+          !m.modified_kr_name?.toLowerCase().includes(q)
+        ) return false;
       }
       return true;
     });
@@ -625,39 +772,148 @@ export default function TierListClient() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverTierId(tierId);
+    setDragOverPool(false);
   }, []);
 
-  const handleDragLeave = useCallback(() => setDragOverTierId(null), []);
+  const handleDragLeave = useCallback(() => {
+    setDragOverTierId(null);
+    setDragOverPool(false);
+  }, []);
 
   const handleDrop = useCallback((e: React.DragEvent, toTierId: string) => {
     e.preventDefault();
     setDragOverTierId(null);
+    setDragOverPool(false);
     const info = dragInfo.current;
     if (!info) return;
     dragInfo.current = null;
-    setTiers((prev) => {
-      const next = prev.map((t) => ({ ...t, monsterIds: [...t.monsterIds] }));
-      if (info.from === 'tier' && info.fromTierId) {
-        const src = next.find((t) => t.id === info.fromTierId);
-        if (src) src.monsterIds = src.monsterIds.filter((id) => id !== info.monsterId);
-      }
-      const dst = next.find((t) => t.id === toTierId);
-      if (dst && !dst.monsterIds.includes(info.monsterId)) dst.monsterIds.push(info.monsterId);
-      return next;
-    });
+    setTiers((prev) => applyMonsterMove(prev, info, { type: 'tier', tierId: toTierId }));
   }, []);
 
   const handleDropToPool = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    setDragOverPool(false);
     const info = dragInfo.current;
     if (!info || info.from === 'pool') { dragInfo.current = null; return; }
     dragInfo.current = null;
-    setTiers((prev) =>
-      prev.map((t) =>
-        t.id === info.fromTierId ? { ...t, monsterIds: t.monsterIds.filter((id) => id !== info.monsterId) } : t,
-      ),
-    );
+    setTiers((prev) => applyMonsterMove(prev, info, { type: 'pool' }));
   }, []);
+
+  const clearTouchDragUi = useCallback(() => {
+    touchPendingRef.current = null;
+    touchGhostRef.current = null;
+    setTouchGhost(null);
+    setDragOverTierId(null);
+    setDragOverPool(false);
+  }, []);
+
+  const updateTouchDropHighlight = useCallback((clientX: number, clientY: number) => {
+    const target = findTierDropTarget(clientX, clientY);
+    if (target?.type === 'tier') {
+      setDragOverTierId(target.tierId);
+      setDragOverPool(false);
+    } else if (target?.type === 'pool') {
+      setDragOverTierId(null);
+      setDragOverPool(true);
+    } else {
+      setDragOverTierId(null);
+      setDragOverPool(false);
+    }
+  }, []);
+
+  const handleMonsterTouchStart = useCallback(
+    (e: React.TouchEvent, monsterId: string, from: 'pool' | 'tier', fromTierId?: string) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      if (e.touches.length !== 1) return;
+      const monster = monsterById[monsterId];
+      if (!monster) return;
+      const touch = e.touches[0];
+      touchPendingRef.current = {
+        monsterId,
+        from,
+        fromTierId,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        monster,
+      };
+    },
+    [monsterById],
+  );
+
+  useEffect(() => {
+    touchGhostRef.current = touchGhost;
+  }, [touchGhost]);
+
+  useEffect(() => {
+    const onTouchMove = (e: TouchEvent) => {
+      const pending = touchPendingRef.current;
+      const ghost = touchGhostRef.current;
+
+      if (!pending && !ghost) return;
+
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      if (pending && !ghost) {
+        const dx = touch.clientX - pending.startX;
+        const dy = touch.clientY - pending.startY;
+        if (dx * dx + dy * dy < TOUCH_DRAG_THRESHOLD_PX * TOUCH_DRAG_THRESHOLD_PX) return;
+        e.preventDefault();
+        dragInfo.current = {
+          monsterId: pending.monsterId,
+          from: pending.from,
+          fromTierId: pending.fromTierId,
+        };
+        const nextGhost: TouchGhost = { monster: pending.monster, x: touch.clientX, y: touch.clientY };
+        touchPendingRef.current = null;
+        touchGhostRef.current = nextGhost;
+        setTouchGhost(nextGhost);
+        updateTouchDropHighlight(touch.clientX, touch.clientY);
+        return;
+      }
+
+      if (ghost) {
+        e.preventDefault();
+        const nextGhost: TouchGhost = { ...ghost, x: touch.clientX, y: touch.clientY };
+        touchGhostRef.current = nextGhost;
+        setTouchGhost(nextGhost);
+        updateTouchDropHighlight(touch.clientX, touch.clientY);
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      const pending = touchPendingRef.current;
+      const ghost = touchGhostRef.current;
+
+      if (!pending && !ghost) return;
+
+      if (pending && !ghost) {
+        touchPendingRef.current = null;
+        return;
+      }
+
+      const info = dragInfo.current;
+      const touch = e.changedTouches[0];
+      if (info && touch) {
+        const target = findTierDropTarget(touch.clientX, touch.clientY);
+        if (target) {
+          setTiers((prev) => applyMonsterMove(prev, info, target));
+        }
+      }
+
+      dragInfo.current = null;
+      clearTouchDragUi();
+    };
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('touchcancel', onTouchEnd);
+    return () => {
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchcancel', onTouchEnd);
+    };
+  }, [clearTouchDragUi, updateTouchDropHighlight]);
 
   // ── Tier management ───────────────────────────────────────────────────────
 
@@ -727,18 +983,18 @@ export default function TierListClient() {
     if (!tierListRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading('이미지 생성 중...');
+    let restoreImages: (() => void) | undefined;
     try {
       const html2canvas = (await import('html2canvas')).default;
-      // 임시로 export 모드 클래스 추가 (컨트롤 버튼 숨김)
-      tierListRef.current.classList.add('export-mode');
-      const canvas = await html2canvas(tierListRef.current, {
+      const root = tierListRef.current;
+      root.classList.add('export-mode');
+      restoreImages = await inlineImagesForHtml2Canvas(root);
+      const canvas = await html2canvas(root, {
         backgroundColor: '#0f172a',
         scale: 2,
         useCORS: true,
-        allowTaint: true,
         logging: false,
       });
-      tierListRef.current.classList.remove('export-mode');
       const link = document.createElement('a');
       link.download = 'tier-list.png';
       link.href = canvas.toDataURL('image/png');
@@ -747,10 +1003,11 @@ export default function TierListClient() {
       toast.success('PNG로 저장되었습니다!');
     } catch (err) {
       console.error(err);
-      if (tierListRef.current) tierListRef.current.classList.remove('export-mode');
       toast.dismiss(toastId);
       toast.error('이미지 생성에 실패했습니다.');
     } finally {
+      restoreImages?.();
+      tierListRef.current?.classList.remove('export-mode');
       setIsExporting(false);
     }
   }, []);
@@ -819,14 +1076,23 @@ export default function TierListClient() {
             링크 공유
           </HoverBtn>
           {loggedIn && (
-            <HoverBtn style={{ ...btnBase, borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} hoverStyle={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd' }} onClick={() => setShowSaveModal(true)}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                <polyline points="17 21 17 13 7 13 7 21" />
-                <polyline points="7 3 7 8 15 8" />
-              </svg>
-              히스토리 저장
-            </HoverBtn>
+            <>
+              <HoverBtn style={{ ...btnBase, borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} hoverStyle={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd' }} onClick={() => setShowHistoryModal(true)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
+                  <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="12" x2="15" y2="14" />
+                </svg>
+                불러오기
+              </HoverBtn>
+              <HoverBtn style={{ ...btnBase, borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} hoverStyle={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd' }} onClick={() => setShowSaveModal(true)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                  <polyline points="17 21 17 13 7 13 7 21" />
+                  <polyline points="7 3 7 8 15 8" />
+                </svg>
+                히스토리 저장
+              </HoverBtn>
+            </>
           )}
           <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.1)' }} />
           <HoverBtn style={{ ...btnBase, border: 'none' }} hoverStyle={btnHover} onClick={clearAll}>
@@ -861,6 +1127,8 @@ export default function TierListClient() {
             onMoveUp={() => moveTier(tier.id, -1)} onMoveDown={() => moveTier(tier.id, 1)}
             onRemoveMonster={(mid) => removeMonsterFromTier(tier.id, mid)}
             onDragStart={handleDragStart}
+            onTouchDragStart={handleMonsterTouchStart}
+            touchDraggingId={touchGhost?.monster.monster_id ?? null}
             onDragOver={(e) => handleDragOver(e, tier.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, tier.id)}
@@ -872,8 +1140,19 @@ export default function TierListClient() {
       <div>
         <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>몬스터 풀</h3>
         <div
-          style={{ borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+          style={{
+            borderRadius: 12,
+            border: `1px solid ${dragOverPool ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
+            background: dragOverPool ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+            transition: 'border-color 0.15s, background 0.15s',
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            setDragOverPool(true);
+            setDragOverTierId(null);
+          }}
+          onDragLeave={() => setDragOverPool(false)}
           onDrop={handleDropToPool}
         >
           {/* Filters */}
@@ -933,7 +1212,7 @@ export default function TierListClient() {
                 ))}
               </div>
               {/* 2A toggle */}
-              <button onClick={() => setOnly2A(!only2A)} title="2차 각성 몬스터만 보기" style={{
+              <button onClick={() => { setOnly2A((v) => { if (!v) setStarFilter(null); return !v; }); }} title="2차 각성 몬스터만 보기" style={{
                 padding: '4px 10px', fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
                 textTransform: 'uppercase', borderRadius: 6, cursor: 'pointer',
                 border: only2A ? '1px solid rgba(255,255,255,0.3)' : '1px solid rgba(255,255,255,0.1)',
@@ -952,26 +1231,64 @@ export default function TierListClient() {
             </div>
           </div>
           {/* Grid */}
-          <div style={{ padding: 10, display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 320, overflowY: 'auto', minHeight: 80 }}>
+          <div
+            {...{ [TIER_DROP_ZONE_ATTR]: 'pool' }}
+            style={{ padding: 10, display: 'flex', flexWrap: 'wrap', gap: 6, maxHeight: 320, overflowY: 'auto', minHeight: 80 }}
+          >
             {isLoading ? (
               <div style={{ width: '100%', display: 'flex', justifyContent: 'center', padding: '24px 0', color: '#475569', fontSize: 13 }}>로딩 중...</div>
             ) : filteredPool.length === 0 ? (
               <p style={{ width: '100%', textAlign: 'center', color: 'rgba(148,163,184,0.4)', fontSize: 13, padding: '24px 0', margin: 0 }}>몬스터가 없습니다</p>
             ) : (
               filteredPool.map((m) => (
-                <MonsterIcon key={m.monster_id} monster={m} size={44} draggable
-                  onDragStart={(e) => handleDragStart(e, m.monster_id, 'pool')} />
+                <MonsterIcon
+                  key={m.monster_id}
+                  monster={m}
+                  size={44}
+                  draggable
+                  dimmed={touchGhost?.monster.monster_id === m.monster_id}
+                  onDragStart={(e) => handleDragStart(e, m.monster_id, 'pool')}
+                  onTouchDragStart={(e) => handleMonsterTouchStart(e, m.monster_id, 'pool')}
+                />
               ))
             )}
           </div>
         </div>
       </div>
 
-      {/* History panel */}
-      <div>
-        <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>히스토리</h3>
-        <HistoryPanel loggedIn={loggedIn} onLoad={handleLoadHistory} />
-      </div>
+      {/* History modal */}
+      {showHistoryModal && (
+        <div
+          onClick={() => setShowHistoryModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1e293b', borderRadius: 16,
+              border: '1px solid rgba(255,255,255,0.1)',
+              padding: 24, width: 420, maxWidth: '90vw',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 15, color: '#e2e8f0', fontWeight: 600 }}>저장된 티어리스트</h3>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#64748b', fontSize: 18, lineHeight: 1, padding: 4,
+                }}
+              >×</button>
+            </div>
+            <HistoryPanel loggedIn={loggedIn} onLoad={(tiers) => { handleLoadHistory(tiers); setShowHistoryModal(false); }} />
+          </div>
+        </div>
+      )}
 
       {/* Save modal */}
       {showSaveModal && (
@@ -980,6 +1297,24 @@ export default function TierListClient() {
           onClose={() => setShowSaveModal(false)}
           onSave={handleSave}
         />
+      )}
+
+      {/* Touch drag ghost */}
+      {touchGhost && (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            left: touchGhost.x,
+            top: touchGhost.y,
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10000,
+            pointerEvents: 'none',
+            filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.45))',
+          }}
+        >
+          <MonsterIcon monster={touchGhost.monster} size={48} />
+        </div>
       )}
 
       {/* export-mode CSS */}

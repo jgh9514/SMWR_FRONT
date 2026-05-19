@@ -152,11 +152,11 @@ function SkillCard({ skill, isLeader = false, leaderDesc = '', leaderIcon }: {
   if (isLeader) {
     const iconSrc = leaderIcon ? getRenderableImageUrl(leaderIcon) : '/images/default-monster.png';
     return (
-      <Card variant="outlined" sx={(t) => ({ borderRadius: 2, height: '100%', bgcolor: t.palette.mode === 'dark' ? 'transparent' : 'common.white' })}>
+      <Card variant="outlined" sx={(t) => ({ borderRadius: 0, height: '100%', bgcolor: t.palette.mode === 'dark' ? 'transparent' : 'common.white' })}>
         <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
           <Stack direction="row" spacing={1.5} alignItems="flex-start">
             <Box component="img" src={iconSrc} alt=""
-              sx={{ width: 48, height: 48, flexShrink: 0, borderRadius: 1.5, bgcolor: 'action.hover', objectFit: 'contain', border: '1px solid', borderColor: 'divider' }}
+              sx={{ width: 48, height: 48, flexShrink: 0, borderRadius: 0, bgcolor: 'action.hover', objectFit: 'contain', border: '1px solid', borderColor: 'divider' }}
             />
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>

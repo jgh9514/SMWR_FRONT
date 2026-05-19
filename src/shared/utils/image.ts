@@ -110,3 +110,133 @@ export function getSwexPlayerImageUrl(
   const file = id ?? 'default';
   return `${SWEX_PLAYER_IMAGE_BASE}/${file}.jpg`;
 }
+
+const CDN_IMAGE_PATH_PREFIXES = ['/images/', '/monster/', '/siege/'] as const;
+
+/** CloudFront·상대 경로 → `/images/...` 또는 `/monster/...` (허용 프리픽스만) */
+export function extractMonsterImagePath(src: string | null | undefined): string | null {
+  if (!src || !src.trim()) {
+    return '/images/default-monster.png';
+  }
+
+  const trimmed = src.trim();
+  if (trimmed.startsWith('data:')) {
+    return null;
+  }
+
+  let path: string;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      path = new URL(trimmed).pathname;
+    } catch {
+      return null;
+    }
+  } else {
+    path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+  }
+
+  if (path.includes('..')) {
+    return null;
+  }
+
+  if (!CDN_IMAGE_PATH_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    return null;
+  }
+
+  return path;
+}
+
+/**
+ * html2canvas 등 캡처용 — `/api/cdn-image` 동일 출처 프록시 URL.
+ * (브라우저 → CloudFront 직접 fetch는 CORS로 막힘)
+ */
+export function toCanvasExportImageUrl(src: string | null | undefined): string {
+  const origin =
+    typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+
+  const trimmed = src?.trim() ?? '';
+  if (trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  const path = extractMonsterImagePath(src);
+  if (!path) {
+    return trimmed;
+  }
+
+  return `${origin}/api/cdn-image?path=${encodeURIComponent(path)}`;
+}
+
+/** @deprecated {@link toCanvasExportImageUrl} 사용 */
+export const toSameOriginMonsterImageUrl = toCanvasExportImageUrl;
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+function waitForImageLoad(img: HTMLImageElement, url: string): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => resolve();
+    img.onload = done;
+    img.onerror = done;
+    if (img.src !== url) {
+      img.src = url;
+    } else if (img.complete) {
+      resolve();
+    }
+  });
+}
+
+/**
+ * html2canvas 전에 `<img>`를 data URL로 인라인. 완료 후 restore()로 원복.
+ */
+export async function inlineImagesForHtml2Canvas(root: Element): Promise<() => void> {
+  const images = Array.from(root.querySelectorAll('img'));
+  const restores: Array<{ img: HTMLImageElement; src: string; crossOrigin: string | null }> =
+    [];
+
+  await Promise.all(
+    images.map(async (img) => {
+      const attrSrc = img.getAttribute('src') ?? img.src;
+      const fetchUrl = toCanvasExportImageUrl(attrSrc);
+
+      restores.push({
+        img,
+        src: img.src,
+        crossOrigin: img.crossOrigin,
+      });
+
+      if (fetchUrl.startsWith('data:') || !fetchUrl.includes('/api/cdn-image')) {
+        return;
+      }
+
+      try {
+        const res = await fetch(fetchUrl, { credentials: 'same-origin', cache: 'force-cache' });
+        if (!res.ok) {
+          throw new Error(`image fetch failed: ${res.status}`);
+        }
+        img.src = await blobToDataUrl(await res.blob());
+        img.removeAttribute('crossorigin');
+      } catch {
+        img.crossOrigin = 'anonymous';
+        await waitForImageLoad(img, fetchUrl);
+      }
+    }),
+  );
+
+  return () => {
+    for (const { img, src, crossOrigin } of restores) {
+      img.src = src;
+      if (crossOrigin) {
+        img.crossOrigin = crossOrigin;
+      } else {
+        img.removeAttribute('crossorigin');
+      }
+    }
+  };
+}

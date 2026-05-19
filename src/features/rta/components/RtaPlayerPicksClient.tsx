@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, memo, useMemo, useState } from 'react';
+import { Fragment, memo, useMemo, useState, type ComponentProps } from 'react';
 import { useParams } from 'next/navigation';
 import {
   Alert,
@@ -49,6 +49,32 @@ function n(v: unknown): number {
   if (v == null || v === '') return 0;
   const x = Number(v);
   return Number.isFinite(x) ? x : 0;
+}
+
+function winRateColor(value: number | null): 'text.disabled' | 'success.main' | 'error.main' {
+  if (value == null) return 'text.disabled';
+  return value >= 50 ? 'success.main' : 'error.main';
+}
+
+function PlayerWinRateText({
+  value,
+  sx,
+}: {
+  value: number | null;
+  sx?: ComponentProps<typeof Typography>['sx'];
+}) {
+  if (value == null) {
+    return (
+      <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, ...sx }}>
+        —
+      </Typography>
+    );
+  }
+  return (
+    <Typography fontWeight={800} color={winRateColor(value)} sx={{ ...NUMERIC_CELL_SX, ...sx }}>
+      {formatPercentage(value)}
+    </Typography>
+  );
 }
 
 function rowFromApi(r: RtaPlayerMonsterUsageRow & Record<string, unknown>): RtaPlayerMonsterUsageRow {
@@ -124,10 +150,7 @@ function PickSlotBox({
   const fill = Math.min(100, Math.max(0, pickSharePct));
   const slotLabel = TEAM_PICK_SLOT_LABEL[slotNo] ?? '—';
   const wr = winRatePct;
-  const wrColor = wr == null ? 'text.disabled'
-    : wr >= 55 ? 'error.main'
-    : wr >= 50 ? 'success.main'
-    : 'text.secondary';
+  const wrColor = winRateColor(wr);
   const hasData = matchCnt > 0;
   const textColor = hasData
     ? (isDark ? '#fff' : theme.palette.getContrastText(alpha(color, 0.35)))
@@ -657,9 +680,7 @@ const PlayerPickStatCard = memo(function PlayerPickStatCard({
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
               승률
             </Typography>
-            <Typography fontWeight={800} sx={{ ...NUMERIC_CELL_SX, fontSize: '0.95rem' }}>
-              {wr == null ? '—' : formatPercentage(wr)}
-            </Typography>
+            <PlayerWinRateText value={wr} sx={{ fontSize: '0.95rem' }} />
           </Box>
           <Box>
             <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block' }}>
@@ -917,7 +938,10 @@ export default function RtaPlayerPicksClient() {
                         {row.pick_rate_pct == null ? '—' : formatPercentage(toNum(row.pick_rate_pct))}
                       </TableCell>
                       <TableCell align="right" sx={NUMERIC_CELL_SX}>
-                        {row.win_rate_pct == null ? '—' : formatPercentage(toNum(row.win_rate_pct))}
+                        <PlayerWinRateText
+                          value={row.win_rate_pct == null ? null : toNum(row.win_rate_pct)}
+                          sx={{ fontSize: 'inherit', fontWeight: 700 }}
+                        />
                       </TableCell>
                       <TableCell align="right" sx={NUMERIC_CELL_SX}>
                         {row.ban_rate_pct == null ? '—' : formatPercentage(toNum(row.ban_rate_pct))}

@@ -20,6 +20,8 @@ import {
   Skeleton,
   Tooltip,
 } from '@mui/material';
+import type { Theme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -50,19 +52,37 @@ function getHistoryRowDeckId(item: HistoryItem): string | null {
 function BasicInfoSkeleton() {
   return (
     <CardContent sx={{ '&:last-child': { paddingBottom: '16px' } }}>
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, gap: 2 }}>
-        {[1, 2, 3].map((i) => (
-          <Box key={i} sx={{ textAlign: 'center' }}>
-            <Skeleton variant="rounded" width={100} height={100} sx={{ borderRadius: 0 }} />
-            <Skeleton variant="text" width={60} sx={{ mx: 'auto', mt: 0.5 }} />
-          </Box>
-        ))}
-      </Box>
-      <Skeleton variant="rounded" height={60} sx={{ mb: 3 }} />
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} variant="rounded" height={70} />
-        ))}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { md: 'stretch' },
+          gap: { xs: 2, md: 3 },
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexShrink: 0 }}>
+          {[1, 2, 3].map((i) => (
+            <Box key={i} sx={{ textAlign: 'center' }}>
+              <Skeleton variant="rounded" width={100} height={100} sx={{ borderRadius: 0 }} />
+              <Skeleton variant="text" width={60} sx={{ mx: 'auto', mt: 0.5 }} />
+            </Box>
+          ))}
+        </Box>
+        <Skeleton variant="rounded" height={60} sx={{ flex: 1, minWidth: 0 }} />
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, minmax(72px, 1fr))' },
+            gap: 2,
+            flexShrink: 0,
+            width: { md: 'auto' },
+            minWidth: { md: 280 },
+          }}
+        >
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} variant="rounded" height={70} />
+          ))}
+        </Box>
       </Box>
     </CardContent>
   );
@@ -87,6 +107,37 @@ function HistorySkeleton() {
     </CardContent>
   );
 }
+
+function siegeDetailCardHeaderSx(t: Theme) {
+  return {
+    background: `linear-gradient(135deg, ${t.palette.primary.main} 0%, ${alpha(t.palette.primary.main, 0.85)} 100%)`,
+    color: t.palette.primary.contrastText,
+    borderBottom: '1px solid',
+    borderColor: t.palette.divider,
+    '& .MuiCardHeader-title': {
+      color: t.palette.primary.contrastText,
+    },
+  };
+}
+
+function siegeDetailMutedPanelSx(t: Theme) {
+  return {
+    bgcolor: alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.1 : 0.06),
+    borderRadius: 1,
+    border: '1px solid',
+    borderColor: t.palette.divider,
+  };
+}
+
+const siegeDetailListCardSx = {
+  border: '1px solid',
+  borderColor: 'divider',
+  transition: 'all 0.2s',
+  '&:hover': {
+    boxShadow: 2,
+    borderColor: 'primary.light',
+  },
+} as const;
 
 export default function MonsterDetailPage() {
   const params = useParams();
@@ -339,9 +390,9 @@ export default function MonsterDetailPage() {
             startIcon={<ArrowBackIcon />}
             size={mobile ? 'small' : 'medium'}
             sx={{
-              borderColor: '#34495e',
-              color: '#34495e',
-              '&:hover': { borderColor: '#2c3e50', bgcolor: '#f8f9fa' },
+              borderColor: 'divider',
+              color: 'text.primary',
+              '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
             }}
           >
             뒤로가기
@@ -349,7 +400,7 @@ export default function MonsterDetailPage() {
           <Typography
             variant="h5"
             component="h1"
-            sx={{ fontWeight: 600, fontSize: { xs: '20px', md: '28px' }, color: '#2c3e50' }}
+            sx={{ fontWeight: 600, fontSize: { xs: '20px', md: '28px' }, color: 'text.primary' }}
           >
             몬스터 상세 정보
           </Typography>
@@ -358,142 +409,169 @@ export default function MonsterDetailPage() {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+            /* PC: 기본정보 전폭 → 추천공덱 | 공성률 1:1 */
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
             gap: { xs: 2, md: 3 },
           }}
         >
-          {/* 기본 정보 */}
-          <Box>
+          {/* 기본 정보 — md+ 한 줄 전폭 */}
+          <Box sx={{ gridColumn: { md: '1 / -1' }, minWidth: 0 }}>
             <Card sx={{ height: '100%', boxShadow: 2 }}>
               <CardHeader
                 title="기본 정보"
-                sx={{
-                  bgcolor: '#2c3e50',
-                  color: 'white',
-                  borderBottom: '1px solid #e0e0e0',
-                }}
+                sx={siegeDetailCardHeaderSx}
                 titleTypographyProps={{ variant: mobile ? 'subtitle1' : 'h6', fontWeight: 600 }}
               />
               {basic.isLoading && !enemyData ? (
                 <BasicInfoSkeleton />
               ) : enemyData ? (
                 <CardContent sx={{ '&:last-child': { paddingBottom: '16px' } }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3, gap: { xs: 1, md: 2 } }}>
-                    {[1, 2, 3].map((index) => {
-                      const imageUrl = enemyData[`image_url${index}` as keyof EnemyData] as string | undefined;
-                      const monsterName = enemyData[`m${index}_kr_name` as keyof EnemyData] as string | undefined;
-                      return (
-                        <Box key={index} sx={{ textAlign: 'center' }}>
-                          {imageUrl && (
-                            <Avatar
-                              src={getMonsterImageUrl(imageUrl)}
-                              sx={{
-                                width: { xs: 80, md: 100 },
-                                height: { xs: 80, md: 100 },
-                                border: '2px solid #34495e',
-                                boxShadow: 2,
-                              }}
-                            />
-                          )}
-                          {monsterName && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                mt: 0.5,
-                                display: 'block',
-                                fontSize: { xs: '11px', md: '12px' },
-                                color: 'text.primary',
-                                fontWeight: 500,
-                              }}
-                            >
-                              {monsterName}
-                            </Typography>
-                          )}
-                        </Box>
-                      );
-                    })}
-                  </Box>
-                  {enemyData?.leader_skill_description && (
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      flexDirection: { xs: 'column', md: 'row' },
+                      alignItems: { md: 'stretch' },
+                      gap: { xs: 2, md: 3 },
+                    }}
+                  >
                     <Box
                       sx={{
-                        mb: 3,
-                        p: 2,
-                        bgcolor: '#f5f5f5',
-                        borderRadius: 1,
-                        border: '1px solid #e0e0e0',
                         display: 'flex',
-                        gap: 2,
-                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: { xs: 1, md: 2 },
+                        flexShrink: 0,
                       }}
                     >
-                      {enemyData?.leader_icon && (
-                        <Box
-                          component="img"
-                          src={getMonsterImageUrl(enemyData.leader_icon)}
-                          alt="리더 스킬"
-                          sx={{
-                            width: { xs: 48, md: 60 },
-                            height: { xs: 48, md: 60 },
-                            border: '2px solid #34495e',
-                            boxShadow: 1,
-                            bgcolor: 'white',
-                            borderRadius: 0,
-                            objectFit: 'contain',
-                            flexShrink: 0,
-                          }}
-                        />
-                      )}
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            fontWeight: 600,
-                            display: 'block',
-                            mb: 1,
-                            color: '#2c3e50',
-                            fontSize: { xs: '12px', md: '14px' },
-                          }}
-                        >
-                          리더 스킬
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontSize: { xs: '12px', md: '14px' }, color: 'text.primary', lineHeight: 1.6 }}
-                        >
-                          {enemyData.leader_skill_description}
-                        </Typography>
-                      </Box>
+                      {[1, 2, 3].map((index) => {
+                        const imageUrl = enemyData[`image_url${index}` as keyof EnemyData] as string | undefined;
+                        const monsterName = enemyData[`m${index}_kr_name` as keyof EnemyData] as string | undefined;
+                        return (
+                          <Box key={index} sx={{ textAlign: 'center' }}>
+                            {imageUrl && (
+                              <Avatar
+                                src={getMonsterImageUrl(imageUrl)}
+                                sx={{
+                                  width: { xs: 80, md: 96 },
+                                  height: { xs: 80, md: 96 },
+                                  border: '2px solid',
+                                  borderColor: 'primary.main',
+                                  boxShadow: 2,
+                                  bgcolor: 'background.paper',
+                                  '& img': { objectFit: 'contain' },
+                                }}
+                              />
+                            )}
+                            {monsterName && (
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  mt: 0.5,
+                                  display: 'block',
+                                  fontSize: { xs: '11px', md: '12px' },
+                                  color: 'text.primary',
+                                  fontWeight: 500,
+                                }}
+                              >
+                                {monsterName}
+                              </Typography>
+                            )}
+                          </Box>
+                        );
+                      })}
                     </Box>
-                  )}
-                  <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-                    {[
-                      { value: enemyData?.total_rate || 0, label: '공성률' },
-                      { value: enemyData?.total_count || 0, label: '총 게임' },
-                      { value: enemyData?.win_count || 0, label: '승리' },
-                      { value: enemyData?.lose_count || 0, label: '패배' },
-                    ].map((item) => (
-                      <Box key={item.label}>
-                        <Box
-                          sx={{
-                            textAlign: 'center',
-                            p: 2,
-                            bgcolor: '#f8f9fa',
-                            borderRadius: 1,
-                            border: '1px solid #e0e0e0',
-                          }}
-                        >
+                    {enemyData?.leader_skill_description && (
+                      <Box
+                        sx={(t) => ({
+                          p: 2,
+                          display: 'flex',
+                          gap: 2,
+                          alignItems: 'center',
+                          flex: 1,
+                          minWidth: 0,
+                          ...siegeDetailMutedPanelSx(t),
+                        })}
+                      >
+                        {enemyData?.leader_icon && (
+                          <Box
+                            component="img"
+                            src={getMonsterImageUrl(enemyData.leader_icon)}
+                            alt="리더 스킬"
+                            sx={{
+                              width: { xs: 48, md: 56 },
+                              height: { xs: 48, md: 56 },
+                              border: '2px solid',
+                              borderColor: 'primary.main',
+                              boxShadow: 1,
+                              bgcolor: 'background.paper',
+                              borderRadius: 0,
+                              objectFit: 'contain',
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
                           <Typography
-                            variant={mobile ? 'h6' : 'h5'}
-                            sx={{ fontWeight: 700, mb: 0.5, color: '#2c3e50' }}
+                            variant="caption"
+                            sx={{
+                              fontWeight: 600,
+                              display: 'block',
+                              mb: 1,
+                              color: 'text.secondary',
+                              fontSize: { xs: '12px', md: '14px' },
+                            }}
                           >
-                            {item.value}
+                            리더 스킬
                           </Typography>
-                          <Typography variant="caption" sx={{ color: '#7f8c8d' }}>
-                            {item.label}
+                          <Typography
+                            variant="body2"
+                            sx={{ fontSize: { xs: '12px', md: '14px' }, color: 'text.primary', lineHeight: 1.6 }}
+                          >
+                            {enemyData.leader_skill_description}
                           </Typography>
                         </Box>
                       </Box>
-                    ))}
+                    )}
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, minmax(72px, 1fr))' },
+                        gap: 2,
+                        flexShrink: 0,
+                        width: { xs: '100%', md: 'auto' },
+                        minWidth: { md: 280 },
+                      }}
+                    >
+                      {[
+                        { value: enemyData?.total_rate || 0, label: '공성률' },
+                        { value: enemyData?.total_count || 0, label: '총 게임' },
+                        { value: enemyData?.win_count || 0, label: '승리' },
+                        { value: enemyData?.lose_count || 0, label: '패배' },
+                      ].map((item) => (
+                        <Box key={item.label}>
+                          <Box
+                            sx={(t) => ({
+                              textAlign: 'center',
+                              p: { xs: 2, md: 1.5 },
+                              height: '100%',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'center',
+                              ...siegeDetailMutedPanelSx(t),
+                            })}
+                          >
+                            <Typography
+                              variant={mobile ? 'h6' : 'h5'}
+                              sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}
+                            >
+                              {item.value}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {item.label}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
                   </Box>
                 </CardContent>
               ) : (
@@ -502,8 +580,8 @@ export default function MonsterDetailPage() {
             </Card>
           </Box>
 
-          {/* 추천 공덱 */}
-          <Box>
+          {/* 추천 공덱 — md+ 좌 50% */}
+          <Box sx={{ minWidth: 0 }}>
             <Card sx={{ height: '100%', boxShadow: 2 }}>
               <CardHeader
                 title={
@@ -513,21 +591,17 @@ export default function MonsterDetailPage() {
                       variant="contained"
                       size="small"
                       onClick={() => setAddPopupOpen(true)}
-                      sx={{
-                        bgcolor: '#34495e',
-                        color: 'white',
-                        '&:hover': { bgcolor: '#2c3e50' },
-                      }}
+                      sx={(t) => ({
+                        bgcolor: alpha(t.palette.common.white, 0.18),
+                        color: t.palette.primary.contrastText,
+                        '&:hover': { bgcolor: alpha(t.palette.common.white, 0.28) },
+                      })}
                     >
                       추가
                     </Button>
                   </Box>
                 }
-                sx={{
-                  bgcolor: '#34495e',
-                  color: 'white',
-                  borderBottom: '1px solid #e0e0e0',
-                }}
+                sx={siegeDetailCardHeaderSx}
                 titleTypographyProps={{ variant: mobile ? 'subtitle1' : 'h6', fontWeight: 600 }}
               />
               {recommended.isLoading && !recommended.data ? (
@@ -536,7 +610,7 @@ export default function MonsterDetailPage() {
                 <CardContent>
                   {recommendedList.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                      <Typography variant="body2" color="text.secondary">
                         추천 공덱이 없습니다
                       </Typography>
                     </Box>
@@ -544,15 +618,7 @@ export default function MonsterDetailPage() {
                     <>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {recommendedList.map((item: RecommendedItem, idx: number) => (
-                          <Card
-                            key={idx}
-                            variant="outlined"
-                            sx={{
-                              border: '1px solid #e0e0e0',
-                              '&:hover': { boxShadow: 2, borderColor: '#34495e' },
-                              transition: 'all 0.2s',
-                            }}
-                          >
+                          <Card key={idx} variant="outlined" sx={siegeDetailListCardSx}>
                             <CardContent sx={{ py: 1.5, '&:last-child': { paddingBottom: '12px' } }}>
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -566,7 +632,8 @@ export default function MonsterDetailPage() {
                                           sx={{
                                             width: { xs: 34, sm: 38, md: 50 },
                                             height: { xs: 34, sm: 38, md: 50 },
-                                            border: '2px solid #34495e',
+                                            border: '2px solid',
+                                            borderColor: 'primary.main',
                                             borderWidth: { xs: 1.5, md: 2 },
                                             boxShadow: 1,
                                             flexShrink: 0,
@@ -586,9 +653,9 @@ export default function MonsterDetailPage() {
                                     setDeckDetailPopupOpen(true);
                                   }}
                                   sx={{
-                                    borderColor: '#34495e',
-                                    color: '#34495e',
-                                    '&:hover': { borderColor: '#2c3e50', bgcolor: '#f8f9fa' },
+                                    borderColor: 'divider',
+                                    color: 'text.primary',
+                                    '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
                                   }}
                                 >
                                   상세보기
@@ -604,13 +671,7 @@ export default function MonsterDetailPage() {
                             count={Math.ceil(recommendedTotalCount / recommendedLimit)}
                             page={recommendedPage}
                             onChange={(_, page) => setRecommendedPage(page)}
-                            sx={{
-                              '& .MuiPaginationItem-root': {
-                                color: '#34495e',
-                                '&.Mui-selected': { bgcolor: '#34495e', color: 'white', '&:hover': { bgcolor: '#2c3e50' } },
-                                '&:hover': { bgcolor: '#f8f9fa' },
-                              },
-                            }}
+                            color="primary"
                             size={mobile ? 'small' : 'medium'}
                           />
                         </Box>
@@ -622,16 +683,12 @@ export default function MonsterDetailPage() {
             </Card>
           </Box>
 
-          {/* 공성률 정보 */}
-          <Box>
-            <Card sx={{ boxShadow: 2 }}>
+          {/* 공성률 정보 — md+ 우 50% */}
+          <Box sx={{ minWidth: 0 }}>
+            <Card sx={{ height: '100%', boxShadow: 2 }}>
               <CardHeader
                 title="공성률 정보"
-                sx={{
-                  bgcolor: '#34495e',
-                  color: 'white',
-                  borderBottom: '1px solid #e0e0e0',
-                }}
+                sx={siegeDetailCardHeaderSx}
                 titleTypographyProps={{ variant: mobile ? 'subtitle1' : 'h6', fontWeight: 600 }}
               />
               {history.isLoading && !history.data ? (
@@ -640,7 +697,7 @@ export default function MonsterDetailPage() {
                 <CardContent>
                   {historyList.length === 0 ? (
                     <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" sx={{ color: '#7f8c8d' }}>
+                      <Typography variant="body2" color="text.secondary">
                         공격 이력이 없습니다
                       </Typography>
                     </Box>
@@ -655,86 +712,79 @@ export default function MonsterDetailPage() {
                       )}
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                         {historyList.map((item: HistoryItem, idx: number) => (
-                          <Card
-                            key={idx}
-                            variant="outlined"
-                            sx={{
-                              border: '1px solid #e0e0e0',
-                              '&:hover': { boxShadow: 2, borderColor: '#34495e' },
-                              transition: 'all 0.2s',
-                            }}
-                          >
+                          <Card key={idx} variant="outlined" sx={siegeDetailListCardSx}>
                             <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { paddingBottom: '12px' } }}>
                               <Box
                                 sx={{
-                                  display: 'flex',
+                                  display: 'grid',
+                                  gridTemplateColumns: {
+                                    xs: '1fr',
+                                    sm: 'auto minmax(0, 1fr) auto',
+                                  },
+                                  gap: { xs: 1.25, sm: 2 },
                                   alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: 1,
-                                  flexWrap: { xs: 'wrap', sm: 'nowrap' },
                                 }}
                               >
-                                <Box
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: { xs: 1, md: 2 },
-                                    flexWrap: 'nowrap',
-                                    flex: 1,
-                                    minWidth: 0,
-                                  }}
-                                >
-                                  <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, minWidth: { xs: 'auto', md: 180 } }}>
-                                    {[1, 2, 3].map((i) => {
-                                      const imageUrl = item[`image_url${i}` as keyof HistoryItem] as string | undefined;
-                                      if (i === 3 && !imageUrl) return null;
-                                      return (
-                                        <Avatar
-                                          key={i}
-                                          src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
-                                          sx={{
-                                            width: { xs: 44, md: 56 },
-                                            height: { xs: 44, md: 56 },
-                                            border: '2px solid #34495e',
-                                            boxShadow: 1,
-                                            ml: i > 1 ? -0.5 : 0,
-                                            flexShrink: 0,
-                                            bgcolor: 'background.paper',
-                                            '& img': { objectFit: 'contain' },
-                                          }}
-                                        />
-                                      );
-                                    })}
-                                  </Box>
-                                  <Box sx={{ flex: 1, minWidth: 0, maxWidth: { xs: '100%', md: 300 } }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                      <Chip
-                                        label={`${item.total_rate || 0}%`}
+                                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                                  {[1, 2, 3].map((i) => {
+                                    const imageUrl = item[`image_url${i}` as keyof HistoryItem] as string | undefined;
+                                    if (i === 3 && !imageUrl) return null;
+                                    return (
+                                      <Avatar
+                                        key={i}
+                                        src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
                                         sx={{
-                                          bgcolor: item.total_rate && item.total_rate >= 50 ? '#34495e' : '#95a5a6',
-                                          color: 'white',
-                                          fontWeight: 500,
-                                          height: 24,
+                                          width: { xs: 44, md: 52 },
+                                          height: { xs: 44, md: 52 },
+                                          border: '2px solid',
+                                          borderColor: 'primary.main',
+                                          boxShadow: 1,
+                                          ml: i > 1 ? -0.5 : 0,
+                                          flexShrink: 0,
+                                          bgcolor: 'background.paper',
+                                          '& img': { objectFit: 'contain' },
                                         }}
-                                        size="small"
                                       />
-                                      <Typography variant="caption" sx={{ color: '#7f8c8d', fontSize: '0.75rem' }}>
-                                        {item.win_count || 0}승 {item.lose_count || 0}패
-                                      </Typography>
-                                    </Box>
-                                    <LinearProgress
-                                      variant="determinate"
-                                      value={item.total_rate || 0}
-                                      sx={{
-                                        height: 6,
-                                        borderRadius: 1,
-                                        bgcolor: '#e0e0e0',
-                                        '& .MuiLinearProgress-bar': {
-                                          bgcolor: item.total_rate && item.total_rate >= 50 ? '#34495e' : '#95a5a6',
-                                        },
-                                      }}
+                                    );
+                                  })}
+                                </Box>
+                                <Box sx={{ minWidth: 0, width: '100%' }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
+                                    <Chip
+                                      label={`${item.total_rate || 0}%`}
+                                      size="small"
+                                      sx={(t) => ({
+                                        fontWeight: 600,
+                                        height: 24,
+                                        bgcolor:
+                                          item.total_rate && item.total_rate >= 50
+                                            ? t.palette.primary.main
+                                            : alpha(t.palette.text.secondary, 0.25),
+                                        color:
+                                          item.total_rate && item.total_rate >= 50
+                                            ? t.palette.primary.contrastText
+                                            : t.palette.text.primary,
+                                      })}
                                     />
+                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', flexShrink: 0 }}>
+                                      {item.win_count || 0}승 {item.lose_count || 0}패
+                                    </Typography>
                                   </Box>
+                                  <LinearProgress
+                                    variant="determinate"
+                                    value={item.total_rate || 0}
+                                    color={item.total_rate && item.total_rate >= 50 ? 'primary' : 'inherit'}
+                                    sx={(t) => ({
+                                      height: 6,
+                                      borderRadius: 1,
+                                      bgcolor: alpha(t.palette.divider, 0.8),
+                                      ...(!(item.total_rate && item.total_rate >= 50) && {
+                                        '& .MuiLinearProgress-bar': {
+                                          bgcolor: t.palette.text.disabled,
+                                        },
+                                      }),
+                                    })}
+                                  />
                                 </Box>
                                 <Box
                                   sx={{
@@ -742,8 +792,7 @@ export default function MonsterDetailPage() {
                                     alignItems: 'center',
                                     gap: 0.75,
                                     flexShrink: 0,
-                                    flexBasis: { xs: '100%', sm: 'auto' },
-                                    justifyContent: { xs: 'flex-end', sm: 'flex-start' },
+                                    justifyContent: { xs: 'center', sm: 'flex-end' },
                                   }}
                                 >
                                   {(() => {
@@ -820,13 +869,7 @@ export default function MonsterDetailPage() {
                             count={Math.ceil(historyTotalCount / historyLimit)}
                             page={historyPage}
                             onChange={(_, page) => setHistoryPage(page)}
-                            sx={{
-                              '& .MuiPaginationItem-root': {
-                                color: '#34495e',
-                                '&.Mui-selected': { bgcolor: '#34495e', color: 'white', '&:hover': { bgcolor: '#2c3e50' } },
-                                '&:hover': { bgcolor: '#f8f9fa' },
-                              },
-                            }}
+                            color="primary"
                             size={mobile ? 'small' : 'medium'}
                           />
                         </Box>

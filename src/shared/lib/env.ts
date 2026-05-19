@@ -11,6 +11,9 @@ declare global {
   }
 }
 
+/** CloudFront 기본 (NEXT_PUBLIC_APP_CDN_URL 미설정 시 /api/cdn-image·/siege 에셋용) */
+export const DEFAULT_APP_CDN_BASE = 'https://dyjduzi8vf2k4.cloudfront.net';
+
 /**
  * CloudFront CDN URL 가져오기
  * 1. 빌드 시점: process.env.APP_CDN_URL (NEXT_PUBLIC_ 접두사 필요)
@@ -69,17 +72,22 @@ export const getCdnImageUrl = (imagePath: string): string => {
     return imagePath;
   }
 
+  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
   const cdnUrl = getCdnUrl();
-  
-  // CDN URL이 없으면 상대 경로 반환 (기존 동작 유지)
+
+  // CDN URL이 없으면: /images·/monster 는 public 상대 경로, /siege 는 Next 라우트(/siege/map)와 충돌 → CDN 직접
   if (!cdnUrl) {
-    return imagePath;
+    if (cleanPath.startsWith('/siege/')) {
+      const base = DEFAULT_APP_CDN_BASE.endsWith('/')
+        ? DEFAULT_APP_CDN_BASE.slice(0, -1)
+        : DEFAULT_APP_CDN_BASE;
+      return `${base}${cleanPath}`;
+    }
+    return cleanPath;
   }
 
-  // 경로 정리 (앞뒤 슬래시 처리)
-  const cleanPath = imagePath.startsWith('/') ? imagePath : `/${imagePath}`;
   const cleanCdnUrl = cdnUrl.endsWith('/') ? cdnUrl.slice(0, -1) : cdnUrl;
-  
+
   return `${cleanCdnUrl}${cleanPath}`;
 };
 
