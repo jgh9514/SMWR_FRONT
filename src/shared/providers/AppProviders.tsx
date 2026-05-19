@@ -428,6 +428,34 @@ export default function AppProviders({ children }: AppProvidersProps) {
     bootstrap();
   }, [isPublicPath, isAdminPath]);
 
+  // 자동 로그인: 탭을 오래 켜 둔 경우(API 호출 없음)에도 주기적으로 세션 갱신
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isPublicPath || isAdminPath) return;
+
+    const SESSION_KEEPALIVE_MS = 60 * 60 * 1000; // 1시간
+
+    const tick = async () => {
+      if (isForceLoggedOut()) return;
+      if (localStorage.getItem('remember_login') !== 'true') return;
+      if (!isAuthenticated()) return;
+
+      try {
+        const { apiClient } = await import('@/shared/lib/api/client');
+        const response = await apiClient.post<AuthCheckResponse>('/auth/login-check', {});
+        if (response.result === 'SUCCESS' && response.userInfo) {
+          localStorage.setItem('userInfo', JSON.stringify(response.userInfo));
+          localStorage.setItem('isLoggedIn', 'true');
+        }
+      } catch {
+        // 네트워크 일시 오류 시 기존 세션 유지
+      }
+    };
+
+    const id = window.setInterval(tick, SESSION_KEEPALIVE_MS);
+    return () => window.clearInterval(id);
+  }, [isAdminPath, isPublicPath]);
+
   // 보호 경로는 로그인 검증 이후에만 접근 허용
   useEffect(() => {
     if (typeof window === 'undefined') return;
