@@ -220,9 +220,7 @@ export const getRtaPlayerSummaryData = cache(async (wizardId: string): Promise<R
   }
   try {
     const path = `/rta/player/${encodeURIComponent(id)}/summary`;
-    return await serverApiPost<RtaPlayerSummary>(path, {}, PUBLIC_REVALIDATE_SECONDS.rtaDetail, {
-      cache: 'no-store',
-    });
+    return await serverApiPost<RtaPlayerSummary>(path, {}, PUBLIC_REVALIDATE_SECONDS.rtaDetail);
   } catch {
     return null;
   }

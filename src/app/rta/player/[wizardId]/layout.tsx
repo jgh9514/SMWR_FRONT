@@ -5,14 +5,6 @@ import { getRtaPlayerSummaryData } from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl, sanitizeMetaDescription } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
-function displayNameFromSummary(summary: RtaPlayerSummary | null, wizardId: string): string {
-  if (summary?.found) {
-    const n = summary.wizard_name?.trim();
-    if (n) return n;
-  }
-  return `소환사 ${wizardId}`;
-}
-
 export async function generateMetadata({
   params,
 }: {
@@ -28,6 +20,14 @@ export async function generateMetadata({
     keywords: ['RTA', '실레나', '소환사', wizardId],
     noIndex: true,
   });
+}
+
+function displayNameFromSummary(summary: RtaPlayerSummary | null, wizardId: string): string {
+  if (summary?.found) {
+    const n = summary.wizard_name?.trim();
+    if (n) return n;
+  }
+  return `소환사 ${wizardId}`;
 }
 
 export default async function RtaPlayerLayout({

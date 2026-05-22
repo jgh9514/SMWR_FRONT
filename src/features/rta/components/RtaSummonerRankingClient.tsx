@@ -186,12 +186,14 @@ const SummonerRankCard = memo(function SummonerRankCard({
   onRowClick,
   onAuxClick,
   onKeyDown,
+  onMouseEnter,
 }: {
   r: SummonerRankingRowView;
   profileHref: string | null;
   onRowClick: (e: ReactMouseEvent<HTMLElement>, href: string) => void;
   onAuxClick: (e: ReactMouseEvent<HTMLElement>, href: string) => void;
   onKeyDown: (e: ReactKeyboardEvent<HTMLElement>, href: string) => void;
+  onMouseEnter?: (href: string) => void;
 }) {
   const serverLabel = r.country ? r.country.toUpperCase() : '—';
   return (
@@ -200,6 +202,7 @@ const SummonerRankCard = memo(function SummonerRankCard({
       onClick={profileHref ? (e) => onRowClick(e, profileHref) : undefined}
       onAuxClick={profileHref ? (e) => onAuxClick(e, profileHref) : undefined}
       onKeyDown={profileHref ? (e) => onKeyDown(e, profileHref) : undefined}
+      onMouseEnter={profileHref && onMouseEnter ? () => onMouseEnter(profileHref) : undefined}
       tabIndex={profileHref ? 0 : -1}
       role={profileHref ? 'link' : undefined}
       sx={{
@@ -365,6 +368,10 @@ export default function RtaSummonerRankingClient() {
       e.preventDefault();
       navigateToProfile(href, e.metaKey || e.ctrlKey);
     }
+  };
+
+  const handleRowMouseEnter = (href: string) => {
+    router.prefetch(href);
   };
 
   /** 첫 로드만 전체 스피너, 더보기는 테이블 상단 프로그레스 */
@@ -597,6 +604,7 @@ export default function RtaSummonerRankingClient() {
                         onRowClick={handleRowClick}
                         onAuxClick={handleRowAuxClick}
                         onKeyDown={handleRowKeyDown}
+                        onMouseEnter={handleRowMouseEnter}
                       />
                     );
                   })
@@ -658,6 +666,7 @@ export default function RtaSummonerRankingClient() {
                             ? (e) => handleRowKeyDown(e, profileHref)
                             : undefined
                         }
+                        onMouseEnter={profileHref ? () => handleRowMouseEnter(profileHref) : undefined}
                         tabIndex={profileHref ? 0 : -1}
                         role={profileHref ? 'link' : undefined}
                         sx={

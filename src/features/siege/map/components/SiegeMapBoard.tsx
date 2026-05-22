@@ -29,13 +29,9 @@ type SiegeMapBoardProps = {
 };
 
 function guildColorById(guilds: SiegeMapGuildRow[], guildId: string): string {
-  if (!guildId) {
-    return 'rgba(255,255,255,0.25)';
-  }
+  if (!guildId) return 'rgba(255,255,255,0.25)';
   const g = guilds.find((x) => String(x.guild_id) === String(guildId));
-  if (!g) {
-    return '#9e9e9e';
-  }
+  if (!g) return '#9e9e9e';
   return POS_GUILD_COLORS[g.pos_id] ?? '#9e9e9e';
 }
 
