@@ -14,7 +14,9 @@ import SiegeMapZoneShape from '@/features/siege/map/components/SiegeMapZoneShape
 type SiegeMapBaseMarkerProps = {
   layout: SiegeBaseLayout;
   zone: SiegeBaseZone;
-  baseNumber: number;
+  slotNo: number;
+  displayWidth: number;
+  displayHeight: number;
   baseStatus: number;
   color: string;
   empty: boolean;
@@ -28,15 +30,16 @@ type SiegeMapBaseMarkerProps = {
 export default function SiegeMapBaseMarker({
   layout,
   zone,
-  baseNumber,
+  slotNo,
+  displayWidth,
+  displayHeight,
   baseStatus,
   color,
   empty,
   isHq,
   imageUrl,
 }: SiegeMapBaseMarkerProps) {
-  const towerWidth = layout.displayWidth;
-  const barWidth = siegeMarkerBarWidth(layout.ringKind, towerWidth);
+  const barWidth = siegeMarkerBarWidth(layout.ringKind, displayWidth);
 
   return (
     <Box
@@ -50,8 +53,8 @@ export default function SiegeMapBaseMarker({
       <SiegeMapTower
         zone={zone}
         isHq={isHq}
-        displayWidth={towerWidth}
-        displayHeight={layout.displayHeight}
+        displayWidth={displayWidth}
+        displayHeight={displayHeight}
         color={color}
         empty={empty}
         imageUrl={imageUrl}
@@ -86,7 +89,7 @@ export default function SiegeMapBaseMarker({
             <SiegeMapZoneShape
               zone={zone}
               color={color}
-              baseNumber={baseNumber}
+              slotNo={slotNo}
               empty={empty}
             />
           </Box>

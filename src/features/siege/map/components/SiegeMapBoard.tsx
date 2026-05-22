@@ -10,7 +10,7 @@ import {
   isSiegeHqBase,
   normalizeLayoutMasterImages,
   POS_GUILD_COLORS,
-  resolveSiegeBaseImagePath,
+  resolveSiegeBaseImage,
 } from '@/features/siege/map/lib/siegeBaseLayout';
 import { SIEGE_MAP_ASPECT, SIEGE_MAP_WIDTH } from '@/features/siege/map/lib/siegeMapConfig';
 import { siegeRingKindLabel } from '@/features/siege/map/lib/siegeDeckSlots';
@@ -147,7 +147,7 @@ export default function SiegeMapBoard({
         const isHq = isSiegeHqBase(layout, base.base_type);
         const selectable = !isHq && !empty;
         const remain = empty ? null : formatRemainMmSs(base.remain_sec);
-        const imageUrl = resolveSiegeBaseImagePath(
+        const baseImage = resolveSiegeBaseImage(
           baseImages,
           layout,
           empty ? 0 : base.base_status,
@@ -158,10 +158,10 @@ export default function SiegeMapBoard({
             key={base.base_number}
             title={
               isHq
-                ? `본진 ${base.base_number} · 선택 불가`
+                ? `본진 (슬롯 ${layout.slotNo}) · 선택 불가`
                 : empty
-                  ? `거점 ${base.base_number} · ${siegeRingKindLabel(layout.ringKind)} · 데이터 없음`
-                  : `거점 ${base.base_number} · ${siegeRingKindLabel(layout.ringKind)} · 상태 ${base.base_status}${remain ? ` · ${remain}` : ''}`
+                  ? `슬롯 ${layout.slotNo} · ${siegeRingKindLabel(layout.ringKind)} · 데이터 없음`
+                  : `슬롯 ${layout.slotNo} · ${siegeRingKindLabel(layout.ringKind)} · 상태 ${base.base_status}${remain ? ` · ${remain}` : ''}`
             }
           >
             <Box
@@ -192,12 +192,14 @@ export default function SiegeMapBoard({
               <SiegeMapBaseMarker
                 layout={layout}
                 zone={layout.zone}
-                baseNumber={base.base_number}
+                slotNo={layout.slotNo}
+                displayWidth={baseImage.displayWidth}
+                displayHeight={baseImage.displayHeight}
                 baseStatus={base.base_status}
                 color={color}
                 empty={empty}
                 isHq={isHq}
-                imageUrl={imageUrl}
+                imageUrl={baseImage.imagePath}
               />
             </Box>
           </Tooltip>

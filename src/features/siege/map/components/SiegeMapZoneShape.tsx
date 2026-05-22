@@ -13,7 +13,8 @@ export const SIEGE_ZONE_BADGE_SIZE = SIEGE_MARKER_BADGE_SIZE;
 type SiegeMapZoneShapeProps = {
   zone: SiegeBaseZone;
   color: string;
-  baseNumber: number;
+  /** 성채 내 슬롯 번호 (0=본진, 1~12) */
+  slotNo: number;
   size?: number;
   empty?: boolean;
 };
@@ -30,11 +31,11 @@ const numberSx = {
   userSelect: 'none' as const,
 };
 
-/** 거점 하단 — 성채 구역 실루엣 안에 거점 번호 */
+/** 거점 하단 — 성채 구역 실루엣 안에 슬롯 번호(slot_no) */
 export default function SiegeMapZoneShape({
   zone,
   color,
-  baseNumber,
+  slotNo,
   size = SIEGE_ZONE_BADGE_SIZE,
   empty = false,
 }: SiegeMapZoneShapeProps) {
@@ -63,7 +64,7 @@ export default function SiegeMapZoneShape({
           }}
         />
         <Typography component="span" sx={numberSx}>
-          {baseNumber}
+          {slotNo}
         </Typography>
       </Box>
     );
@@ -84,7 +85,7 @@ export default function SiegeMapZoneShape({
         }}
       >
         <Typography component="span" sx={{ ...numberSx, textShadow: '0 1px 1px rgba(0,0,0,0.6)' }}>
-          {baseNumber}
+          {slotNo}
         </Typography>
       </Box>
     );
@@ -112,7 +113,7 @@ export default function SiegeMapZoneShape({
         }}
       />
       <Typography component="span" sx={{ ...numberSx, mt: 0.15 }}>
-        {baseNumber}
+        {slotNo}
       </Typography>
     </Box>
   );

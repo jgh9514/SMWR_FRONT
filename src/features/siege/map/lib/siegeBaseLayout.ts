@@ -6,6 +6,7 @@ import {
   defaultSiegeDisplaySize,
 } from '@/features/siege/map/lib/siegeMapConfig';
 import type {
+  ResolvedSiegeBaseImage,
   SiegeBaseRingKind,
   SiegeMapBaseImageMasterRow,
   SiegeMapBaseLayoutMasterRow,
@@ -21,8 +22,6 @@ export type SiegeBaseLayout = {
   zone: SiegeBaseZone;
   slotNo: number;
   ringKind: SiegeBaseRingKind;
-  displayWidth: number;
-  displayHeight: number;
 };
 
 /** 게임 MatchupInfo base_type=3(요새) — 성채당 3개, 4성 거점 */
@@ -70,15 +69,12 @@ function fb(
   baseNumber: number,
 ): SiegeBaseLayout {
   const ringKind = ringKindFromGameBase(baseNumber, slotNo);
-  const size = defaultSiegeDisplaySize(slotNo, ringKind);
   return {
     top,
     left,
     zone,
     slotNo,
     ringKind,
-    displayWidth: size.width,
-    displayHeight: size.height,
   };
 }
 
@@ -130,17 +126,12 @@ export const ALL_SIEGE_BASE_NUMBERS = Object.keys(FALLBACK)
 
 export function layoutRowToSiegeBaseLayout(row: SiegeMapBaseLayoutMasterRow): SiegeBaseLayout {
   const ringKind = asRingKind(row.ringKind, row.slotNo, row.gameBaseNumber);
-  const fallback = defaultSiegeDisplaySize(row.slotNo, ringKind);
-  const displayWidth = Number(row.displayWidthPx) > 0 ? Number(row.displayWidthPx) : fallback.width;
-  const displayHeight = Number(row.displayHeightPx) > 0 ? Number(row.displayHeightPx) : fallback.height;
   return {
     top: Number(row.posYPct),
     left: Number(row.posXPct),
     zone: row.castleZone,
     slotNo: row.slotNo,
     ringKind,
-    displayWidth,
-    displayHeight,
   };
 }
 
@@ -175,8 +166,6 @@ export function normalizeLayoutMasterRow(row: Record<string, unknown>): SiegeMap
     posXPct: Number(row.posXPct ?? row.pos_x_pct),
     posYPct: Number(row.posYPct ?? row.pos_y_pct),
     ringKind: asRingKind(row.ringKind ?? row.ring_kind, slotNo, gameBaseNumber),
-    displayWidthPx: Number(row.displayWidthPx ?? row.display_width_px ?? 0),
-    displayHeightPx: Number(row.displayHeightPx ?? row.display_height_px ?? 0),
   };
 }
 
@@ -189,6 +178,8 @@ export function normalizeLayoutMasterImage(row: Record<string, unknown>): SiegeM
     ringKind,
     baseStatus: isBase ? null : Number(rawStatus),
     imagePath: String(row.imagePath ?? row.image_path ?? ''),
+    displayWidthPx: Number(row.displayWidthPx ?? row.display_width_px ?? 0),
+    displayHeightPx: Number(row.displayHeightPx ?? row.display_height_px ?? 0),
   };
 }
 
@@ -225,18 +216,13 @@ export function getSiegeBaseLayout(
   if (fromMaster) {
     return fromMaster;
   }
-  const slotNo = isSiegeHqGameBase(baseNumber) ? 0 : 1;
-  const ringKind = ringKindFromGameBase(baseNumber, slotNo);
-  const size = defaultSiegeDisplaySize(slotNo, ringKind);
   return (
     FALLBACK[baseNumber] ?? {
       top: 50,
       left: 50,
       zone: 'shield',
       slotNo: isSiegeHqGameBase(baseNumber) ? 0 : -1,
-      ringKind,
-      displayWidth: size.width,
-      displayHeight: size.height,
+      ringKind: ringKindFromGameBase(baseNumber, isSiegeHqGameBase(baseNumber) ? 0 : 1),
     }
   );
 }
@@ -259,16 +245,16 @@ export function isSiegeHqGameBase(baseNumber: number, layout?: SiegeBaseLayout):
   return SIEGE_HQ_BASE_NUMBERS.has(baseNumber);
 }
 
-export function resolveSiegeBaseImagePath(
+function findSiegeBaseImageRow(
   images: SiegeMapBaseImageMasterRow[] | undefined,
   layout: SiegeBaseLayout,
   baseStatus: number,
-): string | null {
+): SiegeMapBaseImageMasterRow | null {
   if (!images?.length) {
     return null;
   }
   if (layout.ringKind === 'base') {
-    return images.find((i) => i.castleZone === layout.zone && i.ringKind === 'base')?.imagePath ?? null;
+    return images.find((i) => i.castleZone === layout.zone && i.ringKind === 'base') ?? null;
   }
   const status = baseStatus < 0 ? 0 : baseStatus > 2 ? 2 : baseStatus;
   return (
@@ -277,6 +263,39 @@ export function resolveSiegeBaseImagePath(
         i.castleZone === layout.zone &&
         i.ringKind === layout.ringKind &&
         Number(i.baseStatus) === status,
-    )?.imagePath ?? null
+    ) ?? null
   );
+}
+
+/** 거점 이미지 경로·표시 크기 — 크기는 이미지 마스터(siege_map_base_image) 기준 */
+export function resolveSiegeBaseImage(
+  images: SiegeMapBaseImageMasterRow[] | undefined,
+  layout: SiegeBaseLayout,
+  baseStatus: number,
+): ResolvedSiegeBaseImage {
+  const fallback = defaultSiegeDisplaySize(layout.slotNo, layout.ringKind);
+  const row = findSiegeBaseImageRow(images, layout, baseStatus);
+  if (!row) {
+    return {
+      imagePath: null,
+      displayWidth: fallback.width,
+      displayHeight: fallback.height,
+    };
+  }
+  const w = Number(row.displayWidthPx);
+  const h = Number(row.displayHeightPx);
+  return {
+    imagePath: row.imagePath || null,
+    displayWidth: w > 0 ? w : fallback.width,
+    displayHeight: h > 0 ? h : fallback.height,
+  };
+}
+
+/** @deprecated resolveSiegeBaseImage 사용 */
+export function resolveSiegeBaseImagePath(
+  images: SiegeMapBaseImageMasterRow[] | undefined,
+  layout: SiegeBaseLayout,
+  baseStatus: number,
+): string | null {
+  return resolveSiegeBaseImage(images, layout, baseStatus).imagePath;
 }

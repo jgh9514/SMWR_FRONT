@@ -121,8 +121,6 @@ export type SiegeMapBaseLayoutMasterRow = {
   posXPct: number;
   posYPct: number;
   ringKind: SiegeBaseRingKind;
-  displayWidthPx: number;
-  displayHeightPx: number;
 };
 
 export type SiegeMapBaseImageMasterRow = {
@@ -131,6 +129,15 @@ export type SiegeMapBaseImageMasterRow = {
   /** 본진(base)은 null — 단일 이미지 */
   baseStatus: number | null;
   imagePath: string;
+  displayWidthPx: number;
+  displayHeightPx: number;
+};
+
+/** 지도에 쓰는 거점 이미지(경로·표시 크기) */
+export type ResolvedSiegeBaseImage = {
+  imagePath: string | null;
+  displayWidth: number;
+  displayHeight: number;
 };
 
 export type SiegeMapLayoutMasterResponse = {
