@@ -141,6 +141,13 @@ function getNavGroups(
       { title: '점령전 지도', path: '/siege/map', icon: <MapIcon />, requiresGuild: true },
       { title: '지도 히스토리', path: '/siege/map/history', icon: <HistoryIcon />, requiresGuild: true },
       { title: '전적 조회', path: '/battle-history', icon: <BarChartIcon />, requiresGuild: true },
+      {
+        title: '길드 관리',
+        path: '/guild-management',
+        icon: <GroupIcon />,
+        requiresGuild: true,
+        requiresLeaderOrManager: true,
+      },
     ],
   };
 
@@ -164,13 +171,6 @@ function getNavGroups(
         icon: <GroupIcon />,
         requiresLogin: true,
         requiresNoGuild: true,
-      },
-      {
-        title: '길드 관리',
-        path: '/guild-management',
-        icon: <GroupIcon />,
-        requiresGuild: true,
-        requiresLeaderOrManager: true,
       },
     ],
   };

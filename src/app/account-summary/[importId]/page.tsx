@@ -184,100 +184,60 @@ export default function AccountSummaryDetailPage() {
       </Card>
 
       <Card sx={{ mb: 3 }}>
-        <CardHeader title="룬 점수 요약" />
+        <CardHeader title="룬 속도 요약" subheader="6피스 조합 기준 최고 공격속도 (신속 4세트 +25%)" />
         <CardContent>
           {runeScoreQuery.isLoading && <LinearProgress sx={{ mb: 2 }} />}
           {!runeScoreQuery.data?.hasData ? (
-            <Alert severity="info">룬 점수 요약 데이터를 계산할 수 없습니다.</Alert>
+            <Alert severity="info">룬 속도 요약을 계산할 수 없습니다.</Alert>
           ) : (
             <>
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                Top 10 합산 (룬 기준: 신속/폭주/절망)
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    신속 Top10 합산 (상위 {runeScoreQuery.data?.top10?.swift?.considered ?? 0}/{runeScoreQuery.data?.top10?.swift?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.top10?.swift?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    폭주 Top10 합산 (상위 {runeScoreQuery.data?.top10?.violent?.considered ?? 0}/{runeScoreQuery.data?.top10?.violent?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.top10?.violent?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    절망 Top10 합산 (상위 {runeScoreQuery.data?.top10?.despair?.considered ?? 0}/{runeScoreQuery.data?.top10?.despair?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.top10?.despair?.sum ?? 0}
-                  </Typography>
-                </Box>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                  gap: 2,
+                  mb: 2,
+                }}
+              >
+                {(['swiftPlusJunk', 'swiftPlusWill'] as const).map((key) => {
+                  const build = runeScoreQuery.data?.speed?.[key];
+                  if (!build) return null;
+                  return (
+                    <Box
+                      key={key}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'action.hover',
+                      }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 0.5 }}>
+                        {build.label}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                        신속 {build.swiftPieceCount}/4 + {key === 'swiftPlusWill' ? '의지' : '잡룬'}{' '}
+                        {build.fillerPieceCount}/2
+                      </Typography>
+                      <Typography variant="h4" sx={{ fontWeight: 800, color: 'primary.main', mb: 1 }}>
+                        +{build.totalSpeed}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        flat 합 {build.flatSum}
+                        {build.setBonusApplied ? ` × ${1 + build.setBonusPercent / 100}` : ' (신속 4세트 미충족)'}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" component="div">
+                        신속 룬 SPD {build.swiftSpeedSum} + 나머지 {build.fillerSpeedSum}
+                      </Typography>
+                    </Box>
+                  );
+                })}
               </Box>
 
-              <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>
-                General Rune Score (전체 룬 합산)
-              </Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    신속 (n={runeScoreQuery.data?.general?.swift?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.general?.swift?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    폭주 (n={runeScoreQuery.data?.general?.violent?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.general?.violent?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    절망 (n={runeScoreQuery.data?.general?.despair?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.general?.despair?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    의지 (n={runeScoreQuery.data?.general?.will?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.general?.will?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    반격 (n={runeScoreQuery.data?.general?.revenge?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.general?.revenge?.sum ?? 0}
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography variant="caption" color="text.secondary">
-                    기타 (n={runeScoreQuery.data?.general?.others?.count ?? 0})
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 800 }}>
-                    {runeScoreQuery.data?.general?.others?.sum ?? 0}
-                  </Typography>
-                </Box>
-              </Box>
-
-              {runeScoreQuery.data?.scoreFormula && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                  점수식: {runeScoreQuery.data.scoreFormula}
+              {runeScoreQuery.data?.speedFormula && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                  {runeScoreQuery.data.speedFormula}
                 </Typography>
               )}
             </>

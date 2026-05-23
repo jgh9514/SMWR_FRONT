@@ -78,30 +78,27 @@ export interface SwexRuneItem {
   substats_json?: unknown;
 }
 
-export interface RuneScoreBucket {
-  count: number;
-  sum?: number;
-  avg: number;
-  considered?: number;
+export interface RuneSpeedBuildSummary {
+  label: string;
+  fillerType: 'junk' | 'will' | string;
+  swiftPieceCount: number;
+  fillerPieceCount: number;
+  swiftSpeedSum: number;
+  fillerSpeedSum: number;
+  flatSum: number;
+  setBonusApplied: boolean;
+  setBonusPercent: number;
+  totalSpeed: number;
 }
 
 export interface RuneScoreSummaryResponse {
   hasData: boolean;
   import_id?: number;
-  top10?: {
-    swift: RuneScoreBucket;
-    violent: RuneScoreBucket;
-    despair: RuneScoreBucket;
+  speed?: {
+    swiftPlusJunk: RuneSpeedBuildSummary;
+    swiftPlusWill: RuneSpeedBuildSummary;
   };
-  general?: {
-    swift: RuneScoreBucket;
-    violent: RuneScoreBucket;
-    despair: RuneScoreBucket;
-    will: RuneScoreBucket;
-    revenge: RuneScoreBucket;
-    others: RuneScoreBucket;
-  };
-  scoreFormula?: string;
+  speedFormula?: string;
 }
 
 
