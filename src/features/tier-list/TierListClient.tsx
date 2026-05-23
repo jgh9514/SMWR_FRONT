@@ -983,17 +983,20 @@ export default function TierListClient() {
     if (!tierListRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading('이미지 생성 중...');
-    let restoreImages: (() => void) | undefined;
     try {
       const html2canvas = (await import('html2canvas')).default;
       const root = tierListRef.current;
-      root.classList.add('export-mode');
-      restoreImages = await inlineImagesForHtml2Canvas(root);
       const canvas = await html2canvas(root, {
         backgroundColor: '#0f172a',
         scale: 2,
         useCORS: true,
         logging: false,
+        onclone: async (_doc, clonedRoot) => {
+          clonedRoot.querySelectorAll('button').forEach((btn) => {
+            (btn as HTMLElement).style.display = 'none';
+          });
+          await inlineImagesForHtml2Canvas(clonedRoot);
+        },
       });
       const link = document.createElement('a');
       link.download = 'tier-list.png';
@@ -1006,8 +1009,6 @@ export default function TierListClient() {
       toast.dismiss(toastId);
       toast.error('이미지 생성에 실패했습니다.');
     } finally {
-      restoreImages?.();
-      tierListRef.current?.classList.remove('export-mode');
       setIsExporting(false);
     }
   }, []);
@@ -1317,10 +1318,6 @@ export default function TierListClient() {
         </div>
       )}
 
-      {/* export-mode CSS */}
-      <style>{`
-        .export-mode button { display: none !important; }
-      `}</style>
     </div>
   );
 }
