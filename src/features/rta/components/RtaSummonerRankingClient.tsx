@@ -9,6 +9,9 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/shared/lib/api/client';
+import { keyPart } from '@/hooks/api/useApiQuery';
 import {
   Box,
   Button,
@@ -193,7 +196,7 @@ const SummonerRankCard = memo(function SummonerRankCard({
   onRowClick: (e: ReactMouseEvent<HTMLElement>, href: string) => void;
   onAuxClick: (e: ReactMouseEvent<HTMLElement>, href: string) => void;
   onKeyDown: (e: ReactKeyboardEvent<HTMLElement>, href: string) => void;
-  onMouseEnter?: (href: string) => void;
+  onMouseEnter?: (wizardId: string, href: string) => void;
 }) {
   const serverLabel = r.country ? r.country.toUpperCase() : '—';
   return (
@@ -202,7 +205,7 @@ const SummonerRankCard = memo(function SummonerRankCard({
       onClick={profileHref ? (e) => onRowClick(e, profileHref) : undefined}
       onAuxClick={profileHref ? (e) => onAuxClick(e, profileHref) : undefined}
       onKeyDown={profileHref ? (e) => onKeyDown(e, profileHref) : undefined}
-      onMouseEnter={profileHref && onMouseEnter ? () => onMouseEnter(profileHref) : undefined}
+      onMouseEnter={profileHref && onMouseEnter ? () => onMouseEnter(r.wizardId, profileHref) : undefined}
       tabIndex={profileHref ? 0 : -1}
       role={profileHref ? 'link' : undefined}
       sx={{
@@ -314,6 +317,7 @@ export default function RtaSummonerRankingClient() {
   const theme = useTheme();
   const isNarrow = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: seasonsData } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions } = useRtaSeasonSelect(seasonsData);
 
@@ -370,8 +374,14 @@ export default function RtaSummonerRankingClient() {
     }
   };
 
-  const handleRowMouseEnter = (href: string) => {
+  const handleRowMouseEnter = (wizardId: string, href: string) => {
     router.prefetch(href);
+    const summaryPath = `/rta/player/${encodeURIComponent(wizardId)}/summary`;
+    queryClient.prefetchQuery({
+      queryKey: [summaryPath, keyPart({})],
+      queryFn: () => apiClient.post(summaryPath, {}),
+      staleTime: 30_000,
+    });
   };
 
   /** 첫 로드만 전체 스피너, 더보기는 테이블 상단 프로그레스 */
@@ -666,7 +676,7 @@ export default function RtaSummonerRankingClient() {
                             ? (e) => handleRowKeyDown(e, profileHref)
                             : undefined
                         }
-                        onMouseEnter={profileHref ? () => handleRowMouseEnter(profileHref) : undefined}
+                        onMouseEnter={profileHref ? () => handleRowMouseEnter(r.wizardId, profileHref) : undefined}
                         tabIndex={profileHref ? 0 : -1}
                         role={profileHref ? 'link' : undefined}
                         sx={

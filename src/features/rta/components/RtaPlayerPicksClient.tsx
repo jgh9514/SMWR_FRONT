@@ -29,6 +29,7 @@ import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import { useRtaMonsterPickBreakdown, useRtaMonsterPickSlotMatches, useRtaPlayerMonsterUsage } from '@/features/rta/hooks/useRtaData';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
+import { useRtaMonsterCatalog } from '@/features/rta/hooks/useRtaMonsterCatalog';
 import { RtaMatchCard } from '@/features/rta/components/RtaMatchCard';
 import type { RawMatchItem } from '@/types';
 import type {
@@ -336,11 +337,12 @@ function SlotMatchesPanel({
   pickSlotNo: number;
   color: string;
 }) {
+  const catalog = useRtaMonsterCatalog();
   const { data, isLoading, error } = useRtaMonsterPickSlotMatches(
     wizardId, seasonCode, seasonId, unitMasterId, teamSide, pickSlotNo,
   );
   const matches = (data?.matches ?? []).map((r) =>
-    processRawMatchToMatchItem(r as unknown as RawMatchItem),
+    processRawMatchToMatchItem(r as unknown as RawMatchItem, catalog),
   );
 
   if (isLoading) {

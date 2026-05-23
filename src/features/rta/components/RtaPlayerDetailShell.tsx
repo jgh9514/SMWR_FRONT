@@ -18,6 +18,7 @@ import {
   Menu,
   MenuItem,
   Select,
+  Skeleton,
   Stack,
   Tab,
   Tabs,
@@ -344,33 +345,39 @@ export default function RtaPlayerDetailShell({
                     </List>
                   )}
                 </Menu>
-                {countryFlag ? (
-                  <Box
-                    component="img"
-                    src={countryFlag}
-                    alt=""
-                    sx={{
-                      width: 28,
-                      height: 18,
-                      objectFit: 'cover',
-                      borderRadius: 0.5,
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      flexShrink: 0,
-                    }}
-                  />
-                ) : null}
-                <Chip
-                  size="small"
-                  label={countryLabel}
-                  sx={{
-                    fontWeight: 700,
-                    border: '1px solid',
-                    borderColor: 'primary.main',
-                    bgcolor: (t) => (t.palette.mode === 'dark' ? 'primary.dark' : 'primary.light'),
-                    color: 'primary.main',
-                  }}
-                />
+                {!summary && isFetching ? (
+                  <Skeleton variant="rounded" width={48} height={24} />
+                ) : (
+                  <>
+                    {countryFlag ? (
+                      <Box
+                        component="img"
+                        src={countryFlag}
+                        alt=""
+                        sx={{
+                          width: 28,
+                          height: 18,
+                          objectFit: 'cover',
+                          borderRadius: 0.5,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : null}
+                    <Chip
+                      size="small"
+                      label={countryLabel}
+                      sx={{
+                        fontWeight: 700,
+                        border: '1px solid',
+                        borderColor: 'primary.main',
+                        bgcolor: (t) => (t.palette.mode === 'dark' ? 'primary.dark' : 'primary.light'),
+                        color: 'primary.main',
+                      }}
+                    />
+                  </>
+                )}
               </Stack>
 
               <Stack
@@ -381,36 +388,46 @@ export default function RtaPlayerDetailShell({
                 gap={{ xs: 2, sm: 3 }}
                 sx={{ mt: 1 }}
               >
-                <Stack direction="row" alignItems="baseline" gap={0.75}>
-                  <Typography variant="body2" color="text.secondary">
-                    점수
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700} color="primary.main" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {score != null ? score.toLocaleString() : '—'}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" alignItems="baseline" gap={0.75}>
-                  <Typography variant="body2" color="text.secondary">
-                    랭크
-                  </Typography>
-                  <Typography variant="body1" fontWeight={700} sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                    {rank != null ? `#${rank.toLocaleString()}` : '—'}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" alignItems="center" gap={0.75}>
-                  <Typography variant="body2" color="text.secondary">
-                    승률
-                  </Typography>
-                  <Typography
-                    variant="body1"
-                    fontWeight={700}
-                    color={winRate != null ? 'success.main' : 'text.primary'}
-                    sx={{ fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {winRate != null ? `${winRate.toFixed(1)}%` : '—'}
-                  </Typography>
-                </Stack>
-                {rating != null ? <RtaRatingStarIcons rating={rating} size={16} /> : null}
+                {!summary && isFetching ? (
+                  <>
+                    <Skeleton variant="rounded" width={72} height={20} />
+                    <Skeleton variant="rounded" width={72} height={20} />
+                    <Skeleton variant="rounded" width={72} height={20} />
+                  </>
+                ) : (
+                  <>
+                    <Stack direction="row" alignItems="baseline" gap={0.75}>
+                      <Typography variant="body2" color="text.secondary">
+                        점수
+                      </Typography>
+                      <Typography variant="body1" fontWeight={700} color="primary.main" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {score != null ? score.toLocaleString() : '—'}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" alignItems="baseline" gap={0.75}>
+                      <Typography variant="body2" color="text.secondary">
+                        랭크
+                      </Typography>
+                      <Typography variant="body1" fontWeight={700} sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {rank != null ? `#${rank.toLocaleString()}` : '—'}
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" alignItems="center" gap={0.75}>
+                      <Typography variant="body2" color="text.secondary">
+                        승률
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        fontWeight={700}
+                        color={winRate != null ? 'success.main' : 'text.primary'}
+                        sx={{ fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {winRate != null ? `${winRate.toFixed(1)}%` : '—'}
+                      </Typography>
+                    </Stack>
+                    {rating != null ? <RtaRatingStarIcons rating={rating} size={16} /> : null}
+                  </>
+                )}
               </Stack>
 
               {summary && !summary.found ? (

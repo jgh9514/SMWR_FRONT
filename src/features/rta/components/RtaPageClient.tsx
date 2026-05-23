@@ -28,11 +28,12 @@ import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import RtaMatchListCard from '@/features/rta/components/RtaMatchListCard';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
+import { useRtaMonsterCatalog } from '@/features/rta/hooks/useRtaMonsterCatalog';
 import type { MatchItem, RawMatchItem } from '@/types';
 
 export default function RtaPageClient() {
   const [offset, setOffset] = useState(0);
-  const [allMatches, setAllMatches] = useState<MatchItem[]>([]);
+  const [allRawMatches, setAllRawMatches] = useState<RawMatchItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [tierSelection, setTierSelection] = useState('');
 
@@ -55,9 +56,11 @@ export default function RtaPageClient() {
   /** 시즌·티어 필터가 바뀌면 목록 초기화 */
   useEffect(() => {
     setOffset(0);
-    setAllMatches([]);
+    setAllRawMatches([]);
     setHasMore(false);
   }, [seasonSelectValue, tierSelection]);
+
+  const catalog = useRtaMonsterCatalog();
 
   const {
     data: pageResponse,
@@ -77,19 +80,21 @@ export default function RtaPageClient() {
   /** 새 데이터 도착 시 누적 */
   useEffect(() => {
     if (!pageResponse) return;
-    const rawMatches = pageResponse.matches ?? [];
-    const newMatches = Array.isArray(rawMatches)
-      ? rawMatches.map((m: RawMatchItem) => processRawMatchToMatchItem(m))
-      : [];
+    const raw = pageResponse.matches ?? [];
+    const newRaw: RawMatchItem[] = Array.isArray(raw) ? (raw as RawMatchItem[]) : [];
     if (offset === 0) {
-      setAllMatches(newMatches);
+      setAllRawMatches(newRaw);
     } else {
-      setAllMatches((prev) => [...prev, ...newMatches]);
+      setAllRawMatches((prev) => [...prev, ...newRaw]);
     }
     setHasMore(Boolean(pageResponse.stats?.hasMore));
-  // offset이 바뀌어야만 재실행 — pageResponse 의존성은 offset 변경 후 도착하는 응답이 처리됨
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageResponse]);
+
+  const allMatches = useMemo<MatchItem[]>(
+    () => allRawMatches.map((m) => processRawMatchToMatchItem(m, catalog)),
+    [allRawMatches, catalog],
+  );
 
   const isLoadingMore = isFetching && offset > 0;
   const isInitialLoading = isLoadingPage && offset === 0;

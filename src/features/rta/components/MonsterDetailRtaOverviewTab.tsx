@@ -35,6 +35,7 @@ import {
 import RtaSeasonTierSelectRow from '@/features/rta/components/RtaSeasonTierSelectRow';
 import RtaMatchListCard from '@/features/rta/components/RtaMatchListCard';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
+import { useRtaMonsterCatalog } from '@/features/rta/hooks/useRtaMonsterCatalog';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { RtaMonsterPickSlotRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
@@ -296,6 +297,7 @@ interface MonsterDetailRtaOverviewTabProps {
 }
 
 export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetailRtaOverviewTabProps) {
+  const catalog = useRtaMonsterCatalog();
   const { data: seasonsData } = useRtaSeasons();
   const { seasonSelectValue, setSeason, seasonOptions, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
   const { data: gradeRules = [], isLoading: tierRulesLoading } = useRtaRatingGradeRules();
@@ -537,7 +539,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
               {(recentMatchesData!.matches as unknown as RawMatchItem[])
                 .slice(0, visibleMatchCount)
                 .map((raw, idx) => {
-                  const match = processRawMatchToMatchItem(raw);
+                  const match = processRawMatchToMatchItem(raw, catalog);
                   return (
                     <RtaMatchListCard key={raw.rid != null ? String(raw.rid) : idx} match={match} />
                   );

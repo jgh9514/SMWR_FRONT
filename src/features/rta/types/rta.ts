@@ -35,12 +35,8 @@ export interface RawMatchItem {
   p2_leader_unit?: number;
   p1_units?: string[];
   p2_units?: string[];
-  p1_unit_names?: string[];
-  p1_unit_images?: string[];
   /** pick_slot_no 순서와 동일한 길이의 벤 여부 */
   p1_unit_banned?: boolean[] | (boolean | string | number)[];
-  p2_unit_names?: string[];
-  p2_unit_images?: string[];
   p2_unit_banned?: boolean[] | (boolean | string | number)[];
   /** `pick_slot_no` (전체 밴/픽 턴) — `unit_names`·`unit_images`·`unit_banned`와 동일 순서 */
   p1_unit_pick_slot_no?: number[] | (string | number | null)[];

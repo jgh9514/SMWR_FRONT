@@ -25,6 +25,7 @@ import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import { useRtaPlayerOpponentRecords, useRtaVsMatches } from '@/features/rta/hooks/useRtaData';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
+import { useRtaMonsterCatalog } from '@/features/rta/hooks/useRtaMonsterCatalog';
 import { RtaMatchCard } from '@/features/rta/components/RtaMatchCard';
 import type { RtaPlayerOpponentRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
@@ -73,13 +74,14 @@ function VsMatchList({
   /** 펼친 뒤에만 맞대결 목록 조회 — 표 전적(row)과 완전 분리 */
   fetchEnabled: boolean;
 }) {
+  const catalog = useRtaMonsterCatalog();
   const { data, isLoading, error } = useRtaVsMatches(wizardId, opponentWizardId, seasonCode, {
     seasonId,
     enabled: Boolean(wizardId) && Boolean(opponentWizardId) && fetchEnabled,
   });
 
   const matches = (data?.matches ?? []).map((r) =>
-    processRawMatchToMatchItem(r as unknown as RawMatchItem),
+    processRawMatchToMatchItem(r as unknown as RawMatchItem, catalog),
   );
 
   const hasMore = data?.has_more ?? false;
