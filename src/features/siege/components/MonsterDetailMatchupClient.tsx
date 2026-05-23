@@ -40,7 +40,7 @@ export default function MonsterDetailMatchupClient() {
     return body.ratingId ?? null;
   }, [tierSelection, gradeRules]);
 
-  const { data: rtaDetail, isLoading, isFetching, isError } = useRtaMonsterDetail(
+  const { data: rtaDetail, isLoading, isError } = useRtaMonsterDetail(
     rtaMonsterNumericId,
     null,
     seasonIdForApi ?? null,
@@ -62,7 +62,7 @@ export default function MonsterDetailMatchupClient() {
         hideBulkTierOptions
       />
 
-      {(isLoading || isFetching) && <LinearProgress sx={{ my: 2 }} />}
+      {isLoading && <LinearProgress sx={{ my: 2 }} />}
 
       {isError && !rtaDetail && (
         <Alert severity="warning" sx={{ mb: 2 }}>
@@ -70,12 +70,12 @@ export default function MonsterDetailMatchupClient() {
         </Alert>
       )}
 
-      {!isLoading && !isFetching && !isError && !rtaDetail && (
+      {!isLoading && !isError && !rtaDetail && (
         <Alert severity="info">RTA 집계 데이터가 아직 없습니다.</Alert>
       )}
 
       {rtaDetail && (
-        <RtaMonsterDetailContent data={rtaDetail} embedded embeddedPart="tables" />
+        <RtaMonsterDetailContent data={rtaDetail} embedded embeddedPart="counter-only" />
       )}
     </>
   );

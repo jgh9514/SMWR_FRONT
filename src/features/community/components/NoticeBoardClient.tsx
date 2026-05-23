@@ -67,11 +67,14 @@ export default function NoticeBoardClient({ initialData }: NoticeBoardClientProp
     return userInfo?.roles?.some((role) => role.role_id === 'RL0001') ?? false;
   }, [userInfo]);
 
+  const hasValidInitialData =
+    page === (initialData.page || 1) && initialData.list.length > 0;
+
   const noticeListQuery = useNoticeList(
     { page, limit },
     {
       refetchOnWindowFocus: false,
-      initialData: page === (initialData.page || 1) ? initialData : undefined,
+      initialData: hasValidInitialData ? initialData : undefined,
     },
   );
 

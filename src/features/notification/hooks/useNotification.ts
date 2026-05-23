@@ -8,7 +8,9 @@ import type {
   NotificationListResponse,
   MarkNotificationReadParams,
   MarkNotificationReadResponse,
+  DismissNotificationResponse,
 } from '@/features/notification/types/notification';
+import { mapNotificationListResponse } from '@/features/notification/lib/notificationUtils';
 
 /**
  * 알림 목록 조회
@@ -23,6 +25,7 @@ export const useNotificationList = (
     {
       enabled: true,
       refetchOnWindowFocus: true,
+      select: (data) => mapNotificationListResponse(data),
       ...options,
     },
   );
@@ -50,6 +53,19 @@ export const useMarkAllNotificationsRead = (
 ) => {
   return useApiPostMutation<{ result: string }, unknown>(
     '/notification/read-all',
+    options,
+  );
+};
+
+/**
+ * 알림 숨김(목록에서 제거)
+ * 백엔드: POST /api/v1/notification/dismiss
+ */
+export const useDismissNotification = (
+  options?: Parameters<typeof useApiPostMutation<DismissNotificationResponse, MarkNotificationReadParams>>[1],
+) => {
+  return useApiPostMutation<DismissNotificationResponse, MarkNotificationReadParams>(
+    '/notification/dismiss',
     options,
   );
 };

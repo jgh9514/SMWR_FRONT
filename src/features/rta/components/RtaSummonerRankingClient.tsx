@@ -2,8 +2,10 @@
 
 import {
   memo,
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -64,13 +66,26 @@ function countrySharesFromRankings(rows: RtaSummonerRankingRow[]): { code: strin
     .map(([code, n]) => ({ code, pct: (100 * n) / total }));
 }
 
+/** @keyframes를 컴포넌트 밖에 정의 — 매 렌더마다 스타일 주입 방지 */
+const WIN_RATE_TRACK_SX = {
+  flex: 1,
+  height: 26,
+  borderRadius: 1,
+  overflow: 'hidden',
+  bgcolor: 'action.hover',
+  '@keyframes slideInBar': {
+    from: { transform: 'translateX(-100%)' },
+    to: { transform: 'translateX(0)' },
+  },
+} as const;
+
+const MIN_LABEL_PCT = 0.18;
+
 function WinRateBar({ wins, total }: { wins: number; total: number }) {
   const losses = Math.max(0, total - wins);
   const pct = total > 0 ? (wins / total) * 100 : 0;
   const winPct = total > 0 ? wins / total : 0;
   const lossPct = total > 0 ? losses / total : 0;
-  /** 텍스트를 표시할 최소 비율 (너무 좁으면 생략) */
-  const MIN_LABEL_PCT = 0.18;
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
@@ -86,19 +101,7 @@ function WinRateBar({ wins, total }: { wins: number; total: number }) {
       >
         {total <= 0 ? '0%' : `${pct.toFixed(1)}%`}
       </Typography>
-      <Box
-        sx={{
-          flex: 1,
-          height: 26,
-          borderRadius: 1,
-          overflow: 'hidden',
-          bgcolor: 'action.hover',
-          '@keyframes slideInBar': {
-            from: { transform: 'translateX(-100%)' },
-            to: { transform: 'translateX(0)' },
-          },
-        }}
-      >
+      <Box sx={WIN_RATE_TRACK_SX}>
         {total <= 0 ? (
           <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography sx={{ fontSize: '0.68rem', fontWeight: 700, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
@@ -343,46 +346,51 @@ export default function RtaSummonerRankingClient() {
     seasonId: seasonIdForApi,
   });
 
-  const navigateToProfile = (href: string, openInNewTab = false) => {
+  const navigateToProfile = useCallback((href: string, openInNewTab = false) => {
     if (openInNewTab && typeof window !== 'undefined') {
       window.open(href, '_blank', 'noopener,noreferrer');
       return;
     }
     router.push(href);
-  };
+  }, [router]);
 
-  const handleRowClick = (e: ReactMouseEvent<HTMLElement>, href: string) => {
+  const handleRowClick = useCallback((e: ReactMouseEvent<HTMLElement>, href: string) => {
     if (e.defaultPrevented) return;
     if (e.metaKey || e.ctrlKey) {
       navigateToProfile(href, true);
       return;
     }
     router.push(href);
-  };
+  }, [navigateToProfile, router]);
 
-  const handleRowAuxClick = (e: ReactMouseEvent<HTMLElement>, href: string) => {
+  const handleRowAuxClick = useCallback((e: ReactMouseEvent<HTMLElement>, href: string) => {
     if (e.button === 1) {
       e.preventDefault();
       navigateToProfile(href, true);
     }
-  };
+  }, [navigateToProfile]);
 
-  const handleRowKeyDown = (e: ReactKeyboardEvent<HTMLElement>, href: string) => {
+  const handleRowKeyDown = useCallback((e: ReactKeyboardEvent<HTMLElement>, href: string) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       navigateToProfile(href, e.metaKey || e.ctrlKey);
     }
-  };
+  }, [navigateToProfile]);
 
-  const handleRowMouseEnter = (wizardId: string, href: string) => {
-    router.prefetch(href);
-    const summaryPath = `/rta/player/${encodeURIComponent(wizardId)}/summary`;
-    queryClient.prefetchQuery({
-      queryKey: [summaryPath, keyPart({})],
-      queryFn: () => apiClient.post(summaryPath, {}),
-      staleTime: 30_000,
-    });
-  };
+  /** 스크롤 중 연속 hover 이벤트가 프리페치를 폭발적으로 만들지 않도록 150ms 디바운스 */
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleRowMouseEnter = useCallback((wizardId: string, href: string) => {
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      router.prefetch(href);
+      const summaryPath = `/rta/player/${encodeURIComponent(wizardId)}/summary`;
+      queryClient.prefetchQuery({
+        queryKey: [summaryPath, keyPart({})],
+        queryFn: () => apiClient.post(summaryPath, {}),
+        staleTime: 30_000,
+      });
+    }, 150);
+  }, [router, queryClient]);
 
   /** 첫 로드만 전체 스피너, 더보기는 테이블 상단 프로그레스 */
   const tableInitialLoading = loadingPage && allRows.length === 0;

@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import {
+  alpha,
+  Avatar,
   Box,
   Button,
   Card,
@@ -13,6 +15,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  Stack,
   Switch,
   TextField,
   Typography,
@@ -37,7 +40,12 @@ import EditIcon from '@mui/icons-material/Edit';
 import CloseIcon from '@mui/icons-material/Close';
 import GroupIcon from '@mui/icons-material/Group';
 import SearchIcon from '@mui/icons-material/Search';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import SummarizeIcon from '@mui/icons-material/Summarize';
+import HistoryIcon from '@mui/icons-material/History';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import { useRouter } from 'next/navigation';
+import { PageHeader } from '@/shared/ui';
 import { showToast } from '@/shared/lib/notification';
 import {
   useUserGuild,
@@ -78,6 +86,108 @@ function readStoredUserInfo(): (UserInfo & { siege_view_scope?: string }) | null
     logger.error('사용자 정보 파싱 실패', error);
     return null;
   }
+}
+
+const SECTION_ICON_SX = {
+  width: 40,
+  height: 40,
+  borderRadius: 2,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  bgcolor: (t: { palette: { primary: { main: string } } }) => alpha(t.palette.primary.main, 0.12),
+  color: 'primary.main',
+} as const;
+
+function SettingsRow({
+  label,
+  value,
+  children,
+  showDivider = true,
+}: {
+  label: string;
+  value?: ReactNode;
+  children?: ReactNode;
+  showDivider?: boolean;
+}) {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: children ? 'center' : 'flex-start',
+        gap: 2,
+        py: 2,
+        borderBottom: showDivider ? '1px solid' : 'none',
+        borderColor: 'divider',
+        flexWrap: 'wrap',
+      }}
+    >
+      <Typography variant="body2" fontWeight={600} color="text.secondary" sx={{ minWidth: 88 }}>
+        {label}
+      </Typography>
+      {children ?? (
+        <Typography variant="body2" sx={{ fontWeight: 600, textAlign: 'right', wordBreak: 'break-all' }}>
+          {value}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+function SettingsSectionCard({
+  title,
+  icon,
+  action,
+  children,
+  accent,
+}: {
+  title: string;
+  icon: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+  accent?: 'error';
+}) {
+  return (
+    <Card
+      elevation={0}
+      sx={{
+        height: '100%',
+        border: '1px solid',
+        borderColor: accent === 'error' ? (t) => alpha(t.palette.error.main, 0.35) : 'divider',
+        bgcolor: accent === 'error' ? (t) => alpha(t.palette.error.main, 0.06) : undefined,
+        transition: 'border-color 0.2s, box-shadow 0.2s',
+        '&:hover': {
+          borderColor: accent === 'error' ? 'error.main' : 'primary.main',
+          boxShadow: (t) =>
+            accent === 'error'
+              ? `0 0 0 1px ${alpha(t.palette.error.main, 0.2)}, 0 8px 32px rgba(0,0,0,0.25)`
+              : `0 0 0 1px ${alpha(t.palette.primary.main, 0.15)}, 0 8px 32px rgba(0,0,0,0.25)`,
+        },
+      }}
+    >
+      <CardHeader
+        avatar={
+          <Box
+            sx={{
+              ...SECTION_ICON_SX,
+              ...(accent === 'error' && {
+                bgcolor: (t) => alpha(t.palette.error.main, 0.12),
+                color: 'error.main',
+              }),
+            }}
+          >
+            {icon}
+          </Box>
+        }
+        title={title}
+        titleTypographyProps={{ variant: 'subtitle1', fontWeight: 700 }}
+        action={action}
+        sx={{ pb: 0 }}
+      />
+      <CardContent sx={{ pt: 1 }}>{children}</CardContent>
+    </Card>
+  );
 }
 
 function readInitialSiegeGuildSetting(): {
@@ -449,103 +559,158 @@ export default function SettingsPage() {
     showToast.success('설정이 저장되었습니다.');
   };
 
+  const displayName = userInfo?.user_nm || userInfo?.user_id || '게스트';
+  const avatarLetter = (displayName.trim()[0] || '?').toUpperCase();
+
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: '#f8f9fa', py: 4 }}>
-      <Container>
-        <Box sx={{ textAlign: 'center', mb: 5 }}>
-          <Typography variant="h4" sx={{ fontWeight: 300, mb: 1, color: '#2c3e50' }}>
-            설정
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            계정 및 앱 설정을 관리하세요
-          </Typography>
-        </Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 4, md: 6 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
+        <PageHeader title="마이페이지" backPath="/" />
 
-        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, gap: 3, flexWrap: 'wrap' }}>
-          {/* 사용자 정보 */}
-          <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 calc(50% - 12px)' } }}>
-            <Card sx={{ height: '100%' }}>
-              <CardHeader
-                avatar={<AccountCircleIcon color="primary" />}
-                title="사용자 정보"
-                action={
-                  <Button
-                    variant="text"
-                    color="primary"
-                    size="small"
-                    onClick={editUserInfo}
-                    startIcon={<EditIcon />}
-                  >
-                    수정
-                  </Button>
-                }
-              />
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="body1" fontWeight={600}>
-                    사용자명
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {userInfo?.user_nm || userInfo?.user_id || '정보 없음'}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 2 }}>
-                  <Typography variant="body1" fontWeight={600}>
-                    사용자 ID
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {userInfo?.user_id || '정보 없음'}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
+        <Card
+          elevation={0}
+          sx={{
+            mb: 3,
+            border: '1px solid',
+            borderColor: 'divider',
+            background: (t) =>
+              `linear-gradient(135deg, ${alpha(t.palette.primary.main, 0.14)} 0%, ${alpha(t.palette.background.paper, 0.9)} 55%, ${t.palette.background.default} 100%)`,
+          }}
+        >
+          <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2.5, alignItems: { sm: 'center' } }}>
+              <Avatar
+                sx={{
+                  width: { xs: 64, md: 72 },
+                  height: { xs: 64, md: 72 },
+                  fontSize: '1.5rem',
+                  fontWeight: 800,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  border: '2px solid',
+                  borderColor: (t) => alpha(t.palette.primary.light, 0.5),
+                }}
+              >
+                {avatarLetter}
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="overline" color="primary" sx={{ letterSpacing: 0.1, fontWeight: 700 }}>
+                  내 계정
+                </Typography>
+                <Typography variant="h5" sx={{ fontWeight: 800, mt: 0.25, mb: 0.5 }}>
+                  {displayName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-all' }}>
+                  {userInfo?.user_id || '로그인 정보 없음'}
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                  {userInfo?.guild_name ? (
+                    <Chip label={userInfo.guild_name} size="small" color="primary" variant="outlined" />
+                  ) : (
+                    <Chip label="길드 미소속" size="small" variant="outlined" />
+                  )}
+                  {userInfo?.guild_role && (
+                    <Chip label={getRoleLabel(userInfo.guild_role)} size="small" color={getRoleColor(userInfo.guild_role)} />
+                  )}
+                </Stack>
+              </Box>
+            </Box>
+            <Stack direction="row" spacing={1} sx={{ mt: 2.5, flexWrap: 'wrap', gap: 1 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<SummarizeIcon />}
+                onClick={() => router.push('/account-summary')}
+              >
+                계정 요약
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<CloudUploadIcon />}
+                onClick={() => router.push('/log-upload')}
+              >
+                로그 업로드
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<HistoryIcon />}
+                onClick={() => router.push('/battle-history')}
+              >
+                전투 이력
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<NotificationsActiveIcon />}
+                onClick={() => router.push('/notifications')}
+              >
+                알림
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
 
-          {/* 길드 정보 */}
-          <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 calc(50% - 12px)' } }}>
-            <Card sx={{ height: '100%' }}>
-              <CardHeader
-                avatar={<GroupIcon color="primary" />}
-                title="길드 정보"
-                action={
-                  !userInfo?.guild_id && !myJoinApplication && (
-                    <Button
-                      variant="text"
-                      color="primary"
-                      size="small"
-                      onClick={() => setGuildJoinDialog(true)}
-                      startIcon={<SearchIcon />}
-                    >
-                      길드 가입
-                    </Button>
-                  )
-                }
-              />
-              <CardContent>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' },
+            gap: 3,
+          }}
+        >
+          <SettingsSectionCard
+            title="사용자 정보"
+            icon={<AccountCircleIcon fontSize="small" />}
+            action={
+              <Button variant="text" color="primary" size="small" onClick={editUserInfo} startIcon={<EditIcon />}>
+                수정
+              </Button>
+            }
+          >
+            <SettingsRow label="사용자명" value={userInfo?.user_nm || userInfo?.user_id || '정보 없음'} />
+            <SettingsRow label="사용자 ID" value={userInfo?.user_id || '정보 없음'} showDivider={false} />
+          </SettingsSectionCard>
+
+          <SettingsSectionCard
+            title="길드 정보"
+            icon={<GroupIcon fontSize="small" />}
+            action={
+              !userInfo?.guild_id && !myJoinApplication ? (
+                <Button
+                  variant="text"
+                  color="primary"
+                  size="small"
+                  onClick={() => setGuildJoinDialog(true)}
+                  startIcon={<SearchIcon />}
+                >
+                  길드 가입
+                </Button>
+              ) : undefined
+            }
+          >
                 {userInfo?.guild_id ? (
                   <>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                      <Typography variant="body1" fontWeight={600}>
-                        길드명
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {userInfo.guild_name || '정보 없음'}
-                      </Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2 }}>
-                      <Typography variant="body1" fontWeight={600}>
-                        등급
-                      </Typography>
+                    <SettingsRow label="길드명" value={userInfo.guild_name || '정보 없음'} />
+                    <SettingsRow label="등급" showDivider={false}>
                       <Chip
                         label={getRoleLabel(userInfo.guild_role)}
                         color={getRoleColor(userInfo.guild_role)}
                         size="small"
                       />
-                    </Box>
+                    </SettingsRow>
                   </>
                 ) : myJoinApplication ? (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <Box sx={{ p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
+                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                    <Box
+                      sx={{
+                        p: 3,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: (t) => alpha(t.palette.warning.main, 0.35),
+                        bgcolor: (t) => alpha(t.palette.warning.main, 0.08),
+                      }}
+                    >
                       <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
                         길드 가입 신청 중
                       </Typography>
@@ -582,8 +747,16 @@ export default function SettingsPage() {
                     </Box>
                   </Box>
                 ) : myGuildApplication ? (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <Box sx={{ p: 3, bgcolor: 'action.hover', borderRadius: 2 }}>
+                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                    <Box
+                      sx={{
+                        p: 3,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: (t) => alpha(t.palette.background.paper, 0.6),
+                      }}
+                    >
                       <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
                         길드 생성 신청 중
                       </Typography>
@@ -610,22 +783,21 @@ export default function SettingsPage() {
                     </Box>
                   </Box>
                 ) : (
-                  <Box sx={{ textAlign: 'center', py: 4 }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                  <Box sx={{ textAlign: 'center', py: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
                       소속된 길드가 없습니다.
                     </Typography>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
+                    <Stack spacing={1.5} sx={{ maxWidth: 320, mx: 'auto' }}>
                       <Button
                         variant="contained"
                         color="primary"
                         onClick={() => setGuildJoinDialog(true)}
                         startIcon={<SearchIcon />}
                         fullWidth
-                        sx={{ maxWidth: 300 }}
                       >
                         길드 가입하기
                       </Button>
-                      <Typography variant="body2" color="text.secondary" sx={{ my: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
                         또는
                       </Typography>
                       <Button
@@ -634,35 +806,23 @@ export default function SettingsPage() {
                         onClick={() => router.push('/guild-application')}
                         startIcon={<GroupIcon />}
                         fullWidth
-                        sx={{ maxWidth: 300 }}
                       >
                         길드 생성 신청
                       </Button>
-                    </Box>
+                    </Stack>
                   </Box>
                 )}
-              </CardContent>
-            </Card>
-          </Box>
+          </SettingsSectionCard>
 
-          {/* 계정 설정 */}
-          <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 calc(50% - 12px)' } }}>
-            <Card sx={{ height: '100%' }}>
-              <CardHeader avatar={<SecurityIcon color="primary" />} title="계정 설정" />
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography variant="body1" fontWeight={600}>
-                      자동 로그인
-                    </Typography>
-                  </Box>
+          <SettingsSectionCard title="계정 설정" icon={<SecurityIcon fontSize="small" />}>
+                <SettingsRow label="자동 로그인">
                   <Switch
                     checked={autoLoginEnabled}
                     onChange={(e) => toggleAutoLogin(e.target.checked)}
                     color="primary"
                   />
-                </Box>
-                <Box sx={{ py: 2 }}>
+                </SettingsRow>
+                <Box sx={{ pt: 1 }}>
                   <Typography variant="body1" fontWeight={600} sx={{ mb: 2 }}>
                     점령전 조회 범위
                   </Typography>
@@ -807,63 +967,28 @@ export default function SettingsPage() {
                     </Box>
                   )}
                 </Box>
-              </CardContent>
-            </Card>
-          </Box>
+          </SettingsSectionCard>
 
-          {/* 앱 정보 */}
-          <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 calc(50% - 12px)' } }}>
-            <Card sx={{ height: '100%' }}>
-              <CardHeader avatar={<InfoIcon color="primary" />} title="앱 정보" />
-              <CardContent>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="body1" fontWeight={600}>
-                    앱 버전
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {appVersion}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 2 }}>
-                  <Typography variant="body1" fontWeight={600}>
-                    빌드 날짜
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {buildDate}
-                  </Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
+          <SettingsSectionCard title="앱 정보" icon={<InfoIcon fontSize="small" />}>
+            <SettingsRow label="앱 버전" value={appVersion} />
+            <SettingsRow label="빌드 날짜" value={buildDate} showDivider={false} />
+          </SettingsSectionCard>
 
-          {/* 계정 관리 */}
-          <Box sx={{ flex: { xs: '1 1 100%', lg: '1 1 calc(50% - 12px)' } }}>
-            <Card
-              sx={{
-                height: '100%',
-                background: 'linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%)',
-                border: '1px solid #fed7d7',
-              }}
+          <SettingsSectionCard title="계정 관리" icon={<LogoutIcon fontSize="small" />} accent="error">
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              현재 계정에서 로그아웃합니다. 자동 로그인 설정도 함께 해제됩니다.
+            </Typography>
+            <Button
+              variant="outlined"
+              color="error"
+              fullWidth
+              onClick={logout}
+              startIcon={<LogoutIcon />}
+              disabled={logoutMutation.isPending}
             >
-              <CardHeader avatar={<LogoutIcon color="error" />} title="계정 관리" />
-              <CardContent>
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="body2" color="error" sx={{ mb: 3 }}>
-                    현재 계정에서 로그아웃합니다.
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="large"
-                    onClick={logout}
-                    startIcon={<LogoutIcon />}
-                  >
-                    로그아웃
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
-          </Box>
+              {logoutMutation.isPending ? '로그아웃 중...' : '로그아웃'}
+            </Button>
+          </SettingsSectionCard>
         </Box>
 
         {/* 사용자 정보 수정 다이얼로그 */}

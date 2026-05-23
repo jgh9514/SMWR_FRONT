@@ -55,3 +55,11 @@ export interface MarkNotificationReadResponse {
   result: string; // 'SUCCESS' | 'FAIL'
 }
 
+/**
+ * 알림 숨김 처리 응답
+ */
+export interface DismissNotificationResponse {
+  result: string; // 'SUCCESS' | 'FAIL'
+  message?: string;
+}
+

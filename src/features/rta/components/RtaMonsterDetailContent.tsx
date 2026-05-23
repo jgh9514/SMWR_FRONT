@@ -25,7 +25,13 @@ import type { CounterMatchupRow, MonsterDetail } from '@/features/rta/types/rta'
 interface RtaMonsterDetailContentProps {
   data: MonsterDetail;
   embedded?: boolean;
-  embeddedPart?: 'full' | 'tables';
+  /** tables: 시너지·카운터 2단 탭 / counter-only: 카운터 솔·듀·트만 (몬스터 상세 상성) */
+  embeddedPart?: 'full' | 'tables' | 'counter-only';
+}
+
+function counterComboSize(row: CounterMatchupRow): number {
+  const n = Number(row.opponentComboSize);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function MonsterAvatar({ image, name, size = 32 }: { image?: string; name: string; size?: number }) {
@@ -126,7 +132,7 @@ function SynergyTrioTab({ data }: { data: MonsterDetail }) {
 }
 
 function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3 }) {
-  const filtered = rows.filter((r) => r.opponentComboSize === size);
+  const filtered = rows.filter((r) => counterComboSize(r) === size);
   if (!filtered.length) return <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>데이터가 없습니다.</Typography>;
   return (
     <TableContainer>
@@ -179,11 +185,30 @@ function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3
   );
 }
 
-function TablesSection({ data }: { data: MonsterDetail }) {
+function CounterTabsPanel({ counterRows }: { counterRows: CounterMatchupRow[] }) {
+  const [counterTab, setCounterTab] = useState(0);
+  return (
+    <Box>
+      <Tabs value={counterTab} onChange={(_, v) => setCounterTab(v)} sx={{ mb: 1.5 }} variant="scrollable" scrollButtons="auto">
+        <Tab label="솔로" />
+        <Tab label="듀오" />
+        <Tab label="트리오" />
+      </Tabs>
+      {counterTab === 0 && <CounterTab rows={counterRows} size={1} />}
+      {counterTab === 1 && <CounterTab rows={counterRows} size={2} />}
+      {counterTab === 2 && <CounterTab rows={counterRows} size={3} />}
+    </Box>
+  );
+}
+
+function TablesSection({ data, counterOnly = false }: { data: MonsterDetail; counterOnly?: boolean }) {
   const [mainTab, setMainTab] = useState(0);
   const [synergyTab, setSynergyTab] = useState(0);
-  const [counterTab, setCounterTab] = useState(0);
   const counterRows: CounterMatchupRow[] = data.counter_matchups ?? [];
+
+  if (counterOnly) {
+    return <CounterTabsPanel counterRows={counterRows} />;
+  }
 
   return (
     <Box>
@@ -203,18 +228,7 @@ function TablesSection({ data }: { data: MonsterDetail }) {
         </Box>
       )}
 
-      {mainTab === 1 && (
-        <Box>
-          <Tabs value={counterTab} onChange={(_, v) => setCounterTab(v)} sx={{ mb: 1.5 }} variant="scrollable" scrollButtons="auto">
-            <Tab label="솔로" />
-            <Tab label="듀오" />
-            <Tab label="트리오" />
-          </Tabs>
-          {counterTab === 0 && <CounterTab rows={counterRows} size={1} />}
-          {counterTab === 1 && <CounterTab rows={counterRows} size={2} />}
-          {counterTab === 2 && <CounterTab rows={counterRows} size={3} />}
-        </Box>
-      )}
+      {mainTab === 1 && <CounterTabsPanel counterRows={counterRows} />}
     </Box>
   );
 }
@@ -291,8 +305,8 @@ export default function RtaMonsterDetailContent({
         </Box>
       )}
 
-      {(embedded && embeddedPart === 'tables') ? (
-        <TablesSection data={data} />
+      {(embedded && (embeddedPart === 'tables' || embeddedPart === 'counter-only')) ? (
+        <TablesSection data={data} counterOnly={embeddedPart === 'counter-only'} />
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 3 }}>
           <Card>

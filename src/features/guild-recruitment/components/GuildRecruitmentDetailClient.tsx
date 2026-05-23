@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import {
   Box,
   Button,
+  Chip,
   Container,
   Dialog,
   DialogActions,
@@ -17,6 +18,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useState, useMemo } from 'react';
 import { PageBanner, PageHeader } from '@/shared/ui';
+import { RichTextDisplay } from '@/shared/ui/editor/RichTextDisplay';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import {
@@ -104,7 +106,7 @@ export default function GuildRecruitmentDetailClient({ postId }: Props) {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 2, md: 6 } }}>
       <PageBanner />
-      <Container sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 3 } }}>
+      <Container sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 3 }, maxWidth: 900 }}>
         <PageHeader
           title={data.guild_name}
           backPath="/guild-recruitment"
@@ -130,20 +132,40 @@ export default function GuildRecruitmentDetailClient({ postId }: Props) {
             ) : null
           }
         />
+
+        {/* 메타 정보 */}
         <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            서버: <strong>{data.server_name}</strong>
-            {' · '}
-            전시즌 등급: <strong>{data.last_season_grade}</strong>
-            {' · '}
-            {formatPostedAt(data.crt_date)}
-            {data.user_name ? ` · ${data.user_name}` : ''}
-          </Typography>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
+            <Chip label={data.server_name} variant="outlined" size="small" />
+            <Chip label={data.last_season_grade} color="primary" size="small" />
+            <Typography variant="body2" color="text.secondary" sx={{ ml: 'auto' }}>
+              {data.user_name ? `${data.user_name} · ` : ''}{formatPostedAt(data.crt_date)}
+            </Typography>
+          </Box>
         </Paper>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, whiteSpace: 'pre-wrap' }}>
-          <Typography component="div" variant="body1">
-            {data.content || ''}
-          </Typography>
+
+        {/* 썸네일 */}
+        {data.thumbnail_url && (
+          <Box
+            component="img"
+            src={data.thumbnail_url}
+            alt={`${data.guild_name} 대표 이미지`}
+            sx={{
+              width: '100%',
+              maxHeight: 400,
+              objectFit: 'cover',
+              borderRadius: 2,
+              mb: 2,
+              display: 'block',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          />
+        )}
+
+        {/* 본문 */}
+        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2 }}>
+          <RichTextDisplay content={data.content || ''} />
         </Paper>
       </Container>
 

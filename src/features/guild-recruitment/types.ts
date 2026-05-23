@@ -10,6 +10,7 @@ export interface GuildRecruitmentRow {
   guild_name: string;
   server_name: string;
   last_season_grade: string;
+  thumbnail_url?: string;
   content_preview?: string;
   crt_date?: string;
   upt_date?: string;
@@ -32,6 +33,7 @@ export interface GuildRecruitmentSaveParams {
   guild_name: string;
   server_name: string;
   last_season_grade: string;
+  thumbnail_url?: string;
   content: string;
 }
 
@@ -39,4 +41,10 @@ export interface GuildRecruitmentSaveResponse {
   result: string;
   message?: string;
   post_id?: string | number;
+}
+
+export interface GuildRecruitmentImageUploadResponse {
+  result: string;
+  url?: string;
+  message?: string;
 }

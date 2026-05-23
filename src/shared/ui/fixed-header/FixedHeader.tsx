@@ -20,7 +20,6 @@ import {
   Avatar,
   Divider,
   Badge,
-  ListItemAvatar,
   Button,
   Container,
   Link as MuiLink,
@@ -42,9 +41,7 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import GroupIcon from '@mui/icons-material/Group';
 import AnnouncementIcon from '@mui/icons-material/Announcement';
 import QuestionAnswerIcon from '@mui/icons-material/QuestionAnswer';
-import NotificationsIcon from '@mui/icons-material/Notifications';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
-import CircleIcon from '@mui/icons-material/Circle';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -57,13 +54,16 @@ import { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from 
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
 import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
-import { MS_PER_MINUTE, MS_PER_HOUR, MS_PER_DAY } from '@/shared/constants/validation';
 import {
   useNotificationList,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
+  useDismissNotification,
 } from '@/features/notification/hooks/useNotification';
+import NotificationListPanel from '@/features/notification/components/NotificationListPanel';
 import type { NotificationItem } from '@/features/notification/types/notification';
+import { isNotificationUnread } from '@/features/notification/lib/notificationUtils';
+import { showToast } from '@/shared/lib/notification';
 import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
@@ -343,8 +343,27 @@ export default function FixedHeader() {
   });
 
   const markAllReadMutation = useMarkAllNotificationsRead({
-    onSuccess: () => {
+    onSuccess: (res) => {
+      if (res?.result === 'SUCCESS') {
+        showToast.success('모든 알림을 읽음 처리했습니다.');
+      }
       notificationListQuery.refetch();
+    },
+    onError: () => {
+      showToast.error('전체 읽음 처리에 실패했습니다.');
+    },
+  });
+
+  const dismissNotificationMutation = useDismissNotification({
+    onSuccess: (res) => {
+      if (res?.result === 'SUCCESS') {
+        notificationListQuery.refetch();
+      } else {
+        showToast.error(res?.message || '알림을 숨기지 못했습니다.');
+      }
+    },
+    onError: () => {
+      showToast.error('알림을 숨기지 못했습니다.');
     },
   });
 
@@ -402,7 +421,7 @@ export default function FixedHeader() {
   };
 
   const handleNotificationItemClick = (notification: NotificationItem) => {
-    if (!notification.is_read) {
+    if (isNotificationUnread(notification)) {
       markReadMutation.mutate({ notification_id: notification.notification_id });
     }
     if (notification.related_url) {
@@ -411,8 +430,17 @@ export default function FixedHeader() {
     }
   };
 
+  const handleDismissNotification = (notificationId: string) => {
+    dismissNotificationMutation.mutate({ notification_id: notificationId });
+  };
+
   const handleMarkAllRead = () => {
     markAllReadMutation.mutate({});
+  };
+
+  const handleViewAllNotifications = () => {
+    handleNotificationClose();
+    router.push('/notifications');
   };
 
   const handleLogout = () => {
@@ -426,42 +454,6 @@ export default function FixedHeader() {
 
   const handleHome = () => {
     router.push('/');
-  };
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'GUILD_MEMBER_JOINED':
-      case 'GUILD_MEMBER_LEFT':
-      case 'GUILD_APPLICATION_PENDING':
-        return <GroupIcon fontSize="small" />;
-      case 'INQUIRY_PENDING':
-      case 'INQUIRY_ANSWERED':
-        return <QuestionAnswerIcon fontSize="small" />;
-      case 'NOTICE_NEW':
-        return <AnnouncementIcon fontSize="small" />;
-      default:
-        return <NotificationsIcon fontSize="small" />;
-    }
-  };
-
-  const formatNotificationTime = (dateString: string) => {
-    if (!isClient) return '';
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / MS_PER_MINUTE);
-      const diffHours = Math.floor(diffMs / MS_PER_HOUR);
-      const diffDays = Math.floor(diffMs / MS_PER_DAY);
-
-      if (diffMins < 1) return '방금 전';
-      if (diffMins < 60) return `${diffMins}분 전`;
-      if (diffHours < 24) return `${diffHours}시간 전`;
-      if (diffDays < 7) return `${diffDays}일 전`;
-      return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-    } catch {
-      return '';
-    }
   };
 
   const isLoggedIn = isClient && isAuthenticated();
@@ -885,109 +877,26 @@ export default function FixedHeader() {
               },
             }}
           >
-            <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>
-                알림
-              </Typography>
-              {notificationListQuery.data && notificationListQuery.data.unreadCount > 0 && (
-                <Button
-                  size="small"
-                  onClick={handleMarkAllRead}
-                  disabled={markAllReadMutation.isPending}
-                  sx={{ fontSize: '0.75rem', minWidth: 'auto', px: 1 }}
-                >
-                  모두 읽음
-                </Button>
-              )}
-            </Box>
-            <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
-              {notificationListQuery.isLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    로딩 중...
-                  </Typography>
-                </Box>
-              ) : notificationListQuery.data && notificationListQuery.data.list.length > 0 ? (
-                <List sx={{ p: 0 }}>
-                  {notificationListQuery.data.list.map((notification: NotificationItem) => (
-                    <ListItem
-                      key={notification.notification_id}
-                      disablePadding
-                      sx={{
-                        bgcolor: notification.is_read ? 'transparent' : 'action.hover',
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        '&:hover': {
-                          bgcolor: 'action.selected',
-                        },
-                      }}
-                    >
-                      <ListItemButton
-                        onClick={() => handleNotificationItemClick(notification)}
-                        sx={{ py: 1.5, px: 2 }}
-                      >
-                        <ListItemAvatar sx={{ minWidth: 40 }}>
-                          <Avatar
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              bgcolor: notification.is_read ? 'action.disabledBackground' : 'primary.main',
-                              color: notification.is_read ? 'action.disabled' : 'primary.contrastText',
-                            }}
-                          >
-                            {getNotificationIcon(notification.type)}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <Typography
-                                variant="body2"
-                                sx={{
-                                  fontWeight: notification.is_read ? 400 : 600,
-                                  flex: 1,
-                                }}
-                              >
-                                {notification.title}
-                              </Typography>
-                              {!notification.is_read && (
-                                <CircleIcon sx={{ fontSize: 8, color: 'primary.main' }} />
-                              )}
-                            </Box>
-                          }
-                          secondary={
-                            <Box>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: 'block',
-                                  mb: 0.5,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {notification.content}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                                {formatNotificationTime(notification.crt_date)}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 6, px: 2 }}>
-                  <NotificationsNoneIcon sx={{ fontSize: 48, color: 'action.disabled', mb: 2 }} />
-                  <Typography variant="body2" color="text.secondary" align="center">
-                    알림이 없습니다
-                  </Typography>
-                </Box>
-              )}
+            <NotificationListPanel
+              notifications={notificationListQuery.data?.list ?? []}
+              unreadCount={notificationListQuery.data?.unreadCount ?? 0}
+              isLoading={notificationListQuery.isLoading}
+              isClient={isClient}
+              maxHeight={400}
+              onItemClick={handleNotificationItemClick}
+              onDismiss={handleDismissNotification}
+              onMarkAllRead={handleMarkAllRead}
+              markAllReadPending={markAllReadMutation.isPending}
+              dismissingId={
+                dismissNotificationMutation.isPending
+                  ? dismissNotificationMutation.variables?.notification_id ?? null
+                  : null
+              }
+            />
+            <Box sx={{ px: 2, py: 1, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'center' }}>
+              <Button size="small" fullWidth onClick={handleViewAllNotifications}>
+                알림 관리
+              </Button>
             </Box>
           </Menu>
 
