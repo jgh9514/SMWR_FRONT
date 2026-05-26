@@ -46,10 +46,7 @@ import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
 import {
   useRtaDashboardRankCutoff,
-  useRtaPlayerSummary,
-  useRtaPlayerScoreDaily,
-  useRtaPlayerMonsterUsage,
-  useRtaPlayerOpponentRecords,
+  useRtaPlayerPageData,
 } from '@/features/rta/hooks/useRtaData';
 import type { RtaPlayerScoreDailyRow } from '@/features/rta/types/rta';
 import { isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
@@ -126,7 +123,15 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const opponentsHref = `/rta/player/${encodeURIComponent(wizardId)}/opponents`;
   const { seasonCode, seasonId } = useRtaPlayerSeason();
   const { data: rankCutData } = useRtaDashboardRankCutoff(seasonCode, seasonId);
-  const { data: summary } = useRtaPlayerSummary(wizardId, undefined, seasonCode, { seasonId });
+
+  // summary·scoreDaily·monsterUsage·opponentH2H 를 단일 요청으로 수신 (HTTP 4회→1회)
+  const { data: pageData, isLoading: pageDataLoading } = useRtaPlayerPageData(wizardId, seasonCode, seasonId);
+  const summary = pageData?.summary;
+  const monsterUsageData = pageData?.monsterUsage;
+  const opponentData = pageData?.opponentH2H;
+  const scoreDailyData = pageData?.scoreDaily;
+  const scoreDailyLoading = pageDataLoading;
+
   const {
     data: infinite,
     isLoading,
@@ -134,23 +139,6 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     fetchNextPage,
     hasNextPage,
   } = useRtaPlayerMatchesInfinite(wizardId, true, seasonCode, seasonId);
-
-  const { data: monsterUsageData } = useRtaPlayerMonsterUsage(wizardId, seasonCode, {
-    seasonId,
-    enabled: Boolean(wizardId),
-  });
-
-  const { data: opponentData } = useRtaPlayerOpponentRecords(wizardId, seasonCode, {
-    seasonId,
-    limit: 5,
-    offset: 0,
-    enabled: Boolean(wizardId),
-  });
-
-  const { data: scoreDailyData, isLoading: scoreDailyLoading } = useRtaPlayerScoreDaily(wizardId, seasonCode, {
-    seasonId,
-    enabled: Boolean(wizardId),
-  });
 
   /** '전체 점수 추이' 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
   const [chartOpen, setChartOpen] = useState(false);

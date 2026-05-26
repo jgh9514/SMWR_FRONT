@@ -21,6 +21,7 @@ import type {
   RtaMonsterTopSummonerRow,
   RtaRankCutDetailResponse,
   CounterMatchupRow,
+  RtaPlayerPageData,
 } from '@/features/rta/types/rta';
 
 function ratingIdBody(ratingId?: number | null): Record<string, number> {
@@ -958,5 +959,29 @@ export const useRtaCounterMatchup = (
     '/rta/monster-counter',
     enabled ? { monster_id: monsterId, combo_size: comboSize, ratingId, ...(seasonId != null ? { seasonId } : {}) } : {},
     { enabled, staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false, retry: false },
+  );
+};
+
+/**
+ * 소환사 상세 페이지 초기 데이터 — summary·scoreDaily·monsterUsage·opponentH2H 를 서버에서 병렬 조회.
+ * 5개 독립 HTTP 요청을 1개로 압축해 초기 로드 시간 단축.
+ */
+export const useRtaPlayerPageData = (
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+) => {
+  const id = wizardId?.trim() ?? '';
+  const path = id ? `/rta/player/${encodeURIComponent(id)}/page-data` : '/rta/player/-/page-data';
+  return useApiPostQuery<RtaPlayerPageData>(
+    path,
+    seasonBody(seasonCode, seasonId),
+    {
+      enabled: Boolean(id),
+      staleTime: 2 * 60_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: false,
+    },
   );
 };

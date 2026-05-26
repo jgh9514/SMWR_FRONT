@@ -557,6 +557,16 @@ export interface RtaPlayerOpponentResponse {
   has_more: boolean;
 }
 
+/** POST /rta/player/{wizardId}/page-data — summary·scoreDaily·monsterUsage·opponentH2H 병렬 단일 응답 */
+export interface RtaPlayerPageData {
+  found: boolean;
+  seasonId?: number | null;
+  summary: RtaPlayerSummary;
+  scoreDaily: RtaPlayerScoreDailyResponse;
+  monsterUsage: RtaPlayerMonsterUsageResponse;
+  opponentH2H: RtaPlayerOpponentResponse;
+}
+
 /** POST /rta/matches/player/{wizardId}/vs/{opponentWizardId} */
 export interface RtaVsMatchesResponse {
   wizardId?: string;
