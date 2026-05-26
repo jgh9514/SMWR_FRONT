@@ -983,24 +983,31 @@ export default function TierListClient() {
     if (!tierListRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading('이미지 생성 중...');
+    const hiddenButtons: HTMLElement[] = [];
+    let restoreImages: (() => void) | null = null;
     try {
-      const html2canvas = (await import('html2canvas')).default;
+      const { toPng } = await import('html-to-image');
       const root = tierListRef.current;
-      const canvas = await html2canvas(root, {
-        backgroundColor: '#0f172a',
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        onclone: async (_doc, clonedRoot) => {
-          clonedRoot.querySelectorAll('button').forEach((btn) => {
-            (btn as HTMLElement).style.display = 'none';
-          });
-          await inlineImagesForHtml2Canvas(clonedRoot);
-        },
+
+      // 버튼 숨김 (캡처 전 실제 DOM에서)
+      root.querySelectorAll('button').forEach((btn) => {
+        (btn as HTMLElement).style.visibility = 'hidden';
+        hiddenButtons.push(btn as HTMLElement);
       });
+
+      // 이미지 pre-inline: html2canvas의 onclone은 async를 await하지 않아
+      // 이미지 인라인 완료 전에 캡처되는 문제가 있음 — 실제 DOM에서 먼저 await
+      restoreImages = await inlineImagesForHtml2Canvas(root);
+
+      const dataUrl = await toPng(root, {
+        backgroundColor: '#0f172a',
+        pixelRatio: 2,
+        skipFonts: false,
+      });
+
       const link = document.createElement('a');
       link.download = 'tier-list.png';
-      link.href = canvas.toDataURL('image/png');
+      link.href = dataUrl;
       link.click();
       toast.dismiss(toastId);
       toast.success('PNG로 저장되었습니다!');
@@ -1009,6 +1016,8 @@ export default function TierListClient() {
       toast.dismiss(toastId);
       toast.error('이미지 생성에 실패했습니다.');
     } finally {
+      hiddenButtons.forEach((btn) => { btn.style.visibility = ''; });
+      restoreImages?.();
       setIsExporting(false);
     }
   }, []);

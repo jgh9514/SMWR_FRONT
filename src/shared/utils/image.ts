@@ -193,38 +193,41 @@ function waitForImageLoad(img: HTMLImageElement, url: string): Promise<void> {
 }
 
 /**
- * html2canvas 전에 `<img>`를 data URL로 인라인. 완료 후 restore()로 원복.
+ * 캡처 전 `<img>`를 data URL로 인라인. 완료 후 restore()로 원복.
+ * - CDN 이미지: /api/cdn-image 프록시 경유 (CORS 우회)
+ * - 외부 이미지 (element icon 등): direct CORS fetch 시도, 실패 시 원본 유지
  */
 export async function inlineImagesForHtml2Canvas(root: Element): Promise<() => void> {
   const images = Array.from(root.querySelectorAll('img'));
-  const restores: Array<{ img: HTMLImageElement; src: string; crossOrigin: string | null }> =
-    [];
+  const restores: Array<{ img: HTMLImageElement; src: string; crossOrigin: string | null }> = [];
 
   await Promise.all(
     images.map(async (img) => {
       const attrSrc = img.getAttribute('src') ?? img.src;
-      const fetchUrl = toCanvasExportImageUrl(attrSrc);
+      if (!attrSrc || attrSrc.startsWith('data:')) return;
 
-      restores.push({
-        img,
-        src: img.src,
-        crossOrigin: img.crossOrigin,
-      });
+      restores.push({ img, src: img.src, crossOrigin: img.crossOrigin });
 
-      if (fetchUrl.startsWith('data:') || !fetchUrl.includes('/api/cdn-image')) {
-        return;
+      // CDN 이미지 → 동일 출처 프록시 경유
+      const proxyUrl = toCanvasExportImageUrl(attrSrc);
+      if (proxyUrl.includes('/api/cdn-image')) {
+        try {
+          const res = await fetch(proxyUrl, { credentials: 'same-origin', cache: 'force-cache' });
+          if (!res.ok) throw new Error(`proxy ${res.status}`);
+          img.src = await blobToDataUrl(await res.blob());
+          img.removeAttribute('crossorigin');
+          return;
+        } catch { /* fall through */ }
       }
 
-      try {
-        const res = await fetch(fetchUrl, { credentials: 'same-origin', cache: 'force-cache' });
-        if (!res.ok) {
-          throw new Error(`image fetch failed: ${res.status}`);
-        }
-        img.src = await blobToDataUrl(await res.blob());
-        img.removeAttribute('crossorigin');
-      } catch {
-        img.crossOrigin = 'anonymous';
-        await waitForImageLoad(img, fetchUrl);
+      // 외부 이미지 (static.lucksack.gg 등) → CORS fetch 시도
+      if (attrSrc.startsWith('http://') || attrSrc.startsWith('https://')) {
+        try {
+          const res = await fetch(attrSrc, { mode: 'cors', credentials: 'omit', cache: 'force-cache' });
+          if (!res.ok) throw new Error(`direct ${res.status}`);
+          img.src = await blobToDataUrl(await res.blob());
+          img.removeAttribute('crossorigin');
+        } catch { /* 원본 src 유지 */ }
       }
     }),
   );
@@ -232,11 +235,8 @@ export async function inlineImagesForHtml2Canvas(root: Element): Promise<() => v
   return () => {
     for (const { img, src, crossOrigin } of restores) {
       img.src = src;
-      if (crossOrigin) {
-        img.crossOrigin = crossOrigin;
-      } else {
-        img.removeAttribute('crossorigin');
-      }
+      if (crossOrigin) img.crossOrigin = crossOrigin;
+      else img.removeAttribute('crossorigin');
     }
   };
 }
