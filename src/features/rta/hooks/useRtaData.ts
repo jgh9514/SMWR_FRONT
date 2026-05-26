@@ -20,6 +20,7 @@ import type {
   RtaMonsterPickSlotRow,
   RtaMonsterTopSummonerRow,
   RtaRankCutDetailResponse,
+  CounterMatchupRow,
 } from '@/features/rta/types/rta';
 
 function ratingIdBody(ratingId?: number | null): Record<string, number> {
@@ -943,5 +944,19 @@ export const useRtaMonsterDetail = (
       retry: false,
       ...queryOptions,
     },
+  );
+};
+
+export const useRtaCounterMatchup = (
+  monsterId: number | null,
+  seasonId: number | null | undefined,
+  ratingId: number | null | undefined,
+  comboSize: 1 | 2 | 3,
+) => {
+  const enabled = monsterId != null && monsterId > 0 && ratingId != null && ratingId > 0;
+  return useApiPostQuery<{ rows: CounterMatchupRow[]; seasonId: number | null }>(
+    '/rta/monster-counter',
+    enabled ? { monster_id: monsterId, combo_size: comboSize, ratingId, ...(seasonId != null ? { seasonId } : {}) } : {},
+    { enabled, staleTime: 5 * 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false, retry: false },
   );
 };
