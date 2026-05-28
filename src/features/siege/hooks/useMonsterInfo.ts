@@ -2,7 +2,12 @@
  * 몬스터 기본 정보 조회 Hook
  */
 
-import { useApiPostQuery } from '@/hooks/api/useApiQuery';
+import { useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import type { QueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { keyPart, useApiPostQuery } from '@/hooks/api/useApiQuery';
+import { apiClient } from '@/shared/lib/api/client';
 import type { AttributeType } from '@/features/siege/types/monster';
 
 /** WAS detail_context에서 내려주는 패밀리·진화용 요약 행 */
@@ -145,6 +150,40 @@ export interface MonsterSkill {
   effects?: MonsterSkillEffectRow[];
 }
 
+export const MONSTER_INFO_STALE_MS = 10 * 60 * 1000;
+
+export function monsterInfoQueryKey(monsterId: string) {
+  return ['/summonerswar/monster/info', keyPart({ monster_id: monsterId.trim() })] as const;
+}
+
+export function prefetchMonsterInfo(queryClient: QueryClient, monsterId: string | undefined | null) {
+  const id = monsterId?.trim();
+  if (!id) return;
+  void queryClient.prefetchQuery({
+    queryKey: monsterInfoQueryKey(id),
+    queryFn: () => apiClient.post<MonsterInfoResponse>('/summonerswar/monster/info', { monster_id: id }),
+    staleTime: MONSTER_INFO_STALE_MS,
+  });
+}
+
+/** 몬스터 상세 라우트·info API hover prefetch (150ms 디바운스) */
+export function useMonsterDetailLinkPrefetch() {
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  return useCallback(
+    (monsterId: string | undefined, href: string) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        router.prefetch(href);
+        prefetchMonsterInfo(queryClient, monsterId);
+      }, 150);
+    },
+    [queryClient, router],
+  );
+}
+
 /**
  * 몬스터 기본 정보 조회
  */
@@ -155,6 +194,8 @@ export const useMonsterInfo = (monsterId: string | null) => {
     {
       enabled: !!monsterId,
       refetchOnWindowFocus: false,
+      staleTime: MONSTER_INFO_STALE_MS,
+      gcTime: MONSTER_INFO_STALE_MS * 2,
     }
   );
 };

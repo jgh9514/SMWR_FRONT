@@ -966,8 +966,10 @@ export const useRtaCounterMatchup = (
   seasonId: number | null | undefined,
   ratingId: number | null | undefined,
   comboSize: 1 | 2 | 3,
+  tabActive = true,
 ) => {
-  const enabled = monsterId != null && monsterId > 0 && ratingId != null && ratingId > 0;
+  const enabled =
+    tabActive && monsterId != null && monsterId > 0 && ratingId != null && ratingId > 0;
   return useApiPostQuery<{ rows: CounterMatchupRow[]; seasonId: number | null }>(
     '/rta/monster-counter',
     enabled ? { monster_id: monsterId, combo_size: comboSize, ratingId, ...(seasonId != null ? { seasonId } : {}) } : {},

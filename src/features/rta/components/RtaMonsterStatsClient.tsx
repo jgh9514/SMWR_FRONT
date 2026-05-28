@@ -79,6 +79,7 @@ import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
+import { useMonsterDetailLinkPrefetch } from '@/features/siege/hooks/useMonsterInfo';
 import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -261,6 +262,7 @@ interface MonsterCellProps {
 }
 
 const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterId }: MonsterCellProps) {
+  const prefetchMonsterDetailLink = useMonsterDetailLinkPrefetch();
   const attr = parseMonsterElemental(elemental);
   const displayName = name?.trim() || '—';
   const href = rtaMonsterDetailHref(monsterId);
@@ -328,7 +330,7 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
       <Box
         component={Link}
         href={href}
-        prefetch={false}
+        onMouseEnter={() => prefetchMonsterDetailLink(monsterId, href)}
         sx={{
           textDecoration: 'none',
           color: 'inherit',
@@ -353,6 +355,7 @@ const MonsterCell = memo(function MonsterCell({ name, image, elemental, monsterI
 const COMBO_TILE_AVATAR_PX = 48;
 
 const ComboMonsterTile = memo(function ComboMonsterTile({ name, image, elemental, monsterId }: MonsterCellProps) {
+  const prefetchMonsterDetailLink = useMonsterDetailLinkPrefetch();
   const attr = parseMonsterElemental(elemental);
   const displayName = name?.trim() || '—';
   const href = rtaMonsterDetailHref(monsterId);
@@ -408,7 +411,7 @@ const ComboMonsterTile = memo(function ComboMonsterTile({ name, image, elemental
       <Box
         component={Link}
         href={href}
-        prefetch={false}
+        onMouseEnter={() => prefetchMonsterDetailLink(monsterId, href)}
         sx={{
           textDecoration: 'none',
           color: 'inherit',
@@ -521,13 +524,14 @@ const MonsterStatsSortSelect = memo(function MonsterStatsSortSelect({
 });
 
 const SoloStatCard = memo(function SoloStatCard({ rank, stat }: { rank: number; stat: MonsterStats }) {
+  const prefetchMonsterDetailLink = useMonsterDetailLinkPrefetch();
   const href = rtaMonsterDetailHref(stat.monster_id);
   return (
     <Paper
       elevation={0}
       component={href ? Link : 'div'}
       href={href}
-      prefetch={false}
+      onMouseEnter={href ? () => prefetchMonsterDetailLink(stat.monster_id, href) : undefined}
       sx={{
         borderRadius: 2.5,
         border: '1px solid',
@@ -787,6 +791,7 @@ export default function RtaMonsterStatsClient() {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const prefetchMonsterDetailLink = useMonsterDetailLinkPrefetch();
   const tab = useMemo(() => tabFromPathname(pathname), [pathname]);
 
   // Season
@@ -1217,7 +1222,7 @@ export default function RtaMonsterStatsClient() {
                           <Box
                             component={Link}
                             href={href}
-                            prefetch={false}
+                            onMouseEnter={() => prefetchMonsterDetailLink(m.monster_id, href)}
                             sx={{
                               borderRadius: 1,
                               border: '1px solid',

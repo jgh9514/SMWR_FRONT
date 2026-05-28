@@ -35,6 +35,7 @@ import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import type { AttributeType } from '@/features/siege/types/monster';
 import { monsterAwakenStepDigit, monsterEvolutionGroupKey } from '@/features/siege/lib/monsterIdEvolution';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
+import { useMonsterDetailLinkPrefetch } from '@/features/siege/hooks/useMonsterInfo';
 import { apiClient } from '@/shared/lib/api/client';
 
 const attributeLabels: Record<AttributeType, string> = {
@@ -309,6 +310,7 @@ function MonsterIconCell({
   showDashWhenEmpty?: boolean;
   sizePx?: number;
 }) {
+  const prefetchMonsterDetailLink = useMonsterDetailLinkPrefetch();
   const frameSx = {
     width: sizePx,
     height: sizePx,
@@ -348,6 +350,7 @@ function MonsterIconCell({
   return (
     <Link
       href={href}
+      onMouseEnter={() => prefetchMonsterDetailLink(m.monster_id, href)}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -363,6 +366,7 @@ function MonsterIconCell({
 }
 
 export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: MonsterSearchClientProps) {
+  const prefetchMonsterDetailLink = useMonsterDetailLinkPrefetch();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [elementFilter, setElementFilter] = useState<ElementFilter>('all');
   const [starFilter, setStarFilter] = useState<StarFilter>('all');
@@ -939,6 +943,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                                 hrefNormal ? (
                                   <Link
                                     href={hrefNormal}
+                                    onMouseEnter={() => prefetchMonsterDetailLink(row.normal!.monster_id, hrefNormal)}
                                     style={{ textDecoration: 'none', color: 'inherit' }}
                                   >
                                     <MonsterTitleBlock m={row.normal} titleClass="title" />
@@ -956,6 +961,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                                 hrefAwakened ? (
                                   <Link
                                     href={hrefAwakened}
+                                    onMouseEnter={() => prefetchMonsterDetailLink(row.awakened!.monster_id, hrefAwakened)}
                                     style={{ textDecoration: 'none', color: 'inherit' }}
                                   >
                                     <MonsterTitleBlock m={row.awakened} titleClass="title" />
@@ -977,6 +983,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                                 hrefSecond ? (
                                   <Link
                                     href={hrefSecond}
+                                    onMouseEnter={() => prefetchMonsterDetailLink(row.secondAwakening!.monster_id, hrefSecond)}
                                     style={{ textDecoration: 'none', color: 'inherit' }}
                                   >
                                     <MonsterTitleBlock m={row.secondAwakening} titleClass="title" />
@@ -1121,6 +1128,7 @@ export default function MonsterSearchClient({ monsterList, devilmonImageUrl }: M
                                   {titleHref ? (
                                     <Link
                                       href={titleHref}
+                                      onMouseEnter={() => prefetchMonsterDetailLink(m.monster_id, titleHref)}
                                       style={{ textDecoration: 'none', color: 'inherit' }}
                                     >
                                       <MonsterTitleBlock m={m} />

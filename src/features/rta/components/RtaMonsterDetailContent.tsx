@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Avatar,
   Box,
@@ -21,6 +21,7 @@ import {
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import { getRenderableImageUrl } from '@/shared/utils/image';
 import type { CounterMatchupRow, MonsterDetail } from '@/features/rta/types/rta';
+import { counterMatchupMatchCnt, sortCounterMatchupsByMatchCntDesc } from '@/features/rta/utils/counterMatchupSort';
 
 interface RtaMonsterDetailContentProps {
   data: MonsterDetail;
@@ -132,8 +133,11 @@ function SynergyTrioTab({ data }: { data: MonsterDetail }) {
 }
 
 function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3 }) {
-  const filtered = rows.filter((r) => counterComboSize(r) === size);
-  if (!filtered.length) return <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>데이터가 없습니다.</Typography>;
+  const sorted = useMemo(
+    () => sortCounterMatchupsByMatchCntDesc(rows.filter((r) => counterComboSize(r) === size)),
+    [rows, size],
+  );
+  if (!sorted.length) return <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>데이터가 없습니다.</Typography>;
   return (
     <TableContainer>
       <Table size="small">
@@ -146,9 +150,9 @@ function CounterTab({ rows, size }: { rows: CounterMatchupRow[]; size: 1 | 2 | 3
           </TableRow>
         </TableHead>
         <TableBody>
-          {filtered.slice(0, 30).map((r, i) => {
+          {sorted.slice(0, 30).map((r, i) => {
             const wr = r.winRate != null && Number.isFinite(Number(r.winRate)) ? Number(r.winRate) : null;
-            const matchCnt = r.matchCnt ?? (Number(r.winCnt ?? 0) + Number(r.loseCnt ?? 0));
+            const matchCnt = counterMatchupMatchCnt(r);
             const monsters = r.opponentMonsters ?? [];
             return (
               <TableRow key={`${r.opponentComboKey}-${i}`}>
