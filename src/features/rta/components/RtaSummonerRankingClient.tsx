@@ -13,7 +13,6 @@ import {
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/shared/lib/api/client';
-import { keyPart } from '@/hooks/api/useApiQuery';
 import {
   Box,
   Button,
@@ -39,7 +38,12 @@ import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
 import { blurFocusedMenuItem } from '@/features/rta/rtaMenuModalProps';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
-import { useRtaSummonerRanking, useRtaSeasonSelect } from '@/features/rta/hooks/useRtaData';
+import {
+  useRtaSummonerRanking,
+  useRtaSeasonSelect,
+  rtaPlayerPageDataQueryKey,
+  seasonBody,
+} from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { RtaSummonerRankingRow } from '@/features/rta/types/rta';
@@ -383,14 +387,15 @@ export default function RtaSummonerRankingClient() {
     if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     prefetchTimerRef.current = setTimeout(() => {
       router.prefetch(href);
-      const summaryPath = `/rta/player/${encodeURIComponent(wizardId)}/summary`;
+      const body = seasonBody(seasonSelectValue, seasonIdForApi);
+      const pageDataPath = rtaPlayerPageDataQueryKey(wizardId, seasonSelectValue, seasonIdForApi)[0];
       queryClient.prefetchQuery({
-        queryKey: [summaryPath, keyPart({})],
-        queryFn: () => apiClient.post(summaryPath, {}),
-        staleTime: 30_000,
+        queryKey: rtaPlayerPageDataQueryKey(wizardId, seasonSelectValue, seasonIdForApi),
+        queryFn: () => apiClient.post(pageDataPath, body),
+        staleTime: 2 * 60_000,
       });
     }, 150);
-  }, [router, queryClient]);
+  }, [router, queryClient, seasonSelectValue, seasonIdForApi]);
 
   /** 첫 로드만 전체 스피너, 더보기는 테이블 상단 프로그레스 */
   const tableInitialLoading = loadingPage && allRows.length === 0;

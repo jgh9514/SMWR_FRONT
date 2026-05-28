@@ -351,12 +351,16 @@ export const useRtaDashboardTierDistribution = (seasonCode?: string | null, seas
  * RTA 대시보드 — 랭크 컷 (앵커·스냅샷)
  * 백엔드: POST /api/v1/rta/dashboard/rank-cutoff
  */
-export const useRtaDashboardRankCutoff = (seasonCode?: string | null, seasonId?: number | null) => {
+export const useRtaDashboardRankCutoff = (
+  seasonCode?: string | null,
+  seasonId?: number | null,
+  options?: { enabled?: boolean },
+) => {
   return useApiPostQuery<RtaDashboardRankCutoffResponse>(
     '/rta/dashboard/rank-cutoff',
     seasonBody(seasonCode, seasonId),
     {
-      enabled: true,
+      enabled: options?.enabled !== false,
       staleTime: RTA_READ_STALE_MS,
       gcTime: RTA_READ_GC_MS,
       refetchOnWindowFocus: false,
@@ -652,16 +656,25 @@ export const useRtaPlayerMonsterUsage = (
   options: {
     seasonId: number | null;
     enabled?: boolean;
+    /** page-data monsterUsage( top N ) — picks 탭 첫 페인트 placeholder */
+    placeholderData?: RtaPlayerMonsterUsageResponse;
   },
 ) => {
+  const { seasonId, placeholderData, ...restOptions } = options;
   const id = wizardId?.trim() ?? '';
   const path = id ? `/rta/player/${encodeURIComponent(id)}/monster-usage` : '/rta/player/-/monster-usage';
-  return useApiPostQuery<RtaPlayerMonsterUsageResponse>(path, seasonBody(seasonCode ?? null, options.seasonId), {
-    enabled: Boolean(id) && (options.enabled !== false),
-    staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
-    gcTime: 5 * 60_000,
-    refetchOnWindowFocus: false,
-  });
+  return useApiPostQuery<RtaPlayerMonsterUsageResponse>(
+    path,
+    seasonBody(seasonCode ?? null, seasonId),
+    {
+      enabled: Boolean(id) && (options.enabled !== false),
+      staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
+      gcTime: 5 * 60_000,
+      refetchOnWindowFocus: false,
+      ...(placeholderData != null ? { placeholderData } : {}),
+      ...restOptions,
+    },
+  );
 };
 
 const RTA_MONSTER_PICK_BREAKDOWN_STALE_MS = 120_000;
@@ -963,6 +976,22 @@ export const useRtaCounterMatchup = (
 };
 
 /**
+ * 소환사 상세 page-data — React Query 키·경로 (prefetch 와 useRtaPlayerPageData 동일 계약)
+ */
+export function rtaPlayerPageDataPath(wizardId: string): string {
+  const id = wizardId?.trim() ?? '';
+  return id ? `/rta/player/${encodeURIComponent(id)}/page-data` : '/rta/player/-/page-data';
+}
+
+export function rtaPlayerPageDataQueryKey(
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+) {
+  return [rtaPlayerPageDataPath(wizardId), keyPart(seasonBody(seasonCode, seasonId))] as const;
+}
+
+/**
  * 소환사 상세 페이지 초기 데이터 — summary·scoreDaily·monsterUsage·opponentH2H 를 서버에서 병렬 조회.
  * 5개 독립 HTTP 요청을 1개로 압축해 초기 로드 시간 단축.
  */
@@ -972,7 +1001,7 @@ export const useRtaPlayerPageData = (
   seasonId: number | null | undefined,
 ) => {
   const id = wizardId?.trim() ?? '';
-  const path = id ? `/rta/player/${encodeURIComponent(id)}/page-data` : '/rta/player/-/page-data';
+  const path = rtaPlayerPageDataPath(id);
   return useApiPostQuery<RtaPlayerPageData>(
     path,
     seasonBody(seasonCode, seasonId),

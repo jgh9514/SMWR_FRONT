@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
@@ -46,11 +46,12 @@ import { getRtaTierShortLabel } from '@/shared/utils/util';
 import type { MatchItem } from '@/types';
 import {
   useRtaDashboardRankCutoff,
-  useRtaPlayerPageData,
+  useRtaPlayerScoreDaily,
 } from '@/features/rta/hooks/useRtaData';
 import type { RtaPlayerScoreDailyRow } from '@/features/rta/types/rta';
 import { isRtaCutoffMissing } from '@/features/rta/utils/rtaCutoffScore';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
+import { useRtaPlayerPageDataContext } from '@/features/rta/context/RtaPlayerPageDataContext';
 import { useRtaPlayerMatchesInfinite } from '@/features/rta/hooks/useRtaPlayerMatchesInfinite';
 import { getMatchPerspective } from '@/features/rta/utils/rtaPlayerPerspective';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
@@ -122,15 +123,52 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
   const picksHref = `/rta/player/${encodeURIComponent(wizardId)}/picks`;
   const opponentsHref = `/rta/player/${encodeURIComponent(wizardId)}/opponents`;
   const { seasonCode, seasonId } = useRtaPlayerSeason();
-  const { data: rankCutData } = useRtaDashboardRankCutoff(seasonCode, seasonId);
+  const tierBarRef = useRef<HTMLDivElement | null>(null);
+  const [tierBarVisible, setTierBarVisible] = useState(false);
 
-  // summary·scoreDaily·monsterUsage·opponentH2H 를 단일 요청으로 수신 (HTTP 4회→1회)
-  const { data: pageData, isLoading: pageDataLoading } = useRtaPlayerPageData(wizardId, seasonCode, seasonId);
+  useEffect(() => {
+    const el = tierBarRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setTierBarVisible(true);
+      return;
+    }
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setTierBarVisible(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: '120px 0px' },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  const { data: rankCutData } = useRtaDashboardRankCutoff(seasonCode, seasonId, {
+    enabled: tierBarVisible,
+  });
+
+  // Shell에서 page-data 1회 조회 — Context 공유
+  const { data: pageData, isLoading: pageDataLoading } = useRtaPlayerPageDataContext();
   const summary = pageData?.summary;
   const monsterUsageData = pageData?.monsterUsage;
   const opponentData = pageData?.opponentH2H;
-  const scoreDailyData = pageData?.scoreDaily;
-  const scoreDailyLoading = pageDataLoading;
+  const pageScoreDaily = pageData?.scoreDaily;
+
+  /** '전체 점수 추이' 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
+  const [chartOpen, setChartOpen] = useState(false);
+  const { data: fullScoreDaily, isLoading: fullScoreDailyLoading } = useRtaPlayerScoreDaily(
+    wizardId,
+    seasonCode,
+    { seasonId, enabled: chartOpen },
+  );
+  const scoreDailyData = chartOpen && fullScoreDaily ? fullScoreDaily : pageScoreDaily;
+  const scoreDailyLoading = chartOpen ? fullScoreDailyLoading : pageDataLoading;
+  const [chartMode, setChartMode] = useState<ChartMode>('daily');
+  const [trendViewMode, setTrendViewMode] = useState<TrendViewMode>('chart');
+  /** 30일·'N일 전' 기준 시각(마운트 시 1회) — render 순수성 */
+  const [asOfTime] = useState(() => Date.now());
 
   const {
     data: infinite,
@@ -139,13 +177,6 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
     fetchNextPage,
     hasNextPage,
   } = useRtaPlayerMatchesInfinite(wizardId, true, seasonCode, seasonId);
-
-  /** '전체 점수 추이' 접힘 (기본 접어 두고 30일 라인이 먼저 보이게) */
-  const [chartOpen, setChartOpen] = useState(false);
-  const [chartMode, setChartMode] = useState<ChartMode>('daily');
-  const [trendViewMode, setTrendViewMode] = useState<TrendViewMode>('chart');
-  /** 30일·'N일 전' 기준 시각(마운트 시 1회) — render 순수성 */
-  const [asOfTime] = useState(() => Date.now());
 
   const allMatches = useMemo(() => {
     const pages = infinite?.pages ?? [];
@@ -472,7 +503,7 @@ export default function RtaPlayerOverviewClient({ wizardId }: { wizardId: string
             </Stack>
           </Stack>
 
-          <Box sx={{ mt: 2 }}>
+          <Box ref={tierBarRef} sx={{ mt: 2 }}>
             {tierBand.type === 'range' ? (
               <>
               {(() => {

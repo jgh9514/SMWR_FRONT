@@ -33,15 +33,13 @@ import SportsMmaIcon from '@mui/icons-material/SportsMma';
 import Inventory2Icon from '@mui/icons-material/Inventory2';
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import {
-  resolveDefaultRtaSeasonCode,
-  resolveRtaSeasonIdForApi,
   useRtaPlayerNameHistory,
-  useRtaPlayerSummary,
+  useRtaPlayerPageData,
   useRtaSeasonSelect,
 } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { RtaPlayerSeasonContext } from '@/features/rta/context/RtaPlayerSeasonContext';
-import type { RtaPlayerSummary } from '@/features/rta/types/rta';
+import { RtaPlayerPageDataProvider } from '@/features/rta/context/RtaPlayerPageDataContext';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import { RTA_SELECT_MENU_PROPS } from '@/features/rta/components/RtaSeasonTierSelectRow';
@@ -91,11 +89,9 @@ function buildNavItems(wizardId: string): NavItem[] {
 
 export default function RtaPlayerDetailShell({
   wizardId,
-  initialSummary,
   children,
 }: {
   wizardId: string;
-  initialSummary: RtaPlayerSummary | null;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -114,23 +110,23 @@ export default function RtaPlayerDetailShell({
     }));
   }, [seasonsData]);
 
-  /** RSC는 `POST .../summary` body 없음(서버 기본 시즌). 기본 시즌 선택일 때만 클라 쿼리에 시드한다. */
-  const rscSummaryInitial = useMemo((): RtaPlayerSummary | undefined => {
-    if (initialSummary == null) return undefined;
-    const rows = seasonsData?.seasons;
-    if (!rows?.length) return undefined;
-    const defaultCode = resolveDefaultRtaSeasonCode(seasonsData, '');
-    const defaultSid = resolveRtaSeasonIdForApi(rows, defaultCode);
-    if (defaultSid == null || seasonIdForApi == null) return undefined;
-    if (seasonIdForApi !== defaultSid) return undefined;
-    return initialSummary;
-  }, [initialSummary, seasonsData, seasonIdForApi]);
+  /** page-data 1회 조회 — 헤더 summary·개요 탭 초기 데이터 공유 (summary 중복 POST 방지) */
+  const {
+    data: pageData,
+    refetch,
+    isFetching,
+    isLoading: pageDataLoading,
+  } = useRtaPlayerPageData(wizardId, seasonSelectValue, seasonIdForApi);
+  const summary = pageData?.summary;
 
-  const { data: summary, refetch, isFetching } = useRtaPlayerSummary(
-    wizardId,
-    rscSummaryInitial,
-    seasonSelectValue,
-    { seasonId: seasonIdForApi },
+  const pageDataContextValue = useMemo(
+    () => ({
+      data: pageData,
+      isLoading: pageDataLoading,
+      isFetching,
+      refetch,
+    }),
+    [pageData, pageDataLoading, isFetching, refetch],
   );
 
   /** 검색/헤더가 아닌 랭킹·URL 직접 진입이어도 sessionStorage 최근검색에 1회 반영 */
@@ -142,7 +138,7 @@ export default function RtaPlayerDetailShell({
     if (sessionRecentForWizardRef.current === w) {
       return;
     }
-    const s = summary ?? initialSummary;
+    const s = summary;
     if (!s) {
       return;
     }
@@ -160,7 +156,7 @@ export default function RtaPlayerDetailShell({
       country: s.country,
     });
     sessionRecentForWizardRef.current = w;
-  }, [wizardId, initialSummary, summary]);
+  }, [wizardId, summary]);
 
   const displayName = useMemo(() => {
     if (summary?.found) {
@@ -213,6 +209,7 @@ export default function RtaPlayerDetailShell({
   };
 
   return (
+    <RtaPlayerPageDataProvider value={pageDataContextValue}>
     <Container
       maxWidth="lg"
       sx={{
@@ -591,5 +588,6 @@ export default function RtaPlayerDetailShell({
         </RtaPlayerSeasonContext.Provider>
       </Box>
     </Container>
+    </RtaPlayerPageDataProvider>
   );
 }

@@ -27,15 +27,20 @@ export function useRtaPlayerMatchesInfinite(
       if (sid != null) body.seasonId = sid;
       else if (sc) body.seasonCode = sc;
       const raw = await apiClient.post<RawMatchItem[]>(path, body);
-      const list = Array.isArray(raw) ? raw : [];
-      return list.map((m) => processRawMatchToMatchItem(m, catalog));
+      return Array.isArray(raw) ? raw : [];
     },
+    select: (data) => ({
+      pages: data.pages.map((page) =>
+        page.map((m) => processRawMatchToMatchItem(m, catalog)),
+      ),
+      pageParams: data.pageParams,
+    }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < PAGE_SIZE) return undefined;
       return allPages.reduce((acc, p) => acc + p.length, 0);
     },
-    enabled: enabled && id.length > 0 && catalog.size > 0,
+    enabled: enabled && id.length > 0,
     staleTime: 60_000,
     gcTime: 5 * 60_000,
   });

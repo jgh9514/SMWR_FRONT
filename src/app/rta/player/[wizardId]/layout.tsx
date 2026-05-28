@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import RtaPlayerDetailShell from '@/features/rta/components/RtaPlayerDetailShell';
-import { getRtaPlayerSummaryData } from '@/shared/lib/api/server';
 import { buildBreadcrumbJsonLd, buildPublicMetadata, getAbsoluteUrl, sanitizeMetaDescription } from '@/shared/lib/seo';
 import JsonLd from '@/shared/ui/seo/JsonLd';
 
@@ -10,8 +9,7 @@ export async function generateMetadata({
   params: Promise<{ wizardId: string }>;
 }): Promise<Metadata> {
   const { wizardId } = await params;
-  const summary = await getRtaPlayerSummaryData(wizardId);
-  const name = (summary?.found && summary.wizard_name?.trim()) || `소환사 ${wizardId}`;
+  const name = `소환사 ${wizardId}`;
 
   return buildPublicMetadata({
     title: `${name} · RTA 소환사`,
@@ -49,7 +47,7 @@ export default async function RtaPlayerLayout({
   return (
     <>
       <JsonLd data={[jsonLd, breadcrumbJsonLd]} />
-      <RtaPlayerDetailShell wizardId={wizardId} initialSummary={null}>
+      <RtaPlayerDetailShell wizardId={wizardId}>
         {children}
       </RtaPlayerDetailShell>
     </>

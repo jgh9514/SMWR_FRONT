@@ -28,6 +28,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import BarChartOutlinedIcon from '@mui/icons-material/BarChartOutlined';
 import { useRtaMonsterPickBreakdown, useRtaMonsterPickSlotMatches, useRtaPlayerMonsterUsage } from '@/features/rta/hooks/useRtaData';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
+import { useOptionalRtaPlayerPageDataContext } from '@/features/rta/context/RtaPlayerPageDataContext';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import { useRtaMonsterCatalog } from '@/features/rta/hooks/useRtaMonsterCatalog';
 import { RtaMatchCard } from '@/features/rta/components/RtaMatchCard';
@@ -35,6 +36,7 @@ import type { RawMatchItem } from '@/types';
 import type {
   RtaMonsterPickBucketRow,
   RtaPlayerMonsterFightSnapshot,
+  RtaPlayerMonsterUsageResponse,
   RtaPlayerMonsterUsageRow,
 } from '@/features/rta/types/rta';
 import {
@@ -733,10 +735,18 @@ export default function RtaPlayerPicksClient() {
   const params = useParams<{ wizardId: string }>();
   const wizardId = String(params?.wizardId ?? '').trim();
   const { seasonCode, seasonId } = useRtaPlayerSeason();
+  const pageCtx = useOptionalRtaPlayerPageDataContext();
+  const monsterUsagePlaceholder = useMemo((): RtaPlayerMonsterUsageResponse | undefined => {
+    const mu = pageCtx?.data?.monsterUsage;
+    if (!mu || seasonId == null) return undefined;
+    if (mu.seasonId != null && mu.seasonId !== seasonId) return undefined;
+    return mu;
+  }, [pageCtx?.data?.monsterUsage, seasonId]);
 
   const { data, isLoading, error, isFetching } = useRtaPlayerMonsterUsage(wizardId, seasonCode, {
     seasonId,
     enabled: Boolean(wizardId),
+    placeholderData: monsterUsagePlaceholder,
   });
 
   const [expandedUnitId, setExpandedUnitId] = useState<number | null>(null);
