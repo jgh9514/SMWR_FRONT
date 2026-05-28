@@ -50,7 +50,7 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import GroupsIcon from '@mui/icons-material/Groups';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
-import { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
 import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
@@ -465,39 +465,87 @@ export default function FixedHeader() {
 
   /** 데스크톱: 대분류 호버 시 하위 메뉴 앵커 */
   const [navHover, setNavHover] = useState<{ groupId: NavGroup['id']; anchor: HTMLElement } | null>(null);
+  const navHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const closeNavHoverMenu = () => {
+  const closeNavHoverMenu = useCallback(() => {
+    if (navHoverCloseTimerRef.current) {
+      clearTimeout(navHoverCloseTimerRef.current);
+      navHoverCloseTimerRef.current = null;
+    }
     setNavHover(null);
-  };
+  }, []);
 
-  /**
-   * 열린 하위 메뉴(MUI Paper)가 옆 대메뉴 버튼 위까지 가로로 넓어져,
-   * 옆 그룹 onMouseEnter가 막히는 문제를 피하려고 버튼 rect만 좌표로 판별한다.
-   */
-  const handleNavMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!isClient) return;
-      const { clientX, clientY } = e;
+  const cancelNavHoverClose = useCallback(() => {
+    if (navHoverCloseTimerRef.current) {
+      clearTimeout(navHoverCloseTimerRef.current);
+      navHoverCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleNavHoverClose = useCallback(() => {
+    cancelNavHoverClose();
+    navHoverCloseTimerRef.current = setTimeout(() => {
+      navHoverCloseTimerRef.current = null;
+      setNavHover(null);
+    }, 100);
+  }, [cancelNavHoverClose]);
+
+  /** 대메뉴 버튼 또는 Portal 하위 Menu 위인지 (좌표 기준 — Paper가 옆 버튼을 가릴 때도 전환 가능) */
+  const resolveNavHoverAtPoint = useCallback(
+    (clientX: number, clientY: number): { groupId: NavGroup['id']; anchor: HTMLElement } | 'menu' | null => {
       for (const group of navGroups) {
         const btn = document.getElementById(`nav-group-${group.id}`);
         if (!(btn instanceof HTMLElement)) continue;
         const r = btn.getBoundingClientRect();
         if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
-          setNavHover((prev) => {
-            const next = { groupId: group.id, anchor: btn };
-            if (prev?.groupId === next.groupId && prev?.anchor === next.anchor) return prev;
-            return next;
-          });
-          return;
+          return { groupId: group.id, anchor: btn };
         }
       }
       const el = document.elementFromPoint(clientX, clientY);
       if (el?.closest('[role="menu"]')) {
+        return 'menu';
+      }
+      return null;
+    },
+    [navGroups],
+  );
+
+  const handleNavGroupMouseEnter = useCallback(
+    (groupId: NavGroup['id'], anchor: HTMLElement) => {
+      if (!isClient) return;
+      cancelNavHoverClose();
+      setNavHover({ groupId, anchor });
+    },
+    [isClient, cancelNavHoverClose],
+  );
+
+  /** Menu는 Portal이라 nav mouseLeave만으로는 닫히지 않음 — 열린 동안 document에서 hover 영역 추적 */
+  useEffect(() => {
+    if (!isClient || !navHover) return;
+
+    const onPointerMove = (e: PointerEvent) => {
+      const hit = resolveNavHoverAtPoint(e.clientX, e.clientY);
+      if (hit === 'menu') {
+        cancelNavHoverClose();
         return;
       }
-    },
-    [isClient, navGroups],
-  );
+      if (hit) {
+        cancelNavHoverClose();
+        setNavHover((prev) => {
+          if (prev?.groupId === hit.groupId && prev.anchor === hit.anchor) return prev;
+          return hit;
+        });
+        return;
+      }
+      scheduleNavHoverClose();
+    };
+
+    document.addEventListener('pointermove', onPointerMove);
+    return () => {
+      document.removeEventListener('pointermove', onPointerMove);
+      cancelNavHoverClose();
+    };
+  }, [isClient, navHover, resolveNavHoverAtPoint, cancelNavHoverClose, scheduleNavHoverClose]);
 
   const iconQ = getPwaIconCacheQuery();
   const logoIconUrl = `/icons/ci_active.png${iconQ}`;
@@ -623,15 +671,6 @@ export default function FixedHeader() {
             <Box
               component="nav"
               aria-label="주요 메뉴"
-              onMouseMove={handleNavMouseMove}
-              onMouseLeave={(e) => {
-                if (!isClient) return;
-                // 대메뉴 간 이동 시에는 닫지 않음(자식 → 자식은 relatedTarget이 아직 nav 안).
-                // nav 영역 밖으로 나갈 때만 하위 메뉴 닫기.
-                const next = e.relatedTarget;
-                if (next instanceof Node && e.currentTarget.contains(next)) return;
-                closeNavHoverMenu();
-              }}
               sx={{
                 display: { xs: 'none', lg: 'flex' },
                 flex: 1,
@@ -659,6 +698,7 @@ export default function FixedHeader() {
                       color="inherit"
                       size="small"
                       endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18, opacity: 0.85 }} />}
+                      onMouseEnter={(e) => handleNavGroupMouseEnter(group.id, e.currentTarget)}
                       onClick={() => {
                         if (!isClient) return;
                         if (group.dashboardPath) {
@@ -701,6 +741,8 @@ export default function FixedHeader() {
                       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
                       slotProps={{
                         paper: {
+                          onMouseEnter: cancelNavHoverClose,
+                          onMouseLeave: scheduleNavHoverClose,
                           sx: {
                             mt: 0.5,
                             zIndex: (theme) => theme.zIndex.modal,
