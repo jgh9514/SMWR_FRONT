@@ -25,7 +25,6 @@ import {
   Link as MuiLink,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
-import HomeIcon from '@mui/icons-material/Home';
 import CastleIcon from '@mui/icons-material/Castle';
 import MapIcon from '@mui/icons-material/Map';
 import HistoryIcon from '@mui/icons-material/History';
@@ -34,7 +33,6 @@ import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import SportsEsportsIcon from '@mui/icons-material/SportsEsports';
 import SearchIcon from '@mui/icons-material/Search';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
-import SettingsIcon from '@mui/icons-material/Settings';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
@@ -130,12 +128,7 @@ function getNavGroups(
     ],
   };
 
-  const siege: NavGroup = {
-    id: 'siege',
-    label: 'Siege',
-    hint: '점령전',
-    dashboardPath: '/',
-    items: [
+  const siegeItems: NavLeaf[] = [
       { title: '전체 점령전', path: '/siege', icon: <CastleIcon /> },
       { title: '최근 점령전', path: '/recent-siege', icon: <HistoryIcon />, requiresGuild: true },
       { title: '점령전 지도', path: '/siege/map', icon: <MapIcon />, requiresGuild: true },
@@ -148,7 +141,24 @@ function getNavGroups(
         requiresGuild: true,
         requiresLeaderOrManager: true,
       },
-    ],
+  ];
+  if (isAdmin || isGuildLeaderOrManager) {
+    siegeItems.push({
+      title: '로그 업로드',
+      path: '/log-upload',
+      icon: <UploadFileIcon />,
+      requiresAdmin: isAdmin,
+      requiresGuild: !isAdmin && isGuildLeaderOrManager,
+      requiresLeaderOrManager: !isAdmin && isGuildLeaderOrManager,
+    });
+  }
+
+  const siege: NavGroup = {
+    id: 'siege',
+    label: 'Siege',
+    hint: '점령전',
+    dashboardPath: '/',
+    items: siegeItems,
   };
 
   const community: NavGroup = {
@@ -176,26 +186,9 @@ function getNavGroups(
   };
 
   const guideItemsFinal: NavLeaf[] = [
-    { title: '홈', path: '/', icon: <HomeIcon /> },
     { title: '서비스 소개', path: '/about', icon: <MenuBookIcon /> },
     { title: '몬스터 검색', path: '/monster-search', icon: <SearchIcon /> },
   ];
-  if (isLoggedIn) {
-    guideItemsFinal.push({ title: '계정 요약', path: '/account-summary', icon: <AccountCircleIcon />, requiresLogin: true });
-  }
-  if (isAdmin || isGuildLeaderOrManager) {
-    guideItemsFinal.push({
-      title: '로그 업로드',
-      path: '/log-upload',
-      icon: <UploadFileIcon />,
-      requiresAdmin: isAdmin,
-      requiresGuild: !isAdmin && isGuildLeaderOrManager,
-      requiresLeaderOrManager: !isAdmin && isGuildLeaderOrManager,
-    });
-  }
-  if (isLoggedIn) {
-    guideItemsFinal.push({ title: '설정', path: '/settings', icon: <SettingsIcon />, requiresLogin: true });
-  }
 
   const guideGroup: NavGroup = { id: 'guide', label: '가이드', items: guideItemsFinal };
 

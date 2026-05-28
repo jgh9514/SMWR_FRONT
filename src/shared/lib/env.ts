@@ -11,7 +11,7 @@ declare global {
   }
 }
 
-/** CloudFront 기본 (NEXT_PUBLIC_APP_CDN_URL 미설정 시 /api/cdn-image·/siege 에셋용) */
+/** CloudFront 기본 (NEXT_PUBLIC_APP_CDN_URL 미설정 시 /cdn-image·/siege 에셋용) */
 export const DEFAULT_APP_CDN_BASE = 'https://dyjduzi8vf2k4.cloudfront.net';
 
 /**

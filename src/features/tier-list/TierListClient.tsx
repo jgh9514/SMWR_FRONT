@@ -8,7 +8,7 @@ import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { apiClient } from '@/shared/lib/api/client';
 import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
-import { getRenderableImageUrl, inlineImagesForHtml2Canvas } from '@/shared/utils/image';
+import { getMonsterImageUrl, inlineImagesForHtml2Canvas } from '@/shared/utils/image';
 import { monsterAwakenStepDigit } from '@/features/siege/lib/monsterIdEvolution';
 import { isAuthenticated } from '@/shared/utils/auth';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
@@ -173,7 +173,7 @@ function MonsterIcon({
   onRemove?: () => void;
   dimmed?: boolean;
 }) {
-  const imgUrl = getRenderableImageUrl(monster.image_url);
+  const imgUrl = getMonsterImageUrl(monster.image_url);
   return (
     <div
       draggable={draggable}

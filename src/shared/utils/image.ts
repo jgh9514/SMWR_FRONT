@@ -146,9 +146,12 @@ export function extractMonsterImagePath(src: string | null | undefined): string 
   return path;
 }
 
+/** PNG/html-to-image 캡처용 동일 출처 프록시 (Ingress: `/api/*` → WAS 이므로 `/cdn-image` 사용) */
+const CDN_IMAGE_PROXY_PATH = '/cdn-image';
+
 /**
- * html2canvas 등 캡처용 — `/api/cdn-image` 동일 출처 프록시 URL.
- * (브라우저 → CloudFront 직접 fetch는 CORS로 막힘)
+ * html2canvas 등 캡처용 — `/cdn-image` 동일 출처 프록시 URL.
+ * (브라우저 → CloudFront 직접 fetch는 CORS·SW opaque 응답으로 막힘)
  */
 export function toCanvasExportImageUrl(src: string | null | undefined): string {
   const origin =
@@ -164,7 +167,7 @@ export function toCanvasExportImageUrl(src: string | null | undefined): string {
     return trimmed;
   }
 
-  return `${origin}/api/cdn-image?path=${encodeURIComponent(path)}`;
+  return `${origin}${CDN_IMAGE_PROXY_PATH}?path=${encodeURIComponent(path)}`;
 }
 
 /** @deprecated {@link toCanvasExportImageUrl} 사용 */
@@ -179,27 +182,27 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-function waitForImageLoad(img: HTMLImageElement, url: string): Promise<void> {
-  return new Promise((resolve) => {
-    const done = () => resolve();
-    img.onload = done;
-    img.onerror = done;
-    if (img.src !== url) {
-      img.src = url;
-    } else if (img.complete) {
-      resolve();
-    }
-  });
+async function fetchAsDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, { credentials: 'same-origin', cache: 'no-store' });
+    if (!res.ok) return null;
+    return blobToDataUrl(await res.blob());
+  } catch {
+    return null;
+  }
 }
 
 /**
  * 캡처 전 `<img>`를 data URL로 인라인. 완료 후 restore()로 원복.
- * - CDN 이미지: /api/cdn-image 프록시 경유 (CORS 우회)
+ * - CDN 이미지: `/cdn-image` 프록시 경유 (Ingress `/api/*` 회피)
  * - 외부 이미지 (element icon 등): direct CORS fetch 시도, 실패 시 원본 유지
  */
 export async function inlineImagesForHtml2Canvas(root: Element): Promise<() => void> {
   const images = Array.from(root.querySelectorAll('img'));
   const restores: Array<{ img: HTMLImageElement; src: string; crossOrigin: string | null }> = [];
+  const defaultPlaceholder = await fetchAsDataUrl(
+    `${typeof window !== 'undefined' ? window.location.origin : ''}/images/default-monster.png`,
+  );
 
   await Promise.all(
     images.map(async (img) => {
@@ -208,16 +211,19 @@ export async function inlineImagesForHtml2Canvas(root: Element): Promise<() => v
 
       restores.push({ img, src: img.src, crossOrigin: img.crossOrigin });
 
-      // CDN 이미지 → 동일 출처 프록시 경유
       const proxyUrl = toCanvasExportImageUrl(attrSrc);
-      if (proxyUrl.includes('/api/cdn-image')) {
-        try {
-          const res = await fetch(proxyUrl, { credentials: 'same-origin', cache: 'force-cache' });
-          if (!res.ok) throw new Error(`proxy ${res.status}`);
-          img.src = await blobToDataUrl(await res.blob());
+      if (proxyUrl.includes(CDN_IMAGE_PROXY_PATH)) {
+        const dataUrl = await fetchAsDataUrl(proxyUrl);
+        if (dataUrl) {
+          img.src = dataUrl;
           img.removeAttribute('crossorigin');
           return;
-        } catch { /* fall through */ }
+        }
+        if (defaultPlaceholder) {
+          img.src = defaultPlaceholder;
+          img.removeAttribute('crossorigin');
+        }
+        return;
       }
 
       // 외부 이미지 (static.lucksack.gg 등) → CORS fetch 시도

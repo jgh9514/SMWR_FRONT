@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -16,6 +16,7 @@ import {
   TextField,
   IconButton,
   Collapse,
+  Skeleton,
   Menu,
   MenuItem,
   ListItemIcon,
@@ -35,13 +36,29 @@ import type { Comment, BoardType, CommentSaveParams } from '@/features/community
 import { MAX_COMMENT_LENGTH } from '@/shared/constants/validation';
 import type { UserInfo } from '@/features/auth/types/auth';
 
+function blurFocusedMenuItem() {
+  if (typeof document === 'undefined') return;
+  const run = () => {
+    const el = document.activeElement;
+    if (el instanceof HTMLElement) {
+      el.blur();
+    }
+  };
+  run();
+  queueMicrotask(run);
+}
+
 interface CommentSectionProps {
   boardType: BoardType;
   boardId: string;
   userInfo?: UserInfo;
 }
 
-type CommentWithReplies = Comment & { replies: Comment[] };
+type CommentWithReplies = Omit<Comment, 'replies'> & { replies: CommentWithReplies[] };
+
+function countAllReplies(comment: CommentWithReplies): number {
+  return comment.replies.reduce((total, child) => total + 1 + countAllReplies(child), 0);
+}
 
 function getPlainText(content: string): string {
   if (!/<[a-z][\s\S]*>/i.test(content)) return content;
@@ -191,6 +208,18 @@ interface CommentMenuProps {
 
 function CommentMenu({ isOwner, onEdit, onDelete }: CommentMenuProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const pendingActionRef = useRef<'edit' | 'delete' | null>(null);
+
+  const handleClose = useCallback(() => {
+    setAnchor(null);
+  }, []);
+
+  const handleMenuExited = useCallback(() => {
+    const action = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (action === 'edit') onEdit();
+    else if (action === 'delete') onDelete();
+  }, [onEdit, onDelete]);
 
   if (!isOwner) return null;
 
@@ -206,14 +235,21 @@ function CommentMenu({ isOwner, onEdit, onDelete }: CommentMenuProps) {
       <Menu
         anchorEl={anchor}
         open={Boolean(anchor)}
-        onClose={() => setAnchor(null)}
+        onClose={handleClose}
+        disableScrollLock
+        disableEnforceFocus
+        disableRestoreFocus
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        TransitionProps={{
+          onExiting: blurFocusedMenuItem,
+          onExited: handleMenuExited,
+        }}
       >
         <MenuItem
           onClick={() => {
-            setAnchor(null);
-            onEdit();
+            pendingActionRef.current = 'edit';
+            handleClose();
           }}
         >
           <ListItemIcon><EditIcon fontSize="small" /></ListItemIcon>
@@ -221,8 +257,8 @@ function CommentMenu({ isOwner, onEdit, onDelete }: CommentMenuProps) {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            setAnchor(null);
-            onDelete();
+            pendingActionRef.current = 'delete';
+            handleClose();
           }}
           sx={{ color: 'error.main' }}
         >
@@ -234,14 +270,529 @@ function CommentMenu({ isOwner, onEdit, onDelete }: CommentMenuProps) {
   );
 }
 
+const COMMENT_AVATAR = 36;
+const REPLY_AVATAR = 24;
+const THREAD_RAIL_WIDTH = 2;
+const AVATAR_GAP = 12;
+const REPLY_CONTENT_OFFSET = REPLY_AVATAR + AVATAR_GAP;
+const ROOT_AVATAR_CENTER = COMMENT_AVATAR / 2;
+const REPLY_AVATAR_CENTER = REPLY_AVATAR / 2;
+/** 세로선 왼쪽 X — 답글 아바타 열 기준 (최상위 댓글 아바타 중심) */
+const ROOT_TO_REPLY_BRANCH_OFFSET =
+  ROOT_AVATAR_CENTER - THREAD_RAIL_WIDTH / 2 - (COMMENT_AVATAR + AVATAR_GAP);
+/** 세로선 왼쪽 X — 자식 답글 아바타 열 기준 (부모 답글 아바타 중심) */
+const NESTED_REPLY_BRANCH_OFFSET =
+  REPLY_AVATAR_CENTER - THREAD_RAIL_WIDTH / 2 - REPLY_CONTENT_OFFSET;
+const THREAD_CORNER_SIZE = 10;
+const THREAD_TOGGLE_MID_Y = 14;
+const REPLIES_SKELETON_MS = 320;
+
+function isTargetInSubtree(node: CommentWithReplies, targetId: string): boolean {
+  if (node.comment_id === targetId) return true;
+  return node.replies.some((child) => isTargetInSubtree(child, targetId));
+}
+
+/** 스레드 세로선 — 마지막 L자(토글/숨기기) midY에서 끊김 */
+function ThreadVerticalRail({ branchOffsetPx }: { branchOffsetPx: number }) {
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'absolute',
+        left: branchOffsetPx,
+        top: 0,
+        bottom: THREAD_TOGGLE_MID_Y,
+        width: THREAD_RAIL_WIDTH,
+        bgcolor: 'divider',
+        borderRadius: 1,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+function ThreadLCorner({ branchOffsetPx, midY }: { branchOffsetPx: number; midY: number }) {
+  const armWidth = REPLY_AVATAR_CENTER - branchOffsetPx;
+  if (armWidth <= THREAD_RAIL_WIDTH) return null;
+
+  return (
+    <Box
+      aria-hidden
+      sx={{
+        position: 'absolute',
+        left: branchOffsetPx,
+        top: midY - THREAD_CORNER_SIZE,
+        width: armWidth,
+        height: THREAD_CORNER_SIZE,
+        borderLeft: THREAD_RAIL_WIDTH,
+        borderBottom: THREAD_RAIL_WIDTH,
+        borderStyle: 'solid',
+        borderColor: 'divider',
+        borderBottomLeftRadius: THREAD_CORNER_SIZE,
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
+
+/** 답글 토글(보기) — 아바타 열 + L자 + 버튼 */
+function ThreadBranchRow({
+  branchOffsetPx,
+  children,
+}: {
+  branchOffsetPx: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+      <Box
+        sx={{
+          width: REPLY_AVATAR,
+          flexShrink: 0,
+          position: 'relative',
+          alignSelf: 'stretch',
+          minHeight: 28,
+        }}
+      >
+        <ThreadLCorner branchOffsetPx={branchOffsetPx} midY={THREAD_TOGGLE_MID_Y} />
+      </Box>
+      <Box sx={{ ml: 1.5, minWidth: 0 }}>{children}</Box>
+    </Box>
+  );
+}
+
+/** 답글 숨기기 — 버튼 왼쪽 정렬, L자만 아바타 열에 겹침 */
+function ThreadHideRow({
+  branchOffsetPx,
+  children,
+}: {
+  branchOffsetPx: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box sx={{ position: 'relative', mt: 1.5 }}>
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          left: 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: REPLY_AVATAR,
+          height: 28,
+          pointerEvents: 'none',
+        }}
+      >
+        <ThreadLCorner branchOffsetPx={branchOffsetPx} midY={THREAD_TOGGLE_MID_Y} />
+      </Box>
+      {children}
+    </Box>
+  );
+}
+
+function ReplyAvatarColumn({
+  comment,
+  size,
+  showBranch,
+  branchOffsetPx,
+}: {
+  comment: Comment;
+  size: number;
+  showBranch: boolean;
+  branchOffsetPx: number;
+}) {
+  const midY = size / 2 + 2;
+
+  return (
+    <Box
+      sx={{
+        width: size,
+        flexShrink: 0,
+        position: 'relative',
+        alignSelf: 'stretch',
+        pt: '2px',
+      }}
+    >
+      {showBranch && <ThreadLCorner branchOffsetPx={branchOffsetPx} midY={midY} />}
+      <Avatar
+        sx={{
+          width: size,
+          height: size,
+          bgcolor: 'primary.main',
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
+        {getAvatarLetter(comment)}
+      </Avatar>
+    </Box>
+  );
+}
+
+function ReplyThreadSkeleton({ count }: { count: number }) {
+  const rows = Math.max(1, Math.min(count, 3));
+  return (
+    <Box sx={{ mt: 1.5 }} aria-hidden>
+      <Stack spacing={2.5}>
+        {Array.from({ length: rows }, (_, i) => (
+          <Stack key={i} direction="row" spacing={1.5} alignItems="flex-start">
+            <Skeleton variant="circular" width={REPLY_AVATAR} height={REPLY_AVATAR} sx={{ flexShrink: 0 }} />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Skeleton variant="text" width="28%" height={18} />
+              <Skeleton variant="text" width="72%" height={16} sx={{ mt: 0.5 }} />
+            </Box>
+          </Stack>
+        ))}
+      </Stack>
+    </Box>
+  );
+}
+
+// ── 답글 본문 (아바타·연결선 제외) ───────────────────────────
+interface ReplyContentProps {
+  comment: Comment;
+  userInfo?: UserInfo;
+  isMutating?: boolean;
+  onReply: () => void;
+  onUpdate: (commentId: string, text: string) => void;
+  onDelete: (commentId: string) => void;
+}
+
+function ReplyContent({
+  comment,
+  userInfo,
+  isMutating = false,
+  onReply,
+  onUpdate,
+  onDelete,
+}: ReplyContentProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const isOwner = userInfo?.user_id === comment.user_id;
+  const displayName = comment.user_name || comment.user_id || '익명';
+
+  const handleUpdateSubmit = (text: string) => {
+    onUpdate(comment.comment_id, text);
+    setIsEditing(false);
+  };
+
+  return (
+    <>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
+            {displayName}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {formatDate(comment.crt_date)}
+          </Typography>
+        </Stack>
+
+        {isEditing ? (
+          <Box sx={{ mt: 0.5 }}>
+            <CommentInput
+              userInfo={userInfo}
+              placeholder="댓글 수정..."
+              initialValue={getPlainText(comment.content)}
+              submitLabel="저장"
+              autoFocus
+              compact
+              isLoading={isMutating}
+              onSubmit={handleUpdateSubmit}
+              onCancel={() => setIsEditing(false)}
+            />
+          </Box>
+        ) : (
+          <Typography
+            variant="body2"
+            sx={{ mt: 0.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}
+          >
+            {getPlainText(comment.content)}
+          </Typography>
+        )}
+
+        {!isEditing && (
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
+            <IconButton size="small" sx={{ color: 'text.secondary' }}>
+              <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+            <IconButton size="small" sx={{ color: 'text.secondary' }}>
+              <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+            {userInfo && (
+              <Button
+                size="small"
+                sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700, minWidth: 0, px: 1, borderRadius: 5 }}
+                onClick={onReply}
+              >
+                답글
+              </Button>
+            )}
+          </Stack>
+        )}
+      </Box>
+
+      <CommentMenu
+        isOwner={isOwner}
+        onEdit={() => setIsEditing(true)}
+        onDelete={() => setShowDeleteDialog(true)}
+      />
+
+      <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
+        <DialogTitle>댓글 삭제</DialogTitle>
+        <DialogContent>
+          <Typography>이 댓글을 삭제하시겠습니까?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDeleteDialog(false)}>취소</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={isMutating}
+            onClick={() => {
+              onDelete(comment.comment_id);
+              setShowDeleteDialog(false);
+            }}
+          >
+            삭제
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
+interface ThreadReplySharedProps {
+  userInfo?: UserInfo;
+  isMutating?: boolean;
+  replyTargetId: string | null;
+  replyInitial: string;
+  onReplyTo: (comment: Comment) => void;
+  onReplySubmit: (text: string) => void;
+  onReplyCancel: () => void;
+  onUpdate: (commentId: string, text: string) => void;
+  onDelete: (commentId: string) => void;
+}
+
+interface ThreadReplyNodeProps extends ThreadReplySharedProps {
+  comment: CommentWithReplies;
+  branchOffsetPx: number;
+}
+
+function ThreadReplyNode({
+  comment,
+  branchOffsetPx,
+  userInfo,
+  isMutating = false,
+  replyTargetId,
+  replyInitial,
+  onReplyTo,
+  onReplySubmit,
+  onReplyCancel,
+  onUpdate,
+  onDelete,
+}: ThreadReplyNodeProps) {
+  const [showChildReplies, setShowChildReplies] = useState(false);
+  const [childRevealReady, setChildRevealReady] = useState(false);
+
+  const displayName = comment.user_name || comment.user_id || '익명';
+  const isReplyingHere = replyTargetId === comment.comment_id;
+  const hasChildren = comment.replies.length > 0;
+  const childReplyCount = countAllReplies(comment);
+
+  useEffect(() => {
+    if (replyTargetId && isTargetInSubtree(comment, replyTargetId)) {
+      setShowChildReplies(true);
+    }
+  }, [replyTargetId, comment]);
+
+  useEffect(() => {
+    if (!showChildReplies || !hasChildren) {
+      setChildRevealReady(false);
+      return;
+    }
+    setChildRevealReady(false);
+    const timer = window.setTimeout(() => setChildRevealReady(true), REPLIES_SKELETON_MS);
+    return () => window.clearTimeout(timer);
+  }, [showChildReplies, hasChildren, childReplyCount]);
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'stretch', position: 'relative' }}>
+      <ReplyAvatarColumn
+        comment={comment}
+        size={REPLY_AVATAR}
+        showBranch
+        branchOffsetPx={branchOffsetPx}
+      />
+
+      <Box sx={{ flex: 1, minWidth: 0, ml: 1.5 }}>
+        <Stack direction="row" spacing={0} alignItems="flex-start">
+          <ReplyContent
+            comment={comment}
+            userInfo={userInfo}
+            isMutating={isMutating}
+            onReply={() => onReplyTo(comment)}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+          />
+        </Stack>
+
+        {isReplyingHere && (
+          <Box sx={{ mt: 1.5, ml: `${REPLY_CONTENT_OFFSET}px` }}>
+            <CommentInput
+              key={`reply-${comment.comment_id}`}
+              userInfo={userInfo}
+              placeholder={`@${displayName}에게 답글...`}
+              initialValue={replyInitial}
+              submitLabel="답글 등록"
+              autoFocus
+              compact
+              isLoading={isMutating}
+              onSubmit={onReplySubmit}
+              onCancel={onReplyCancel}
+            />
+          </Box>
+        )}
+
+        {hasChildren && (
+          <Box sx={{ position: 'relative', mt: 1.5 }}>
+            <ThreadVerticalRail branchOffsetPx={NESTED_REPLY_BRANCH_OFFSET} />
+
+            {!showChildReplies && (
+              <ThreadBranchRow branchOffsetPx={NESTED_REPLY_BRANCH_OFFSET}>
+                <Button
+                  size="small"
+                  startIcon={<KeyboardArrowDownIcon />}
+                  onClick={() => setShowChildReplies(true)}
+                  sx={{
+                    fontSize: '0.8rem',
+                    color: 'primary.main',
+                    fontWeight: 700,
+                    px: 1,
+                    borderRadius: 5,
+                  }}
+                >
+                  {`답글 ${childReplyCount}개`}
+                </Button>
+              </ThreadBranchRow>
+            )}
+
+            {showChildReplies && (
+              <>
+                {!childRevealReady ? (
+                  <ReplyThreadSkeleton count={childReplyCount} />
+                ) : (
+                  <Stack spacing={2.5}>
+                    {comment.replies.map((child) => (
+                      <ThreadReplyNode
+                        key={child.comment_id}
+                        comment={child}
+                        branchOffsetPx={NESTED_REPLY_BRANCH_OFFSET}
+                        userInfo={userInfo}
+                        isMutating={isMutating}
+                        replyTargetId={replyTargetId}
+                        replyInitial={replyInitial}
+                        onReplyTo={onReplyTo}
+                        onReplySubmit={onReplySubmit}
+                        onReplyCancel={onReplyCancel}
+                        onUpdate={onUpdate}
+                        onDelete={onDelete}
+                      />
+                    ))}
+                  </Stack>
+                )}
+
+                <ThreadHideRow branchOffsetPx={NESTED_REPLY_BRANCH_OFFSET}>
+                  <Button
+                    size="small"
+                    startIcon={<KeyboardArrowUpIcon />}
+                    onClick={() => setShowChildReplies(false)}
+                    sx={{
+                      fontSize: '0.8rem',
+                      color: 'primary.main',
+                      fontWeight: 700,
+                      px: 1,
+                      borderRadius: 5,
+                    }}
+                  >
+                    답글 숨기기
+                  </Button>
+                </ThreadHideRow>
+              </>
+            )}
+          </Box>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
+interface ReplyThreadProps extends ThreadReplySharedProps {
+  replies: CommentWithReplies[];
+  onClose: () => void;
+}
+
+function ReplyThread({
+  replies,
+  userInfo,
+  isMutating = false,
+  replyTargetId,
+  replyInitial,
+  onReplyTo,
+  onReplySubmit,
+  onReplyCancel,
+  onUpdate,
+  onDelete,
+  onClose,
+}: ReplyThreadProps) {
+  return (
+    <Box sx={{ position: 'relative', mt: 1.5 }}>
+      <ThreadVerticalRail branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET} />
+      <Stack spacing={2.5}>
+        {replies.map((reply) => (
+          <ThreadReplyNode
+            key={reply.comment_id}
+            comment={reply}
+            branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET}
+            userInfo={userInfo}
+            isMutating={isMutating}
+            replyTargetId={replyTargetId}
+            replyInitial={replyInitial}
+            onReplyTo={onReplyTo}
+            onReplySubmit={onReplySubmit}
+            onReplyCancel={onReplyCancel}
+            onUpdate={onUpdate}
+            onDelete={onDelete}
+          />
+        ))}
+      </Stack>
+
+      <ThreadHideRow branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET}>
+        <Button
+          size="small"
+          startIcon={<KeyboardArrowUpIcon />}
+          onClick={onClose}
+          sx={{
+            fontSize: '0.8rem',
+            color: 'primary.main',
+            fontWeight: 700,
+            px: 1,
+            borderRadius: 5,
+          }}
+        >
+          답글 숨기기
+        </Button>
+      </ThreadHideRow>
+    </Box>
+  );
+}
+
 // ── 단일 댓글 아이템 ──────────────────────────────────────────
 interface CommentItemProps {
   comment: CommentWithReplies;
   userInfo?: UserInfo;
-  isReply?: boolean;
-  parentCommentId?: string;
-  // 대댓글에서 답글 제출 완료 시 부모에게 replies 펼치기 요청
-  onReplySaved?: () => void;
   onSaveReply: (parentId: string, text: string) => void;
   onUpdate: (commentId: string, text: string) => void;
   onDelete: (commentId: string) => void;
@@ -251,40 +802,65 @@ interface CommentItemProps {
 function CommentItem({
   comment,
   userInfo,
-  isReply = false,
-  parentCommentId,
-  onReplySaved,
   onSaveReply,
   onUpdate,
   onDelete,
   isMutating = false,
 }: CommentItemProps) {
-  const [showReplyInput, setShowReplyInput] = useState(false);
+  const [replyTargetId, setReplyTargetId] = useState<string | null>(null);
   const [replyInitial, setReplyInitial] = useState('');
   const [showReplies, setShowReplies] = useState(false);
+  const [repliesRevealReady, setRepliesRevealReady] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const isOwner = userInfo?.user_id === comment.user_id;
-  const replyCount = comment.replies?.length ?? 0;
+  const replyCount = countAllReplies(comment);
   const displayName = comment.user_name || comment.user_id || '익명';
+  const hasReplies = replyCount > 0;
+  const isReplyingToRoot = replyTargetId === comment.comment_id;
 
-  const handleReplyClick = () => {
+  useEffect(() => {
+    if (!showReplies || !hasReplies) {
+      setRepliesRevealReady(false);
+      return;
+    }
+    setRepliesRevealReady(false);
+    const timer = window.setTimeout(() => setRepliesRevealReady(true), REPLIES_SKELETON_MS);
+    return () => window.clearTimeout(timer);
+  }, [showReplies, hasReplies, replyCount]);
+
+  const openReplies = () => setShowReplies(true);
+  const closeReplies = () => {
+    setShowReplies(false);
+    setRepliesRevealReady(false);
+    setReplyTargetId(null);
+    setReplyInitial('');
+  };
+
+  const cancelReply = () => {
+    setReplyTargetId(null);
+    setReplyInitial('');
+  };
+
+  const startReplyTo = (target: Comment) => {
+    const name = target.user_name || target.user_id || '익명';
+    setReplyTargetId(target.comment_id);
+    setReplyInitial(`@${name} `);
+    openReplies();
+  };
+
+  const startReplyToRoot = () => {
+    setReplyTargetId(comment.comment_id);
     setReplyInitial(`@${displayName} `);
-    setShowReplyInput(true);
-    if (!isReply) setShowReplies(true);
+    if (hasReplies) openReplies();
   };
 
   const handleReplySubmit = (text: string) => {
-    const targetParentId = isReply ? (parentCommentId ?? comment.comment_id) : comment.comment_id;
-    onSaveReply(targetParentId, text);
-    setShowReplyInput(false);
-    setReplyInitial('');
-    if (isReply) {
-      onReplySaved?.();   // 부모에게 replies 펼치기 요청
-    } else {
-      setShowReplies(true);
-    }
+    if (!replyTargetId) return;
+    onSaveReply(replyTargetId, text);
+    cancelReply();
+    openReplies();
   };
 
   const handleUpdateSubmit = (text: string) => {
@@ -292,47 +868,33 @@ function CommentItem({
     setIsEditing(false);
   };
 
-  const avatarSize = isReply ? 28 : 36;
-  const hasSubThread = !isReply && (replyCount > 0 || showReplyInput);
-  const hasReplies = !isReply && replyCount > 0;
-  const connH = 22;
-  const connW = avatarSize / 2 + 14;
-
   return (
-    <Box>
-      {/* ── 댓글 본문 행 ── */}
-      <Stack direction="row" spacing={1.5}>
-
-        {/* #author-thumbnail: 아바타 + continuation */}
-        <Box
+    <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
+      <Box
+        sx={{
+          width: COMMENT_AVATAR,
+          flexShrink: 0,
+          position: 'relative',
+          alignSelf: 'stretch',
+        }}
+      >
+        <Avatar
           sx={{
-            width: avatarSize,
-            flexShrink: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            width: COMMENT_AVATAR,
+            height: COMMENT_AVATAR,
+            bgcolor: 'primary.main',
+            mt: 0.25,
+            position: 'relative',
+            zIndex: 1,
           }}
         >
-          <Avatar
-            sx={{ width: avatarSize, height: avatarSize, bgcolor: 'primary.main', mt: 0.25 }}
-          >
-            {getAvatarLetter(comment)}
-          </Avatar>
+          {getAvatarLetter(comment)}
+        </Avatar>
+      </Box>
 
-          {/* div.threadline > div.continuation */}
-          {hasReplies && (
-            <Box
-              sx={(theme) => ({
-                flex: 1,
-                width: 2,
-                bgcolor: theme.palette.divider,
-              })}
-            />
-          )}
-        </Box>
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          {/* 작성자 / 날짜 */}
+      <Box sx={{ flex: 1, minWidth: 0, ml: 1.5 }}>
+        <Stack direction="row" spacing={0} alignItems="flex-start">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Typography variant="subtitle2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
               {displayName}
@@ -342,7 +904,6 @@ function CommentItem({
             </Typography>
           </Stack>
 
-          {/* 본문 / 수정 입력 */}
           {isEditing ? (
             <Box sx={{ mt: 0.5 }}>
               <CommentInput
@@ -366,7 +927,6 @@ function CommentItem({
             </Typography>
           )}
 
-          {/* 액션 버튼 */}
           {!isEditing && (
             <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
               <IconButton size="small" sx={{ color: 'text.secondary' }}>
@@ -379,7 +939,7 @@ function CommentItem({
                 <Button
                   size="small"
                   sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700, minWidth: 0, px: 1, borderRadius: 5 }}
-                  onClick={handleReplyClick}
+                  onClick={startReplyToRoot}
                 >
                   답글
                 </Button>
@@ -387,148 +947,79 @@ function CommentItem({
             </Stack>
           )}
 
-          {/* 대댓글에서만 인라인 답글 입력창 표시 */}
-          {isReply && (
-            <Collapse in={showReplyInput}>
-              <Box sx={{ mt: 1.5 }}>
-                <CommentInput
-                  userInfo={userInfo}
-                  placeholder={`@${displayName}에게 답글...`}
-                  initialValue={replyInitial}
-                  submitLabel="답글 등록"
-                  autoFocus
-                  isLoading={isMutating}
-                  onSubmit={handleReplySubmit}
-                  onCancel={() => {
-                    setShowReplyInput(false);
-                    setReplyInitial('');
-                  }}
-                />
-              </Box>
-            </Collapse>
-          )}
-
-        </Box>
-
-        <CommentMenu
-          isOwner={isOwner}
-          onEdit={() => setIsEditing(true)}
-          onDelete={() => setShowDeleteDialog(true)}
-        />
-      </Stack>
-
-      {/* ── yt-sub-thread ──
-          ytSubThreadThreadline(왼쪽) + ytSubThreadSubThreadContent(오른쪽) 형제 구조.
-          threadline은 content 전체 높이에 걸쳐 하나의 선을 그린다.
-      */}
-      {hasSubThread && (
-        <Box sx={{ display: 'flex' }}>
-
-          {/* ytSubThreadThreadline */}
-          <Box
-            sx={{
-              width: avatarSize,
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'flex-start',
-              pl: `${avatarSize / 2 - 1}px`,
-            }}
-          >
-            {/* ytSubThreadConnection — L-curve */}
-            <Box
-              sx={(theme) => ({
-                width: `${connW}px`,
-                height: `${connH}px`,
-                flexShrink: 0,
-                borderLeft: `2px solid ${theme.palette.divider}`,
-                borderBottom: `2px solid ${theme.palette.divider}`,
-                borderBottomLeftRadius: '12px',
-              })}
-            />
-
-            {/* ytSubThreadContinuation — 펼침 시 대댓글 옆으로 세로선 */}
-            {(showReplies || showReplyInput) && (
-              <Box
-                sx={(theme) => ({
-                  width: 2,
-                  flex: 1,
-                  minHeight: 8,
-                  bgcolor: theme.palette.divider,
-                })}
-              />
-            )}
-
-            {/* ytSubThreadShadow — 펼쳤을 때만 하단 페이드 */}
-            {(showReplies || showReplyInput) && (
-              <Box
-                sx={(theme) => ({
-                  width: 2,
-                  height: '20px',
-                  flexShrink: 0,
-                  background: `linear-gradient(to bottom, ${theme.palette.divider}, transparent)`,
-                })}
-              />
-            )}
           </Box>
 
-          {/* ytSubThreadSubThreadContent */}
-          <Box sx={{ flex: 1, pl: 1.5 }}>
-            {/* 대댓글 목록 */}
-            <Collapse in={showReplies}>
-              <Stack spacing={2.5} sx={{ mb: 1 }}>
-                {comment.replies.map((reply) => (
-                  <CommentItem
-                    key={reply.comment_id}
-                    comment={{ ...reply, replies: [] }}
-                    userInfo={userInfo}
-                    isReply
-                    parentCommentId={comment.comment_id}
-                    onReplySaved={() => setShowReplies(true)}
-                    onSaveReply={onSaveReply}
-                    onUpdate={onUpdate}
-                    onDelete={onDelete}
-                    isMutating={isMutating}
-                  />
-                ))}
-              </Stack>
-            </Collapse>
+          <CommentMenu
+            isOwner={isOwner}
+            onEdit={() => setIsEditing(true)}
+            onDelete={() => setShowDeleteDialog(true)}
+          />
+        </Stack>
 
-            {/* 답글 토글 버튼 (replies가 있을 때만) — replies 아래 */}
-            {hasReplies && (
+        {hasReplies && !showReplies && (
+          <Box sx={{ position: 'relative', mt: 0.75 }}>
+            <ThreadVerticalRail branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET} />
+            <ThreadBranchRow branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET}>
               <Button
                 size="small"
-                startIcon={showReplies ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                onClick={() => setShowReplies((v) => !v)}
-                sx={{ fontSize: '0.8rem', color: 'primary.main', fontWeight: 700, px: 1, borderRadius: 5 }}
+                startIcon={<KeyboardArrowDownIcon />}
+                onClick={openReplies}
+                sx={{
+                  fontSize: '0.8rem',
+                  color: 'primary.main',
+                  fontWeight: 700,
+                  px: 1,
+                  borderRadius: 5,
+                }}
               >
-                답글 {replyCount}개
+                {`답글 ${replyCount}개`}
               </Button>
-            )}
-
-            {/* 최상위 댓글 답글 입력창 — replies 아래 */}
-            <Collapse in={showReplyInput}>
-              <Box sx={{ mt: 1.5 }}>
-                <CommentInput
-                  userInfo={userInfo}
-                  placeholder={`@${displayName}에게 답글...`}
-                  initialValue={replyInitial}
-                  submitLabel="답글 등록"
-                  autoFocus
-                  isLoading={isMutating}
-                  onSubmit={handleReplySubmit}
-                  onCancel={() => {
-                    setShowReplyInput(false);
-                    setReplyInitial('');
-                  }}
-                />
-              </Box>
-            </Collapse>
+            </ThreadBranchRow>
           </Box>
-        </Box>
+        )}
+
+      {showReplies && hasReplies && (
+        <>
+          {!repliesRevealReady ? (
+            <Box sx={{ position: 'relative' }}>
+              <ThreadVerticalRail branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET} />
+              <ReplyThreadSkeleton count={replyCount} />
+            </Box>
+          ) : (
+            <ReplyThread
+              replies={comment.replies}
+              userInfo={userInfo}
+              isMutating={isMutating}
+              replyTargetId={replyTargetId}
+              replyInitial={replyInitial}
+              onReplyTo={startReplyTo}
+              onReplySubmit={handleReplySubmit}
+              onReplyCancel={cancelReply}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onClose={closeReplies}
+            />
+          )}
+        </>
       )}
 
-      {/* 삭제 확인 다이얼로그 */}
+      <Collapse in={isReplyingToRoot}>
+        <Box sx={{ mt: 1.5, ml: `${REPLY_CONTENT_OFFSET}px` }}>
+          <CommentInput
+            key={`root-reply-${comment.comment_id}`}
+            userInfo={userInfo}
+            placeholder={`@${displayName}에게 답글...`}
+            initialValue={replyInitial}
+            submitLabel="답글 등록"
+            autoFocus
+            compact
+            isLoading={isMutating}
+            onSubmit={handleReplySubmit}
+            onCancel={cancelReply}
+          />
+        </Box>
+      </Collapse>
+
       <Dialog open={showDeleteDialog} onClose={() => setShowDeleteDialog(false)}>
         <DialogTitle>댓글 삭제</DialogTitle>
         <DialogContent>
@@ -549,6 +1040,7 @@ function CommentItem({
           </Button>
         </DialogActions>
       </Dialog>
+      </Box>
     </Box>
   );
 }

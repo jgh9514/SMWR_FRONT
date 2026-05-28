@@ -87,6 +87,14 @@ const withPWA = withPWAInit({
       },
       {
         urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
+          sameOrigin !== false && url.pathname.startsWith('/cdn-image'),
+        handler: 'NetworkOnly',
+        options: {
+          cacheName: 'cdn-image-proxy',
+        },
+      },
+      {
+        urlPattern: ({ sameOrigin, url }: { sameOrigin?: boolean; url: URL }) =>
           sameOrigin !== false && url.pathname.startsWith("/api/"),
         handler: "NetworkOnly",
         options: {

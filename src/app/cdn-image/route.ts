@@ -10,7 +10,10 @@ function resolveCdnBase(): string {
   return base.endsWith('/') ? base.slice(0, -1) : base;
 }
 
-/** html2canvas 등 클라이언트 fetch용 — CDN 이미지를 동일 출처로 프록시 */
+/**
+ * html2canvas·html-to-image 등 클라이언트 fetch용 — CDN 이미지를 동일 출처로 프록시.
+ * Ingress가 `/api/*` 를 WAS로 보내므로 `/api/cdn-image` 가 아닌 `/cdn-image` 로 둔다.
+ */
 export async function GET(request: NextRequest) {
   const rawPath = request.nextUrl.searchParams.get('path');
   if (!rawPath) {

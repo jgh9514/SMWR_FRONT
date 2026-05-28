@@ -428,8 +428,8 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
         {overviewFetching ? (
           <Skeleton variant="rectangular" width="100%" height={240} sx={{ borderRadius: 1 }} />
         ) : chartData.length > 0 ? (
-          <Box sx={{ width: '100%', height: usePerRatingChart ? 300 : 260 }}>
-            <ResponsiveContainer>
+          <Box sx={{ width: '100%', height: usePerRatingChart ? 300 : 260, minWidth: 0 }}>
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="day" tick={{ fontSize: 11 }} ticks={chartData.map((d) => d.day as string)} />
