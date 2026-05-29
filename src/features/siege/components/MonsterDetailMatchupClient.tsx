@@ -200,7 +200,7 @@ const OpponentCombo = memo(function OpponentCombo({
       {monsters.map((m, mi) => (
         <Stack key={m.monsterId} direction="row" alignItems="center" spacing={0.5}>
           {mi > 0 && (
-            <Typography variant="caption" color="text.disabled" sx={{ px: 0.15, userSelect: 'none' }}>
+            <Typography aria-hidden="true" variant="caption" color="text.disabled" sx={{ px: 0.15, userSelect: 'none' }}>
               +
             </Typography>
           )}
@@ -340,7 +340,7 @@ function MatchupTableRow({ row, rank }: { row: CounterMatchupRow; rank: number }
           #{rank}
         </Typography>
       </Box>
-      <Box component="td" sx={{ display: 'table-cell', py: 1.25, px: 1.5, verticalAlign: 'middle', minWidth: 200 }}>
+      <Box component="td" sx={{ display: 'table-cell', py: 1.25, px: 1.5, verticalAlign: 'middle', minWidth: 160 }}>
         <OpponentCombo row={row} avatarSize={36} />
       </Box>
       <Box
@@ -426,7 +426,7 @@ function MatchupPanel({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const sortedRows = useMemo(() => sortCounterMatchupsByMatchCntDesc(rows), [rows]);
-  const displayed = sortedRows.slice(0, DISPLAY_LIMIT);
+  const displayed = useMemo(() => sortedRows.slice(0, DISPLAY_LIMIT), [sortedRows]);
 
   if (isLoading) return <MatchupListSkeleton cardMode={isMobile} />;
   if (isError) {

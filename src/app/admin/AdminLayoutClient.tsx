@@ -2,15 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, Skeleton, Alert } from '@mui/material';
+import { Box, Skeleton, Alert, useMediaQuery, useTheme } from '@mui/material';
 import { getAuthTokenFromCookie } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import AdminHeader from '@/shared/ui/admin-header/AdminHeader';
 import AdminSidebar from '@/shared/ui/admin-sidebar/AdminSidebar';
+import { ADMIN_DRAWER_WIDTH } from '@/shared/ui/admin-layout/constants';
 import type { UserInfo } from '@/features/auth/types/auth';
-
-const DRAWER_WIDTH = 280;
 
 export default function AdminLayoutClient({
   children,
@@ -18,8 +17,17 @@ export default function AdminLayoutClient({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
+
+  useEffect(() => {
+    if (isDesktop) {
+      setMobileOpen(false);
+    }
+  }, [isDesktop]);
 
   useEffect(() => {
     const checkAuthAndRole = async () => {
@@ -107,18 +115,18 @@ export default function AdminLayoutClient({
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AdminHeader />
-      <AdminSidebar />
+      <AdminHeader onMenuToggle={() => setMobileOpen((prev) => !prev)} />
+      <AdminSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          width: `calc(100% - ${DRAWER_WIDTH}px)`,
-          pt: { xs: 9, md: 10 },
+          width: { xs: '100%', md: `calc(100% - ${ADMIN_DRAWER_WIDTH}px)` },
+          pt: { xs: 8, md: 10 },
           bgcolor: 'background.default',
-          minHeight: 'calc(100vh - 64px)',
-          px: 3,
-          pb: 3,
+          minHeight: '100vh',
+          px: { xs: 1.5, sm: 2, md: 3 },
+          pb: { xs: 2, md: 3 },
         }}
       >
         <Box sx={{ width: '100%', maxWidth: '1400px', mx: 'auto' }}>{children}</Box>

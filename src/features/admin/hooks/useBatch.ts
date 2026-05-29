@@ -53,10 +53,15 @@ export const useBatchConfig = (params: Record<string, unknown> = {}) => {
   return useApiPostQuery<BatchConfigItem[]>('/batch/config', params, { enabled: true });
 };
 
+export interface BatchHistoryParams {
+  bat_id?: string;
+  limit?: number;
+}
+
 /**
  * 배치 실행 이력 조회
  */
-export const useBatchHistory = (params: Record<string, unknown> = {}) => {
+export const useBatchHistory = (params: BatchHistoryParams = {}) => {
   return useApiPostQuery<BatchHistoryItem[]>('/batch/run-his', params, { enabled: true });
 };
 

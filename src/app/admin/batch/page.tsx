@@ -27,12 +27,21 @@ import {
   DialogActions,
   TextField,
   Stack,
+  useMediaQuery,
+  useTheme,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  alpha,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import CloseIcon from '@mui/icons-material/Close';
+import HistoryIcon from '@mui/icons-material/History';
+import FilterAltOffIcon from '@mui/icons-material/FilterAltOff';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useBatchConfig,
@@ -42,11 +51,48 @@ import {
   BatchConfigItem,
   BatchRunResponse,
   SlackTestResponse,
+  BatchHistoryItem,
 } from '@/features/admin/hooks/useBatch';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { PageHeader } from '@/shared/ui';
 import { formatDate } from '@/shared/utils/format';
+
+type BatchResultCode = 'SUCCESS' | 'FAIL' | 'RUNNING' | string;
+type StatusFilter = 'all' | 'success' | 'failed' | 'running';
+
+function getResultChipColor(code?: BatchResultCode): 'success' | 'error' | 'warning' | 'default' {
+  if (code === 'SUCCESS') return 'success';
+  if (code === 'FAIL') return 'error';
+  if (code === 'RUNNING') return 'warning';
+  return 'default';
+}
+
+function getHistoryRowSx(code?: BatchResultCode) {
+  const color = getResultChipColor(code);
+  if (color === 'default') return undefined;
+  return {
+    borderLeft: '4px solid',
+    borderLeftColor: `${color}.main`,
+    bgcolor: (t: { palette: Record<'success' | 'error' | 'warning', { main: string }> }) =>
+      alpha(t.palette[color].main, 0.06),
+  };
+}
+
+function formatDuration(start?: string, end?: string, isClient = true): string {
+  if (!start || !end || !isClient) return '-';
+  const startMs = new Date(start).getTime();
+  const endMs = new Date(end).getTime();
+  if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) return '-';
+  const sec = Math.round((endMs - startMs) / 1000);
+  if (sec < 60) return `${sec}초`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  if (min < 60) return rem > 0 ? `${min}분 ${rem}초` : `${min}분`;
+  const hour = Math.floor(min / 60);
+  const remMin = min % 60;
+  return remMin > 0 ? `${hour}시간 ${remMin}분` : `${hour}시간`;
+}
 
 /**
  * 배치 SSE URL. EventSource는 크로스 오리진(예: :3000 페이지 → :8080 API)에서
@@ -60,6 +106,8 @@ function getBatchLogStreamUrl(streamId: string): string {
 
 export default function BatchManagementPage() {
   const router = useRouter();
+  const theme = useTheme();
+  const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const searchParams = useSearchParams();
   const isClient = useSyncExternalStore(
     () => () => {},
@@ -78,8 +126,24 @@ export default function BatchManagementPage() {
   const streamRunStartedRef = useRef(false);
   const streamLogPreRef = useRef<HTMLPreElement | null>(null);
   const runConfirmOpenRef = useRef(false);
+  const historySectionRef = useRef<HTMLDivElement | null>(null);
   const incident = searchParams.get('incident');
   const historyFilter = searchParams.get('filter');
+  const batIdFromUrl = searchParams.get('bat_id');
+  const [selectedBatId, setSelectedBatId] = useState<string | null>(batIdFromUrl);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(
+    historyFilter === 'failed' ? 'failed' : 'all',
+  );
+
+  useEffect(() => {
+    setSelectedBatId(batIdFromUrl);
+  }, [batIdFromUrl]);
+
+  useEffect(() => {
+    if (historyFilter === 'failed') {
+      setStatusFilter('failed');
+    }
+  }, [historyFilter]);
   const incidentMessage = useMemo(() => {
     if (incident === 'batch_diagnostics_failed') {
       return '운영 상태 카드에서 배치 진단 실패 이슈로 진입했습니다. 최근 배치 설정과 실행 이력을 우선 확인하세요.';
@@ -108,24 +172,61 @@ export default function BatchManagementPage() {
     [batchConfigList],
   );
 
-  // 배치 실행 이력 조회
-  const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory({
-    limit: 10,
-  });
-  const filteredBatchHistory = useMemo(() => {
-    if (historyFilter !== 'failed') {
-      return batchHistory;
+  const batchNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const config of batchConfigList) {
+      map.set(String(config.bat_id), config.bat_nm);
     }
-    return batchHistory.filter((item) => item.rslt_cd === 'FAIL' || item.rslt_cd === 'RUNNING');
-  }, [batchHistory, historyFilter]);
+    return map;
+  }, [batchConfigList]);
+
+  const historyQueryParams = useMemo(() => {
+    const params: { limit: number; bat_id?: string } = {
+      limit: selectedBatId ? 50 : 30,
+    };
+    if (selectedBatId) {
+      params.bat_id = selectedBatId;
+    }
+    return params;
+  }, [selectedBatId]);
+
+  const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory(historyQueryParams);
+
+  const { data: recentHistoryOverview = [] } = useBatchHistory({ limit: 200 });
+
+  const latestRunByBatId = useMemo(() => {
+    const map = new Map<string, BatchHistoryItem>();
+    for (const item of recentHistoryOverview) {
+      const batId = String(item.bat_id);
+      if (!map.has(batId)) {
+        map.set(batId, item);
+      }
+    }
+    return map;
+  }, [recentHistoryOverview]);
+
+  const filteredBatchHistory = useMemo(() => {
+    let rows = batchHistory;
+    if (statusFilter === 'failed') {
+      rows = rows.filter((item) => item.rslt_cd === 'FAIL' || item.rslt_cd === 'RUNNING');
+    } else if (statusFilter === 'success') {
+      rows = rows.filter((item) => item.rslt_cd === 'SUCCESS');
+    } else if (statusFilter === 'running') {
+      rows = rows.filter((item) => item.rslt_cd === 'RUNNING');
+    }
+    return rows;
+  }, [batchHistory, statusFilter]);
+
   const batchHistorySummary = useMemo(() => {
+    let successCount = 0;
     let failCount = 0;
     let runningCount = 0;
     for (const item of batchHistory) {
+      if (item.rslt_cd === 'SUCCESS') successCount += 1;
       if (item.rslt_cd === 'FAIL') failCount += 1;
       if (item.rslt_cd === 'RUNNING') runningCount += 1;
     }
-    return { failCount, runningCount };
+    return { successCount, failCount, runningCount };
   }, [batchHistory]);
 
   // 날짜 포맷팅 함수
@@ -326,11 +427,43 @@ export default function BatchManagementPage() {
     setSelectedResult('');
   }, []);
 
+  const updateBatchFilterInUrl = useCallback(
+    (batId: string | null) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (batId) {
+        params.set('bat_id', batId);
+      } else {
+        params.delete('bat_id');
+      }
+      const qs = params.toString();
+      router.replace(qs ? `/admin/batch?${qs}` : '/admin/batch', { scroll: false });
+    },
+    [router, searchParams],
+  );
+
+  const handleSelectBatchHistory = useCallback(
+    (batId: string) => {
+      setSelectedBatId(batId);
+      updateBatchFilterInUrl(batId);
+      window.requestAnimationFrame(() => {
+        historySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    },
+    [updateBatchFilterInUrl],
+  );
+
+  const handleClearBatchFilter = useCallback(() => {
+    setSelectedBatId(null);
+    updateBatchFilterInUrl(null);
+  }, [updateBatchFilterInUrl]);
+
+  const selectedBatchName = selectedBatId ? batchNameMap.get(selectedBatId) : undefined;
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
       <Container maxWidth="xl" sx={{ py: { xs: 3, md: 4 } }}>
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button variant="outlined" onClick={() => router.push('/admin')} startIcon={<ArrowBackIcon />}>
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Button variant="outlined" onClick={() => router.push('/admin')} startIcon={<ArrowBackIcon />} size={mobile ? 'small' : 'medium'}>
             목록
           </Button>
           <PageHeader title="배치 관리" />
@@ -400,19 +533,22 @@ export default function BatchManagementPage() {
               ) : sortedBatchConfigList.length === 0 ? (
                 <Alert severity="info" sx={{ m: 2 }}>배치 설정이 없습니다.</Alert>
               ) : (
-                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflowX: 'auto' }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
                         {[
-                          { label: '배치 ID', sx: { minWidth: 100 } },
-                          { label: '배치명', sx: { minWidth: 120 } },
-                          { label: 'Cron', sx: { minWidth: 150 } },
-                          { label: '사용여부', sx: { width: 90 }, align: 'center' as const },
-                          { label: '정렬', sx: { width: 70 }, align: 'center' as const },
-                          { label: '설명', sx: { minWidth: 150 } },
-                          { label: '실행', sx: { width: 100 }, align: 'center' as const },
-                        ].map(({ label, sx, align }) => (
+                          { label: '배치 ID', sx: { minWidth: 100 }, hide: false },
+                          { label: '배치명', sx: { minWidth: 120 }, hide: false },
+                          { label: 'Cron', sx: { minWidth: 150 }, hide: mobile },
+                          { label: '사용여부', sx: { width: 90 }, align: 'center' as const, hide: false },
+                          { label: '최근 실행', sx: { minWidth: 140 }, hide: false },
+                          { label: '정렬', sx: { width: 70 }, align: 'center' as const, hide: mobile },
+                          { label: '설명', sx: { minWidth: 150 }, hide: mobile },
+                          { label: '작업', sx: { minWidth: mobile ? 100 : 140 }, align: 'center' as const, hide: false },
+                        ]
+                          .filter(({ hide }) => !hide)
+                          .map(({ label, sx, align }) => (
                           <TableCell
                             key={label}
                             align={align}
@@ -433,22 +569,40 @@ export default function BatchManagementPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {sortedBatchConfigList.map((config) => (
-                        <TableRow key={config.bat_id} hover>
-                          <TableCell>{config.bat_id}</TableCell>
+                      {sortedBatchConfigList.map((config) => {
+                        const latestRun = latestRunByBatId.get(String(config.bat_id));
+                        const isSelected = selectedBatId === String(config.bat_id);
+                        return (
+                        <TableRow
+                          key={config.bat_id}
+                          hover
+                          selected={isSelected}
+                          sx={{
+                            ...(isSelected
+                              ? { bgcolor: (t) => alpha(t.palette.primary.main, 0.08) }
+                              : undefined),
+                          }}
+                        >
                           <TableCell>
-                            <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                              {config.bat_id}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'normal', fontWeight: 600 }}>
                               {config.bat_nm}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
-                              {formatCronExpression(config.cron_expr)}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', display: 'block', mt: 0.5 }}>
-                              {config.cron_expr}
-                            </Typography>
-                          </TableCell>
+                          {!mobile && (
+                            <TableCell>
+                              <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                                {formatCronExpression(config.cron_expr)}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.75rem', display: 'block', mt: 0.5 }}>
+                                {config.cron_expr}
+                              </Typography>
+                            </TableCell>
+                          )}
                           <TableCell align="center">
                             <Chip
                               label={config.use_yn === 'Y' ? '사용' : '중지'}
@@ -456,26 +610,63 @@ export default function BatchManagementPage() {
                               size="small"
                             />
                           </TableCell>
-                          <TableCell align="center">{config.sort_sn}</TableCell>
                           <TableCell>
-                            <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
-                              {config.desc_txt || '-'}
-                            </Typography>
+                            {latestRun ? (
+                              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                                <Chip
+                                  label={latestRun.rslt_cd || '-'}
+                                  color={getResultChipColor(latestRun.rslt_cd)}
+                                  size="small"
+                                  sx={{ fontWeight: 700 }}
+                                />
+                                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                                  {formatDateTime(latestRun.exe_dtm)}
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">
+                                이력 없음
+                              </Typography>
+                            )}
                           </TableCell>
+                          {!mobile && <TableCell align="center">{config.sort_sn}</TableCell>}
+                          {!mobile && (
+                            <TableCell>
+                              <Typography variant="body2" sx={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                                {config.desc_txt || '-'}
+                              </Typography>
+                            </TableCell>
+                          )}
                           <TableCell align="center">
-                            <Button
-                              variant="outlined"
-                              size="small"
-                              startIcon={<PlayArrowIcon />}
-                              onClick={() => handleRowRun(config)}
-                              disabled={runMutation.isPending}
-                              sx={{ minWidth: 80 }}
-                            >
-                              실행
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'wrap' }}>
+                              <Tooltip title="실행 이력 보기">
+                                <Button
+                                  variant={isSelected ? 'contained' : 'outlined'}
+                                  size="small"
+                                  startIcon={mobile ? undefined : <HistoryIcon />}
+                                  onClick={() => handleSelectBatchHistory(String(config.bat_id))}
+                                >
+                                  {mobile ? '이력' : '이력'}
+                                </Button>
+                              </Tooltip>
+                              <Tooltip title="수동 실행">
+                                <Button
+                                  variant="outlined"
+                                  color="primary"
+                                  size="small"
+                                  startIcon={mobile ? undefined : <PlayArrowIcon />}
+                                  onClick={() => handleRowRun(config)}
+                                  disabled={runMutation.isPending}
+                                  sx={{ minWidth: mobile ? 56 : 72 }}
+                                >
+                                  실행
+                                </Button>
+                              </Tooltip>
+                            </Box>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </TableContainer>
@@ -484,9 +675,18 @@ export default function BatchManagementPage() {
           </Card>
 
           {/* 실행 이력 */}
-          <Card>
+          <Card ref={historySectionRef} sx={{ scrollMarginTop: 96 }}>
             <CardHeader
-              title={`배치 실행 이력 (${filteredBatchHistory.length}건)`}
+              title={
+                selectedBatId
+                  ? `실행 이력 — ${selectedBatchName ?? selectedBatId}`
+                  : `배치 실행 이력 (${filteredBatchHistory.length}건)`
+              }
+              subheader={
+                selectedBatId
+                  ? `배치 ID: ${selectedBatId} · 최근 ${historyQueryParams.limit}건`
+                  : '전체 배치 최근 실행 이력 · 배치 설정 목록에서 [이력]을 누르면 해당 배치만 조회합니다.'
+              }
               action={
                 <Tooltip title="새로고침">
                   <Box component="span" sx={{ display: 'inline-flex' }}>
@@ -498,9 +698,68 @@ export default function BatchManagementPage() {
               }
             />
             <CardContent sx={{ p: 0, '&:last-child': { pb: 2 } }}>
+              <Box sx={{ px: 2, pt: 2, pb: 1, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+                  <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 220 } }}>
+                    <InputLabel id="batch-history-filter-label">배치 필터</InputLabel>
+                    <Select
+                      labelId="batch-history-filter-label"
+                      label="배치 필터"
+                      value={selectedBatId ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value) {
+                          handleSelectBatchHistory(String(value));
+                        } else {
+                          handleClearBatchFilter();
+                        }
+                      }}
+                    >
+                      <MenuItem value="">
+                        <em>전체 배치</em>
+                      </MenuItem>
+                      {sortedBatchConfigList.map((config) => (
+                        <MenuItem key={config.bat_id} value={String(config.bat_id)}>
+                          {config.bat_nm} ({config.bat_id})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {selectedBatId && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<FilterAltOffIcon />}
+                      onClick={handleClearBatchFilter}
+                    >
+                      필터 해제
+                    </Button>
+                  )}
+                </Box>
+
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {([
+                    ['all', '전체', batchHistory.length],
+                    ['success', '성공', batchHistorySummary.successCount],
+                    ['failed', '실패', batchHistorySummary.failCount],
+                    ['running', '실행중', batchHistorySummary.runningCount],
+                  ] as const).map(([key, label, count]) => (
+                    <Chip
+                      key={key}
+                      label={`${label} ${count}`}
+                      clickable
+                      color={statusFilter === key ? 'primary' : 'default'}
+                      variant={statusFilter === key ? 'filled' : 'outlined'}
+                      onClick={() => setStatusFilter(key)}
+                    />
+                  ))}
+                </Box>
+              </Box>
+
               {historyFilter === 'failed' && (
-                <Alert severity="info" sx={{ m: 2 }}>
-                  최근 실패 {batchHistorySummary.failCount}건, 실행중 {batchHistorySummary.runningCount}건을 우선 표시합니다.
+                <Alert severity="info" sx={{ mx: 2, mb: 1 }}>
+                  incident 진입: 실패/실행중 {batchHistorySummary.failCount + batchHistorySummary.runningCount}건 기준으로 필터가 적용되어 있습니다.
                 </Alert>
               )}
               {isLoadingHistory ? (
@@ -508,20 +767,25 @@ export default function BatchManagementPage() {
                   <CircularProgress />
                 </Box>
               ) : filteredBatchHistory.length === 0 ? (
-                <Alert severity="info" sx={{ m: 2 }}>실행 이력이 없습니다.</Alert>
+                <Alert severity="info" sx={{ m: 2 }}>
+                  {selectedBatId ? '선택한 배치의 실행 이력이 없습니다.' : '실행 이력이 없습니다.'}
+                </Alert>
               ) : (
-                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600 }}>
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 600, overflowX: 'auto', mx: 2, mb: 2 }}>
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
                         {[
-                          { label: '실행 ID', sx: { width: 80 } },
-                          { label: '배치 ID', sx: { minWidth: 100 } },
-                          { label: '상태', sx: { width: 90 }, align: 'center' as const },
-                          { label: '시작 시간', sx: { minWidth: 150 } },
-                          { label: '종료 시간', sx: { minWidth: 150 } },
-                          { label: '결과', sx: { width: 120 }, align: 'center' as const },
-                        ].map(({ label, sx, align }) => (
+                          { label: '실행 ID', sx: { width: 80 }, hide: mobile },
+                          { label: '배치', sx: { minWidth: 160 }, hide: !!selectedBatId },
+                          { label: '상태', sx: { width: 100 }, align: 'center' as const, hide: false },
+                          { label: '시작', sx: { minWidth: 150 }, hide: false },
+                          { label: '종료', sx: { minWidth: 150 }, hide: mobile },
+                          { label: '소요', sx: { width: 90 }, align: 'center' as const, hide: false },
+                          { label: '결과', sx: { width: 120 }, align: 'center' as const, hide: false },
+                        ]
+                          .filter(({ hide }) => !hide)
+                          .map(({ label, sx, align }) => (
                           <TableCell
                             key={label}
                             align={align}
@@ -543,24 +807,28 @@ export default function BatchManagementPage() {
                     </TableHead>
                     <TableBody>
                       {filteredBatchHistory.map((his, index) => (
-                        <TableRow key={his.bat_exe_log_sn || `history-${index}`} hover>
-                          <TableCell>{his.bat_exe_log_sn}</TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-word', whiteSpace: 'normal' }}>
-                              {his.bat_id}
-                            </Typography>
-                          </TableCell>
+                        <TableRow
+                          key={his.bat_exe_log_sn || `history-${index}`}
+                          hover
+                          sx={getHistoryRowSx(his.rslt_cd)}
+                        >
+                          {!mobile && <TableCell>{his.bat_exe_log_sn}</TableCell>}
+                          {!selectedBatId && (
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                {batchNameMap.get(String(his.bat_id)) ?? his.bat_id}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+                                {his.bat_id}
+                              </Typography>
+                            </TableCell>
+                          )}
                           <TableCell align="center">
                             <Chip
                               label={his.rslt_cd || '-'}
-                              color={
-                                his.rslt_cd === 'SUCCESS'
-                                  ? 'success'
-                                  : his.rslt_cd === 'FAIL'
-                                    ? 'error'
-                                    : 'warning'
-                              }
+                              color={getResultChipColor(his.rslt_cd)}
                               size="small"
+                              sx={{ fontWeight: 700, minWidth: 72 }}
                             />
                           </TableCell>
                           <TableCell>
@@ -568,20 +836,27 @@ export default function BatchManagementPage() {
                               {formatDateTime(his.exe_dtm)}
                             </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem', wordBreak: 'break-word', whiteSpace: 'normal' }}>
-                              {formatDateTime(his.end_dtm)}
+                          {!mobile && (
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                                {formatDateTime(his.end_dtm)}
+                              </Typography>
+                            </TableCell>
+                          )}
+                          <TableCell align="center">
+                            <Typography variant="body2" sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
+                              {formatDuration(his.exe_dtm, his.end_dtm, isClient)}
                             </Typography>
                           </TableCell>
                           <TableCell align="center">
                             <Button
                               variant="outlined"
                               size="small"
-                              startIcon={<VisibilityIcon />}
+                              startIcon={mobile ? undefined : <VisibilityIcon />}
                               onClick={() => handleViewResult(his.rslt_txt || '')}
                               disabled={!his.rslt_txt}
                             >
-                              결과보기
+                              {mobile ? '결과' : '결과보기'}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -595,7 +870,7 @@ export default function BatchManagementPage() {
         </Box>
 
         {/* 수동 실행 실시간 로그 (SSE) */}
-        <Dialog open={streamLogOpen} onClose={handleCloseStreamLogDialog} maxWidth="md" fullWidth>
+        <Dialog open={streamLogOpen} onClose={handleCloseStreamLogDialog} maxWidth="md" fullWidth fullScreen={mobile}>
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
               <Typography variant="h6">배치 실행 로그 (실시간)</Typography>
@@ -647,6 +922,7 @@ export default function BatchManagementPage() {
           onClose={handleCloseResultDialog}
           maxWidth="md"
           fullWidth
+          fullScreen={mobile}
         >
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

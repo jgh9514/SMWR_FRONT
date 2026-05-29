@@ -210,8 +210,8 @@ export default function AdminPage() {
                   <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
                     최근 7일 통계 요약
                   </Typography>
-                  <TableContainer>
-                    <Table>
+                  <TableContainer sx={{ overflowX: 'auto' }}>
+                    <Table size="small">
                       <TableHead>
                         <TableRow>
                           {['날짜', '가입자', '로그인', '게시글', '길드 신청'].map((h, i) => (

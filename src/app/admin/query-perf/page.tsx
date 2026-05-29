@@ -28,6 +28,8 @@ import {
   TextField,
   Typography,
   Chip,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
@@ -64,6 +66,8 @@ function isOrderDir(value: string): value is (typeof ORDER_DIR_OPTIONS)[number] 
 }
 
 export default function AdminQueryPerfPage() {
+  const theme = useTheme();
+  const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const searchParams = useSearchParams();
   const initialTab = searchParams.get('tab');
   const initialQueryLike = searchParams.get('query_like') || '';
@@ -170,8 +174,9 @@ export default function AdminQueryPerfPage() {
   };
 
   const renderSlowTable = (rows: SlowQueryItem[]) => {
+    const colCount = mobile ? 6 : 9;
     return (
-      <TableContainer>
+      <TableContainer sx={{ overflowX: 'auto' }}>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -179,9 +184,9 @@ export default function AdminQueryPerfPage() {
               <TableCell align="right">최대</TableCell>
               <TableCell align="right">총합</TableCell>
               <TableCell align="right">호출</TableCell>
-              <TableCell align="right">Rows</TableCell>
-              <TableCell align="right">I/O(Read)</TableCell>
-              <TableCell align="right">I/O(Write)</TableCell>
+              {!mobile && <TableCell align="right">Rows</TableCell>}
+              {!mobile && <TableCell align="right">I/O(Read)</TableCell>}
+              {!mobile && <TableCell align="right">I/O(Write)</TableCell>}
               <TableCell>Query</TableCell>
               <TableCell align="center">작업</TableCell>
             </TableRow>
@@ -189,7 +194,7 @@ export default function AdminQueryPerfPage() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={colCount} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     데이터가 없습니다. (pg_stat_statements가 꺼져있거나, 아직 쿼리 누적이 없을 수 있습니다)
                   </Typography>
@@ -202,10 +207,10 @@ export default function AdminQueryPerfPage() {
                   <TableCell align="right">{formatMs(r.max_ms)}</TableCell>
                   <TableCell align="right">{formatMs(r.total_ms)}</TableCell>
                   <TableCell align="right">{(r.calls ?? 0).toLocaleString('ko-KR')}</TableCell>
-                  <TableCell align="right">{(r.rows ?? 0).toLocaleString('ko-KR')}</TableCell>
-                  <TableCell align="right">{formatMs(r.blk_read_ms ?? 0)}</TableCell>
-                  <TableCell align="right">{formatMs(r.blk_write_ms ?? 0)}</TableCell>
-                  <TableCell sx={{ maxWidth: 520 }}>
+                  {!mobile && <TableCell align="right">{(r.rows ?? 0).toLocaleString('ko-KR')}</TableCell>}
+                  {!mobile && <TableCell align="right">{formatMs(r.blk_read_ms ?? 0)}</TableCell>}
+                  {!mobile && <TableCell align="right">{formatMs(r.blk_write_ms ?? 0)}</TableCell>}
+                  <TableCell sx={{ maxWidth: mobile ? 180 : 520 }}>
                     <Typography
                       variant="body2"
                       sx={{
@@ -220,18 +225,19 @@ export default function AdminQueryPerfPage() {
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <Button size="small" onClick={() => openQueryDialog(r.query)} variant="outlined">
-                      보기
-                    </Button>
-                    <Button
-                      size="small"
-                      sx={{ ml: 1 }}
-                      onClick={() => copyQuery(r.query)}
-                      variant="text"
-                      startIcon={<ContentCopyIcon fontSize="small" />}
-                    >
-                      복사
-                    </Button>
+                    <Box sx={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 0.5, alignItems: 'center' }}>
+                      <Button size="small" onClick={() => openQueryDialog(r.query)} variant="outlined">
+                        보기
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => copyQuery(r.query)}
+                        variant="text"
+                        startIcon={mobile ? undefined : <ContentCopyIcon fontSize="small" />}
+                      >
+                        복사
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))
@@ -243,16 +249,17 @@ export default function AdminQueryPerfPage() {
   };
 
   const renderRunningTable = (rows: RunningQueryItem[]) => {
+    const colCount = mobile ? 5 : 7;
     return (
-      <TableContainer>
+      <TableContainer sx={{ overflowX: 'auto' }}>
         <Table size="small">
           <TableHead>
             <TableRow>
               <TableCell align="right">PID</TableCell>
-              <TableCell>사용자</TableCell>
+              {!mobile && <TableCell>사용자</TableCell>}
               <TableCell>상태</TableCell>
               <TableCell align="right">지속시간</TableCell>
-              <TableCell>대기</TableCell>
+              {!mobile && <TableCell>대기</TableCell>}
               <TableCell>Query</TableCell>
               <TableCell align="center">작업</TableCell>
             </TableRow>
@@ -260,7 +267,7 @@ export default function AdminQueryPerfPage() {
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={colCount} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
                     실행중인 쿼리가 없습니다.
                   </Typography>
@@ -270,13 +277,15 @@ export default function AdminQueryPerfPage() {
               rows.map((r) => (
                 <TableRow key={String(r.pid)} hover>
                   <TableCell align="right">{r.pid}</TableCell>
-                  <TableCell>{r.usename}</TableCell>
+                  {!mobile && <TableCell>{r.usename}</TableCell>}
                   <TableCell>{r.state || '-'}</TableCell>
                   <TableCell align="right">{formatMs(r.duration_ms)}</TableCell>
-                  <TableCell>
-                    {r.wait_event_type ? `${r.wait_event_type}${r.wait_event ? `/${r.wait_event}` : ''}` : '-'}
-                  </TableCell>
-                  <TableCell sx={{ maxWidth: 520 }}>
+                  {!mobile && (
+                    <TableCell>
+                      {r.wait_event_type ? `${r.wait_event_type}${r.wait_event ? `/${r.wait_event}` : ''}` : '-'}
+                    </TableCell>
+                  )}
+                  <TableCell sx={{ maxWidth: mobile ? 180 : 520 }}>
                     <Typography
                       variant="body2"
                       sx={{
@@ -291,18 +300,19 @@ export default function AdminQueryPerfPage() {
                     </Typography>
                   </TableCell>
                   <TableCell align="center">
-                    <Button size="small" onClick={() => openQueryDialog(r.query)} variant="outlined">
-                      보기
-                    </Button>
-                    <Button
-                      size="small"
-                      sx={{ ml: 1 }}
-                      onClick={() => copyQuery(r.query)}
-                      variant="text"
-                      startIcon={<ContentCopyIcon fontSize="small" />}
-                    >
-                      복사
-                    </Button>
+                    <Box sx={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: 0.5, alignItems: 'center' }}>
+                      <Button size="small" onClick={() => openQueryDialog(r.query)} variant="outlined">
+                        보기
+                      </Button>
+                      <Button
+                        size="small"
+                        onClick={() => copyQuery(r.query)}
+                        variant="text"
+                        startIcon={mobile ? undefined : <ContentCopyIcon fontSize="small" />}
+                      >
+                        복사
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))
@@ -335,11 +345,13 @@ export default function AdminQueryPerfPage() {
         <Card sx={{ mb: 3 }}>
           <CardHeader
             title="조회"
+            sx={{ flexWrap: 'wrap', gap: 1, '& .MuiCardHeader-action': { alignSelf: { xs: 'stretch', sm: 'center' }, m: 0 } }}
             action={
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', width: { xs: '100%', sm: 'auto' } }}>
                 <Button
                   variant="outlined"
                   startIcon={<RefreshIcon />}
+                  size={mobile ? 'small' : 'medium'}
                   onClick={() => {
                     if (tab === 'slow') slowQuery.refetch();
                     else runningQuery.refetch();
@@ -351,6 +363,7 @@ export default function AdminQueryPerfPage() {
                   variant="contained"
                   color="warning"
                   startIcon={<RestartAltIcon />}
+                  size={mobile ? 'small' : 'medium'}
                   disabled={resetMutation.isPending}
                   onClick={async () => {
                     const ok = await confirm('pg_stat_statements 누적 통계를 리셋할까요?\n(리셋 후 비교 측정에 유용합니다)');
@@ -545,7 +558,7 @@ export default function AdminQueryPerfPage() {
         </Card>
       </Container>
 
-      <Dialog open={queryDialogOpen} onClose={() => setQueryDialogOpen(false)} maxWidth="lg" fullWidth>
+      <Dialog open={queryDialogOpen} onClose={() => setQueryDialogOpen(false)} maxWidth="lg" fullWidth fullScreen={mobile}>
         <DialogTitle>Query</DialogTitle>
         <DialogContent>
           <Box

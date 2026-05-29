@@ -25,6 +25,8 @@ import {
   DialogActions,
   CircularProgress,
   Alert,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -38,6 +40,8 @@ import type { GuildApplicationItem } from '@/features/auth/types/auth';
 
 export default function GuildApplicationManagementPage() {
   const router = useRouter();
+  const theme = useTheme();
+  const mobile = useMediaQuery(theme.breakpoints.down('md'));
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -96,9 +100,9 @@ export default function GuildApplicationManagementPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 0, sm: 2 } }}>
       <Box sx={{ mb: 3 }}>
-        <Button variant="outlined" onClick={() => router.push('/admin')} startIcon={<ArrowBackIcon />}>
+        <Button variant="outlined" onClick={() => router.push('/admin')} startIcon={<ArrowBackIcon />} size={mobile ? 'small' : 'medium'}>
           관리자 메인
         </Button>
       </Box>
@@ -107,20 +111,21 @@ export default function GuildApplicationManagementPage() {
         <CardHeader
           title="길드 신청 관리"
           subheader="길드 생성 신청 목록을 조회하고 승인/반려할 수 있습니다."
+          titleTypographyProps={{ fontSize: { xs: '1.1rem', md: '1.25rem' } }}
         />
-        <CardContent>
+        <CardContent sx={{ px: { xs: 1.5, sm: 2 } }}>
           {guildApplicationListQuery.isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
               <CircularProgress />
             </Box>
           ) : guildApplicationListQuery.data && guildApplicationListQuery.data.length > 0 ? (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
+            <TableContainer component={Paper} variant="outlined" sx={{ overflowX: 'auto' }}>
+              <Table size="small">
                 <TableHead>
                   <TableRow>
                     <TableCell>길드명</TableCell>
                     <TableCell>신청자</TableCell>
-                    <TableCell>신청일</TableCell>
+                    {!mobile && <TableCell>신청일</TableCell>}
                     <TableCell>상태</TableCell>
                     <TableCell align="right">작업</TableCell>
                   </TableRow>
@@ -137,15 +142,24 @@ export default function GuildApplicationManagementPage() {
                         <Typography variant="body2" fontWeight={600}>
                           {app.user_name || app.user_id}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {app.user_id}
-                        </Typography>
+                        {!mobile && (
+                          <Typography variant="caption" color="text.secondary">
+                            {app.user_id}
+                          </Typography>
+                        )}
+                        {mobile && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {isClient && app.crt_date ? new Date(app.crt_date).toLocaleDateString('ko-KR') : '-'}
+                          </Typography>
+                        )}
                       </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {isClient && app.crt_date ? new Date(app.crt_date).toLocaleDateString('ko-KR') : '-'}
-                        </Typography>
-                      </TableCell>
+                      {!mobile && (
+                        <TableCell>
+                          <Typography variant="body2">
+                            {isClient && app.crt_date ? new Date(app.crt_date).toLocaleDateString('ko-KR') : '-'}
+                          </Typography>
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Chip
                           label={getStatusLabel(app.status)}
@@ -154,14 +168,14 @@ export default function GuildApplicationManagementPage() {
                         />
                       </TableCell>
                       <TableCell align="right">
-                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                           <IconButton
                             color="primary"
                             size="small"
                             onClick={() => handleViewDetail(app)}
                             title="상세보기"
                           >
-                            <VisibilityIcon />
+                            <VisibilityIcon fontSize="small" />
                           </IconButton>
                           {app.status === 'PENDING' && (
                             <>
@@ -172,7 +186,7 @@ export default function GuildApplicationManagementPage() {
                                 disabled={processApplicationMutation.isPending}
                                 title="승인"
                               >
-                                <CheckCircleIcon />
+                                <CheckCircleIcon fontSize="small" />
                               </IconButton>
                               <IconButton
                                 color="error"
@@ -181,7 +195,7 @@ export default function GuildApplicationManagementPage() {
                                 disabled={processApplicationMutation.isPending}
                                 title="반려"
                               >
-                                <CancelIcon />
+                                <CancelIcon fontSize="small" />
                               </IconButton>
                             </>
                           )}
@@ -203,7 +217,13 @@ export default function GuildApplicationManagementPage() {
       </Card>
 
       {/* 상세보기 다이얼로그 */}
-      <Dialog open={detailDialogOpen} onClose={() => setDetailDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        fullScreen={mobile}
+      >
         <DialogTitle>길드 신청 상세</DialogTitle>
         <DialogContent>
           {selectedApplication && (

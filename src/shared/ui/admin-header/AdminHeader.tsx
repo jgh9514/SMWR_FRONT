@@ -13,6 +13,7 @@ import {
   Avatar,
   Divider,
 } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import LogoutIcon from '@mui/icons-material/Logout';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -21,8 +22,13 @@ import { useLogout } from '@/features/auth/hooks/useAuth';
 import { clearClientAuth } from '@/shared/utils/auth';
 import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
+import { ADMIN_DRAWER_WIDTH } from '@/shared/ui/admin-layout/constants';
 
-export default function AdminHeader() {
+interface AdminHeaderProps {
+  onMenuToggle?: () => void;
+}
+
+export default function AdminHeader({ onMenuToggle }: AdminHeaderProps) {
   const router = useRouter();
   const logoutMutation = useLogout();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -69,7 +75,6 @@ export default function AdminHeader() {
     try {
       await logoutMutation.mutateAsync({});
       clearClientAuth();
-      // 로그아웃해도 로그인 페이지로 강제 이동하지 않음
       router.push('/');
     } catch (error) {
       logger.error('로그아웃 실패', error);
@@ -97,18 +102,39 @@ export default function AdminHeader() {
         bgcolor: 'background.paper',
         borderBottom: '1px solid',
         borderColor: 'divider',
-        width: `calc(100% - ${280}px)`,
-        ml: `${280}px`,
+        width: { xs: '100%', md: `calc(100% - ${ADMIN_DRAWER_WIDTH}px)` },
+        ml: { xs: 0, md: `${ADMIN_DRAWER_WIDTH}px` },
         backgroundImage: 'none',
       }}
     >
-      <Toolbar>
-        <DashboardIcon sx={{ mr: 2, color: 'primary.main' }} />
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 700, color: 'text.primary' }}>
+      <Toolbar sx={{ minHeight: { xs: 56, sm: 64 }, px: { xs: 1.5, sm: 2 } }}>
+        <IconButton
+          color="inherit"
+          aria-label="관리 메뉴 열기"
+          edge="start"
+          onClick={onMenuToggle}
+          sx={{ display: { xs: 'inline-flex', md: 'none' }, mr: 1, flexShrink: 0 }}
+        >
+          <MenuIcon />
+        </IconButton>
+
+        <DashboardIcon sx={{ mr: { xs: 1, sm: 2 }, color: 'primary.main', display: { xs: 'none', sm: 'block' } }} />
+        <Typography
+          variant="h6"
+          component="div"
+          noWrap
+          sx={{
+            flexGrow: 1,
+            fontWeight: 700,
+            color: 'text.primary',
+            fontSize: { xs: '1rem', sm: '1.15rem', md: '1.25rem' },
+            minWidth: 0,
+          }}
+        >
           관리자 시스템
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
           <IconButton
             size="large"
             edge="end"
@@ -170,4 +196,3 @@ export default function AdminHeader() {
     </AppBar>
   );
 }
-

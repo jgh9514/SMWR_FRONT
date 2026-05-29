@@ -222,7 +222,7 @@ export default function MonsterDetailContent({
             overflow: 'hidden',
             background: grad,
             position: 'relative',
-            minHeight: { xs: 140, sm: 170 },
+            minHeight: { xs: 130, sm: 170 },
           }}
         >
           {/* radial spotlight behind image */}
@@ -303,7 +303,7 @@ export default function MonsterDetailContent({
                   lineHeight: 1.0,
                   letterSpacing: '-0.03em',
                   textShadow: `0 2px 16px rgba(0,0,0,0.6), 0 0 60px ${glow}40`,
-                  fontSize: { xs: '1.75rem', sm: '2.2rem', md: '2.6rem' },
+                  fontSize: { xs: '1.5rem', sm: '2.2rem', md: '2.6rem' },
                   mb: 0.4,
                 }}
               >
@@ -318,7 +318,7 @@ export default function MonsterDetailContent({
                   </Typography>
                 )}
                 {un_name && un_name !== kr_name && archetypeKo && (
-                  <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>·</Typography>
+                  <Typography aria-hidden="true" sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>·</Typography>
                 )}
                 {archetypeKo && (
                   <Typography sx={{ color: glow, fontSize: '0.75rem', fontWeight: 700, opacity: 0.9 }}>
@@ -327,7 +327,7 @@ export default function MonsterDetailContent({
                 )}
                 {starCount > 0 && (
                   <>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>·</Typography>
+                    <Typography aria-hidden="true" sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.75rem' }}>·</Typography>
                     <Stack direction="row" spacing={0.1}>
                       {Array.from({ length: starCount }).map((_, i) => (
                         <StarIcon key={i} sx={{ fontSize: 13, color: '#FFD740', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.5))' }} />
@@ -363,12 +363,13 @@ export default function MonsterDetailContent({
                               display: 'block',
                               transition: 'transform 0.15s, box-shadow 0.15s',
                               '&:hover': { transform: 'scale(1.1)', boxShadow: `0 0 14px ${glow}80` },
+                              '&:focus-visible': { outline: `2px solid ${glow}`, outlineOffset: 2 },
                             }}
                           />
                         </Link>
                       </Tooltip>
                       {idx < arr.length - 1 && (
-                        <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem', userSelect: 'none' }}>›</Typography>
+                        <Typography aria-hidden="true" sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem', userSelect: 'none' }}>›</Typography>
                       )}
                     </Stack>
                   ))}
@@ -410,7 +411,7 @@ export default function MonsterDetailContent({
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(auto-fill, minmax(120px, 1fr))' },
+                  gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(130px, 1fr))', sm: 'repeat(auto-fill, minmax(140px, 1fr))' },
                   gap: { xs: 1, sm: 1.5 },
                 }}
               >
@@ -476,7 +477,7 @@ export default function MonsterDetailContent({
           sx={(t) => ({
             borderBottom: '1px solid',
             borderColor: 'divider',
-            mb: 2.5,
+            mb: { xs: 2, sm: 2.5 },
             bgcolor: 'background.paper',
             position: 'sticky',
             top: 0,

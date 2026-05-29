@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ReactNode } from 'react';
 
 interface PageHeaderProps {
-  title: string;
+  title?: string;
   backPath?: string;
   onBack?: () => void;
   actions?: ReactNode;
@@ -31,9 +31,11 @@ export default function PageHeader({ title, backPath, onBack, actions }: PageHea
             목록
           </Button>
         )}
-        <Typography variant="h5" component="h1" sx={{ fontWeight: 700, fontSize: { xs: '20px', md: '24px' } }}>
-          {title}
-        </Typography>
+        {title ? (
+          <Typography variant="h5" component="h1" sx={{ fontWeight: 700, fontSize: { xs: '20px', md: '24px' } }}>
+            {title}
+          </Typography>
+        ) : null}
       </Box>
       {actions && <Box>{actions}</Box>}
     </Box>

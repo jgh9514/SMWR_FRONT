@@ -114,7 +114,7 @@ function StatBar({
 }) {
   const meta = STAT_META[statKey] ?? { color: '#90a4ae' };
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: '80px 1fr 64px', gap: 1.25, alignItems: 'center', py: 0.5 }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '72px 1fr 58px', sm: '80px 1fr 64px' }, gap: { xs: 1, sm: 1.25 }, alignItems: 'center', py: 0.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
         <Box sx={{
           width: 6, height: 6, borderRadius: '50%', bgcolor: meta.color, flexShrink: 0,
@@ -283,7 +283,7 @@ function SkillCard({ skill, isLeader = false, leaderDesc = '', leaderIcon }: {
                   <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ fontSize: '0.72rem' }}>
                     스킬 강화 ({levelLines.length}단계)
                   </Typography>
-                  <IconButton size="small" sx={{ p: 0.2 }}>
+                  <IconButton size="small" aria-expanded={open} aria-label="스킬 강화 상세 펼치기" sx={{ p: 0.2 }}>
                     <ExpandMoreIcon sx={{ fontSize: 13, transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
                   </IconButton>
                 </Stack>
@@ -362,7 +362,7 @@ export default function MonsterDetailStatClient() {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
 
       {/* ── Stats + Skills ── */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '260px 1fr' }, gap: { xs: 2, md: 3 }, alignItems: 'start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(220px, 280px) 1fr' }, gap: { xs: 2, md: 3 }, alignItems: 'start' }}>
 
         {/* 왼쪽: Stats */}
         <Paper variant="outlined" sx={{ borderRadius: 2, p: 2 }}>

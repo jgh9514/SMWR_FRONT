@@ -22,8 +22,7 @@ const STAT_LABELS: Record<string, string> = {
 
 const PERCENT_STATS = ['cr', 'cd', 'res', 'acc'];
 
-function MonsterDetailCard({ monster, monsterIndex }: MonsterDetailCardProps) {
-  void monsterIndex;
+function MonsterDetailCard({ monster }: MonsterDetailCardProps) {
   const isPercentStat = (key: string): boolean => PERCENT_STATS.includes(key);
 
   return (
@@ -40,7 +39,7 @@ function MonsterDetailCard({ monster, monsterIndex }: MonsterDetailCardProps) {
       <CardContent>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, mb: 2 }}>
           <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)' } }}>
-            <Typography variant="subtitle2" component="h4" sx={{ fontWeight: 600, mb: 1, color: '#333' }}>
+            <Typography variant="subtitle2" component="h4" sx={{ fontWeight: 600, mb: 1 }}>
               룬 세트
             </Typography>
             <Typography variant="body2" color="text.secondary" aria-label={`${monster.name}의 룬 세트: ${monster.runeSet}`}>
@@ -48,7 +47,7 @@ function MonsterDetailCard({ monster, monsterIndex }: MonsterDetailCardProps) {
             </Typography>
           </Box>
           <Box sx={{ flex: { xs: '1 1 100%', sm: '1 1 calc(50% - 8px)' } }}>
-            <Typography variant="subtitle2" component="h4" sx={{ fontWeight: 600, mb: 1, color: '#333' }}>
+            <Typography variant="subtitle2" component="h4" sx={{ fontWeight: 600, mb: 1 }}>
               룬 2번
             </Typography>
             <Typography variant="body2" color="text.secondary" aria-label={`${monster.name}의 룬 2번: ${monster.rune2}`}>

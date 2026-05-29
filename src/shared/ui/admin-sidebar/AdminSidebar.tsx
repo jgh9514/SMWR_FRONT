@@ -29,8 +29,7 @@ import PetsIcon from '@mui/icons-material/Pets';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
 import type { MenuCategory, AdminMenuItem } from '@/features/admin/types/admin';
-
-const DRAWER_WIDTH = 280;
+import { ADMIN_DRAWER_WIDTH } from '@/shared/ui/admin-layout/constants';
 
 interface MenuItemWithIcon extends AdminMenuItem {
   icon: React.ReactNode;
@@ -38,6 +37,11 @@ interface MenuItemWithIcon extends AdminMenuItem {
 
 interface MenuCategoryWithItems extends MenuCategory {
   items: MenuItemWithIcon[];
+}
+
+interface AdminSidebarProps {
+  mobileOpen: boolean;
+  onMobileClose: () => void;
 }
 
 const menuCategories: MenuCategoryWithItems[] = [
@@ -133,7 +137,17 @@ const menuCategories: MenuCategoryWithItems[] = [
   },
 ];
 
-export default function AdminSidebar() {
+const drawerPaperSx = {
+  width: ADMIN_DRAWER_WIDTH,
+  boxSizing: 'border-box',
+  borderRight: '1px solid',
+  borderColor: 'divider',
+  bgcolor: 'background.default',
+  backgroundImage: 'none',
+  overflowY: 'auto' as const,
+};
+
+export default function AdminSidebar({ mobileOpen, onMobileClose }: AdminSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const theme = useTheme();
@@ -161,6 +175,7 @@ export default function AdminSidebar() {
 
   const handleMenuItemClick = (path: string) => {
     router.push(path);
+    onMobileClose();
   };
 
   const drawerContent = (
@@ -193,7 +208,6 @@ export default function AdminSidebar() {
         </Box>
       </Toolbar>
 
-      {/* 대시보드 메뉴 */}
       <List>
         <ListItem disablePadding>
           <ListItemButton
@@ -209,7 +223,6 @@ export default function AdminSidebar() {
       </List>
       <Divider />
 
-      {/* 카테고리별 메뉴 */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto' }}>
         <List>
           {menuCategories.map((category) => (
@@ -241,44 +254,44 @@ export default function AdminSidebar() {
                   {category.items.map((item) => {
                     const isActive = pathname === item.path;
                     return (
-                    <ListItemButton
-                      key={item.path}
-                      selected={isActive}
-                      onClick={() => handleMenuItemClick(item.path)}
-                      sx={{
-                        pl: 3,
-                        py: 1,
-                        mx: 1,
-                        mb: 0.5,
-                        borderRadius: 1.5,
-                        '&.Mui-selected': {
-                          bgcolor: alpha(theme.palette.primary.main, 0.15),
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
-                        },
-                        '&:hover': { bgcolor: 'action.hover' },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        <Box sx={{ color: isActive ? 'primary.main' : 'action.active', display: 'flex' }}>
-                          {item.icon}
-                        </Box>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={
-                          <Typography
-                            variant="body2"
-                            sx={{ fontWeight: isActive ? 700 : 400, fontSize: '0.875rem', color: isActive ? 'primary.main' : 'text.primary' }}
-                          >
-                            {item.title}
-                          </Typography>
-                        }
-                        secondary={
-                          <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary', display: 'block' }}>
-                            {item.description}
-                          </Typography>
-                        }
-                      />
-                    </ListItemButton>
+                      <ListItemButton
+                        key={item.path}
+                        selected={isActive}
+                        onClick={() => handleMenuItemClick(item.path)}
+                        sx={{
+                          pl: 3,
+                          py: 1,
+                          mx: 1,
+                          mb: 0.5,
+                          borderRadius: 1.5,
+                          '&.Mui-selected': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.15),
+                            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                          },
+                          '&:hover': { bgcolor: 'action.hover' },
+                        }}
+                      >
+                        <ListItemIcon sx={{ minWidth: 36 }}>
+                          <Box sx={{ color: isActive ? 'primary.main' : 'action.active', display: 'flex' }}>
+                            {item.icon}
+                          </Box>
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: isActive ? 700 : 400, fontSize: '0.875rem', color: isActive ? 'primary.main' : 'text.primary' }}
+                            >
+                              {item.title}
+                            </Typography>
+                          }
+                          secondary={
+                            <Typography variant="caption" sx={{ fontSize: '0.7rem', color: 'text.secondary', display: 'block' }}>
+                              {item.description}
+                            </Typography>
+                          }
+                        />
+                      </ListItemButton>
                     );
                   })}
                 </List>
@@ -291,29 +304,39 @@ export default function AdminSidebar() {
   );
 
   return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: DRAWER_WIDTH,
-        flexShrink: 0,
-        zIndex: (theme) => theme.zIndex.drawer,
-        '& .MuiDrawer-paper': {
-          width: DRAWER_WIDTH,
-          boxSizing: 'border-box',
-          position: 'fixed',
-          height: '100vh',
-          top: 0,
-          left: 0,
-          borderRight: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'background.default',
-          backgroundImage: 'none',
-          overflowY: 'auto',
-        },
-      }}
-    >
-      {drawerContent}
-    </Drawer>
+    <>
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={onMobileClose}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          zIndex: (t) => t.zIndex.drawer,
+          '& .MuiDrawer-paper': drawerPaperSx,
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          width: ADMIN_DRAWER_WIDTH,
+          flexShrink: 0,
+          zIndex: (t) => t.zIndex.drawer,
+          '& .MuiDrawer-paper': {
+            ...drawerPaperSx,
+            position: 'fixed',
+            height: '100vh',
+            top: 0,
+            left: 0,
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+    </>
   );
 }
-

@@ -57,8 +57,8 @@ const RtaSeasonTierSelectRow = memo(function RtaSeasonTierSelectRow({
       sx={{
         display: 'flex',
         flexDirection: 'row',
-        flexWrap: { xs: 'nowrap', md: 'wrap' },
-        alignItems: { xs: 'stretch', md: 'center' },
+        flexWrap: 'wrap',
+        alignItems: 'center',
         gap: { xs: 1, md: 0 },
         mb,
       }}

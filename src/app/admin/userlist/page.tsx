@@ -234,7 +234,7 @@ export default function UserListPage() {
         </Card>
 
         {/* 수정 다이얼로그 */}
-        <Dialog open={editDialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+        <Dialog open={editDialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth fullScreen={mobile}>
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="h6">사용자 정보 수정</Typography>

@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
   type SyntheticEvent,
@@ -13,6 +14,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   Alert,
   Avatar,
@@ -81,6 +83,7 @@ import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOptio
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import { useMonsterDetailLinkPrefetch } from '@/features/siege/hooks/useMonsterInfo';
 import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
+import { useDebounce } from '@/shared/hooks/useDebounce';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,6 +146,11 @@ function monsterStatsSortToComboField(key: MonsterStatsSortKey): { field: ComboS
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
+
+/** 좌측 카탈로그 그리드 — 가상 스크롤 행 높이·열 수 */
+const SOLO_CATALOG_COLS = 3;
+const SOLO_CATALOG_ROW_HEIGHT = 88;
+const SOLO_CATALOG_OVERSCAN = 4;
 
 /** 목록 탭 ↔ Next 라우트 (`/rta/monster-stats/{solo|duo|trio}`) */
 const MONSTER_STATS_ROOT = '/rta/monster-stats';
@@ -783,6 +791,159 @@ const SoloCardList = memo(function SoloCardList({ stats, pageOffset }: { stats: 
   );
 });
 
+// ─── Solo catalog (virtualized grid) ─────────────────────────────────────────
+
+type SoloCatalogTileProps = {
+  monster: MonsterOption;
+  label: string;
+  href: string | undefined;
+  onPrefetch: (monsterId: string, href: string) => void;
+};
+
+const SoloCatalogTile = memo(function SoloCatalogTile({
+  monster,
+  label,
+  href,
+  onPrefetch,
+}: SoloCatalogTileProps) {
+  const inner = (
+    <Stack alignItems="center" spacing={0.5} sx={{ width: '100%', py: 0.25 }}>
+      <Avatar
+        src={getRenderableImageUrl(monster.image_url)}
+        alt={label}
+        variant="rounded"
+        imgProps={{ loading: 'lazy' }}
+        sx={{ width: 44, height: 44, border: '1px solid', borderColor: 'divider' }}
+      >
+        {label.charAt(0)}
+      </Avatar>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        noWrap
+        title={label}
+        sx={{ width: '100%', textAlign: 'center', lineHeight: 1.2, fontSize: '0.65rem' }}
+      >
+        {label}
+      </Typography>
+    </Stack>
+  );
+
+  if (!href) {
+    return (
+      <Box sx={{ borderRadius: 1, border: '1px dashed', borderColor: 'divider', p: 0.5, minWidth: 0 }}>
+        {inner}
+      </Box>
+    );
+  }
+
+  return (
+    <Box
+      component={Link}
+      href={href}
+      onMouseEnter={() => onPrefetch(monster.monster_id, href)}
+      sx={{
+        borderRadius: 1,
+        border: '1px solid',
+        borderColor: 'divider',
+        p: 0.5,
+        cursor: 'pointer',
+        width: '100%',
+        textDecoration: 'none',
+        color: 'inherit',
+        display: 'block',
+        minWidth: 0,
+        '&:hover': { bgcolor: 'action.hover' },
+      }}
+    >
+      {inner}
+    </Box>
+  );
+});
+
+type SoloCatalogVirtualGridProps = {
+  items: MonsterOption[];
+  catalogDisplayName: (m: MonsterOption) => string;
+  onPrefetch: (monsterId: string, href: string) => void;
+};
+
+const SoloCatalogVirtualGrid = memo(function SoloCatalogVirtualGrid({
+  items,
+  catalogDisplayName,
+  onPrefetch,
+}: SoloCatalogVirtualGridProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rowCount = Math.ceil(items.length / SOLO_CATALOG_COLS);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => SOLO_CATALOG_ROW_HEIGHT,
+    overscan: SOLO_CATALOG_OVERSCAN,
+  });
+
+  return (
+    <Box
+      ref={scrollRef}
+      className="filterlist-wrap"
+      sx={{
+        maxHeight: { md: 'min(60vh, 520px)' },
+        overflowY: 'auto',
+        pr: 0.5,
+      }}
+    >
+      <Box
+        component="ul"
+        sx={{
+          m: 0,
+          p: 0,
+          listStyle: 'none',
+          height: rowVirtualizer.getTotalSize(),
+          position: 'relative',
+          width: '100%',
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const startIdx = virtualRow.index * SOLO_CATALOG_COLS;
+          const rowItems = items.slice(startIdx, startIdx + SOLO_CATALOG_COLS);
+          return (
+            <Box
+              component="li"
+              key={virtualRow.key}
+              aria-hidden={false}
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+                display: 'grid',
+                gridTemplateColumns: `repeat(${SOLO_CATALOG_COLS}, minmax(0, 1fr))`,
+                gap: 1,
+                listStyle: 'none',
+              }}
+            >
+              {rowItems.map((m) => {
+                const label = catalogDisplayName(m);
+                const href = rtaMonsterDetailHref(m.monster_id);
+                return (
+                  <SoloCatalogTile
+                    key={m.monster_id}
+                    monster={m}
+                    label={label}
+                    href={href}
+                    onPrefetch={onPrefetch}
+                  />
+                );
+              })}
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
+});
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function RtaMonsterStatsClient() {
@@ -816,6 +977,7 @@ export default function RtaMonsterStatsClient() {
   // Filters
   const [tierSelection, setTierSelection] = useState('');
   const [soloSearch, setSoloSearch] = useState('');
+  const debouncedSoloSearch = useDebounce(soloSearch, 300);
   const [elementFilter, setElementFilter] = useState<ElementFilterValue>('all');
 
   // 솔로·듀오·트리오 공통: 픽횟수(듀오·트리오는 경기 수)·승률 × 오름·내림
@@ -843,7 +1005,7 @@ export default function RtaMonsterStatsClient() {
     {
       /** md 이상: 좌측 검색·속성·썸네일. 모바일은 시즌/티어·목록·정렬만 */
       enabled: tab === 0 && !isNarrow,
-      select: (raw) => normalizeMonsterList(raw),
+      select: (raw) => normalizeMonsterList(raw, { awakenedOnly: true }),
       staleTime: 60 * 60 * 1000,
       gcTime: 2 * 60 * 60 * 1000,
       refetchOnWindowFocus: false,
@@ -949,17 +1111,17 @@ export default function RtaMonsterStatsClient() {
 
   const sortedStats = allSoloStats;
 
-  /** 전체 몬스터 마스터(노말·각성·2각 등 전 행) — 검색·속성만 목록용 (테이블과 무관). 표시는 역순. */
+  /** 각성·2각 대표 1행만 — 검색·속성 필터 후 가상 스크롤 그리드에 전달 */
   const soloCatalogFiltered = useMemo(() => {
     if (!monsterCatalog.length) return [];
     const rows = monsterCatalog.filter((m) => {
       if (!m.monster_id?.trim()) return false;
-      if (!monsterOptionMatchesSearch(m, soloSearch)) return false;
+      if (!monsterOptionMatchesSearch(m, debouncedSoloSearch)) return false;
       if (!monsterOptionMatchesElement(m, elementFilter)) return false;
       return true;
     });
     return rows.slice().reverse();
-  }, [monsterCatalog, soloSearch, elementFilter]);
+  }, [monsterCatalog, debouncedSoloSearch, elementFilter]);
 
   const sortedDuo = allDuoStats;
   const sortedTrio = allTrioStats;
@@ -986,6 +1148,13 @@ export default function RtaMonsterStatsClient() {
     if (u) return u;
     return '—';
   }, []);
+
+  const handleCatalogPrefetch = useCallback(
+    (monsterId: string, href: string) => {
+      prefetchMonsterDetailLink(monsterId, href);
+    },
+    [prefetchMonsterDetailLink],
+  );
 
   const hasAnyAccumulatedData = allSoloStats.length > 0 || allDuoStats.length > 0 || allTrioStats.length > 0;
 
@@ -1182,69 +1351,11 @@ export default function RtaMonsterStatsClient() {
                 </Box>
               )}
               {!catalogLoading && soloCatalogFiltered.length > 0 && (
-                <Box
-                  className="filterlist-wrap"
-                  component="ul"
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: 'repeat(2, minmax(0, 1fr))', sm: 'repeat(3, minmax(0, 1fr))' },
-                    gap: 1,
-                    m: 0,
-                    p: 0,
-                    listStyle: 'none',
-                    alignContent: 'start',
-                    maxHeight: { md: 'min(60vh, 520px)' },
-                    overflowY: 'auto',
-                    pr: 0.5,
-                  }}
-                >
-                  {soloCatalogFiltered.map((m) => {
-                    const label = catalogDisplayName(m);
-                    const href = rtaMonsterDetailHref(m.monster_id);
-                    const inner = (
-                      <Stack alignItems="center" spacing={0.5} sx={{ width: '100%', py: 0.25 }}>
-                        <Avatar
-                          src={getRenderableImageUrl(m.image_url)}
-                          alt={label}
-                          variant="rounded"
-                          sx={{ width: 44, height: 44, border: '1px solid', borderColor: 'divider' }}
-                        >
-                          {label.charAt(0)}
-                        </Avatar>
-                        <Typography variant="caption" color="text.secondary" noWrap title={label} sx={{ width: '100%', textAlign: 'center', lineHeight: 1.2, fontSize: '0.65rem' }}>
-                          {label}
-                        </Typography>
-                      </Stack>
-                    );
-                    return (
-                      <Box key={m.monster_id} component="li" sx={{ listStyle: 'none', minWidth: 0 }}>
-                        {href ? (
-                          <Box
-                            component={Link}
-                            href={href}
-                            onMouseEnter={() => prefetchMonsterDetailLink(m.monster_id, href)}
-                            sx={{
-                              borderRadius: 1,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              p: 0.5,
-                              cursor: 'pointer',
-                              width: '100%',
-                              textDecoration: 'none',
-                              color: 'inherit',
-                              display: 'block',
-                              '&:hover': { bgcolor: 'action.hover' },
-                            }}
-                          >
-                            {inner}
-                          </Box>
-                        ) : (
-                          <Box sx={{ borderRadius: 1, border: '1px dashed', borderColor: 'divider', p: 0.5 }}>{inner}</Box>
-                        )}
-                      </Box>
-                    );
-                  })}
-                </Box>
+                <SoloCatalogVirtualGrid
+                  items={soloCatalogFiltered}
+                  catalogDisplayName={catalogDisplayName}
+                  onPrefetch={handleCatalogPrefetch}
+                />
               )}
               {!catalogLoading && monsterCatalog.length > 0 && soloCatalogFiltered.length === 0 && (
                 <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>

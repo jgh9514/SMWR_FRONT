@@ -158,13 +158,12 @@ export default function RtaPlayerDetailShell({
     sessionRecentForWizardRef.current = w;
   }, [wizardId, summary]);
 
+  const profileLoading = pageDataLoading || (!summary && isFetching);
+
   const displayName = useMemo(() => {
-    if (summary?.found) {
-      const n = summary.wizard_name?.trim();
-      if (n) return n;
-    }
-    return `소환사 ${wizardId}`;
-  }, [summary, wizardId]);
+    if (!summary?.found) return null;
+    return summary.wizard_name?.trim() || null;
+  }, [summary]);
 
   const channelUid = summary?.channel_uid;
   const profileSrc = getSwexPlayerImageUrl(channelUid ?? wizardId);
@@ -218,7 +217,7 @@ export default function RtaPlayerDetailShell({
       }}
     >
       <Box sx={{ mb: { xs: 1.5, md: 3 } }}>
-        <PageHeader title={displayName} backPath="/rta/summoner-ranking" />
+        <PageHeader backPath="/rta/summoner-ranking" />
       </Box>
 
       <Box
@@ -244,18 +243,22 @@ export default function RtaPlayerDetailShell({
             sx={{ flex: 1, minWidth: 0, width: '100%' }}
           >
             <Box sx={{ position: 'relative', flexShrink: 0 }}>
-              <Avatar
-                src={profileSrc}
-                alt={displayName}
-                variant="rounded"
-                sx={{
-                  width: 80,
-                  height: 80,
-                  border: '2px solid',
-                  borderColor: 'divider',
-                  bgcolor: 'action.hover',
-                }}
-              />
+              {profileLoading ? (
+                <Skeleton variant="rounded" width={80} height={80} />
+              ) : (
+                <Avatar
+                  src={profileSrc}
+                  alt={displayName ?? '소환사 프로필'}
+                  variant="rounded"
+                  sx={{
+                    width: 80,
+                    height: 80,
+                    border: '2px solid',
+                    borderColor: 'divider',
+                    bgcolor: 'action.hover',
+                  }}
+                />
+              )}
             </Box>
 
             <Stack spacing={1.5} sx={{ flex: 1, minWidth: 0, textAlign: { xs: 'center', sm: 'left' } }}>
@@ -266,18 +269,63 @@ export default function RtaPlayerDetailShell({
                 justifyContent={{ xs: 'center', sm: 'flex-start' }}
                 gap={1.5}
               >
-                <Typography variant="h5" component="h1" fontWeight={800} noWrap sx={{ maxWidth: '100%' }}>
-                  {displayName}
-                </Typography>
-                <IconButton
-                  size="small"
-                  onClick={(e) => setNameHistoryAnchor(e.currentTarget)}
-                  aria-label="이전 닉네임 보기"
-                  title="이전 닉네임"
-                  sx={{ color: 'text.secondary', flexShrink: 0 }}
-                >
-                  <HistoryIcon fontSize="small" />
-                </IconButton>
+                {profileLoading ? (
+                  <>
+                    <Skeleton variant="text" width={160} height={36} sx={{ maxWidth: '100%' }} />
+                    <Skeleton variant="rounded" width={48} height={24} />
+                    <Skeleton variant="rounded" width={56} height={24} />
+                  </>
+                ) : (
+                  <>
+                    {displayName ? (
+                      <Typography variant="h5" component="h1" fontWeight={800} noWrap sx={{ maxWidth: '100%' }}>
+                        {displayName}
+                      </Typography>
+                    ) : null}
+                    {displayName ? (
+                      <IconButton
+                        size="small"
+                        onClick={(e) => setNameHistoryAnchor(e.currentTarget)}
+                        aria-label="이전 닉네임 보기"
+                        title="이전 닉네임"
+                        sx={{ color: 'text.secondary', flexShrink: 0 }}
+                      >
+                        <HistoryIcon fontSize="small" />
+                      </IconButton>
+                    ) : null}
+                  </>
+                )}
+                {!profileLoading ? (
+                  <>
+                    {countryFlag ? (
+                      <Box
+                        component="img"
+                        src={countryFlag}
+                        alt=""
+                        sx={{
+                          width: 28,
+                          height: 18,
+                          objectFit: 'cover',
+                          borderRadius: 0.5,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : null}
+                    <Chip
+                      size="small"
+                      label={countryLabel}
+                      sx={{
+                        fontWeight: 700,
+                        border: '1px solid',
+                        borderColor: 'primary.main',
+                        bgcolor: (t) => (t.palette.mode === 'dark' ? 'primary.dark' : 'primary.light'),
+                        color: 'primary.main',
+                      }}
+                    />
+                  </>
+                ) : null}
                 <Menu
                   anchorEl={nameHistoryAnchor}
                   open={nameHistoryOpen}
@@ -342,39 +390,6 @@ export default function RtaPlayerDetailShell({
                     </List>
                   )}
                 </Menu>
-                {!summary && isFetching ? (
-                  <Skeleton variant="rounded" width={48} height={24} />
-                ) : (
-                  <>
-                    {countryFlag ? (
-                      <Box
-                        component="img"
-                        src={countryFlag}
-                        alt=""
-                        sx={{
-                          width: 28,
-                          height: 18,
-                          objectFit: 'cover',
-                          borderRadius: 0.5,
-                          border: '1px solid',
-                          borderColor: 'divider',
-                          flexShrink: 0,
-                        }}
-                      />
-                    ) : null}
-                    <Chip
-                      size="small"
-                      label={countryLabel}
-                      sx={{
-                        fontWeight: 700,
-                        border: '1px solid',
-                        borderColor: 'primary.main',
-                        bgcolor: (t) => (t.palette.mode === 'dark' ? 'primary.dark' : 'primary.light'),
-                        color: 'primary.main',
-                      }}
-                    />
-                  </>
-                )}
               </Stack>
 
               <Stack
@@ -385,7 +400,7 @@ export default function RtaPlayerDetailShell({
                 gap={{ xs: 2, sm: 3 }}
                 sx={{ mt: 1 }}
               >
-                {!summary && isFetching ? (
+                {profileLoading ? (
                   <>
                     <Skeleton variant="rounded" width={72} height={20} />
                     <Skeleton variant="rounded" width={72} height={20} />

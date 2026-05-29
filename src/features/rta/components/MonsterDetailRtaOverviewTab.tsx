@@ -86,8 +86,8 @@ function StatChip({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 0.25,
-        py: { xs: 1.5, sm: 2 },
-        px: 1,
+        py: { xs: 1.25, sm: 2 },
+        px: { xs: 0.75, sm: 1 },
         borderRadius: 2,
         bgcolor: t.palette.background.paper,
         border: `1px solid ${t.palette.divider}`,
@@ -99,7 +99,7 @@ function StatChip({
         variant="h5"
         fontWeight={800}
         color={valueColor}
-        sx={{ lineHeight: 1, fontSize: { xs: '1.35rem', sm: '1.6rem' } }}
+        sx={{ lineHeight: 1, fontSize: { xs: '1.1rem', sm: '1.6rem' } }}
       >
         {value}
       </Typography>
@@ -132,6 +132,7 @@ function StatChip({
 const FIRST_PICK_COLS: readonly (readonly number[])[] = [[1], [2, 3], [4, 5]];
 const SECOND_PICK_COLS: readonly (readonly number[])[] = [[1, 2], [3, 4], [5]];
 const TEAM_PICK_SLOT_LABEL: Record<number, string> = { 1: '1번', 2: '2번', 3: '3번', 4: '4번', 5: '5번' };
+const TIER_CHART_COLORS = ['#1976d2', '#7b1fa2', '#2e7d32', '#e65100', '#c62828', '#00695c'] as const;
 
 function PickSlotBox({
   slotNo,
@@ -371,7 +372,7 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
     };
   }, [dailyTrend, dailyTrendPerRating, usePerRatingChart]);
 
-  const firstPickSlots = useMemo(() => pickSlots.filter((s) => s.team_side === 1), [pickSlots]);
+  const firstPickSlots  = useMemo(() => pickSlots.filter((s) => s.team_side === 1), [pickSlots]);
   const secondPickSlots = useMemo(() => pickSlots.filter((s) => s.team_side === 2), [pickSlots]);
 
   return (
@@ -390,13 +391,13 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
       {/* 상단 요약 지표 — 4분할 */}
       <Box sx={{ mb: 2 }}>
         {overviewFetching ? (
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1.5 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: { xs: 1, sm: 1.5 } }}>
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} variant="rectangular" height={80} sx={{ borderRadius: 2 }} />
             ))}
           </Box>
         ) : stats ? (
-          <Box sx={{ display: 'flex', gap: 1.5 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: { xs: 1, sm: 1.5 } }}>
             <StatChip
               label="Win Rate"
               value={fmt1(stats.win_rate_pct)}
@@ -421,14 +422,14 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
       </Box>
 
       {/* 7일 추이 차트 */}
-      <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, mb: 2 }}>
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
           최근 7일 지표 추이 (%)
         </Typography>
         {overviewFetching ? (
           <Skeleton variant="rectangular" width="100%" height={240} sx={{ borderRadius: 1 }} />
         ) : chartData.length > 0 ? (
-          <Box sx={{ width: '100%', height: usePerRatingChart ? 300 : 260, minWidth: 0 }}>
+          <Box sx={{ width: '100%', height: { xs: usePerRatingChart ? 240 : 200, sm: usePerRatingChart ? 300 : 260 }, minWidth: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -439,14 +440,13 @@ export default function MonsterDetailRtaOverviewTab({ monsterId }: MonsterDetail
                 {usePerRatingChart ? (
                   perRatingKeys.map((key, i) => {
                     const isPick = key.endsWith('픽률');
-                    const tierColors = ['#1976d2', '#7b1fa2', '#2e7d32', '#e65100', '#c62828', '#00695c'];
-                    const tierIdx = Math.floor(i / 2) % tierColors.length;
+                    const tierIdx = Math.floor(i / 2) % TIER_CHART_COLORS.length;
                     return (
                       <Line
                         key={key}
                         type="monotone"
                         dataKey={key}
-                        stroke={tierColors[tierIdx]}
+                        stroke={TIER_CHART_COLORS[tierIdx]}
                         strokeWidth={2}
                         dot={false}
                         connectNulls
