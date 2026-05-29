@@ -28,6 +28,7 @@ import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import PetsIcon from '@mui/icons-material/Pets';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import QueryStatsIcon from '@mui/icons-material/QueryStats';
+import InsightsIcon from '@mui/icons-material/Insights';
 import type { MenuCategory, AdminMenuItem } from '@/features/admin/types/admin';
 import { ADMIN_DRAWER_WIDTH } from '@/shared/ui/admin-layout/constants';
 
@@ -125,6 +126,13 @@ const menuCategories: MenuCategoryWithItems[] = [
         icon: <PetsIcon />,
         path: '/admin/monster',
         color: '#9c27b0',
+      },
+      {
+        title: 'Grafana 모니터링',
+        description: 'Grafana Cloud 대시보드 (OTEL/Prometheus)',
+        icon: <InsightsIcon />,
+        path: '/admin/monitoring',
+        color: '#f57c00',
       },
       {
         title: '쿼리 성능',

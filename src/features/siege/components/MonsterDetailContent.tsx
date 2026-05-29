@@ -25,6 +25,7 @@ import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 import type { AttributeType } from '@/features/siege/types/monster';
 import { monsterAwakenStepDigit } from '@/features/siege/lib/monsterIdEvolution';
 import { MonsterInfoContext } from '@/features/siege/context/MonsterInfoContext';
+import { formatRelativeKo } from '@/shared/utils/format';
 
 // ── helpers re-exported for sub-pages ────────────────────────────────────────
 
@@ -96,20 +97,6 @@ export function detailContextFrom(info: MonsterInfoResponse) {
   return (info as unknown as Record<string, unknown>)['detailContext'] as typeof info.detail_context | undefined;
 }
 
-function formatUpdatedRelativeKo(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const diffMs = Date.now() - d.getTime();
-  const days = Math.floor(diffMs / 86400000);
-  if (days < 0) return '방금';
-  if (days === 0) {
-    const hours = Math.floor(diffMs / 3600000);
-    return hours <= 0 ? '방금' : `${hours}시간 전`;
-  }
-  if (days === 1) return '1일 전';
-  return `${days}일 전`;
-}
-
 // ── tabs ──────────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -161,7 +148,7 @@ export default function MonsterDetailContent({
     : null;
 
   const recentSub = infoUpdatedAt?.trim()
-    ? formatUpdatedRelativeKo(infoUpdatedAt)
+    ? formatRelativeKo(infoUpdatedAt)
     : null;
 
   const evolution = useMemo(() => {

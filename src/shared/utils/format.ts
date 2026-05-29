@@ -140,6 +140,22 @@ const SIEGE_DAY_CODE_LABEL: Record<string, string> = {
   '04': '금',
 };
 
+/**
+ * ISO 날짜 문자열 → "N일 전 / N시간 전 / 방금" 한국어 상대 표현
+ */
+export function formatRelativeKo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const diffMs = Date.now() - d.getTime();
+  const days = Math.floor(diffMs / 86400000);
+  if (days < 0) return '방금';
+  if (days === 0) {
+    const hours = Math.floor(diffMs / 3600000);
+    return hours <= 0 ? '방금' : `${hours}시간 전`;
+  }
+  return days === 1 ? '1일 전' : `${days}일 전`;
+}
+
 export function formatSiegeDateLabel(siegeId: string): string {
   const date = parseSiegeDate(siegeId);
   if (!date) return '';

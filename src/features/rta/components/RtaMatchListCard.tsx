@@ -9,6 +9,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import RtaRatingStarIcons from '@/features/rta/components/RtaRatingStarIcons';
 import RtaUnitPickGrid from '@/features/rta/components/RtaUnitPickGrid';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
+import { formatDate } from '@/shared/utils/format';
 import type { MatchItem } from '@/types';
 
 function rtaSideBgWin(theme: Theme) {
@@ -28,10 +29,20 @@ function rtaSideBgLose(theme: Theme) {
 const RTA_BADGE_WIN = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
 const RTA_BADGE_LOSE = 'linear-gradient(135deg, #f87171 0%, #dc2626 100%)';
 
+function formatMatchDate(raw: string): { date: string; time: string } | null {
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return {
+    date: formatDate(d, 'YYYY-MM-DD'),
+    time: formatDate(d, 'HH:mm'),
+  };
+}
+
 export default function RtaMatchListCard({ match }: { match: MatchItem }) {
   const theme = useTheme();
   const rtaStarSize = useMediaQuery(theme.breakpoints.up('md')) ? 12 : 10;
   const [isExpanded, setIsExpanded] = useState(true);
+  const matchDateParts = match.date ? formatMatchDate(match.date) : null;
 
   const p1Wins = match.winnerPosition === '1';
   const expLeftUnits = match.p1Units ?? [];
@@ -96,7 +107,7 @@ export default function RtaMatchListCard({ match }: { match: MatchItem }) {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, overflow: 'hidden' }}>
                 {match.p1Country && (
-                  <Box component="img" src={`https://flagcdn.com/w40/${match.p1Country.toLowerCase()}.png`} alt={match.p1Country} sx={{ width: { xs: 14, md: 18 }, height: { xs: 10, md: 13 }, flexShrink: 0 }} />
+                  <Box component="img" src={`https://flagcdn.com/w40/${match.p1Country.toLowerCase()}.png`} alt={match.p1Country} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} sx={{ width: { xs: 14, md: 18 }, height: { xs: 10, md: 13 }, flexShrink: 0 }} />
                 )}
                 <Typography
                   component={Link}
@@ -141,28 +152,16 @@ export default function RtaMatchListCard({ match }: { match: MatchItem }) {
           <Typography variant="overline" sx={{ fontSize: '0.65rem', fontWeight: 800, letterSpacing: '0.18em', color: 'text.secondary', lineHeight: 1 }}>
             VS
           </Typography>
-          {match.date && (() => {
-            try {
-              const d = new Date(match.date);
-              const year = d.getFullYear();
-              const month = String(d.getMonth() + 1).padStart(2, '0');
-              const day = String(d.getDate()).padStart(2, '0');
-              const hours = String(d.getHours()).padStart(2, '0');
-              const minutes = String(d.getMinutes()).padStart(2, '0');
-              return (
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
-                  <Typography variant="caption" sx={{ fontSize: { xs: '0.6rem', sm: '0.65rem', md: '0.75rem' }, fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {`${year}-${month}-${day}`}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.55rem', sm: '0.6rem', md: '0.7rem' }, textAlign: 'center' }}>
-                    {`${hours}:${minutes}`}
-                  </Typography>
-                </Box>
-              );
-            } catch {
-              return <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', textAlign: 'center' }}>{match.date}</Typography>;
-            }
-          })()}
+          {matchDateParts && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.25 }}>
+              <Typography variant="caption" sx={{ fontSize: { xs: '0.6rem', sm: '0.65rem', md: '0.75rem' }, fontWeight: 600, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                {matchDateParts.date}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.55rem', sm: '0.6rem', md: '0.7rem' }, textAlign: 'center' }}>
+                {matchDateParts.time}
+              </Typography>
+            </Box>
+          )}
           <IconButton size="small" onClick={() => setIsExpanded((v) => !v)} aria-expanded={isExpanded} sx={{ p: '2px' }}>
             <ExpandMoreIcon sx={(t) => ({ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s', color: t.palette.text.secondary, fontSize: { xs: 22, md: 26 } })} />
           </IconButton>
@@ -218,7 +217,7 @@ export default function RtaMatchListCard({ match }: { match: MatchItem }) {
                   {match.p2Name || 'Opponent'}
                 </Typography>
                 {match.p2Country && (
-                  <Box component="img" src={`https://flagcdn.com/w40/${match.p2Country.toLowerCase()}.png`} alt={match.p2Country} sx={{ width: { xs: 14, md: 18 }, height: { xs: 10, md: 13 }, flexShrink: 0 }} />
+                  <Box component="img" src={`https://flagcdn.com/w40/${match.p2Country.toLowerCase()}.png`} alt={match.p2Country} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} sx={{ width: { xs: 14, md: 18 }, height: { xs: 10, md: 13 }, flexShrink: 0 }} />
                 )}
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

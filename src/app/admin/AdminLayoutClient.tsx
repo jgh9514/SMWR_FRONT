@@ -1,15 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Box, Skeleton, Alert, useMediaQuery, useTheme } from '@mui/material';
+import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { getAuthTokenFromCookie } from '@/shared/utils/auth';
-import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import AdminHeader from '@/shared/ui/admin-header/AdminHeader';
 import AdminSidebar from '@/shared/ui/admin-sidebar/AdminSidebar';
+import AdminAccessGate, { type AdminGateStatus } from '@/shared/ui/admin-layout/AdminAccessGate';
 import { ADMIN_DRAWER_WIDTH } from '@/shared/ui/admin-layout/constants';
 import type { UserInfo } from '@/features/auth/types/auth';
+
+const ADMIN_ROLE_ID = 'RL0001';
 
 export default function AdminLayoutClient({
   children,
@@ -20,8 +22,15 @@ export default function AdminLayoutClient({
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
-  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [gateStatus, setGateStatus] = useState<AdminGateStatus>('checking');
+
+  const goHome = useCallback(() => {
+    router.push('/');
+  }, [router]);
+
+  const goLogin = useCallback(() => {
+    router.push('/login');
+  }, [router]);
 
   useEffect(() => {
     if (isDesktop) {
@@ -30,26 +39,22 @@ export default function AdminLayoutClient({
   }, [isDesktop]);
 
   useEffect(() => {
-    const checkAuthAndRole = async () => {
+    const checkAuthAndRole = () => {
       if (typeof window === 'undefined') {
         return;
       }
 
       try {
         const token = getAuthTokenFromCookie();
-
-        if (!token) {
-          const storedUserInfo = localStorage.getItem('userInfo');
-          if (!storedUserInfo) {
-            router.push('/login');
-            return;
-          }
-        }
-
         const storedUserInfo = localStorage.getItem('userInfo');
 
+        if (!token && !storedUserInfo) {
+          setGateStatus('login_required');
+          return;
+        }
+
         if (!storedUserInfo) {
-          setIsAuthorized(true);
+          setGateStatus('authorized');
           return;
         }
 
@@ -58,59 +63,36 @@ export default function AdminLayoutClient({
           userInfo = JSON.parse(storedUserInfo) as UserInfo;
         } catch (error) {
           logger.error('[AdminLayout] 사용자 정보 파싱 실패', error);
-          setIsAuthorized(true);
+          setGateStatus('authorized');
           return;
         }
 
-        const isAdmin = userInfo?.roles?.some((role) => role.role_id === 'RL0001');
+        const isAdmin = userInfo?.roles?.some((role) => role.role_id === ADMIN_ROLE_ID);
 
         if (!isAdmin) {
-          showToast.error('관리자 권한이 필요합니다.');
-          router.push('/');
+          setGateStatus('denied');
           return;
         }
 
-        setIsAuthorized(true);
+        setGateStatus('authorized');
       } catch (error) {
         logger.error('[AdminLayout] 권한 검증 실패', error);
         const token = getAuthTokenFromCookie();
-        if (token) {
-          setIsAuthorized(true);
-        } else {
-          showToast.error('권한을 확인할 수 없습니다.');
-          router.push('/login');
-        }
-      } finally {
-        setIsChecking(false);
+        setGateStatus(token ? 'authorized' : 'login_required');
       }
     };
 
-    void checkAuthAndRole();
-  }, [router]);
+    checkAuthAndRole();
+  }, []);
 
-  if (isChecking) {
+  if (gateStatus !== 'authorized') {
     return (
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: 'background.default',
-        }}
-      >
-        <Box sx={{ textAlign: 'center' }}>
-          <Skeleton variant="circular" width={48} height={48} />
-          <Box sx={{ mt: 2 }}>
-            <Alert severity="info">권한을 확인하는 중...</Alert>
-          </Box>
-        </Box>
-      </Box>
+      <AdminAccessGate
+        status={gateStatus}
+        onGoHome={goHome}
+        onGoLogin={goLogin}
+      />
     );
-  }
-
-  if (!isAuthorized) {
-    return null;
   }
 
   return (

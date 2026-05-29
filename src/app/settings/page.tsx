@@ -449,14 +449,8 @@ export default function SettingsPage() {
   };
 
   const saveUserInfo = async () => {
-    try {
-      // TODO: API 호출
-      showToast.success('사용자 정보가 수정되었습니다.');
-      setEditDialog(false);
-    } catch (error) {
-      logger.error('사용자 정보 수정 실패', error);
-      showToast.error('사용자 정보 수정에 실패했습니다.');
-    }
+    showToast.info('사용자 정보 수정 기능은 준비 중입니다.');
+    setEditDialog(false);
   };
 
   const logoutMutation = useLogout({

@@ -6,6 +6,7 @@ import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import type { AttributeType } from '@/features/siege/types/monster';
 import AttributeElementIcon from '@/shared/ui/attribute-element-icon/AttributeElementIcon';
 import { getRenderableImageUrl } from '@/shared/utils/image';
+import { formatRelativeKo } from '@/shared/utils/format';
 
 /** 속성 라벨 — 예: 화염속성, 물속성 */
 const ELEMENT_ATTR_KO: Record<AttributeType, string> = {
@@ -31,21 +32,6 @@ function formatArchetypeKo(raw?: string | null): string {
   return ARCHETYPE_TO_KO[t] ?? ARCHETYPE_TO_KO[lower] ?? t;
 }
 
-function formatUpdatedRelativeKo(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  const now = Date.now();
-  const diffMs = now - d.getTime();
-  const days = Math.floor(diffMs / 86400000);
-  if (days < 0) return '방금';
-  if (days === 0) {
-    const hours = Math.floor(diffMs / 3600000);
-    if (hours <= 0) return '방금';
-    return `${hours}시간 전`;
-  }
-  if (days === 1) return '1일 전';
-  return `${days}일 전`;
-}
 
 export interface MonsterDetailHeroTxtWrapProps {
   /** 좌측 썸네일 */
@@ -80,7 +66,7 @@ export default function MonsterDetailHeroTxtWrap({
   const stars = Math.min(6, Math.max(0, naturalStarCount));
   const recentSub =
     infoUpdatedAt && String(infoUpdatedAt).trim() !== ''
-      ? formatUpdatedRelativeKo(infoUpdatedAt)
+      ? formatRelativeKo(infoUpdatedAt)
       : '—';
 
   return (

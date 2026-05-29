@@ -15,6 +15,11 @@ import {
   RtaListPageResponse,
 } from '@/types';
 import type {
+  MonsterDetail,
+  RtaDashboardLinkPreviewResponse,
+  RtaDashboardRankCutoffResponse,
+  RtaDashboardTierDistributionResponse,
+  RtaMonsterStatsResponse,
   RtaMonsterOverviewStats,
   RtaMonsterDailySnapRow,
   RtaMonsterPickSlotRow,
@@ -22,25 +27,6 @@ import type {
   RtaRankCutDetailResponse,
   CounterMatchupRow,
   RtaPlayerPageData,
-} from '@/features/rta/types/rta';
-
-function ratingIdBody(ratingId?: number | null): Record<string, number> {
-  if (ratingId == null || ratingId <= 0) return {};
-  return { ratingId };
-}
-
-/** 매치 목록/페이지 API — 몬스터 통계와 동일: ratingId 단일 우선, 없으면 ratingIds */
-function matchListTierBody(ratingId?: number | null, ratingIds?: number[] | null): Record<string, number | number[]> {
-  if (ratingId != null && ratingId > 0) return { ratingId };
-  if (ratingIds != null && ratingIds.length > 0) return { ratingIds };
-  return {};
-}
-import type {
-  MonsterDetail,
-  RtaDashboardLinkPreviewResponse,
-  RtaDashboardRankCutoffResponse,
-  RtaDashboardTierDistributionResponse,
-  RtaMonsterStatsResponse,
   RtaPlayerSummary,
   RtaPlayerNameHistoryResponse,
   RtaPlayerScoreDailyResponse,
@@ -60,6 +46,18 @@ import type {
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { apiClient } from '@/shared/lib/api/client';
 import { getRtaTierShortLabel } from '@/shared/utils/util';
+
+function ratingIdBody(ratingId?: number | null): Record<string, number> {
+  if (ratingId == null || ratingId <= 0) return {};
+  return { ratingId };
+}
+
+/** 매치 목록/페이지 API — 몬스터 통계와 동일: ratingId 단일 우선, 없으면 ratingIds */
+function matchListTierBody(ratingId?: number | null, ratingIds?: number[] | null): Record<string, number | number[]> {
+  if (ratingId != null && ratingId > 0) return { ratingId };
+  if (ratingIds != null && ratingIds.length > 0) return { ratingIds };
+  return {};
+}
 
 const MONSTER_TIER_BULK_PRED: Record<string, (short: string) => boolean> = {
   CH_ALL: (s) => s.startsWith('Ch'),

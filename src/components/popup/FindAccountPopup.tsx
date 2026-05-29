@@ -19,7 +19,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { useFindUserId, useFindPassword } from '@/features/auth/hooks/useAuth';
 import { showToast } from '@/shared/lib/notification';
 import { isEmpty } from '@/shared/utils/util';
-import { validateAndSanitizeInput, containsSqlInjection } from '@/shared/utils/validation';
+import { validateAndSanitizeInput } from '@/shared/utils/validation';
 
 interface FindAccountPopupProps {
   open: boolean;
@@ -102,14 +102,12 @@ export default function FindAccountPopup({ open, onClose }: FindAccountPopupProp
       showToast.error('이메일을 입력해주세요.');
       return;
     }
-
-    if (containsSqlInjection(findUserIdEmail)) {
+    try {
+      const sanitizedEmail = validateAndSanitizeInput(findUserIdEmail);
+      findUserIdMutation.mutate({ email: sanitizedEmail });
+    } catch {
       showToast.error('입력값에 허용되지 않은 문자가 포함되어 있습니다.');
-      return;
     }
-
-    const sanitizedEmail = validateAndSanitizeInput(findUserIdEmail);
-    findUserIdMutation.mutate({ email: sanitizedEmail });
   };
 
   const handleFindPassword = () => {
@@ -117,24 +115,17 @@ export default function FindAccountPopup({ open, onClose }: FindAccountPopupProp
       showToast.error('아이디를 입력해주세요.');
       return;
     }
-
     if (isEmpty(findPasswordEmail)) {
       showToast.error('이메일을 입력해주세요.');
       return;
     }
-
-    if (containsSqlInjection(findPasswordUserId) || containsSqlInjection(findPasswordEmail)) {
+    try {
+      const sanitizedUserId = validateAndSanitizeInput(findPasswordUserId);
+      const sanitizedEmail = validateAndSanitizeInput(findPasswordEmail);
+      findPasswordMutation.mutate({ user_id: sanitizedUserId, email: sanitizedEmail });
+    } catch {
       showToast.error('입력값에 허용되지 않은 문자가 포함되어 있습니다.');
-      return;
     }
-
-    const sanitizedUserId = validateAndSanitizeInput(findPasswordUserId);
-    const sanitizedEmail = validateAndSanitizeInput(findPasswordEmail);
-
-    findPasswordMutation.mutate({
-      user_id: sanitizedUserId,
-      email: sanitizedEmail,
-    });
   };
 
   return (

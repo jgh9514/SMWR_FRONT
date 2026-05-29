@@ -36,6 +36,17 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
 
+const QUERY_RETRY_NO_STATUS = new Set([429, 401, 403]);
+const QUERY_RETRY_NO_CODES = ['ERR_NETWORK', 'ERR_CONNECTION_REFUSED', 'Network Error'];
+
+function shouldRetry(failureCount: number, error: unknown): boolean {
+  const { code, message, status } = getRetryErrorMeta(error);
+  if ((code && QUERY_RETRY_NO_CODES.includes(code)) ||
+      (message && QUERY_RETRY_NO_CODES.some((c) => message.includes(c)))) return false;
+  if (status != null && QUERY_RETRY_NO_STATUS.has(status)) return false;
+  return failureCount < 1;
+}
+
 const getRetryErrorMeta = (error: unknown) => {
   if (!isRecord(error)) {
     return { code: undefined, message: undefined, status: undefined };
@@ -55,65 +66,12 @@ function makeQueryClient() {
     defaultOptions: {
       queries: {
         refetchOnWindowFocus: false,
-        retry: (failureCount, error: unknown) => {
-          // 재시도하지 않을 에러들
-          const noRetryErrors = [
-            'ERR_NETWORK',
-            'ERR_CONNECTION_REFUSED',
-            'Network Error',
-          ];
-          const { code, message, status } = getRetryErrorMeta(error);
-
-          // 네트워크 에러는 재시도하지 않음
-          if (
-            (code && noRetryErrors.includes(code)) ||
-            (message && noRetryErrors.some(msg => message.includes(msg)))
-          ) {
-            return false;
-          }
-
-          // 429 (Too Many Requests), 401 (Unauthorized), 403 (Forbidden)은 재시도하지 않음
-          if (status === 429 || status === 401 || status === 403) {
-            return false;
-          }
-
-          // 다른 에러는 1번만 재시도
-          return failureCount < 1;
-        },
-        staleTime: 5 * 60 * 1000, // 5분
-        gcTime: 10 * 60 * 1000, // 10분
-        // React Query v5에서는 onError가 제거되었습니다.
-        // 에러 처리는 각 useQuery/useMutation에서 개별적으로 처리하거나,
-        // axios interceptor에서 처리합니다.
+        retry: shouldRetry,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
       },
       mutations: {
-        retry: (failureCount, error: unknown) => {
-          // 재시도하지 않을 에러들
-          const noRetryErrors = [
-            'ERR_NETWORK',
-            'ERR_CONNECTION_REFUSED',
-            'Network Error',
-          ];
-          const { code, message, status } = getRetryErrorMeta(error);
-
-          // 네트워크 에러는 재시도하지 않음
-          if (
-            (code && noRetryErrors.includes(code)) ||
-            (message && noRetryErrors.some(msg => message.includes(msg)))
-          ) {
-            return false;
-          }
-
-          // 429 (Too Many Requests), 401 (Unauthorized), 403 (Forbidden)은 재시도하지 않음
-          if (status === 429 || status === 401 || status === 403) {
-            return false;
-          }
-
-          return failureCount < 1;
-        },
-        // React Query v5에서는 onError가 제거되었습니다.
-        // 에러 처리는 각 useQuery/useMutation에서 개별적으로 처리하거나,
-        // axios interceptor에서 처리합니다.
+        retry: shouldRetry,
       },
     },
   });
@@ -363,18 +321,12 @@ export default function AppProviders({ children }: AppProvidersProps) {
   }, [pathname]);
 
   /** 메인 영역 + 푸터를 세로 flex로 묶어 푸터를 화면 하단에 붙임 */
-  const shellSx = useMemo(() => {
-    const publicPaths = ['/login', '/signup', '/error/401', '/error/403', '/error/404', '/error/500'];
-    const currentPath = pathname || '';
-    const isPublic = publicPaths.includes(currentPath);
-    const isAdmin = currentPath.startsWith('/admin');
-    return {
-      display: 'flex',
-      flexDirection: 'column',
-      minHeight: '100vh',
-      ...(isPublic || isAdmin ? {} : { pt: { xs: 7, md: 8 } }),
-    };
-  }, [pathname]);
+  const shellSx = useMemo(() => ({
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: '100vh',
+    ...(isPublicPath || isAdminPath ? {} : { pt: { xs: 7, md: 8 } }),
+  }), [isPublicPath, isAdminPath]);
 
   const shouldShowFooter = !isAdminPath && !isPublicPath;
 

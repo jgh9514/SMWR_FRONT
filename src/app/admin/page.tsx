@@ -25,6 +25,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import { useAdminOpsOverview, useDashboardStats } from '@/features/admin/hooks/useDashboard';
 import { PageHeader } from '@/shared/ui';
 import AdminOpsOverviewPanel from '@/features/admin/components/AdminOpsOverviewPanel';
+import AdminGrafanaPreviewSection from '@/features/admin/components/AdminGrafanaPreviewSection';
 
 const AdminDashboardCharts = dynamic(
   () => import('@/features/admin/components/AdminDashboardCharts'),
@@ -150,6 +151,8 @@ export default function AdminPage() {
             void refetchOpsOverview();
           }}
         />
+
+        <AdminGrafanaPreviewSection />
 
         {/* 통계 카드 섹션 */}
         {isLoading ? (
