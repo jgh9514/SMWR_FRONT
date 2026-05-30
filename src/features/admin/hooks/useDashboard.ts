@@ -12,8 +12,9 @@ import type { DashboardStatsResponse, OpsOverviewResponse } from '@/features/adm
 export const useDashboardStats = (options?: Parameters<typeof useApiPostQuery<DashboardStatsResponse>>[2]) => {
   return useApiPostQuery<DashboardStatsResponse>('/admin/dashboard/stats', {}, {
     enabled: true,
-    staleTime: 1 * 60 * 1000, // 1분간 캐시 유지
-    refetchOnWindowFocus: true,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
     ...options,
   });
 };
@@ -28,8 +29,9 @@ export const useAdminOpsOverview = (
 ) => {
   return useApiPostQuery<OpsOverviewResponse>('/admin/ops/overview', body, {
     enabled: true,
-    staleTime: 30 * 1000,
-    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     ...options,
   });
 };

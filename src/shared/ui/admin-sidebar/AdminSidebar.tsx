@@ -20,7 +20,6 @@ import {
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PeopleIcon from '@mui/icons-material/People';
-import SecurityIcon from '@mui/icons-material/Security';
 import LanguageIcon from '@mui/icons-material/Language';
 import HistoryIcon from '@mui/icons-material/History';
 import GroupIcon from '@mui/icons-material/Group';
@@ -47,7 +46,7 @@ interface AdminSidebarProps {
 
 const menuCategories: MenuCategoryWithItems[] = [
   {
-    title: '사용자 및 권한 관리',
+    title: '사용자 관리',
     items: [
       {
         title: '사용자 관리',
@@ -55,20 +54,6 @@ const menuCategories: MenuCategoryWithItems[] = [
         icon: <PeopleIcon />,
         path: '/admin/userlist',
         color: '#1976d2',
-      },
-      {
-        title: '권한 관리',
-        description: '시스템 권한 생성 및 관리',
-        icon: <SecurityIcon />,
-        path: '/admin/rolemn',
-        color: '#d32f2f',
-      },
-      {
-        title: '권한별 사용자',
-        description: '권한에 할당된 사용자 관리',
-        icon: <PeopleIcon />,
-        path: '/admin/roleuserlist',
-        color: '#ed6c02',
       },
     ],
   },

@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -31,10 +32,10 @@ export default function LoginHistoryPage() {
   const schDatas = useMemo(() => ({}), []);
 
   const searchParams = useMemo(() => {
-    return searchDataExtraction(schDatas);
+    return { ...searchDataExtraction(schDatas), limit: 200, offset: 0 };
   }, [schDatas]);
 
-  const { data: loginHisList = [] } = useLoginHistoryList(searchParams, false);
+  const { data: loginHisList = [], isLoading, isError, error } = useLoginHistoryList(searchParams);
 
   const headers = useMemo(() => {
     const baseHeaders = [
@@ -66,6 +67,11 @@ export default function LoginHistoryPage() {
         <Card>
           <CardHeader title="로그인 이력 목록" />
           <CardContent>
+            {isError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                로그인 이력을 불러올 수 없습니다. {error instanceof Error ? error.message : '알 수 없는 오류'}
+              </Alert>
+            )}
             <TableContainer>
               <Table size={mobile ? 'small' : 'medium'}>
                 <TableHead>
@@ -78,7 +84,7 @@ export default function LoginHistoryPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loginHisList.length === 0 ? (
+                  {!isLoading && loginHisList.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={headers.length} align="center" sx={{ py: 4 }}>
                         <Typography variant="body2" color="text.secondary">
@@ -88,10 +94,10 @@ export default function LoginHistoryPage() {
                     </TableRow>
                   ) : (
                     loginHisList.map((row, index) => (
-                      <TableRow key={row.usr_id || index} hover>
-                        <TableCell align="center">{row.usr_id}</TableCell>
-                        <TableCell align="center">{row.usr_nm}</TableCell>
-                        <TableCell align="center">{row.login_dtm}</TableCell>
+                      <TableRow key={row.usr_id || row.user_id || index} hover>
+                        <TableCell align="center">{row.usr_id ?? row.user_id}</TableCell>
+                        <TableCell align="center">{row.usr_nm ?? row.user_name}</TableCell>
+                        <TableCell align="center">{row.login_dtm ?? row.login_date}</TableCell>
                         {!mobile && <TableCell align="center">{row.ip_addr}</TableCell>}
                         {!mobile && <TableCell align="left">{row.role_list}</TableCell>}
                       </TableRow>

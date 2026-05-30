@@ -483,6 +483,48 @@ export default function FixedHeader() {
     }, 100);
   }, [cancelNavHoverClose]);
 
+  /** 데스크톱 대메뉴 버튼·Portal Menu 안에 포커스가 있는지 (키보드 blur 후에도 열림 방지) */
+  const isFocusInDesktopNavFlyout = useCallback((): boolean => {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLElement)) return false;
+    if (active.closest('[role="menu"]')) return true;
+    for (const group of navGroups) {
+      const btn = document.getElementById(`nav-group-${group.id}`);
+      if (btn && (btn === active || btn.contains(active))) return true;
+    }
+    return false;
+  }, [navGroups]);
+
+  useEffect(() => {
+    closeNavHoverMenu();
+  }, [pathname, closeNavHoverMenu]);
+
+  /** Menu는 Portal — 포커스가 빠지면 닫기 (pointermove만으로는 키보드 탭 이탈 시 메뉴가 남음) */
+  useEffect(() => {
+    if (!isClient || !navHover) return;
+
+    const onFocusOut = () => {
+      queueMicrotask(() => {
+        if (!isFocusInDesktopNavFlyout()) {
+          closeNavHoverMenu();
+        }
+      });
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        closeNavHoverMenu();
+      }
+    };
+
+    document.addEventListener('focusout', onFocusOut);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('focusout', onFocusOut);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isClient, navHover, isFocusInDesktopNavFlyout, closeNavHoverMenu]);
+
   /** 대메뉴 버튼 또는 Portal 하위 Menu 위인지 (좌표 기준 — Paper가 옆 버튼을 가릴 때도 전환 가능) */
   const resolveNavHoverAtPoint = useCallback(
     (clientX: number, clientY: number): { groupId: NavGroup['id']; anchor: HTMLElement } | 'menu' | null => {
@@ -690,8 +732,17 @@ export default function FixedHeader() {
                       id={`nav-group-${group.id}`}
                       color="inherit"
                       size="small"
+                      aria-expanded={menuOpen}
+                      aria-haspopup="menu"
                       endIcon={<KeyboardArrowDownIcon sx={{ fontSize: 18, opacity: 0.85 }} />}
                       onMouseEnter={(e) => handleNavGroupMouseEnter(group.id, e.currentTarget)}
+                      onBlur={() => {
+                        queueMicrotask(() => {
+                          if (!isFocusInDesktopNavFlyout()) {
+                            scheduleNavHoverClose();
+                          }
+                        });
+                      }}
                       onClick={() => {
                         if (!isClient) return;
                         if (group.dashboardPath) {
@@ -700,9 +751,13 @@ export default function FixedHeader() {
                           return;
                         }
                         const btn = document.getElementById(`nav-group-${group.id}`);
-                        if (btn instanceof HTMLElement) {
-                          setNavHover({ groupId: group.id, anchor: btn });
+                        if (!(btn instanceof HTMLElement)) return;
+                        if (navHover?.groupId === group.id) {
+                          closeNavHoverMenu();
+                          return;
                         }
+                        cancelNavHoverClose();
+                        setNavHover({ groupId: group.id, anchor: btn });
                       }}
                       sx={{
                         px: 1.25,

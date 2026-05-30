@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import dynamic from 'next/dynamic';
 import {
   Box,
@@ -109,6 +109,13 @@ function StatCard({ title, value, icon, color, trend, subtitle }: StatCardPropsL
 
 
 export default function AdminPage() {
+  /** 통계·운영 개요 우선 — Grafana embed(외부 HTTP·iframe)는 짧게 지연 */
+  const [showGrafanaSection, setShowGrafanaSection] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => setShowGrafanaSection(true), 300);
+    return () => window.clearTimeout(id);
+  }, []);
+
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -152,7 +159,7 @@ export default function AdminPage() {
           }}
         />
 
-        <AdminGrafanaPreviewSection />
+        {showGrafanaSection ? <AdminGrafanaPreviewSection /> : null}
 
         {/* 통계 카드 섹션 */}
         {isLoading ? (
