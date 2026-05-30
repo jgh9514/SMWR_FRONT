@@ -22,7 +22,11 @@ import {
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
-import { useRtaPlayerOpponentRecords, useRtaVsMatches } from '@/features/rta/hooks/useRtaData';
+import {
+  RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE,
+  useRtaPlayerOpponentRecords,
+  useRtaVsMatches,
+} from '@/features/rta/hooks/useRtaData';
 import { useRtaPlayerSeason } from '@/features/rta/context/RtaPlayerSeasonContext';
 import { processRawMatchToMatchItem } from '@/features/rta/utils/processRtaMatchItem';
 import { useRtaMonsterCatalog } from '@/features/rta/hooks/useRtaMonsterCatalog';
@@ -30,7 +34,7 @@ import { RtaMatchCard } from '@/features/rta/components/RtaMatchCard';
 import type { RtaPlayerOpponentRow } from '@/features/rta/types/rta';
 import type { RawMatchItem } from '@/types';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE;
 
 function n(v: unknown): number {
   const x = Number(v);

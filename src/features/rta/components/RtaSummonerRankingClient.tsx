@@ -12,7 +12,6 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/shared/lib/api/client';
 import {
   Box,
   Button,
@@ -41,8 +40,7 @@ import PageHeader from '@/shared/ui/page-header/PageHeader';
 import {
   useRtaSummonerRanking,
   useRtaSeasonSelect,
-  rtaPlayerPageDataQueryKey,
-  seasonBody,
+  prefetchRtaPlayerPageData,
 } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
@@ -387,13 +385,7 @@ export default function RtaSummonerRankingClient() {
     if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     prefetchTimerRef.current = setTimeout(() => {
       router.prefetch(href);
-      const body = seasonBody(seasonSelectValue, seasonIdForApi);
-      const pageDataPath = rtaPlayerPageDataQueryKey(wizardId, seasonSelectValue, seasonIdForApi)[0];
-      queryClient.prefetchQuery({
-        queryKey: rtaPlayerPageDataQueryKey(wizardId, seasonSelectValue, seasonIdForApi),
-        queryFn: () => apiClient.post(pageDataPath, body),
-        staleTime: 2 * 60_000,
-      });
+      prefetchRtaPlayerPageData(queryClient, wizardId, seasonSelectValue, seasonIdForApi);
     }, 150);
   }, [router, queryClient, seasonSelectValue, seasonIdForApi]);
 

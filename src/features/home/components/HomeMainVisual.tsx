@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Autocomplete,
   Avatar,
@@ -18,7 +19,12 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useRtaSummonerSessionSearchLists } from '@/features/rta/hooks/useRtaSummonerSessionSearchLists';
 import { filterSessionBookmarks } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
 import RtaSummonerSessionSearchPanel from '@/features/rta/components/RtaSummonerSessionSearchPanel';
-import { useRtaSummonerSearch } from '@/features/rta/hooks/useRtaData';
+import {
+  prefetchRtaPlayerPageData,
+  useRtaSeasonSelect,
+  useRtaSummonerSearch,
+} from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import type { RtaSummonerSearchHit } from '@/features/rta/types/rta';
 import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import { SITE_NAME_DISPLAY } from '@/shared/lib/seo';
@@ -49,6 +55,9 @@ function countryFlagSrc(country: string | undefined): string | null {
 /** 홈 히어로: 메인 배너 + RTA 소환사 검색(집계·기본 시즌, 서버 결정). */
 export default function HomeMainVisual() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: seasonsData } = useRtaSeasonsContext();
+  const { seasonSelectValue, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
   const theme = useTheme();
   const isMdUp = useMediaQuery(theme.breakpoints.up('md'));
 
@@ -112,11 +121,12 @@ export default function HomeMainVisual() {
   const goPlayer = useCallback(
     (wizardId: string) => {
       if (!wizardId) return;
+      prefetchRtaPlayerPageData(queryClient, wizardId, seasonSelectValue, seasonIdForApi);
       router.push(`/rta/player/${encodeURIComponent(wizardId)}`);
       setInput('');
       setDebounced('');
     },
-    [router],
+    [router, queryClient, seasonSelectValue, seasonIdForApi],
   );
 
   const handleSelect = useCallback(

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Autocomplete,
   Avatar,
@@ -15,7 +16,12 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
-import { useRtaSummonerSearch } from '@/features/rta/hooks/useRtaData';
+import {
+  prefetchRtaPlayerPageData,
+  useRtaSeasonSelect,
+  useRtaSummonerSearch,
+} from '@/features/rta/hooks/useRtaData';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import { useRtaSummonerSessionSearchLists } from '@/features/rta/hooks/useRtaSummonerSessionSearchLists';
 import { filterSessionBookmarks } from '@/features/rta/lib/rtaSummonerSessionSearchStorage';
 import RtaSummonerSessionSearchPanel from '@/features/rta/components/RtaSummonerSessionSearchPanel';
@@ -52,6 +58,9 @@ interface RtaSummonerSearchDialogProps {
 
 function SearchDialogContent({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { data: seasonsData } = useRtaSeasonsContext();
+  const { seasonSelectValue, seasonIdForApi } = useRtaSeasonSelect(seasonsData);
   const inputRef = useRef<HTMLInputElement>(null);
   const [input, setInput] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -99,10 +108,11 @@ function SearchDialogContent({ onClose }: { onClose: () => void }) {
   const goPlayer = useCallback(
     (wizardId: string) => {
       if (!wizardId) return;
+      prefetchRtaPlayerPageData(queryClient, wizardId, seasonSelectValue, seasonIdForApi);
       router.push(`/rta/player/${encodeURIComponent(wizardId)}`);
       onClose();
     },
-    [router, onClose],
+    [router, onClose, queryClient, seasonSelectValue, seasonIdForApi],
   );
 
   const handleSelect = useCallback(

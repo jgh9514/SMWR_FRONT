@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Avatar,
   Box,
@@ -35,6 +36,10 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import {
   useRtaPlayerNameHistory,
   useRtaPlayerPageData,
+  prefetchRtaPlayerMonsterUsage,
+  prefetchRtaPlayerOpponentRecords,
+  prefetchRtaPlayerOwnedBox,
+  prefetchRtaPlayerSubTabs,
   useRtaSeasonSelect,
 } from '@/features/rta/hooks/useRtaData';
 import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
@@ -95,8 +100,10 @@ export default function RtaPlayerDetailShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const queryClient = useQueryClient();
 
-  const { data: seasonsData } = useRtaSeasonsContext();
+  const { data: seasonsData, isLoading: seasonsLoading } = useRtaSeasonsContext();
   const { seasonSelectValue, seasonIdForApi, setSeason } = useRtaSeasonSelect(seasonsData);
 
   // active 표시를 위해 seasons 목록에 isActive 필드를 추가한 옵션
@@ -116,8 +123,49 @@ export default function RtaPlayerDetailShell({
     refetch,
     isFetching,
     isLoading: pageDataLoading,
-  } = useRtaPlayerPageData(wizardId, seasonSelectValue, seasonIdForApi);
+  } = useRtaPlayerPageData(wizardId, seasonSelectValue, seasonIdForApi, {
+    seasonListSettled: !seasonsLoading,
+  });
   const summary = pageData?.summary;
+
+  /** 시즌 확정 후 box·picks·opponents 탭 API 백그라운드 프리페치 */
+  const subTabsPrefetchedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const w = String(wizardId).trim();
+    const sid = seasonIdForApi;
+    if (!w || seasonsLoading || sid == null || sid <= 0) return;
+    const key = `${w}:${sid}`;
+    if (subTabsPrefetchedKeyRef.current === key) return;
+    prefetchRtaPlayerSubTabs(queryClient, w, seasonSelectValue, sid);
+    subTabsPrefetchedKeyRef.current = key;
+  }, [wizardId, seasonsLoading, seasonIdForApi, seasonSelectValue, queryClient]);
+
+  const tabPrefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleTabMouseEnter = useCallback(
+    (href: string) => {
+      const w = String(wizardId).trim();
+      if (!w) return;
+      if (tabPrefetchTimerRef.current) clearTimeout(tabPrefetchTimerRef.current);
+      tabPrefetchTimerRef.current = setTimeout(() => {
+        router.prefetch(href);
+        if (href.endsWith('/box')) {
+          prefetchRtaPlayerOwnedBox(queryClient, w);
+        } else if (href.endsWith('/picks')) {
+          prefetchRtaPlayerMonsterUsage(queryClient, w, seasonSelectValue, seasonIdForApi);
+        } else if (href.endsWith('/opponents')) {
+          prefetchRtaPlayerOpponentRecords(queryClient, w, seasonSelectValue, seasonIdForApi);
+        }
+        tabPrefetchTimerRef.current = null;
+      }, 150);
+    },
+    [wizardId, router, queryClient, seasonSelectValue, seasonIdForApi],
+  );
+  useEffect(
+    () => () => {
+      if (tabPrefetchTimerRef.current) clearTimeout(tabPrefetchTimerRef.current);
+    },
+    [],
+  );
 
   const pageDataContextValue = useMemo(
     () => ({
@@ -552,6 +600,7 @@ export default function RtaPlayerDetailShell({
                 scroll={false}
                 value={index}
                 disableRipple
+                onMouseEnter={() => handleTabMouseEnter(item.href)}
                 label={
                   <Stack
                     component="span"

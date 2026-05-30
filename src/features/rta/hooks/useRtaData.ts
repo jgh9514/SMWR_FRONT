@@ -645,6 +645,49 @@ export const useRtaPlayerScoreDaily = (
 
 const RTA_PLAYER_MONSTER_USAGE_STALE_MS = 60_000;
 
+export function rtaPlayerMonsterUsagePath(wizardId: string): string {
+  const id = wizardId?.trim() ?? '';
+  return id ? `/rta/player/${encodeURIComponent(id)}/monster-usage` : '/rta/player/-/monster-usage';
+}
+
+export function rtaPlayerMonsterUsageQueryKey(
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+) {
+  return [rtaPlayerMonsterUsagePath(wizardId), keyPart(seasonBody(seasonCode ?? null, seasonId))] as const;
+}
+
+export async function fetchRtaPlayerMonsterUsage(
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+): Promise<RtaPlayerMonsterUsageResponse> {
+  const id = wizardId?.trim() ?? '';
+  return apiClient.post<RtaPlayerMonsterUsageResponse>(
+    rtaPlayerMonsterUsagePath(id),
+    seasonBody(seasonCode ?? null, seasonId),
+  );
+}
+
+/** 사용 몬스터 탭 — {@link useRtaPlayerMonsterUsage} 와 동일 queryKey */
+export function prefetchRtaPlayerMonsterUsage(
+  queryClient: import('@tanstack/react-query').QueryClient,
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+): void {
+  const id = wizardId?.trim() ?? '';
+  const sid =
+    seasonId != null && Number.isFinite(Number(seasonId)) ? Math.trunc(Number(seasonId)) : null;
+  if (!id || sid == null || sid <= 0) return;
+  void queryClient.prefetchQuery({
+    queryKey: rtaPlayerMonsterUsageQueryKey(id, seasonCode, sid),
+    queryFn: () => fetchRtaPlayerMonsterUsage(id, seasonCode, sid),
+    staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
+  });
+}
+
 /**
  * 소환사×시즌 몬스터 사용 스냅(픽/밴/승/선첫비밴/보유). 배치 rta_agg_summoner_monster_snap.
  */
@@ -660,19 +703,15 @@ export const useRtaPlayerMonsterUsage = (
 ) => {
   const { seasonId, placeholderData, ...restOptions } = options;
   const id = wizardId?.trim() ?? '';
-  const path = id ? `/rta/player/${encodeURIComponent(id)}/monster-usage` : '/rta/player/-/monster-usage';
-  return useApiPostQuery<RtaPlayerMonsterUsageResponse>(
-    path,
-    seasonBody(seasonCode ?? null, seasonId),
-    {
-      enabled: Boolean(id) && (options.enabled !== false),
-      staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
-      gcTime: 5 * 60_000,
-      refetchOnWindowFocus: false,
-      ...(placeholderData != null ? { placeholderData } : {}),
-      ...restOptions,
-    },
-  );
+  const body = seasonBody(seasonCode ?? null, seasonId);
+  return useApiPostQuery<RtaPlayerMonsterUsageResponse>(rtaPlayerMonsterUsagePath(id), body, {
+    enabled: Boolean(id) && (options.enabled !== false),
+    staleTime: RTA_PLAYER_MONSTER_USAGE_STALE_MS,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    ...(placeholderData != null ? { placeholderData } : {}),
+    ...restOptions,
+  });
 };
 
 const RTA_MONSTER_PICK_BREAKDOWN_STALE_MS = 120_000;
@@ -752,6 +791,90 @@ export const useRtaMonsterPickSlotMatches = (
   );
 };
 
+/** 라이벌 탭 첫 페이지 — {@link useRtaPlayerOpponentRecords} 기본 limit */
+export const RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE = 50;
+
+const RTA_PLAYER_OPPONENT_RECORDS_STALE_MS = 60_000;
+
+export function rtaPlayerOpponentRecordsPath(wizardId: string): string {
+  const id = wizardId?.trim() ?? '';
+  return id
+    ? `/rta/player/${encodeURIComponent(id)}/opponent-records`
+    : '/rta/player/-/opponent-records';
+}
+
+export function buildRtaPlayerOpponentRecordsBody(
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+  limit = RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE,
+  offset = 0,
+): Record<string, unknown> {
+  return {
+    limit,
+    offset,
+    ...seasonBody(seasonCode, seasonId ?? null),
+  };
+}
+
+export function rtaPlayerOpponentRecordsQueryKey(
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+  limit = RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE,
+  offset = 0,
+) {
+  return [
+    rtaPlayerOpponentRecordsPath(wizardId),
+    keyPart(buildRtaPlayerOpponentRecordsBody(seasonCode, seasonId, limit, offset)),
+  ] as const;
+}
+
+export async function fetchRtaPlayerOpponentRecords(
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+  limit = RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE,
+  offset = 0,
+): Promise<RtaPlayerOpponentResponse> {
+  const id = wizardId?.trim() ?? '';
+  return apiClient.post<RtaPlayerOpponentResponse>(
+    rtaPlayerOpponentRecordsPath(id),
+    buildRtaPlayerOpponentRecordsBody(seasonCode, seasonId, limit, offset),
+  );
+}
+
+/** 라이벌 탭 1페이지 — {@link useRtaPlayerOpponentRecords} 와 동일 queryKey */
+export function prefetchRtaPlayerOpponentRecords(
+  queryClient: import('@tanstack/react-query').QueryClient,
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+  limit = RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE,
+  offset = 0,
+): void {
+  const id = wizardId?.trim() ?? '';
+  const sid =
+    seasonId != null && Number.isFinite(Number(seasonId)) ? Math.trunc(Number(seasonId)) : null;
+  if (!id || sid == null || sid <= 0) return;
+  void queryClient.prefetchQuery({
+    queryKey: rtaPlayerOpponentRecordsQueryKey(id, seasonCode, sid, limit, offset),
+    queryFn: () => fetchRtaPlayerOpponentRecords(id, seasonCode, sid, limit, offset),
+    staleTime: RTA_PLAYER_OPPONENT_RECORDS_STALE_MS,
+  });
+}
+
+/** 보유·사용 몬스터·라이벌 탭 공통 백그라운드 프리페치 */
+export function prefetchRtaPlayerSubTabs(
+  queryClient: import('@tanstack/react-query').QueryClient,
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+): void {
+  prefetchRtaPlayerOwnedBox(queryClient, wizardId);
+  prefetchRtaPlayerMonsterUsage(queryClient, wizardId, seasonCode, seasonId);
+  prefetchRtaPlayerOpponentRecords(queryClient, wizardId, seasonCode, seasonId);
+}
+
 /** 소환사 상대 전적(H2H) — rta_agg_summoner_opponent_h2h_snap (배치, 시즌별) */
 export const useRtaPlayerOpponentRecords = (
   wizardId: string,
@@ -759,17 +882,12 @@ export const useRtaPlayerOpponentRecords = (
   options?: { seasonId?: number | null; limit?: number; offset?: number; enabled?: boolean },
 ) => {
   const id = wizardId?.trim() ?? '';
-  const path = id
-    ? `/rta/player/${encodeURIComponent(id)}/opponent-records`
-    : '/rta/player/-/opponent-records';
-  const body: Record<string, unknown> = {
-    limit: options?.limit ?? 50,
-    offset: options?.offset ?? 0,
-    ...seasonBody(seasonCode, options?.seasonId ?? null),
-  };
-  return useApiPostQuery<RtaPlayerOpponentResponse>(path, body, {
+  const limit = options?.limit ?? RTA_PLAYER_OPPONENT_RECORDS_PAGE_SIZE;
+  const offset = options?.offset ?? 0;
+  const body = buildRtaPlayerOpponentRecordsBody(seasonCode, options?.seasonId ?? null, limit, offset);
+  return useApiPostQuery<RtaPlayerOpponentResponse>(rtaPlayerOpponentRecordsPath(id), body, {
     enabled: Boolean(id) && (options?.enabled !== false),
-    staleTime: 60_000,
+    staleTime: RTA_PLAYER_OPPONENT_RECORDS_STALE_MS,
     gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
   });
@@ -799,11 +917,38 @@ export const useRtaVsMatches = (
   );
 };
 
+export function rtaPlayerOwnedBoxPath(wizardId: string): string {
+  const id = wizardId?.trim() ?? '';
+  return id ? `/rta/player/${encodeURIComponent(id)}/owned-box` : '/rta/player/-/owned-box';
+}
+
+export function rtaPlayerOwnedBoxQueryKey(wizardId: string) {
+  return [rtaPlayerOwnedBoxPath(wizardId), keyPart({})] as const;
+}
+
+export async function fetchRtaPlayerOwnedBox(wizardId: string): Promise<RtaPlayerOwnedBoxResponse> {
+  const id = wizardId?.trim() ?? '';
+  return apiClient.post<RtaPlayerOwnedBoxResponse>(rtaPlayerOwnedBoxPath(id), {});
+}
+
+/** 보유 몬스터 탭 — {@link useRtaPlayerOwnedBox} 와 동일 queryKey (시즌 무관) */
+export function prefetchRtaPlayerOwnedBox(
+  queryClient: import('@tanstack/react-query').QueryClient,
+  wizardId: string,
+): void {
+  const id = wizardId?.trim() ?? '';
+  if (!id) return;
+  void queryClient.prefetchQuery({
+    queryKey: rtaPlayerOwnedBoxQueryKey(id),
+    queryFn: () => fetchRtaPlayerOwnedBox(id),
+    staleTime: 60_000,
+  });
+}
+
 /** RTA 픽·밴 스냅 rta_agg_summoner_owned_box_snap (시즌 무관, 무거운 스냅 배치 갱신) */
 export const useRtaPlayerOwnedBox = (wizardId: string, options?: { enabled?: boolean }) => {
   const id = wizardId?.trim() ?? '';
-  const path = id ? `/rta/player/${encodeURIComponent(id)}/owned-box` : '/rta/player/-/owned-box';
-  return useApiPostQuery<RtaPlayerOwnedBoxResponse>(path, {}, {
+  return useApiPostQuery<RtaPlayerOwnedBoxResponse>(rtaPlayerOwnedBoxPath(id), {}, {
     enabled: Boolean(id) && (options?.enabled !== false),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
@@ -995,18 +1140,52 @@ export function rtaPlayerPageDataQueryKey(
  * 소환사 상세 페이지 초기 데이터 — summary·scoreDaily·monsterUsage·opponentH2H 를 서버에서 병렬 조회.
  * 5개 독립 HTTP 요청을 1개로 압축해 초기 로드 시간 단축.
  */
+export async function fetchRtaPlayerPageData(
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+): Promise<RtaPlayerPageData> {
+  const id = wizardId?.trim() ?? '';
+  return apiClient.post<RtaPlayerPageData>(rtaPlayerPageDataPath(id), seasonBody(seasonCode, seasonId));
+}
+
+/** 랭킹 hover·검색 직전 등 — {@link useRtaPlayerPageData} 와 동일 queryKey */
+export function prefetchRtaPlayerPageData(
+  queryClient: import('@tanstack/react-query').QueryClient,
+  wizardId: string,
+  seasonCode: string | null | undefined,
+  seasonId: number | null | undefined,
+): void {
+  const id = wizardId?.trim() ?? '';
+  if (!id) return;
+  void queryClient.prefetchQuery({
+    queryKey: rtaPlayerPageDataQueryKey(id, seasonCode, seasonId),
+    queryFn: () => fetchRtaPlayerPageData(id, seasonCode, seasonId),
+    staleTime: 2 * 60_000,
+  });
+  prefetchRtaPlayerSubTabs(queryClient, id, seasonCode, seasonId);
+}
+
 export const useRtaPlayerPageData = (
   wizardId: string,
   seasonCode: string | null | undefined,
   seasonId: number | null | undefined,
+  options?: { enabled?: boolean; /** false: 시즌 목록 로드 전 중복 page-data 방지 */ seasonListSettled?: boolean },
 ) => {
   const id = wizardId?.trim() ?? '';
   const path = rtaPlayerPageDataPath(id);
+  const body = seasonBody(seasonCode, seasonId);
+  const sid =
+    seasonId != null && Number.isFinite(Number(seasonId)) ? Math.trunc(Number(seasonId)) : null;
+  const code = seasonCode?.trim() ?? '';
+  const seasonReady =
+    (sid != null && sid > 0) || code.length > 0 || options?.seasonListSettled === true;
+  const baseEnabled = Boolean(id) && seasonReady;
   return useApiPostQuery<RtaPlayerPageData>(
     path,
-    seasonBody(seasonCode, seasonId),
+    body,
     {
-      enabled: Boolean(id),
+      enabled: options?.enabled !== false && baseEnabled,
       staleTime: 2 * 60_000,
       gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,
