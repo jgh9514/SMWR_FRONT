@@ -2,6 +2,7 @@
  * 배치 관리 Hook
  */
 
+import type { UseQueryOptions } from '@tanstack/react-query';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 
@@ -60,8 +61,15 @@ export interface BatchHistoryParams {
 /**
  * 배치 실행 이력 조회
  */
-export const useBatchHistory = (params: BatchHistoryParams = {}) => {
-  return useApiPostQuery<BatchHistoryItem[]>('/batch/run-his', params, { enabled: true });
+export const useBatchHistory = (
+  params: BatchHistoryParams = {},
+  options?: Omit<UseQueryOptions<BatchHistoryItem[], Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useApiPostQuery<BatchHistoryItem[]>('/batch/run-his', params, {
+    enabled: true,
+    staleTime: 30_000,
+    ...options,
+  });
 };
 
 /**

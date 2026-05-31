@@ -186,7 +186,11 @@ export default function BatchManagementPage() {
 
   const { data: batchHistory = [], refetch: refetchHistory, isLoading: isLoadingHistory } = useBatchHistory(historyQueryParams);
 
-  const { data: recentHistoryOverview = [] } = useBatchHistory({ limit: 100 });
+  /** 좌측 배치 목록 최근 1건 표시용 — bat_id 필터 화면에서는 중복 조회 생략 */
+  const { data: recentHistoryOverview = [] } = useBatchHistory(
+    { limit: 40 },
+    { enabled: !selectedBatId },
+  );
 
   const historyDetailMutation = useBatchHistoryDetailMutation();
 
