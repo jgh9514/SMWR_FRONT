@@ -28,22 +28,21 @@ export interface BatchRunResponse {
   message?: string;
 }
 
-/** POST /batch/slack/test — 배치용 smw.rta.batch Slack 토큰·채널로 샘플 전송 */
-export interface SlackTestResponse {
-  result: string;
-  configured: boolean;
-  message?: string;
-}
-
 export interface BatchHistoryItem {
   bat_exe_log_sn: string | number; // run_sn
   bat_id: string;
   exe_dtm: string; // start_dtm
   end_dtm?: string;
   rslt_cd: string; // SUCCESS, FAIL, RUNNING 등
-  rslt_txt?: string; // 결과 메시지
+  rslt_txt?: string; // 목록: 최대 512자 미리보기
+  rslt_txt_truncated?: boolean;
+  has_rslt_txt?: boolean;
   crt_user_id?: string;
   crt_date?: string;
+}
+
+export interface BatchHistoryDetailItem extends BatchHistoryItem {
+  rslt_txt?: string;
 }
 
 /**
@@ -66,6 +65,21 @@ export const useBatchHistory = (params: BatchHistoryParams = {}) => {
 };
 
 /**
+ * 배치 실행 이력 상세(로그 전문)
+ */
+export const useBatchHistoryDetailMutation = (
+  options?: Omit<
+    Parameters<typeof useApiPostMutation<BatchHistoryDetailItem, { runSn: string | number }>>[1],
+    'mutationFn'
+  >,
+) => {
+  return useApiPostMutation<BatchHistoryDetailItem, { runSn: string | number }>(
+    '/batch/run-his/detail',
+    options,
+  );
+};
+
+/**
  * 배치 재시작 Mutation
  */
 export const useBatchRestart = (
@@ -81,17 +95,5 @@ export const useBatchRun = (
   options?: Omit<Parameters<typeof useApiPostMutation<BatchRunResponse, BatchRunRequest>>[1], 'mutationFn'>
 ) => {
   return useApiPostMutation<BatchRunResponse, BatchRunRequest>('/batch/run', options);
-};
-
-/**
- * Slack 테스트 (관리자) — WAS `smw.rta.batch.slack-token` / `slack-channel-id` 사용 (배치 실패 알림과 동일)
- */
-export const useSlackTestSend = (
-  options?: Omit<
-    Parameters<typeof useApiPostMutation<SlackTestResponse, { message?: string } | undefined>>[1],
-    'mutationFn'
-  >,
-) => {
-  return useApiPostMutation<SlackTestResponse, { message?: string } | undefined>('/batch/slack/test', options);
 };
 

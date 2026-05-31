@@ -67,6 +67,7 @@ import { logger } from '@/shared/lib/logger';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
 import { SITE_NAME_DISPLAY } from '@/shared/lib/seo';
 import RtaSummonerSearchDialog from '@/features/rta/components/RtaSummonerSearchDialog';
+import { blurFocusedMenuItem, MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11y';
 
 interface NavLeaf {
   title: string;
@@ -400,6 +401,7 @@ export default function FixedHeader() {
   };
 
   const handleUserMenuClose = () => {
+    blurFocusedMenuItem();
     setUserMenuAnchor(null);
   };
 
@@ -410,6 +412,7 @@ export default function FixedHeader() {
   };
 
   const handleNotificationClose = () => {
+    blurFocusedMenuItem();
     setNotificationAnchor(null);
   };
 
@@ -465,6 +468,7 @@ export default function FixedHeader() {
       clearTimeout(navHoverCloseTimerRef.current);
       navHoverCloseTimerRef.current = null;
     }
+    blurFocusedMenuItem();
     setNavHover(null);
   }, []);
 
@@ -479,6 +483,7 @@ export default function FixedHeader() {
     cancelNavHoverClose();
     navHoverCloseTimerRef.current = setTimeout(() => {
       navHoverCloseTimerRef.current = null;
+      blurFocusedMenuItem();
       setNavHover(null);
     }, 100);
   }, [cancelNavHoverClose]);
@@ -783,11 +788,12 @@ export default function FixedHeader() {
                       anchorEl={menuOpen ? navHover?.anchor ?? null : null}
                       open={menuOpen}
                       onClose={closeNavHoverMenu}
-                      disableScrollLock
                       disableAutoFocus
                       anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
                       transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+                      {...MUI_MENU_A11Y_PROPS}
                       slotProps={{
+                        ...MUI_MENU_A11Y_PROPS.slotProps,
                         paper: {
                           onMouseEnter: cancelNavHoverClose,
                           onMouseLeave: scheduleNavHoverClose,
@@ -950,6 +956,7 @@ export default function FixedHeader() {
             anchorEl={notificationAnchor}
             open={isClient && Boolean(notificationAnchor)}
             onClose={handleNotificationClose}
+            {...MUI_MENU_A11Y_PROPS}
             anchorOrigin={{
               vertical: 'bottom',
               horizontal: 'right',
@@ -994,6 +1001,7 @@ export default function FixedHeader() {
             anchorEl={userMenuAnchor}
             open={isClient && Boolean(userMenuAnchor)}
             onClose={handleUserMenuClose}
+            {...MUI_MENU_A11Y_PROPS}
             anchorOrigin={{
               vertical: 'bottom',
               horizontal: 'right',
