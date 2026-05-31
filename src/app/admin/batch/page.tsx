@@ -57,6 +57,16 @@ import { blurFocusedMenuItem, MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11
 type BatchResultCode = 'SUCCESS' | 'FAIL' | 'RUNNING' | string;
 type StatusFilter = 'all' | 'success' | 'failed' | 'running';
 
+/** API ORDER BY sort_sn, bat_id 와 동일 — bat_id 문자열 정렬(1,10,10001,11) 방지 */
+function compareBatchConfigBySort(a: BatchConfigItem, b: BatchConfigItem): number {
+  const sortDiff = (a.sort_sn ?? 0) - (b.sort_sn ?? 0);
+  if (sortDiff !== 0) return sortDiff;
+  const idA = Number(a.bat_id);
+  const idB = Number(b.bat_id);
+  if (!Number.isNaN(idA) && !Number.isNaN(idB)) return idA - idB;
+  return String(a.bat_id).localeCompare(String(b.bat_id));
+}
+
 function getResultChipColor(code?: BatchResultCode): 'success' | 'error' | 'warning' | 'default' {
   if (code === 'SUCCESS') return 'success';
   if (code === 'FAIL') return 'error';
@@ -162,7 +172,7 @@ export default function BatchManagementPage() {
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
   const sortedBatchConfigList = useMemo(
-    () => [...batchConfigList].sort((a, b) => String(a.bat_id).localeCompare(String(b.bat_id))),
+    () => [...batchConfigList].sort(compareBatchConfigBySort),
     [batchConfigList],
   );
 

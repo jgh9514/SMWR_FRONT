@@ -51,7 +51,14 @@ export interface ApiHistoryResponse {
   totalCount: number;
   limit: number;
   offset: number;
+  httpStatusEnabled?: boolean;
+  elapsedMsEnabled?: boolean;
+  traceIdEnabled?: boolean;
+  observabilityOnly?: boolean;
 }
+
+/** POST /common/sm/api-his 요청 파라미터 */
+export type ApiHistoryQueryParams = Record<string, unknown>;
 
 // 권한 관련
 export interface RoleItem {
