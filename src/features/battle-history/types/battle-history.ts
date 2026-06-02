@@ -12,6 +12,8 @@ export interface UserItem {
 
 export interface BattleItem {
   match_id: string;
+  log_id?: string;
+  log_timestamp?: string;
   guild_name: string;
   opp_guild_name: string;
   win_lose: string;

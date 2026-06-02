@@ -28,29 +28,17 @@ function buildBattleHistoryDescription(
 
 export async function generateMetadata({
   params,
-  searchParams,
 }: BattleHistoryDetailPageProps): Promise<Metadata> {
   const { detail } = await params;
-  const { season_no } = await searchParams;
-  const seasonNo = season_no != null && season_no !== '' ? season_no : undefined;
-  const battles = await getBattleHistoryDetailData({
-    paging: DEFAULT_PAGE_SIZE,
-    offset: DEFAULT_PAGE_OFFSET,
-    wizard_id: detail,
-    season_no: seasonNo,
-  }).catch(() => []);
-  const firstBattle = battles[0];
-  const wizardName = firstBattle?.wizard_name?.trim() || detail;
-  const battleCount = battles.length;
-  const winCount = battles.filter((battle) => battle.win_lose === '1').length;
-  const description = buildBattleHistoryDescription(wizardName, battleCount, winCount);
+  const wizardName = detail;
+  const description = buildBattleHistoryDescription(wizardName, 0, 0);
 
   return buildPublicMetadata({
     title: `${wizardName} 전적 상세`,
     description,
     path: `/battle-history/detail/${detail}`,
     keywords: [wizardName, '전적 상세', '점령전 로그', '승패 기록'],
-    noIndex: battleCount === 0,
+    noIndex: false,
   });
 }
 

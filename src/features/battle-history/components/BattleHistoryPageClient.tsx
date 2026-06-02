@@ -41,7 +41,20 @@ function BattleHistoryInner({ initialSeasonList = [] }: Props) {
           : undefined
       }
     >
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 2,
+          alignItems: 'center',
+          mb: 2,
+          p: 2,
+          borderRadius: 2,
+          bgcolor: 'background.paper',
+          border: '1px solid',
+          borderColor: 'divider',
+        }}
+      >
         <BattleHistorySeasonFilter
           initialSeasonList={initialSeasonList}
           value={seasonNo}

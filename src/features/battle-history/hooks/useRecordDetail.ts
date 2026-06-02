@@ -3,6 +3,7 @@
  */
 
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
+import { QUERY_STALE_TIME_MS } from '@/shared/constants';
 import { BattleItem, RecordDetailParams } from '@/types';
 
 /**
@@ -11,6 +12,7 @@ import { BattleItem, RecordDetailParams } from '@/types';
 export const useRecordDetail = (params: RecordDetailParams | null) => {
   return useApiPostQuery<BattleItem[]>('/summonerswar/record-detail', params, {
     enabled: !!params,
+    staleTime: QUERY_STALE_TIME_MS,
   });
 };
 
