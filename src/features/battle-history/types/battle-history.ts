@@ -79,3 +79,6 @@ export interface RecordDetailParams extends RecordListParams {
   wizard_id: string;
 }
 
+/** record-detail 1회 요청 건수 (WAS normalizeRecordDetailQuery 상한 200) */
+export const BATTLE_RECORD_DETAIL_PAGE_SIZE = 50;
+

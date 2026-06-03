@@ -54,13 +54,14 @@ import { PageHeader } from '@/shared/ui';
 import { formatDate } from '@/shared/utils/format';
 import { blurFocusedMenuItem, MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11y';
 
-type BatchResultCode = 'SUCCESS' | 'FAIL' | 'RUNNING' | string;
+type BatchResultCode = 'SUCCESS' | 'FAIL' | 'RUNNING' | 'ABORTED' | string;
 type StatusFilter = 'all' | 'success' | 'failed' | 'running';
 
 
 function getResultChipColor(code?: BatchResultCode): 'success' | 'error' | 'warning' | 'default' {
   if (code === 'SUCCESS') return 'success';
   if (code === 'FAIL') return 'error';
+  if (code === 'ABORTED') return 'error';
   if (code === 'RUNNING') return 'warning';
   return 'default';
 }
@@ -121,6 +122,8 @@ export default function BatchManagementPage() {
   const streamEsRef = useRef<EventSource | null>(null);
   const streamRunStartedRef = useRef(false);
   const streamLogPreRef = useRef<HTMLPreElement | null>(null);
+  const streamBatIdRef = useRef<string | null>(null);
+  const streamManualStartedAtRef = useRef<number>(0);
   const runConfirmOpenRef = useRef(false);
   const incident = searchParams.get('incident');
   const historyFilter = searchParams.get('filter');
@@ -190,6 +193,55 @@ export default function BatchManagementPage() {
   );
 
   const historyDetailMutation = useBatchHistoryDetailMutation();
+
+  /** SSE 미수신 시 run-his 폴링으로 완료·로그 보완 (Pod 분리·장시간 Job 대비) */
+  useEffect(() => {
+    if (!streamLogOpen || streamLogStatus !== 'running') {
+      return;
+    }
+    const batId = streamBatIdRef.current;
+    if (!batId) {
+      return;
+    }
+    const poll = async () => {
+      try {
+        const { apiClient } = await import('@/shared/lib/api/client');
+        const list = await apiClient.post<BatchHistoryItem[]>('/batch/run-his', {
+          bat_id: batId,
+          limit: 5,
+        });
+        const startedAfter = streamManualStartedAtRef.current;
+        const candidate = list.find((row) => {
+          if (String(row.bat_id) !== batId) return false;
+          if (!row.exe_dtm) return false;
+          const t = new Date(row.exe_dtm).getTime();
+          return !Number.isNaN(t) && t >= startedAfter - 5000;
+        });
+        if (!candidate || candidate.rslt_cd === 'RUNNING') {
+          return;
+        }
+        const detail = await apiClient.post<BatchHistoryItem>('/batch/run-his/detail', {
+          runSn: candidate.bat_exe_log_sn,
+        });
+        const fullLog = detail?.rslt_txt?.trim();
+        if (fullLog) {
+          setStreamLogText(fullLog);
+        }
+        const code = candidate.rslt_cd;
+        if (code === 'SUCCESS') {
+          setStreamLogStatus('success');
+        } else if (code === 'ABORTED' || code === 'FAIL') {
+          setStreamLogStatus('fail');
+        }
+        closeStreamLog();
+        void refetchHistory();
+      } catch {
+        // 폴링 실패는 SSE 경로 유지
+      }
+    };
+    const id = window.setInterval(() => void poll(), 8000);
+    return () => window.clearInterval(id);
+  }, [streamLogOpen, streamLogStatus, closeStreamLog, refetchHistory]);
 
   const latestRunByBatId = useMemo(() => {
     const map = new Map<string, BatchHistoryItem>();
@@ -328,6 +380,8 @@ export default function BatchManagementPage() {
       runConfirmOpenRef.current = false;
       if (!res) return;
 
+      streamBatIdRef.current = String(config.bat_id);
+      streamManualStartedAtRef.current = Date.now();
       const streamId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       setStreamLogOpen(true);
       setStreamLogText('');
@@ -395,6 +449,8 @@ export default function BatchManagementPage() {
 
   const handleCloseStreamLogDialog = useCallback(() => {
     closeStreamLog();
+    streamBatIdRef.current = null;
+    streamManualStartedAtRef.current = 0;
     setStreamLogOpen(false);
     setStreamLogText('');
     setStreamLogStatus('idle');
