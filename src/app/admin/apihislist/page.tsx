@@ -50,7 +50,7 @@ const METHOD_OPTIONS = ['', 'GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as const;
 function rowVal(row: ApiHisItem, snake: keyof ApiHisItem, camel: string): string | number | undefined {
   const v = row[snake];
   if (v !== undefined && v !== null) return v as string | number;
-  const alt = (row as Record<string, unknown>)[camel];
+  const alt = (row as unknown as Record<string, unknown>)[camel];
   if (alt === undefined || alt === null) return undefined;
   return typeof alt === 'string' || typeof alt === 'number' ? alt : String(alt);
 }
@@ -153,7 +153,8 @@ export default function ApiHistoryPage() {
 
   const rowKey = useCallback((row: ApiHisItem, index: number) => {
     const trace = rowVal(row, 'trace_id', 'traceId');
-    const sn = (row as Record<string, unknown>).api_exe_log_sn ?? (row as Record<string, unknown>).apiExeLogSn;
+    const record = row as unknown as Record<string, unknown>;
+    const sn = record.api_exe_log_sn ?? record.apiExeLogSn;
     if (trace != null && String(trace) !== '') return String(trace);
     if (sn != null) return String(sn);
     return `row-${index}`;
