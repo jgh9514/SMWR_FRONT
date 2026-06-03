@@ -34,6 +34,7 @@ export type {
   RoleItem,
   ApiHisItem,
   ApiHistoryResponse,
+  ApiHistoryQueryParams,
   UserRoleItem,
   SaveRequest,
   MlangItem,
