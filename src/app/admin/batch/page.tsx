@@ -57,15 +57,6 @@ import { blurFocusedMenuItem, MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11
 type BatchResultCode = 'SUCCESS' | 'FAIL' | 'RUNNING' | string;
 type StatusFilter = 'all' | 'success' | 'failed' | 'running';
 
-/** API ORDER BY sort_sn, bat_id 와 동일 — bat_id 문자열 정렬(1,10,10001,11) 방지 */
-function compareBatchConfigBySort(a: BatchConfigItem, b: BatchConfigItem): number {
-  const sortDiff = (a.sort_sn ?? 0) - (b.sort_sn ?? 0);
-  if (sortDiff !== 0) return sortDiff;
-  const idA = Number(a.bat_id);
-  const idB = Number(b.bat_id);
-  if (!Number.isNaN(idA) && !Number.isNaN(idB)) return idA - idB;
-  return String(a.bat_id).localeCompare(String(b.bat_id));
-}
 
 function getResultChipColor(code?: BatchResultCode): 'success' | 'error' | 'warning' | 'default' {
   if (code === 'SUCCESS') return 'success';
@@ -171,10 +162,6 @@ export default function BatchManagementPage() {
 
   // 배치 설정 목록 조회
   const { data: batchConfigList = [], refetch: refetchConfig, isLoading: isLoadingConfig } = useBatchConfig({});
-  const sortedBatchConfigList = useMemo(
-    () => [...batchConfigList].sort(compareBatchConfigBySort),
-    [batchConfigList],
-  );
 
   const batchNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -530,7 +517,7 @@ export default function BatchManagementPage() {
           >
             <CardHeader
               title="배치 목록"
-              subheader={`${sortedBatchConfigList.length}개 · 행 클릭 시 우측 이력 필터`}
+              subheader={`${batchConfigList.length}개 · 행 클릭 시 우측 이력 필터`}
               titleTypographyProps={{ variant: 'subtitle1', fontWeight: 700 }}
               subheaderTypographyProps={{ variant: 'caption' }}
               sx={{ py: 1.5, px: 2, borderBottom: 1, borderColor: 'divider' }}
@@ -549,7 +536,7 @@ export default function BatchManagementPage() {
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                   <CircularProgress />
                 </Box>
-              ) : sortedBatchConfigList.length === 0 ? (
+              ) : batchConfigList.length === 0 ? (
                 <Alert severity="info" sx={{ m: 2 }}>배치 설정이 없습니다.</Alert>
               ) : (
                 <TableContainer
@@ -595,7 +582,7 @@ export default function BatchManagementPage() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {sortedBatchConfigList.map((config) => {
+                      {batchConfigList.map((config) => {
                         const latestRun = latestRunByBatId.get(String(config.bat_id));
                         const isSelected = selectedBatId === String(config.bat_id);
                         return (
@@ -746,7 +733,7 @@ export default function BatchManagementPage() {
                       <MenuItem value="">
                         <em>전체</em>
                       </MenuItem>
-                      {sortedBatchConfigList.map((config) => (
+                      {batchConfigList.map((config) => (
                         <MenuItem key={config.bat_id} value={String(config.bat_id)}>
                           {config.bat_nm}
                         </MenuItem>

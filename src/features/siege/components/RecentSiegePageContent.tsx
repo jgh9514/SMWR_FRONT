@@ -81,12 +81,12 @@ export default function RecentSiegePageContent() {
     const limit = pageSize + 1;
     const offset = (page - 1) * pageSize;
 
+    // offset만 전달 — page와 limit을 함께 보내면 SQL이 (page-1)*limit 으로 재계산해 페이지가 어긋남
     return {
       ...searchDataExtraction(schData),
       ...siegeGuildViewParams,
       limit,
       offset,
-      page,
     };
   }, [schData, siegeGuildViewParams]);
 

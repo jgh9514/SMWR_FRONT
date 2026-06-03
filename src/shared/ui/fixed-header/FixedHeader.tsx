@@ -48,6 +48,7 @@ import Diversity3Icon from '@mui/icons-material/Diversity3';
 import GroupsIcon from '@mui/icons-material/Groups';
 import HandymanIcon from '@mui/icons-material/Handyman';
 import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import SpeedIcon from '@mui/icons-material/Speed';
 import { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { useLogout } from '@/features/auth/hooks/useAuth';
 import { useUserGuild } from '@/hooks/api';
@@ -198,6 +199,7 @@ function getNavGroups(
     label: '도구',
     items: [
       { title: '티어 리스트 메이커', path: '/tier-list', icon: <FormatListNumberedIcon /> },
+      { title: '공속 순서 계산기', path: '/speed-calculator', icon: <SpeedIcon /> },
     ],
   };
 

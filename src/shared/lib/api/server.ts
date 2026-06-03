@@ -2,8 +2,6 @@ import 'server-only';
 
 import { cache } from 'react';
 import type {
-  BattleItem,
-  RecordDetailParams,
   RecordListParams,
   SeasonItem,
   UserItem,
@@ -270,22 +268,6 @@ export async function getBattleHistoryListData(
   };
   return serverApiPost<UserItem[]>(
     '/summonerswar/record-list',
-    body,
-    PUBLIC_REVALIDATE_SECONDS.battleHistory,
-  );
-}
-
-export async function getBattleHistoryDetailData(
-  params: RecordDetailParams,
-): Promise<BattleItem[]> {
-  const body = {
-    wizard_id: params.wizard_id,
-    paging: params.paging,
-    offset: params.offset,
-    ...(params.season_no != null && params.season_no !== '' && { season_no: params.season_no }),
-  };
-  return serverApiPost<BattleItem[]>(
-    '/summonerswar/record-detail',
     body,
     PUBLIC_REVALIDATE_SECONDS.battleHistory,
   );

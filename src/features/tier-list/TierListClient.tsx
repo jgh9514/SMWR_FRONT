@@ -163,7 +163,7 @@ function jsonToTiers(json: string): TierRow[] | null {
 // ─── MonsterIcon ──────────────────────────────────────────────────────────────
 
 function MonsterIcon({
-  monster, size = 44, draggable = false, onDragStart, onTouchDragStart, onRemove, dimmed = false,
+  monster, size = 44, draggable = false, onDragStart, onTouchDragStart, onRemove, onAssignClick, dimmed = false,
 }: {
   monster: MonsterOption;
   size?: number;
@@ -171,18 +171,25 @@ function MonsterIcon({
   onDragStart?: (e: React.DragEvent) => void;
   onTouchDragStart?: (e: React.TouchEvent) => void;
   onRemove?: () => void;
+  onAssignClick?: () => void;
   dimmed?: boolean;
 }) {
   const imgUrl = getMonsterImageUrl(monster.image_url);
   return (
     <div
+      data-monster-icon
       draggable={draggable}
       onDragStart={onDragStart}
       onTouchStart={onTouchDragStart}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        e.stopPropagation();
+        onAssignClick?.();
+      }}
       title={monster.kr_name || monster.un_name}
       style={{
         position: 'relative', width: size, height: size, flexShrink: 0,
-        cursor: draggable ? 'grab' : 'default',
+        cursor: onAssignClick ? 'pointer' : draggable ? 'grab' : 'default',
         touchAction: draggable ? 'none' : undefined,
         opacity: dimmed ? 0.35 : 1,
         transition: 'opacity 0.12s',
@@ -533,6 +540,10 @@ interface TierRowItemProps {
   onDragOver: (e: React.DragEvent) => void;
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent) => void;
+  hideHoverOverlay?: boolean;
+  isSelected?: boolean;
+  onSelect?: () => void;
+  onMonsterAssignClick?: (monsterId: string) => void;
 }
 
 function TierRowItem({
@@ -542,22 +553,35 @@ function TierRowItem({
   onStartEdit, onApplyEdit, onCancelEdit,
   onDelete, onMoveUp, onMoveDown,
   onRemoveMonster, onDragStart, onTouchDragStart, touchDraggingId, onDragOver, onDragLeave, onDrop,
+  hideHoverOverlay = false,
+  isSelected = false,
+  onSelect,
+  onMonsterAssignClick,
 }: TierRowItemProps) {
   const [hovered, setHovered] = useState(false);
+
+  const handleSelectClick = (e: React.MouseEvent) => {
+    if (isEditing) return;
+    if ((e.target as HTMLElement).closest('button')) return;
+    if ((e.target as HTMLElement).closest('[data-monster-icon]')) return;
+    onSelect?.();
+  };
 
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'stretch',
-        border: `1px solid ${isDragOver ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
+        border: `2px solid ${isSelected ? tier.color : isDragOver ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
         borderRadius: 8,
-        background: isDragOver ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
-        transition: 'border-color 0.15s, background 0.15s',
+        background: isDragOver ? 'rgba(255,255,255,0.04)' : isSelected ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.02)',
+        boxShadow: isSelected ? `0 0 0 1px ${tier.color}55` : undefined,
+        transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
         overflow: 'hidden',
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onClick={handleSelectClick}
     >
       {/* Label column */}
       <div style={{
@@ -565,6 +589,7 @@ function TierRowItem({
         display: 'grid', placeItems: 'center',
         borderRight: '1px solid rgba(255,255,255,0.06)',
         backgroundColor: tier.color, padding: '0 6px',
+        cursor: isEditing ? 'default' : 'pointer',
       }}>
         {isEditing ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', width: '100%', padding: 4 }}>
@@ -603,11 +628,14 @@ function TierRowItem({
               textAlign: 'center', wordBreak: 'break-all', margin: 0, padding: '0 6px',
               pointerEvents: 'none',
             }}>{tier.label}</span>
-            {hovered && (
-              <div style={{
-                position: 'absolute', inset: 0,
-                background: 'rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', borderRadius: 7,
-              }}>
+            {hovered && !hideHoverOverlay && (
+              <div
+                data-tier-hover-overlay
+                style={{
+                  position: 'absolute', inset: 0,
+                  background: 'rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', borderRadius: 7,
+                }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 2 }}>
                   <CtrlBtn onClick={onMoveUp} disabled={isFirst} title="위로">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2"><path d="m18 15-6-6-6 6" /></svg>
@@ -663,6 +691,7 @@ function TierRowItem({
                 onDragStart={(e) => onDragStart(e, mid, 'tier', tier.id)}
                 onTouchDragStart={(e) => onTouchDragStart(e, mid, 'tier', tier.id)}
                 onRemove={() => onRemoveMonster(mid)}
+                onAssignClick={onMonsterAssignClick ? () => onMonsterAssignClick(mid) : undefined}
               />
             );
           })
@@ -689,12 +718,14 @@ export default function TierListClient() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
 
   const dragInfo = useRef<DragInfo | null>(null);
   const touchPendingRef = useRef<TouchPending | null>(null);
   const touchGhostRef = useRef<TouchGhost | null>(null);
   const tierListRef = useRef<HTMLDivElement>(null);
+  const selectedTierIdRef = useRef<string | null>(null);
   const qc = useQueryClient();
 
   const { data: monsters = [], isLoading } = useMonsterList({});
@@ -758,6 +789,43 @@ export default function TierListClient() {
     monsters.forEach((m) => { map[m.monster_id] = m; });
     return map;
   }, [monsters]);
+
+  const selectedTier = useMemo(
+    () => (selectedTierId ? tiers.find((t) => t.id === selectedTierId) ?? null : null),
+    [tiers, selectedTierId],
+  );
+
+  useEffect(() => {
+    selectedTierIdRef.current = selectedTierId;
+  }, [selectedTierId]);
+
+  const assignMonsterToSelectedTier = useCallback((
+    monsterId: string,
+    from: 'pool' | 'tier',
+    fromTierId?: string,
+  ) => {
+    const tierId = selectedTierIdRef.current;
+    if (!tierId) return false;
+    if (from === 'tier' && fromTierId === tierId) return false;
+    setTiers((prev) => applyMonsterMove(prev, { monsterId, from, fromTierId }, { type: 'tier', tierId }));
+    return true;
+  }, []);
+
+  const handleMonsterAssignClick = useCallback((
+    monsterId: string,
+    from: 'pool' | 'tier',
+    fromTierId?: string,
+  ) => {
+    if (!selectedTierIdRef.current) {
+      toast('티어를 먼저 선택하세요', { icon: '👆' });
+      return;
+    }
+    assignMonsterToSelectedTier(monsterId, from, fromTierId);
+  }, [assignMonsterToSelectedTier]);
+
+  const toggleTierSelection = useCallback((tierId: string) => {
+    setSelectedTierId((prev) => (prev === tierId ? null : tierId));
+  }, []);
 
   // ── Drag & Drop ───────────────────────────────────────────────────────────
 
@@ -888,6 +956,11 @@ export default function TierListClient() {
       if (!pending && !ghost) return;
 
       if (pending && !ghost) {
+        if (!selectedTierIdRef.current) {
+          toast('티어를 먼저 선택하세요', { icon: '👆' });
+        } else {
+          assignMonsterToSelectedTier(pending.monsterId, pending.from, pending.fromTierId);
+        }
         touchPendingRef.current = null;
         return;
       }
@@ -913,7 +986,7 @@ export default function TierListClient() {
       document.removeEventListener('touchend', onTouchEnd);
       document.removeEventListener('touchcancel', onTouchEnd);
     };
-  }, [clearTouchDragUi, updateTouchDropHighlight]);
+  }, [assignMonsterToSelectedTier, clearTouchDragUi, updateTouchDropHighlight]);
 
   // ── Tier management ───────────────────────────────────────────────────────
 
@@ -927,6 +1000,7 @@ export default function TierListClient() {
 
   const deleteTier = useCallback((tierId: string) => {
     setTiers((prev) => prev.filter((t) => t.id !== tierId));
+    setSelectedTierId((prev) => (prev === tierId ? null : prev));
   }, []);
 
   const moveTier = useCallback((tierId: string, dir: -1 | 1) => {
@@ -983,16 +1057,16 @@ export default function TierListClient() {
     if (!tierListRef.current) return;
     setIsExporting(true);
     const toastId = toast.loading('이미지 생성 중...');
-    const hiddenButtons: HTMLElement[] = [];
+    const hiddenForExport: HTMLElement[] = [];
     let restoreImages: (() => void) | null = null;
     try {
       const { toPng } = await import('html-to-image');
       const root = tierListRef.current;
 
-      // 버튼 숨김 (캡처 전 실제 DOM에서)
-      root.querySelectorAll('button').forEach((btn) => {
-        (btn as HTMLElement).style.visibility = 'hidden';
-        hiddenButtons.push(btn as HTMLElement);
+      // 버튼·티어 호버 오버레이 숨김 (캡처 전 실제 DOM에서 — React state 반영 전에도 적용)
+      root.querySelectorAll('button, [data-tier-hover-overlay]').forEach((el) => {
+        (el as HTMLElement).style.visibility = 'hidden';
+        hiddenForExport.push(el as HTMLElement);
       });
 
       // 이미지 pre-inline: html2canvas의 onclone은 async를 await하지 않아
@@ -1016,7 +1090,7 @@ export default function TierListClient() {
       toast.dismiss(toastId);
       toast.error('이미지 생성에 실패했습니다.');
     } finally {
-      hiddenButtons.forEach((btn) => { btn.style.visibility = ''; });
+      hiddenForExport.forEach((el) => { el.style.visibility = ''; });
       restoreImages?.();
       setIsExporting(false);
     }
@@ -1122,6 +1196,12 @@ export default function TierListClient() {
       </div>
 
       {/* Tier rows */}
+      {selectedTier && (
+        <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+          <span style={{ color: selectedTier.color, fontWeight: 700 }}>{selectedTier.label}</span>
+          {' '}티어 선택됨 — 몬스터를 클릭하면 배치됩니다
+        </p>
+      )}
       <div ref={tierListRef} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {tiers.map((tier, idx) => (
           <TierRowItem
@@ -1142,13 +1222,24 @@ export default function TierListClient() {
             onDragOver={(e) => handleDragOver(e, tier.id)}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, tier.id)}
+            hideHoverOverlay={isExporting}
+            isSelected={selectedTierId === tier.id}
+            onSelect={() => toggleTierSelection(tier.id)}
+            onMonsterAssignClick={(mid) => handleMonsterAssignClick(mid, 'tier', tier.id)}
           />
         ))}
       </div>
 
       {/* Monster Pool */}
       <div>
-        <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>몬스터 풀</h3>
+        <h3 style={{ margin: '0 0 8px', fontSize: 13, color: '#64748b', fontWeight: 500 }}>
+          몬스터 풀
+          {!selectedTier && (
+            <span style={{ marginLeft: 8, fontSize: 11, color: '#475569', fontWeight: 400 }}>
+              티어를 클릭해 선택한 뒤 몬스터를 클릭하세요
+            </span>
+          )}
+        </h3>
         <div
           style={{
             borderRadius: 12,
@@ -1259,6 +1350,7 @@ export default function TierListClient() {
                   dimmed={touchGhost?.monster.monster_id === m.monster_id}
                   onDragStart={(e) => handleDragStart(e, m.monster_id, 'pool')}
                   onTouchDragStart={(e) => handleMonsterTouchStart(e, m.monster_id, 'pool')}
+                  onAssignClick={() => handleMonsterAssignClick(m.monster_id, 'pool')}
                 />
               ))
             )}

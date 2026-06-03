@@ -22,5 +22,6 @@ export const PRIVATE_DISALLOW_PATHS = [
   '/log-upload',
   '/inquiry',
   '/recent-siege',
+  '/battle-history/detail/',
   '/siege/siege-detail/',
 ] as const;

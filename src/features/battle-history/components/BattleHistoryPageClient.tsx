@@ -1,26 +1,51 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Box } from '@mui/material';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { useRecordList } from '@/features/battle-history/hooks/useRecordList';
+import { useSeasonList } from '@/features/battle-history/hooks/useSeasonList';
 import BattleHistoryListClient from '@/features/battle-history/components/BattleHistoryListClient';
 import BattleHistorySeasonFilter from '@/features/battle-history/components/BattleHistorySeasonFilter';
 import BattleHistoryPersonSearch from '@/features/battle-history/components/BattleHistoryPersonSearch';
 import type { SeasonItem, UserItem } from '@/features/battle-history/types/battle-history';
+import { getLatestSeasonNo } from '@/features/battle-history/types/battle-history';
 import GuildRequiredGate from '@/features/guild/components/GuildRequiredGate';
 
 type Props = { initialSeasonList?: SeasonItem[] };
 
 function BattleHistoryInner({ initialSeasonList = [] }: Props) {
-  const [seasonNo, setSeasonNo] = useState('');
+  const searchParams = useSearchParams();
+  const urlSeasonNo = searchParams.get('season_no') ?? '';
+  const { data: rawSeasonList } = useSeasonList();
+  const seasonList = useMemo(() => {
+    const fromClient = Array.isArray(rawSeasonList) ? rawSeasonList : [];
+    return fromClient.length > 0 ? fromClient : initialSeasonList;
+  }, [rawSeasonList, initialSeasonList]);
+
+  const latestSeasonNo = getLatestSeasonNo(seasonList);
+  const [seasonNo, setSeasonNo] = useState(() => urlSeasonNo || getLatestSeasonNo(initialSeasonList));
   const [searchKeyword, setSearchKeyword] = useState('');
+
+  useEffect(() => {
+    if (urlSeasonNo) {
+      setSeasonNo(urlSeasonNo);
+      return;
+    }
+    if (latestSeasonNo) {
+      setSeasonNo((prev) => (prev === '' ? latestSeasonNo : prev));
+    }
+  }, [urlSeasonNo, latestSeasonNo]);
+
   const params = {
     paging: DEFAULT_PAGE_SIZE,
     offset: 0,
     ...(seasonNo !== '' && { season_no: seasonNo }),
   };
-  const { data: userList = [] } = useRecordList(params);
+  const seasonListFetched = rawSeasonList !== undefined;
+  const queryEnabled = seasonNo !== '' || (seasonListFetched && seasonList.length === 0);
+  const { data: userList = [] } = useRecordList(params, queryEnabled);
 
   const filteredUserList = useMemo(() => {
     const raw = Array.isArray(userList) ? userList : [];

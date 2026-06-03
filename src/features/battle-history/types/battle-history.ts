@@ -57,6 +57,17 @@ export function getSeasonNo(item: Record<string, unknown>): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** 시즌 목록에서 가장 높은(최신) season_no 문자열 — 없으면 '' */
+export function getLatestSeasonNo(seasonList: SeasonItem[] | null | undefined): string {
+  if (!seasonList?.length) return '';
+  let max = 0;
+  for (const item of seasonList) {
+    const no = getSeasonNo(item as Record<string, unknown>);
+    if (no > max) max = no;
+  }
+  return max > 0 ? String(max) : '';
+}
+
 /** season_no: 없으면 전체, 있으면 해당 시즌만 */
 export interface RecordListParams {
   paging?: number;
