@@ -36,7 +36,7 @@ import { useResponsive, useServerPagination } from '@/shared/hooks';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterItem, SiegeSearchParams } from '@/types';
 import type { GuildInfo } from '@/features/siege/types/siege';
-import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
+import { useSiegeApiContextParams } from '@/shared/hooks/useSiegeApiContextParams';
 import { SiegeManualDefenseDeckDialog } from '@/features/siege/components/SiegeManualDefenseDeckDialog';
 import { SiegeOpponentGuildPicker } from '@/features/siege/components/SiegeOpponentGuildPicker';
 import GuildRequiredGate from '@/features/guild/components/GuildRequiredGate';
@@ -294,7 +294,7 @@ function SiegeContent() {
   const { isMobile } = useResponsive();
   const searchParams = useSearchParams();
   const matchIdFromQuery = searchParams?.get('match_id');
-  const siegeGuildViewParams = useSiegeGuildViewParams();
+  const siegeApiContextParams = useSiegeApiContextParams();
   // 검색조건(편집용: draft)
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false); // 모바일 검색 조건 펼침/접기
@@ -389,7 +389,7 @@ function SiegeContent() {
     }
 
     // 관리자: 전체/특정 길드 전적 조회
-    Object.assign(params, siegeGuildViewParams);
+    Object.assign(params, siegeApiContextParams);
 
     return searchDataExtraction(params);
   }, [
@@ -398,7 +398,7 @@ function SiegeContent() {
     selectedGuildIdsApplied,
     appliedDeckStarFilter,
     appliedOnlyLoseAtLeastOnce,
-    siegeGuildViewParams,
+    siegeApiContextParams,
   ]);
 
   const [shouldSearch, setShouldSearch] = useState(true); // 초기 1회 자동 조회

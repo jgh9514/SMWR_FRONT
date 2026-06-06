@@ -22,7 +22,7 @@ import { isAuthenticated } from '@/shared/utils/auth';
 import { logger } from '@/shared/lib/logger';
 import type { SiegeItem } from '@/features/siege/types/recent-siege';
 import { useGuildSiegeHistory } from '@/features/siege/hooks/useRecentSiege';
-import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
+import { useSiegeApiContextParams } from '@/shared/hooks/useSiegeApiContextParams';
 import type { UserInfo } from '@/features/auth/types/auth';
 
 export default function RecentSiegePageContent() {
@@ -58,7 +58,7 @@ export default function RecentSiegePageContent() {
   const isMobile = isClient ? responsive.isMobile : false;
   const [schData, setSchData] = useState({ paging: 5, offset: DEFAULT_PAGE_OFFSET });
   const prevAuthRef = useRef<boolean | null>(null);
-  const siegeGuildViewParams = useSiegeGuildViewParams();
+  const siegeApiContextParams = useSiegeApiContextParams();
   const [authFlag, userInfoJson] = authSnapshot.split('::', 2);
   const isAuthed = authFlag === '1';
   const userInfo = useMemo<UserInfo | null>(() => {
@@ -84,11 +84,11 @@ export default function RecentSiegePageContent() {
     // offset만 전달 — page와 limit을 함께 보내면 SQL이 (page-1)*limit 으로 재계산해 페이지가 어긋남
     return {
       ...searchDataExtraction(schData),
-      ...siegeGuildViewParams,
+      ...siegeApiContextParams,
       limit,
       offset,
     };
-  }, [schData, siegeGuildViewParams]);
+  }, [schData, siegeApiContextParams]);
 
   // 점령전 이력 조회 (원본 Vue 코드와 동일한 API 사용)
   const {

@@ -37,7 +37,6 @@ import type { ChipProps } from '@mui/material/Chip';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import EditIcon from '@mui/icons-material/Edit';
-import DriveFileRenameOutlineIcon from '@mui/icons-material/DriveFileRenameOutline';
 import GroupIcon from '@mui/icons-material/Group';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
@@ -91,6 +90,30 @@ function canEditMemberName(
   return true;
 }
 
+function canEditMemberRole(
+  isLeader: boolean,
+  isManager: boolean,
+  targetRole?: string,
+): boolean {
+  const role = targetRole || 'MEMBER';
+  if (isLeader && role !== 'LEADER') {
+    return true;
+  }
+  return isManager && role === 'MEMBER';
+}
+
+function canEditMember(
+  actorRole?: UserInfo['guild_role'],
+  targetRole?: string,
+  targetUserId?: string,
+  actorUserId?: string,
+  isLeader = false,
+  isManager = false,
+): boolean {
+  return canEditMemberName(actorRole, targetRole, targetUserId, actorUserId)
+    || canEditMemberRole(isLeader, isManager, targetRole);
+}
+
 function isRenderablePendingJoinApplication(
   app: GuildJoinApplication,
 ): app is GuildJoinApplication & { application_id: string | number } {
@@ -127,18 +150,15 @@ export default function GuildManagementPage() {
   }, [userInfoSnapshot]);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState<string>('');
-  const [roleChangeDialogOpen, setRoleChangeDialogOpen] = useState(false);
-  const [selectedMemberForRoleChange, setSelectedMemberForRoleChange] = useState<{
-    user_id: string;
-    current_role: UserInfo['guild_role'];
-  } | null>(null);
-  const [newRole, setNewRole] = useState<string>('');
+  const [memberEditDialogOpen, setMemberEditDialogOpen] = useState(false);
+  const [selectedMemberForEdit, setSelectedMemberForEdit] = useState<GuildMemberLike | null>(null);
+  const [editMemberName, setEditMemberName] = useState('');
+  const [originalMemberName, setOriginalMemberName] = useState('');
+  const [editMemberRole, setEditMemberRole] = useState<string>('MEMBER');
+  const [originalMemberRole, setOriginalMemberRole] = useState<string>('MEMBER');
   const [kickDialogOpen, setKickDialogOpen] = useState(false);
   const [selectedMemberForKick, setSelectedMemberForKick] = useState<GuildMemberLike | null>(null);
   const [kickReason, setKickReason] = useState<string>('');
-  const [nameChangeDialogOpen, setNameChangeDialogOpen] = useState(false);
-  const [selectedMemberForNameChange, setSelectedMemberForNameChange] = useState<GuildMemberLike | null>(null);
-  const [newMemberName, setNewMemberName] = useState('');
   const [guildInfo, setGuildInfo] = useState<GuildSettings>({});
 
   const isLeader = userInfo?.guild_role === 'LEADER';
@@ -270,17 +290,6 @@ export default function GuildManagementPage() {
 
   // 길드 멤버 추방 Mutation
   const updateMemberNameMutation = useUpdateGuildMemberName({
-    onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('이름이 변경되었습니다.');
-        setNameChangeDialogOpen(false);
-        setSelectedMemberForNameChange(null);
-        setNewMemberName('');
-        guildMembersQuery.refetch();
-      } else {
-        throw new Error(res.message || '이름 변경에 실패했습니다.');
-      }
-    },
     onError: (error: Error) => {
       logger.error('멤버 이름 변경 실패', error);
       showToast.error(error.message || '이름 변경에 실패했습니다.');
@@ -307,31 +316,6 @@ export default function GuildManagementPage() {
 
   // 멤버 권한 변경 Mutation
   const updateMemberRoleMutation = useUpdateGuildMemberRole({
-    onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('권한이 변경되었습니다.');
-        setRoleChangeDialogOpen(false);
-        setSelectedMemberForRoleChange(null);
-        guildMembersQuery.refetch();
-        // 사용자 정보 갱신
-        if (typeof window !== 'undefined') {
-          const storedUserInfo = localStorage.getItem('userInfo');
-          if (storedUserInfo) {
-            try {
-              const parsed = JSON.parse(storedUserInfo) as UserInfo;
-              if (parsed.user_id === selectedMemberForRoleChange?.user_id) {
-                parsed.guild_role = toGuildRole(newRole);
-                localStorage.setItem('userInfo', JSON.stringify(parsed));
-              }
-            } catch (error) {
-              logger.error('사용자 정보 업데이트 실패', error);
-            }
-          }
-        }
-      } else {
-        throw new Error(res.message || '권한 변경에 실패했습니다.');
-      }
-    },
     onError: (error: Error) => {
       logger.error('권한 변경 실패', error);
       showToast.error(error.message || '권한 변경에 실패했습니다.');
@@ -385,45 +369,119 @@ export default function GuildManagementPage() {
     });
   };
 
-  const handleRoleChange = (member: GuildMemberLike) => {
+  const handleEditMember = (member: GuildMemberLike) => {
     const userId = member.user_id || member.usr_id;
-    const currentRole = toGuildRole(member.guild_role || member.role) ?? 'MEMBER';
     if (!userId) {
       showToast.error('대상 유저 정보가 없습니다.');
       return;
     }
-    setSelectedMemberForRoleChange({ user_id: userId, current_role: currentRole });
-    setNewRole(currentRole);
-    setRoleChangeDialogOpen(true);
+    const guildRole = member.guild_role || member.role;
+    const userName = member.user_name || member.user_nm || '';
+    const currentRole = toGuildRole(guildRole) ?? 'MEMBER';
+    setSelectedMemberForEdit(member);
+    setEditMemberName(userName);
+    setOriginalMemberName(userName);
+    setEditMemberRole(currentRole);
+    setOriginalMemberRole(currentRole);
+    setMemberEditDialogOpen(true);
+  };
+
+  const closeMemberEditDialog = () => {
+    setMemberEditDialogOpen(false);
+    setSelectedMemberForEdit(null);
+    setEditMemberName('');
+    setOriginalMemberName('');
+    setEditMemberRole('MEMBER');
+    setOriginalMemberRole('MEMBER');
+  };
+
+  const syncUserGuildRoleInStorage = (targetUserId: string, role: UserInfo['guild_role']) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const storedUserInfo = localStorage.getItem('userInfo');
+    if (!storedUserInfo) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(storedUserInfo) as UserInfo;
+      if (parsed.user_id === targetUserId) {
+        parsed.guild_role = role;
+        localStorage.setItem('userInfo', JSON.stringify(parsed));
+      }
+    } catch (error) {
+      logger.error('사용자 정보 업데이트 실패', error);
+    }
+  };
+
+  const confirmMemberEdit = async () => {
+    if (!selectedMemberForEdit?.user_id) {
+      showToast.error('대상 유저 정보가 없습니다.');
+      return;
+    }
+
+    const targetRole = selectedMemberForEdit.guild_role || selectedMemberForEdit.role;
+    const canChangeName = canEditMemberName(
+      userInfo?.guild_role,
+      targetRole,
+      selectedMemberForEdit.user_id,
+      userInfo?.user_id,
+    );
+    const canChangeRole = canEditMemberRole(isLeader, isManager, targetRole);
+    const trimmedName = editMemberName.trim();
+    const nameChanged = canChangeName && trimmedName !== originalMemberName.trim();
+    const roleChanged = canChangeRole && editMemberRole !== originalMemberRole;
+
+    if (canChangeName && !trimmedName) {
+      showToast.error('이름을 입력해주세요.');
+      return;
+    }
+
+    if (!nameChanged && !roleChanged) {
+      showToast.info('변경된 내용이 없습니다.');
+      closeMemberEditDialog();
+      return;
+    }
+
+    try {
+      if (nameChanged) {
+        const nameRes = await updateMemberNameMutation.mutateAsync({
+          user_id: selectedMemberForEdit.user_id,
+          user_nm: trimmedName,
+        });
+        if (!nameRes || nameRes.result !== 'SUCCESS') {
+          throw new Error(nameRes.message || '이름 변경에 실패했습니다.');
+        }
+      }
+
+      if (roleChanged) {
+        const nextRole = toGuildRole(editMemberRole);
+        if (!nextRole) {
+          throw new Error('변경할 권한 정보가 올바르지 않습니다.');
+        }
+        const roleRes = await updateMemberRoleMutation.mutateAsync({
+          user_id: selectedMemberForEdit.user_id,
+          guild_role: nextRole,
+        });
+        if (!roleRes || roleRes.result !== 'SUCCESS') {
+          throw new Error(roleRes.message || '권한 변경에 실패했습니다.');
+        }
+        syncUserGuildRoleInStorage(selectedMemberForEdit.user_id, nextRole);
+      }
+
+      showToast.success('저장되었습니다.');
+      closeMemberEditDialog();
+      guildMembersQuery.refetch();
+    } catch (error) {
+      logger.error('멤버 수정 실패', error);
+      showToast.error(error instanceof Error ? error.message : '저장에 실패했습니다.');
+    }
   };
 
   const handleKickMember = (member: GuildMemberLike) => {
     setSelectedMemberForKick(member);
     setKickReason('');
     setKickDialogOpen(true);
-  };
-
-  const handleNameChange = (member: GuildMemberLike) => {
-    const userName = member.user_name || member.user_nm || '';
-    setSelectedMemberForNameChange(member);
-    setNewMemberName(userName);
-    setNameChangeDialogOpen(true);
-  };
-
-  const confirmNameChange = () => {
-    if (!selectedMemberForNameChange?.user_id) {
-      showToast.error('대상 유저 정보가 없습니다.');
-      return;
-    }
-    const trimmed = newMemberName.trim();
-    if (!trimmed) {
-      showToast.error('이름을 입력해주세요.');
-      return;
-    }
-    updateMemberNameMutation.mutate({
-      user_id: selectedMemberForNameChange.user_id,
-      user_nm: trimmed,
-    });
   };
 
   const confirmKickMember = () => {
@@ -434,19 +492,6 @@ export default function GuildManagementPage() {
     kickMemberMutation.mutate({
       user_id: selectedMemberForKick.user_id,
       leave_reason: kickReason.trim() || undefined,
-    });
-  };
-
-  const handleUpdateRole = () => {
-    if (!selectedMemberForRoleChange || !newRole) return;
-    const guildRole = toGuildRole(newRole);
-    if (!guildRole) {
-      showToast.error('변경할 권한 정보가 올바르지 않습니다.');
-      return;
-    }
-    updateMemberRoleMutation.mutate({
-      user_id: selectedMemberForRoleChange.user_id,
-      guild_role: guildRole,
     });
   };
 
@@ -530,6 +575,16 @@ export default function GuildManagementPage() {
     if (role === 'MANAGER') return 'warning';
     return 'default';
   };
+
+  const selectedMemberTargetRole = selectedMemberForEdit?.guild_role || selectedMemberForEdit?.role;
+  const canEditSelectedMemberName = canEditMemberName(
+    userInfo?.guild_role,
+    selectedMemberTargetRole,
+    selectedMemberForEdit?.user_id,
+    userInfo?.user_id,
+  );
+  const canEditSelectedMemberRole = canEditMemberRole(isLeader, isManager, selectedMemberTargetRole);
+  const isMemberEditSaving = updateMemberNameMutation.isPending || updateMemberRoleMutation.isPending;
 
   if (!userInfo?.guild_id || (!isLeader && !isManager)) {
     return (
@@ -738,19 +793,21 @@ export default function GuildManagementPage() {
                             {(isLeader || isManager) && (
                               <TableCell align="center">
                                 <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
-                                  {canEditMemberName(
+                                  {canEditMember(
                                     userInfo?.guild_role,
                                     guildRole,
                                     member.user_id,
                                     userInfo?.user_id,
+                                    isLeader,
+                                    isManager,
                                   ) && (
                                     <IconButton
                                       color="primary"
                                       size="small"
-                                      onClick={() => handleNameChange(member)}
-                                      title="이름 변경"
+                                      onClick={() => handleEditMember(member)}
+                                      title="멤버 수정"
                                     >
-                                      <DriveFileRenameOutlineIcon fontSize="small" />
+                                      <EditIcon fontSize="small" />
                                     </IconButton>
                                   )}
                                   {/* 길드장만 길드장 위임 가능 */}
@@ -762,17 +819,6 @@ export default function GuildManagementPage() {
                                       title="길드장 권한 위임"
                                     >
                                       <HowToRegIcon fontSize="small" />
-                                    </IconButton>
-                                  )}
-                                  {/* 매니저는 일반 길드원(MEMBER)만 관리 가능, 길드장은 모든 멤버 관리 가능 */}
-                                  {((isLeader && guildRole !== 'LEADER') || (isManager && guildRole === 'MEMBER')) && (
-                                    <IconButton
-                                      color="primary"
-                                      size="small"
-                                      onClick={() => handleRoleChange(member)}
-                                      title="권한 변경"
-                                    >
-                                      <EditIcon fontSize="small" />
                                     </IconButton>
                                   )}
                                   {/* 멤버 추방 */}
@@ -872,40 +918,51 @@ export default function GuildManagementPage() {
         </Card>
       </Box>
 
-      {/* 권한 변경 다이얼로그 */}
-      <Dialog open={roleChangeDialogOpen} onClose={() => setRoleChangeDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>권한 변경</DialogTitle>
+      {/* 멤버 수정 다이얼로그 (이름·권한) */}
+      <Dialog open={memberEditDialogOpen} onClose={closeMemberEditDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>멤버 수정</DialogTitle>
         <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {selectedMemberForRoleChange?.user_id}의 권한을 변경합니다.
-            </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            대상: <b>{selectedMemberForEdit?.user_id}</b>
+          </Typography>
+          {canEditSelectedMemberName && (
+            <TextField
+              label="이름"
+              value={editMemberName}
+              onChange={(e) => setEditMemberName(e.target.value)}
+              fullWidth
+              autoFocus
+              inputProps={{ maxLength: 100 }}
+              disabled={isMemberEditSaving}
+              sx={{ mb: canEditSelectedMemberRole ? 2 : 0 }}
+            />
+          )}
+          {canEditSelectedMemberRole && (
             <FormControl fullWidth>
               <InputLabel>권한</InputLabel>
               <Select
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value)}
+                value={editMemberRole}
+                onChange={(e) => setEditMemberRole(e.target.value)}
                 label="권한"
-                disabled={updateMemberRoleMutation.isPending}
+                disabled={isMemberEditSaving}
               >
                 <MenuItem value="MEMBER">멤버</MenuItem>
-                {/* 매니저는 멤버만 변경 가능, 길드장은 매니저와 멤버 변경 가능 */}
                 {isLeader && <MenuItem value="MANAGER">매니저</MenuItem>}
                 {isLeader && <MenuItem value="LEADER">길드장</MenuItem>}
               </Select>
             </FormControl>
-          </Box>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setRoleChangeDialogOpen(false)} disabled={updateMemberRoleMutation.isPending}>
+          <Button onClick={closeMemberEditDialog} disabled={isMemberEditSaving}>
             취소
           </Button>
           <Button
-            onClick={handleUpdateRole}
+            onClick={confirmMemberEdit}
             variant="contained"
-            disabled={updateMemberRoleMutation.isPending || !newRole}
+            disabled={isMemberEditSaving || (canEditSelectedMemberName && !editMemberName.trim())}
           >
-            {updateMemberRoleMutation.isPending ? '변경 중...' : '변경'}
+            {isMemberEditSaving ? '저장 중...' : '저장'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -932,37 +989,6 @@ export default function GuildManagementPage() {
             disabled={transferLeadershipMutation.isPending}
           >
             {transferLeadershipMutation.isPending ? '위임 중...' : '위임'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* 멤버 이름 변경 다이얼로그 */}
-      <Dialog open={nameChangeDialogOpen} onClose={() => setNameChangeDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>멤버 이름 변경</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            대상: <b>{selectedMemberForNameChange?.user_id}</b>
-          </Typography>
-          <TextField
-            label="이름"
-            value={newMemberName}
-            onChange={(e) => setNewMemberName(e.target.value)}
-            fullWidth
-            autoFocus
-            inputProps={{ maxLength: 100 }}
-            disabled={updateMemberNameMutation.isPending}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setNameChangeDialogOpen(false)} disabled={updateMemberNameMutation.isPending}>
-            취소
-          </Button>
-          <Button
-            variant="contained"
-            onClick={confirmNameChange}
-            disabled={updateMemberNameMutation.isPending || !newMemberName.trim()}
-          >
-            {updateMemberNameMutation.isPending ? '변경 중...' : '변경'}
           </Button>
         </DialogActions>
       </Dialog>

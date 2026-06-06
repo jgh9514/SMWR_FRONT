@@ -14,6 +14,13 @@ import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
 import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
 import { runeSelectionErrorMessage, sumRunePieces } from '@/features/siege/utils/runeValidation';
+import { MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11y';
+
+/** Dialog 안 Select — 메뉴가 모달 뒤로 가려지지 않도록 z-index 상향 */
+const DIALOG_SELECT_MENU_PROPS = {
+  ...MUI_MENU_A11Y_PROPS,
+  sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 2 },
+};
 
 interface RuneSetPickerProps {
   value: DeckMonsterRuneSelection;
@@ -23,6 +30,40 @@ interface RuneSetPickerProps {
 
 const SLOT_KEYS = ['runeId1', 'runeId2', 'runeId3'] as const;
 const SLOT_LABELS = ['룬 세트 1', '룬 세트 2', '룬 세트 3'];
+
+const RUNE_ICON_SX = {
+  width: 28,
+  height: 28,
+  flexShrink: 0,
+  bgcolor: 'background.paper',
+  border: '1px solid',
+  borderColor: 'divider',
+  '& img': { objectFit: 'contain' },
+} as const;
+
+function RuneOptionLabel({
+  nameKo,
+  requiredPieces,
+  imageUrl,
+}: {
+  nameKo: string;
+  requiredPieces: number;
+  imageUrl?: string | null;
+}) {
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+      <Avatar
+        src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
+        alt={nameKo}
+        variant="rounded"
+        sx={RUNE_ICON_SX}
+      />
+      <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {nameKo} ({requiredPieces}피스)
+      </Box>
+    </Box>
+  );
+}
 
 export default function RuneSetPicker({ value, onChange, disabled = false }: RuneSetPickerProps) {
   const { data: runes = [], runeById, isLoading } = useRuneMasterList();
@@ -52,28 +93,44 @@ export default function RuneSetPicker({ value, onChange, disabled = false }: Run
             label={SLOT_LABELS[idx]}
             value={value[slotKey] != null ? String(value[slotKey]) : ''}
             onChange={handleSlotChange(slotKey)}
+            MenuProps={DIALOG_SELECT_MENU_PROPS}
+            displayEmpty
+            renderValue={(selected) => {
+              if (!selected) {
+                return <em>선택 안 함</em>;
+              }
+              const rune = runeById.get(Number(selected));
+              if (!rune) {
+                return String(selected);
+              }
+              return (
+                <RuneOptionLabel
+                  nameKo={rune.name_ko}
+                  requiredPieces={rune.required_pieces}
+                  imageUrl={rune.image_url}
+                />
+              );
+            }}
           >
             <MenuItem value="">
               <em>선택 안 함</em>
             </MenuItem>
+            {runes.length === 0 && !isLoading ? (
+              <MenuItem value="__empty__" disabled>
+                룬 목록을 불러오지 못했습니다
+              </MenuItem>
+            ) : null}
             {runes.map((rune) => {
               const id = Number(rune.rune_id);
+              if (!Number.isFinite(id) || id <= 0) return null;
               const taken = selectedElsewhere(id, slotKey);
               return (
                 <MenuItem key={id} value={String(id)} disabled={taken}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    {rune.image_url ? (
-                      <Avatar
-                        src={getMonsterImageUrl(rune.image_url)}
-                        alt={rune.name_ko}
-                        variant="rounded"
-                        sx={{ width: 24, height: 24 }}
-                      />
-                    ) : null}
-                    <span>
-                      {rune.name_ko} ({rune.required_pieces}피스)
-                    </span>
-                  </Box>
+                  <RuneOptionLabel
+                    nameKo={rune.name_ko}
+                    requiredPieces={rune.required_pieces}
+                    imageUrl={rune.image_url}
+                  />
                 </MenuItem>
               );
             })}

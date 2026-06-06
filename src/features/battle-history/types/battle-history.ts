@@ -21,6 +21,10 @@ export interface BattleItem {
   win_lose: string;
   wizard_name?: string;
   opp_wizard_name?: string;
+  /** 전체 판수 (LIMIT 전 윈도우 집계 — 페이지네이션과 무관하게 일정) */
+  full_total_count?: number;
+  full_win_count?: number;
+  full_lose_count?: number;
   image_url1?: string;
   image_url2?: string;
   image_url3?: string;

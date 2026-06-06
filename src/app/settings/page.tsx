@@ -45,6 +45,7 @@ import SummarizeIcon from '@mui/icons-material/Summarize';
 import HistoryIcon from '@mui/icons-material/History';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/shared/ui';
 import { showToast } from '@/shared/lib/notification';
 import {
@@ -61,6 +62,8 @@ import { useLogout, useUpdateSiegeViewScope } from '@/features/auth/hooks/useAut
 import { logger } from '@/shared/lib/logger';
 import { clearClientAuth, isAuthenticated } from '@/shared/utils/auth';
 import { readSiegeGuildViewSetting, writeSiegeGuildViewSetting, type SiegeGuildViewMode } from '@/shared/utils/siegeGuildView';
+import { notifySiegeViewScopeChanged } from '@/shared/utils/siegeViewScope';
+import { invalidateSiegeQueries } from '@/shared/utils/invalidateSiegeQueries';
 import type { GuildApplicationItem, GuildSearchItem, UserInfo } from '@/features/auth/types/auth';
 
 function toGuildRole(role?: string): UserInfo['guild_role'] {
@@ -220,6 +223,7 @@ function readInitialSiegeGuildSetting(): {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const isClient = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -400,7 +404,6 @@ export default function SettingsPage() {
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
         showToast.success('설정이 저장되었습니다.');
-        // localStorage의 userInfo 업데이트
         if (typeof window !== 'undefined' && userInfo) {
           const updatedUserInfo = {
             ...userInfo,
@@ -409,6 +412,8 @@ export default function SettingsPage() {
           localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo));
           setStoredUserInfo(updatedUserInfo);
         }
+        notifySiegeViewScopeChanged();
+        void invalidateSiegeQueries(queryClient);
       } else {
         throw new Error(res?.message || '설정 저장에 실패했습니다.');
       }
@@ -838,7 +843,7 @@ export default function SettingsPage() {
                     </Select>
                   </FormControl>
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                    점령전 이력 페이지에서 조회할 시즌 범위를 설정합니다.
+                    점령전 방덱 목록·상세·이력에서 조회할 시즌 범위를 설정합니다.
                   </Typography>
 
                   {isAdmin && (

@@ -52,5 +52,9 @@ export interface SiegeListResponse {
 export interface SiegeListParams {
   paging?: number;
   offset?: number;
+  limit?: number;
+  siege_view_scope?: 'C' | 'A';
+  view_all_guilds?: boolean;
+  view_guild_id?: string;
 }
 

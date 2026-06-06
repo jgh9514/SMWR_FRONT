@@ -45,6 +45,14 @@ export default function BattleHistoryDetailContent({
   onLoadMore,
 }: BattleHistoryDetailContentProps) {
   const summary = useMemo(() => {
+    const first = battles[0];
+    if (first?.full_total_count != null) {
+      return {
+        win: Number(first.full_win_count ?? 0),
+        lose: Number(first.full_lose_count ?? 0),
+        total: Number(first.full_total_count),
+      };
+    }
     let win = 0;
     let lose = 0;
     battles.forEach((r) => {

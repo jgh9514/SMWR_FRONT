@@ -31,6 +31,7 @@ export interface HistoryItem {
   leader_increase_by?: number;
   win_rate?: number;
   total_rate?: number;
+  total_count?: number;
   win_count?: number;
   lose_count?: number;
   /** 공격 조합(공성률 이력 행) — 공덱 상세·투표 연동용 */
@@ -83,6 +84,8 @@ export interface MonsterDetailParams {
   dm3?: string;
   view_all_guilds?: boolean;
   view_guild_id?: string;
+  /** C=최근 시즌, A=전체 시즌 — 설정(userInfo)과 동기화 */
+  siege_view_scope?: 'C' | 'A';
   historyLimit?: number;
   historyOffset?: number;
   recommendedLimit?: number;

@@ -1,13 +1,17 @@
 import { useMemo } from 'react';
 import { useApiPostQuery } from '@/hooks/api/useApiQuery';
 import type { RuneMaster } from '@/features/siege/types/rune';
+import { normalizeRuneMasterList } from '@/features/siege/utils/runeMasterNormalize';
 
 const RUNE_MASTER_QUERY_KEY = ['/summonerswar/rune-master/list'] as const;
 
 export function useRuneMasterList() {
   const query = useApiPostQuery<RuneMaster[]>('/summonerswar/rune-master/list', {}, {
+    enabled: true,
+    select: (data) => normalizeRuneMasterList(data),
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const runeById = useMemo(() => {

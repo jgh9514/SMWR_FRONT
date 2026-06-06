@@ -24,6 +24,8 @@ export interface SiegeSearchParams {
   min_lose_count?: number;
   view_all_guilds?: boolean;
   view_guild_id?: string;
+  /** C=최근 시즌, A=전체 시즌 — 설정(userInfo)과 동기화 */
+  siege_view_scope?: 'C' | 'A';
 }
 
 /**

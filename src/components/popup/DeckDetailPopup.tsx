@@ -31,6 +31,8 @@ import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import {
   useDeckDetail,
   useDeleteDeck,
+  isDeckDeleteSuccess,
+  type DeleteDeckPayload,
   useDeckVoteMutation,
   useApiPostMutation,
   type DeckDetailQueryParams,
@@ -49,6 +51,15 @@ import {
   type DeckMonsterStats,
 } from '@/features/siege/types/siege';
 import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
+import {
+  buildDeckDetailQueryParams,
+  pickDeckStat,
+  resolveAtkMonsters,
+  resolveDefMonsters,
+  resolveDeckId,
+  resolveMonsterImageUrl,
+  resolveMonsterKrName,
+} from '@/features/siege/utils/deckRecord';
 
 type DeckDetailRecord = Record<string, unknown>;
 
@@ -72,16 +83,8 @@ function pickDeckNumeric(r: DeckDetailRecord | null | undefined, ...keys: string
 
 function pickDeckMyVote(r: DeckDetailRecord | null | undefined): string {
   if (!r) return '';
-  const a = r.my_vote ?? r.myVote;
+  const a = r.my_vote ?? r.myVote ?? r.myvote;
   return a != null ? String(a).trim().toUpperCase() : '';
-}
-
-function pickDeckDefStr(r: DeckDetailRecord | null | undefined, snake: string, camel: string): string {
-  if (!r) return '';
-  const a = r[snake];
-  const b = r[camel];
-  const v = a !== undefined && a !== null && String(a) !== '' ? a : b;
-  return v != null && String(v) !== '' ? String(v) : '';
 }
 
 const normalizeStatValue = (value: unknown, defaultValue = 0): number => {
@@ -108,9 +111,11 @@ interface DeckDetailPopupProps {
   onClose: () => void;
   onDeleted?: (deckId: string) => void;
   selectedItem?: RecommendedItem | null;
+  /** 목록 행에 def_monster가 없을 때 상세 조회용 */
+  defenseMonsters?: { dm1: string; dm2: string; dm3: string };
 }
 
-export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem }: DeckDetailPopupProps) {
+export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem, defenseMonsters }: DeckDetailPopupProps) {
   const theme = useTheme();
   const [lastSelectedItem, setLastSelectedItem] = useState<RecommendedItem | null>(null);
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
@@ -119,33 +124,17 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const [editStats, setEditStats] = useState<DeckMonsterStats[]>(createInitialDeckStats);
   const { runeById } = useRuneMasterList();
 
+  const activeItem = selectedItem ?? lastSelectedItem;
+
   const deckParams = useMemo((): DeckDetailQueryParams | null => {
-    if (!lastSelectedItem) return null;
-
-    const deckId = lastSelectedItem.deck_id || lastSelectedItem.team_id;
-    if (deckId) {
-      return { deck_id: String(deckId) };
-    }
-
-    const d1 = lastSelectedItem.def_monster_1;
-    const d2 = lastSelectedItem.def_monster_2;
-    const d3 = lastSelectedItem.def_monster_3;
-    const a1 = lastSelectedItem.atk_monster_1;
-    const a2 = lastSelectedItem.atk_monster_2;
-    const a3 = lastSelectedItem.atk_monster_3;
-    if (d1 && d2 && d3 && a1 && a2 && a3) {
-      return {
-        def_monster_1: String(d1),
-        def_monster_2: String(d2),
-        def_monster_3: String(d3),
-        atk_monster_1: String(a1),
-        atk_monster_2: String(a2),
-        atk_monster_3: String(a3),
-      };
-    }
-
-    return null;
-  }, [lastSelectedItem]);
+    if (!open || !activeItem) return null;
+    return buildDeckDetailQueryParams(
+      activeItem as DeckDetailRecord,
+      defenseMonsters
+        ? { dm1: defenseMonsters.dm1, dm2: defenseMonsters.dm2, dm3: defenseMonsters.dm3 }
+        : undefined,
+    );
+  }, [open, activeItem, defenseMonsters]);
 
   const {
     data: detailData,
@@ -170,10 +159,12 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
 
   const deleteDeckMutation = useDeleteDeck({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
+      if (isDeckDeleteSuccess(res)) {
         showToast.success('공덱이 삭제되었습니다.');
-        if (lastSelectedItem?.team_id && onDeleted) {
-          onDeleted(String(lastSelectedItem.team_id));
+        const deletedId = resolveDeckId(lastSelectedItem as DeckDetailRecord)
+          ?? resolveDeckId(detailDataRecord);
+        if (deletedId && onDeleted) {
+          onDeleted(deletedId);
         }
         handleClose();
       } else {
@@ -186,17 +177,20 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     },
   });
 
-  const validateParams = (target: RecommendedItem | DeckDetailRecord): { deck_id: string } => {
-    const item = target as RecommendedItem;
-    const deckId = item.deck_id || item.team_id;
-    if (!deckId) {
-      throw new Error('deck_id 또는 team_id가 필요합니다.');
+  const validateParams = (target: RecommendedItem | DeckDetailRecord): DeleteDeckPayload => {
+    const deckId = resolveDeckId(target as DeckDetailRecord);
+    if (deckId) {
+      return { deck_id: deckId };
     }
-    return { deck_id: String(deckId) };
+    const atk = resolveAtkMonsters(target as DeckDetailRecord);
+    if (atk) {
+      return atk;
+    }
+    throw new Error('deck_id 또는 공격 몬스터 조합이 필요합니다.');
   };
 
   const extractStatsFromDetail = useCallback((detail: DeckDetailRecord, index: 1 | 2 | 3): DeckMonsterStats => {
-    const get = (key: string) => normalizeStatValue(detail[`m${index}_${key}`], 0);
+    const get = (key: string) => normalizeStatValue(pickDeckStat(detail, index, key), 0);
     const runes = extractRuneSelectionFromDetail(detail, index);
     return {
       hp: get('hp'),
@@ -214,19 +208,18 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   }, []);
 
   const monsterImageUrls = (() => {
-    if (!detailDataRecord) return [null, null, null];
-    return [1, 2, 3].map((i) => {
-      const imageUrl = detailDataRecord[`image_url${i}`];
-      return imageUrl ? getMonsterImageUrl(String(imageUrl)) : null;
+    const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
+    if (!row) return [null, null, null];
+    return ([1, 2, 3] as const).map((i) => {
+      const imageUrl = resolveMonsterImageUrl(row, i);
+      return imageUrl ? getMonsterImageUrl(imageUrl) : null;
     });
   })();
 
   const monsterNames = (() => {
-    if (!detailDataRecord) return ['', '', ''];
-    return [1, 2, 3].map((i) => {
-      const name = detailDataRecord[`m${i}_kr_name`];
-      return name ? String(name).trim() : '';
-    });
+    const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
+    if (!row) return ['', '', ''];
+    return ([1, 2, 3] as const).map((i) => resolveMonsterKrName(row, i));
   })();
 
   const monsterRuneDisplays = (() => {
@@ -234,7 +227,10 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     return ([1, 2, 3] as const).map((i) => extractRuneDisplaysFromDetail(detailDataRecord, i));
   })();
 
-  const hasValidData = monsterNames.some((n) => n !== '') || monsterImageUrls.some((u) => u !== null);
+  const hasValidData =
+    monsterNames.some((n) => n !== '') ||
+    monsterImageUrls.some((u) => u !== null) ||
+    resolveDeckId(activeItem as DeckDetailRecord) != null;
 
   useEffect(() => {
     if (selectedItem) {
@@ -347,9 +343,13 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       }
     }
     try {
-      const { deck_id } = validateParams(target);
+      const deleteParams = validateParams(target);
+      if (!('deck_id' in deleteParams)) {
+        showToast.error('등록된 공덱만 수정할 수 있습니다.');
+        return;
+      }
       updateDeckMutation.mutate({
-        deck_id,
+        deck_id: deleteParams.deck_id,
         monster_1_stats: editStats[0],
         monster_2_stats: editStats[1],
         monster_3_stats: editStats[2],
@@ -581,22 +581,27 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   {(() => {
-                    const did = String(detailDataRecord.deck_id);
-                    const d1 = pickDeckDefStr(detailDataRecord, 'def_monster_1', 'defMonster1');
-                    const d2 = pickDeckDefStr(detailDataRecord, 'def_monster_2', 'defMonster2');
-                    const d3 = pickDeckDefStr(detailDataRecord, 'def_monster_3', 'defMonster3');
-                    const a1 = pickDeckDefStr(detailDataRecord, 'atk_monster_1', 'atkMonster1');
-                    const a2 = pickDeckDefStr(detailDataRecord, 'atk_monster_2', 'atkMonster2');
-                    const a3 = pickDeckDefStr(detailDataRecord, 'atk_monster_3', 'atkMonster3');
-                    const canVote = d1 !== '' && d2 !== '' && d3 !== '';
+                    const did = resolveDeckId(detailDataRecord);
+                    const def = resolveDefMonsters(detailDataRecord);
+                    const atk = resolveAtkMonsters(detailDataRecord);
+                    const d1 = def?.def_monster_1 ?? '';
+                    const d2 = def?.def_monster_2 ?? '';
+                    const d3 = def?.def_monster_3 ?? '';
+                    const a1 = atk?.atk_monster_1 ?? '';
+                    const a2 = atk?.atk_monster_2 ?? '';
+                    const a3 = atk?.atk_monster_3 ?? '';
+                    const canVote = Boolean(did && d1 && d2 && d3);
                     const myV = pickDeckMyVote(detailDataRecord);
-                    const upN = pickDeckNumeric(detailDataRecord, 'recommend_count', 'recommendCount');
-                    const downN = pickDeckNumeric(detailDataRecord, 'not_recommend_count', 'notRecommendCount');
+                    const upN = pickDeckNumeric(detailDataRecord, 'recommend_count', 'recommendCount', 'recommendcount');
+                    const downN = pickDeckNumeric(detailDataRecord, 'not_recommend_count', 'notRecommendCount', 'notrecommendcount');
                     const busy = deckVoteMutation.isPending;
                     const send = (vote: 'UP' | 'DOWN' | 'CLEAR') => {
+                      if (!did) return;
                       deckVoteMutation.mutate({
                         deck_id: did,
-                        def_monster_1: d1, def_monster_2: d2, def_monster_3: d3,
+                        def_monster_1: d1,
+                        def_monster_2: d2,
+                        def_monster_3: d3,
                         ...(a1 !== '' && a2 !== '' && a3 !== '' ? { atk_monster_1: a1, atk_monster_2: a2, atk_monster_3: a3 } : {}),
                         vote,
                       });
@@ -779,8 +784,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {[1, 2, 3].map((idx) => {
               const index = idx - 1;
-              const name = detailDataRecord[`m${idx}_kr_name`];
-              const imageUrl = detailDataRecord[`image_url${idx}`];
+              const name = resolveMonsterKrName(detailDataRecord, idx as 1 | 2 | 3);
+              const imageRaw = resolveMonsterImageUrl(detailDataRecord, idx as 1 | 2 | 3);
+              const imageUrl = imageRaw ? getMonsterImageUrl(imageRaw) : null;
               return (
                 <Accordion
                   key={idx}

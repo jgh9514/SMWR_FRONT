@@ -217,14 +217,31 @@ export const useDeckDetail = (params: DeckDetailQueryParams | null) => {
   });
 };
 
+export type DeleteDeckPayload =
+  | { deck_id: string }
+  | {
+      atk_monster_1: string;
+      atk_monster_2: string;
+      atk_monster_3: string;
+    };
+
+/** 백엔드 deck-detail-delete는 plain string "SUCCESS" | "FAIL" 반환 */
+export function isDeckDeleteSuccess(res: unknown): boolean {
+  if (res === 'SUCCESS') return true;
+  if (typeof res === 'object' && res !== null && 'result' in res) {
+    return String((res as { result?: unknown }).result).toUpperCase() === 'SUCCESS';
+  }
+  return false;
+}
+
 /**
  * 공덱 삭제 Mutation
  * 백엔드: /api/v1/summonerswar/deck-detail-delete
  */
 export const useDeleteDeck = (
-  options?: Parameters<typeof useApiPostMutation<{ result: string }, { deck_id: string }>>[1],
+  options?: Parameters<typeof useApiPostMutation<string, DeleteDeckPayload>>[1],
 ) => {
-  return useApiPostMutation<{ result: string }, { deck_id: string }>('/summonerswar/deck-detail-delete', options);
+  return useApiPostMutation<string, DeleteDeckPayload>('/summonerswar/deck-detail-delete', options);
 };
 
 export type DeckVoteType = 'UP' | 'DOWN' | 'CLEAR';

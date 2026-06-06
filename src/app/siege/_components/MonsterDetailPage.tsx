@@ -40,16 +40,12 @@ import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData, RecentBattleItem } from '@/types';
-import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
+import { useSiegeApiContextParams } from '@/shared/hooks/useSiegeApiContextParams';
+import { resolveDeckId, resolveMonsterImageUrl } from '@/features/siege/utils/deckRecord';
 
-/** 이력 API의 deck_id(또는 camelCase) — 있으면 등록 공덱 투표로 병합 */
+/** 이력 API deck_id — MyBatis camelCase·lowerCase 키 대응 */
 function getHistoryRowDeckId(item: HistoryItem): string | null {
-  const rec = item as HistoryItem & { deckId?: unknown };
-  const raw = item.deck_id ?? rec.deckId;
-  if (raw == null) return null;
-  const s = String(raw).trim();
-  if (s === '' || s === '0') return null;
-  return s;
+  return resolveDeckId(item as Record<string, unknown>);
 }
 
 function BasicInfoSkeleton() {
@@ -213,7 +209,7 @@ export default function MonsterDetailPage() {
   }, [detailParam]);
   const schData = parsedDetail.schData;
   const matchId = parsedDetail.matchId;
-  const siegeGuildViewParams = useSiegeGuildViewParams();
+  const siegeApiContextParams = useSiegeApiContextParams();
   const [historyPage, setHistoryPage] = useState(1);
   const [recommendedPage, setRecommendedPage] = useState(1);
   const [recentPage, setRecentPage] = useState(1);
@@ -232,9 +228,9 @@ export default function MonsterDetailPage() {
       dm2,
       dm3,
       ...(matchId && { match_id: matchId }),
-      ...siegeGuildViewParams,
+      ...siegeApiContextParams,
     };
-  }, [schData, matchId, siegeGuildViewParams]);
+  }, [schData, matchId, siegeApiContextParams]);
 
   const recommendedParams = useMemo<MonsterDetailParams | null>(() => {
     if (!baseParams) return null;
@@ -605,7 +601,7 @@ export default function MonsterDetailPage() {
                           >
                             <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
                               {[1, 2, 3].map((i) => {
-                                const imageUrl = item[`image_url${i}` as keyof RecommendedItem] as string | undefined;
+                                const imageUrl = resolveMonsterImageUrl(item as Record<string, unknown>, i as 1 | 2 | 3);
                                 return imageUrl ? (
                                   <Avatar
                                     key={i}
@@ -674,7 +670,13 @@ export default function MonsterDetailPage() {
           <Box sx={{ minWidth: 0 }}>
             <Card sx={(t) => ({ ...sectionCardSx(t), height: '100%' })}>
               <Box sx={(t) => sectionHeaderSx(t)}>
-                <Typography variant="subtitle2" fontWeight={700} color="text.primary">공성률 정보</Typography>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle2" fontWeight={700} color="text.primary">공성률 정보</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontSize: '0.68rem' }}>
+                    공격 덱별 승률 · {historyTotalCount > 0 ? `${historyTotalCount}개 조합` : '조합 없음'}
+                    {enemyData?.total_count != null ? ` · 상단 총 ${enemyData.total_count}경기` : ''}
+                  </Typography>
+                </Box>
                 {history.isFetching && <CircularProgress size={14} sx={{ opacity: 0.5 }} />}
               </Box>
               {history.isLoading && !history.data ? (
@@ -690,6 +692,7 @@ export default function MonsterDetailPage() {
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                         {historyList.map((item: HistoryItem, idx: number) => {
                           const rate = item.total_rate ?? 0;
+                          const totalGames = item.total_count ?? ((item.win_count ?? 0) + (item.lose_count ?? 0));
                           const isHigh = rate >= 50;
                           const canVote = Boolean(schData.dm1 && schData.dm2 && schData.dm3) &&
                             Boolean(item.atk_monster_1 && item.atk_monster_2 && item.atk_monster_3);
@@ -760,7 +763,7 @@ export default function MonsterDetailPage() {
                                       {rate}%
                                     </Typography>
                                     <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
-                                      {item.win_count ?? 0}승 {item.lose_count ?? 0}패
+                                      {totalGames}경기 · {item.win_count ?? 0}승 {item.lose_count ?? 0}패
                                     </Typography>
                                   </Box>
                                   <LinearProgress
@@ -1062,6 +1065,11 @@ export default function MonsterDetailPage() {
           onClose={handleDeckDetailPopupClose}
           onDeleted={handleDeckDetailPopupClose}
           selectedItem={selectedDeckItem}
+          defenseMonsters={
+            schData.dm1 && schData.dm2 && schData.dm3
+              ? { dm1: schData.dm1, dm2: schData.dm2, dm3: schData.dm3 }
+              : undefined
+          }
         />
       </Container>
     </Box>
