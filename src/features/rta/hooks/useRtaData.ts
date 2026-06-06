@@ -428,7 +428,7 @@ export function useRtaSeasonSelect(seasonsData: RtaSeasonsResponse | undefined):
   return { seasonSelectValue, seasonIdForApi, setSeason, seasonOptions };
 }
 
-/** RTA 시즌 목록 (DB) — POST /api/v1/rta/seasons. /rta 레이아웃에서 Provider로 한 번만 마운트 권장 */
+/** RTA 시즌 목록 (DB) — POST /api/v1/rta/seasons. AppProviders 의 RtaSeasonsProvider 에서 1회 마운트 권장 */
 export const useRtaSeasons = () => {
   return useApiQuery<RtaSeasonsResponse>({
     queryKey: ['rta', 'seasons'],

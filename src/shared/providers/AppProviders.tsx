@@ -9,6 +9,7 @@ import { ThemeProvider as MuiThemeProvider, CssBaseline, Box } from '@mui/materi
 import { createTheme } from '@mui/material/styles';
 import ClientOnlyToaster from './ClientOnlyToaster';
 import { RtaSearchStoreProvider } from '@/features/rta/context/RtaSearchStoreContext';
+import { RtaSeasonsProvider } from '@/features/rta/context/RtaSeasonsContext';
 import { isAuthenticated, isForceLoggedOut } from '@/shared/utils/auth';
 import type { AuthCheckResponse } from '@/features/auth/types/auth';
 
@@ -301,6 +302,7 @@ export default function AppProviders({ children }: AppProvidersProps) {
       '/settings',
       '/log-upload',
       '/account-summary',
+      '/inquiry',
     ];
     if (protectedPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`))) {
       return true;
@@ -457,22 +459,24 @@ export default function AppProviders({ children }: AppProvidersProps) {
       <RecoilRoot>
         <RtaSearchStoreProvider>
         <QueryClientProvider client={queryClient}>
-          <AuthGuard>
-            <ClientOnlyToaster />
-            {shouldShowHeader && <FixedHeader />}
-            <Box sx={shellSx}>
-              <Box component="main" sx={{ flex: 1, width: '100%' }} suppressHydrationWarning>
-                {children}
+          <RtaSeasonsProvider>
+            <AuthGuard>
+              <ClientOnlyToaster />
+              {shouldShowHeader && <FixedHeader />}
+              <Box sx={shellSx}>
+                <Box component="main" sx={{ flex: 1, width: '100%' }} suppressHydrationWarning>
+                  {children}
+                </Box>
+                {shouldShowFooter && <SiteFooter />}
               </Box>
-              {shouldShowFooter && <SiteFooter />}
-            </Box>
-            <>
-              {/* 공지 팝업은 메인 화면에서만 동작 */}
-              {!isPublicPath && !isAdminPath && isHomePath && <NoticePopup />}
-              {/* PWA 앱으로 보기 배너 (하단 고정) */}
-              <AddToHomeScreenBanner />
-            </>
-          </AuthGuard>
+              <>
+                {/* 공지 팝업은 메인 화면에서만 동작 */}
+                {!isPublicPath && !isAdminPath && isHomePath && <NoticePopup />}
+                {/* PWA 앱으로 보기 배너 (하단 고정) */}
+                <AddToHomeScreenBanner />
+              </>
+            </AuthGuard>
+          </RtaSeasonsProvider>
         </QueryClientProvider>
         </RtaSearchStoreProvider>
       </RecoilRoot>

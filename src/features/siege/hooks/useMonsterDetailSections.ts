@@ -10,6 +10,7 @@ import type {
   MonsterDetailBasicResponse,
   MonsterDetailRecommendedResponse,
   MonsterDetailHistoryResponse,
+  MonsterDetailRecentBattlesResponse,
 } from '@/features/siege/types/siegeDetail';
 
 const SHARED_OPTIONS = {
@@ -39,6 +40,15 @@ export const useMonsterDetailRecommended = (params: MonsterDetailParams | null) 
 export const useMonsterDetailHistory = (params: MonsterDetailParams | null) => {
   return useApiPostQuery<MonsterDetailHistoryResponse>(
     '/summonerswar/monster-detail-history',
+    params,
+    { enabled: !!params, ...SHARED_OPTIONS },
+  );
+};
+
+/** 최근 전적 (개별 전투 로그) */
+export const useMonsterDetailRecentBattles = (params: MonsterDetailParams | null) => {
+  return useApiPostQuery<MonsterDetailRecentBattlesResponse>(
+    '/summonerswar/monster-detail-recent-battles',
     params,
     { enabled: !!params, ...SHARED_OPTIONS },
   );

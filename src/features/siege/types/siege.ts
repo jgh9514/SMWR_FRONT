@@ -71,5 +71,30 @@ export interface DeckMonsterStats {
   critDmg: number;
   resistance: number;
   accuracy: number;
+  /** 몬스터당 룬 세트 (최대 3종, required_pieces 합산 6 이하) */
+  runeId1?: number | null;
+  runeId2?: number | null;
+  runeId3?: number | null;
+}
+
+export type DeckEditableStatKey = Exclude<
+  keyof DeckMonsterStats,
+  'runeId1' | 'runeId2' | 'runeId3'
+>;
+
+export function createEmptyDeckMonsterStats(): DeckMonsterStats {
+  return {
+    hp: 0,
+    atk: 0,
+    def: 0,
+    spd: 0,
+    critRate: 0,
+    critDmg: 0,
+    resistance: 0,
+    accuracy: 0,
+    runeId1: null,
+    runeId2: null,
+    runeId3: null,
+  };
 }
 

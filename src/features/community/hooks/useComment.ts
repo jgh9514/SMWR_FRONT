@@ -11,6 +11,7 @@ import {
   CommentUpdateParams,
   CommentDeleteParams,
   CommentResponse,
+  CommentVoteParams,
 } from '@/features/community/types/comment';
 
 /**
@@ -55,5 +56,15 @@ export const useDeleteComment = (
   options?: Parameters<typeof useApiPostMutation<CommentResponse, CommentDeleteParams>>[1],
 ) => {
   return useApiPostMutation<CommentResponse, CommentDeleteParams>('/community/comment/delete', options);
+};
+
+/**
+ * 댓글 추천/비추천 Mutation
+ * 백엔드: /api/v1/community/comment/vote
+ */
+export const useCommentVote = (
+  options?: Parameters<typeof useApiPostMutation<CommentResponse, CommentVoteParams>>[1],
+) => {
+  return useApiPostMutation<CommentResponse, CommentVoteParams>('/community/comment/vote', options);
 };
 

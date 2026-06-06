@@ -1,7 +1,7 @@
 'use client';
 
 import { CircularProgress, Box } from '@mui/material';
-import { RtaSeasonsProvider, useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
+import { useRtaSeasonsContext } from '@/features/rta/context/RtaSeasonsContext';
 import type { ReactNode } from 'react';
 
 function SeasonsGate({ children }: { children: ReactNode }) {
@@ -17,9 +17,5 @@ function SeasonsGate({ children }: { children: ReactNode }) {
 }
 
 export default function RtaSeasonsLayoutClient({ children }: { children: ReactNode }) {
-  return (
-    <RtaSeasonsProvider>
-      <SeasonsGate>{children}</SeasonsGate>
-    </RtaSeasonsProvider>
-  );
+  return <SeasonsGate>{children}</SeasonsGate>;
 }

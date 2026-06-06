@@ -61,6 +61,10 @@ export interface RecommendedItem {
   win_rate?: number;
   win_count?: number;
   lose_count?: number;
+  recommend_count?: number;
+  not_recommend_count?: number;
+  /** 로그인 사용자 기준 UP / DOWN / null */
+  my_vote?: string;
   [key: string]: unknown;
 }
 
@@ -83,6 +87,8 @@ export interface MonsterDetailParams {
   historyOffset?: number;
   recommendedLimit?: number;
   recommendedOffset?: number;
+  recentLimit?: number;
+  recentOffset?: number;
 }
 
 /** 기본 정보만 */
@@ -100,5 +106,23 @@ export interface MonsterDetailRecommendedResponse {
 export interface MonsterDetailHistoryResponse {
   historyList: HistoryItem[];
   historyTotalCount: number;
+}
+
+export interface RecentBattleItem {
+  log_timestamp?: string | number;
+  wizard_name?: string;
+  opp_wizard_name?: string;
+  win_lose?: string;
+  opp_guild_name?: string;
+  atk_guild_name?: string;
+  atk_image_url1?: string;
+  atk_image_url2?: string;
+  atk_image_url3?: string;
+}
+
+/** 최근 전적 */
+export interface MonsterDetailRecentBattlesResponse {
+  recentBattleList: RecentBattleItem[];
+  recentBattleTotalCount: number;
 }
 

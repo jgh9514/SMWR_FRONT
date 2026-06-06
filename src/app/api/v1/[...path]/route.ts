@@ -201,15 +201,20 @@ async function proxyRequest(
 
     const pathJoined = pathSegments.join('/');
     const isRtaUpload = pathJoined.includes('rta-upload');
-    /** 기본 fetch 무제한 대기 시 브라우저/axios는 먼저 끊기고 프록시만 멈춘 것처럼 보일 수 있음 — rta-upload 만 장시간 허용 */
+    const isBatchManualRun = pathJoined === 'batch/run';
+    /** 기본 fetch 무제한 대기 시 브라우저/axios는 먼저 끊기고 프록시만 멈춘 것처럼 보일 수 있음 */
     const fetchInit: RequestInit = {
       method,
       headers,
       body: body || undefined,
     };
     const abortSignalAny = AbortSignal as typeof AbortSignal & { timeout?: (ms: number) => AbortSignal };
-    if (isRtaUpload && typeof abortSignalAny.timeout === 'function') {
-      fetchInit.signal = abortSignalAny.timeout(180000);
+    if (typeof abortSignalAny.timeout === 'function') {
+      if (isRtaUpload) {
+        fetchInit.signal = abortSignalAny.timeout(180000);
+      } else if (isBatchManualRun) {
+        fetchInit.signal = abortSignalAny.timeout(7_200_000);
+      }
     }
 
     let response: Response;

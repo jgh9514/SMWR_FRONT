@@ -16,6 +16,8 @@ export const SCROLL_THROTTLE_MS = 150;
 export const API_TIMEOUT_MS = 30000;
 /** 실레나 rta-upload: 전투당 다건 INSERT로 청크당 수십 초 걸릴 수 있음 (30초 기본 타임아웃으로 조용히 끊김 방지) */
 export const RTA_UPLOAD_TIMEOUT_MS = 180000;
+/** 수동 배치 동기 실행 — 완료까지 HTTP 연결 유지 (기본 2시간, WAS smw.batch.manual-run.wait-timeout-ms 와 맞춤) */
+export const BATCH_MANUAL_RUN_TIMEOUT_MS = 7_200_000;
 export const QUERY_STALE_TIME_MS = 5 * 60 * 1000; // 5분
 export const QUERY_GC_TIME_MS = 10 * 60 * 1000; // 10분
 

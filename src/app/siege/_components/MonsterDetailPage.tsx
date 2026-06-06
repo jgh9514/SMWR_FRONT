@@ -7,13 +7,13 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
   Container,
   Typography,
   Avatar,
   LinearProgress,
   Pagination,
   Chip,
+  IconButton,
   useMediaQuery,
   useTheme,
   CircularProgress,
@@ -23,12 +23,15 @@ import {
 import type { Theme } from '@mui/material/styles';
 import { alpha } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import StarIcon from '@mui/icons-material/Star';
+import BattleHistoryMonsterCell from '@/features/battle-history/components/BattleHistoryMonsterCell';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import {
   useMonsterDetailBasic,
   useMonsterDetailRecommended,
   useMonsterDetailHistory,
+  useMonsterDetailRecentBattles,
   useDeckVoteMutation,
 } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
@@ -36,7 +39,7 @@ import AddDeckPopup from '@/components/popup/AddDeckPopup';
 import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
 import { getMonsterImageUrl } from '@/shared/utils/image';
-import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData } from '@/types';
+import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData, RecentBattleItem } from '@/types';
 import { useSiegeGuildViewParams } from '@/shared/hooks/useSiegeGuildViewParams';
 
 /** 이력 API의 deck_id(또는 camelCase) — 있으면 등록 공덱 투표로 병합 */
@@ -108,36 +111,58 @@ function HistorySkeleton() {
   );
 }
 
-function siegeDetailCardHeaderSx(t: Theme) {
+function sectionCardSx(t: Theme) {
   return {
-    background: `linear-gradient(135deg, ${t.palette.primary.main} 0%, ${alpha(t.palette.primary.main, 0.85)} 100%)`,
-    color: t.palette.primary.contrastText,
-    borderBottom: '1px solid',
-    borderColor: t.palette.divider,
-    '& .MuiCardHeader-title': {
-      color: t.palette.primary.contrastText,
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: alpha(t.palette.divider, 0.6),
+    boxShadow: t.palette.mode === 'dark'
+      ? '0 2px 12px rgba(0,0,0,0.3)'
+      : '0 2px 12px rgba(15,23,42,0.06)',
+    overflow: 'hidden',
+  };
+}
+
+function sectionHeaderSx(t: Theme) {
+  return {
+    px: 2.5,
+    py: 1.5,
+    borderBottom: `1px solid ${alpha(t.palette.divider, 0.5)}`,
+    background: t.palette.mode === 'dark'
+      ? alpha(t.palette.background.default, 0.6)
+      : alpha(t.palette.grey[50], 0.8),
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  };
+}
+
+function statBoxSx(t: Theme, highlight?: boolean) {
+  return {
+    textAlign: 'center' as const,
+    px: 1.5,
+    py: 1.25,
+    borderRadius: 1.5,
+    border: '1px solid',
+    borderColor: highlight ? alpha(t.palette.primary.main, 0.3) : alpha(t.palette.divider, 0.6),
+    bgcolor: highlight
+      ? alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.15 : 0.06)
+      : alpha(t.palette.background.default, t.palette.mode === 'dark' ? 0.4 : 0.5),
+  };
+}
+
+function listRowSx(t: Theme) {
+  return {
+    borderRadius: 1.5,
+    border: '1px solid',
+    borderColor: alpha(t.palette.divider, 0.5),
+    transition: 'border-color 0.18s, box-shadow 0.18s',
+    '&:hover': {
+      borderColor: alpha(t.palette.primary.main, 0.4),
+      boxShadow: `0 2px 10px ${alpha(t.palette.primary.main, 0.08)}`,
     },
   };
 }
-
-function siegeDetailMutedPanelSx(t: Theme) {
-  return {
-    bgcolor: alpha(t.palette.primary.main, t.palette.mode === 'dark' ? 0.1 : 0.06),
-    borderRadius: 1,
-    border: '1px solid',
-    borderColor: t.palette.divider,
-  };
-}
-
-const siegeDetailListCardSx = {
-  border: '1px solid',
-  borderColor: 'divider',
-  transition: 'all 0.2s',
-  '&:hover': {
-    boxShadow: 2,
-    borderColor: 'primary.light',
-  },
-} as const;
 
 export default function MonsterDetailPage() {
   const params = useParams();
@@ -191,8 +216,10 @@ export default function MonsterDetailPage() {
   const siegeGuildViewParams = useSiegeGuildViewParams();
   const [historyPage, setHistoryPage] = useState(1);
   const [recommendedPage, setRecommendedPage] = useState(1);
+  const [recentPage, setRecentPage] = useState(1);
   const historyLimit = DEFAULT_PAGE_SIZE;
   const recommendedLimit = 5;
+  const recentLimit = DEFAULT_PAGE_SIZE;
 
   const baseParams = useMemo<MonsterDetailParams | null>(() => {
     const dm1 = schData.dm1?.trim();
@@ -227,9 +254,19 @@ export default function MonsterDetailPage() {
     };
   }, [baseParams, historyLimit, historyPage]);
 
+  const recentParams = useMemo<MonsterDetailParams | null>(() => {
+    if (!baseParams) return null;
+    return {
+      ...baseParams,
+      recentLimit,
+      recentOffset: recentPage,
+    };
+  }, [baseParams, recentLimit, recentPage]);
+
   const basic = useMonsterDetailBasic(baseParams);
   const recommended = useMonsterDetailRecommended(recommendedParams);
   const history = useMonsterDetailHistory(historyParams);
+  const recentBattles = useMonsterDetailRecentBattles(recentParams);
 
   const enemyData =
     basic.data?.enemyData && Array.isArray(basic.data.enemyData) && basic.data.enemyData.length > 0
@@ -239,6 +276,8 @@ export default function MonsterDetailPage() {
   const recommendedTotalCount = recommended.data?.recommendedTotalCount || 0;
   const historyList = history.data?.historyList || [];
   const historyTotalCount = history.data?.historyTotalCount || 0;
+  const recentBattleList = recentBattles.data?.recentBattleList || [];
+  const recentBattleTotalCount = recentBattles.data?.recentBattleTotalCount || 0;
 
   const [addPopupOpen, setAddPopupOpen] = useState(false);
   const [deckDetailPopupOpen, setDeckDetailPopupOpen] = useState(false);
@@ -381,97 +420,77 @@ export default function MonsterDetailPage() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 4 } }}>
-      <Container maxWidth="xl">
-        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Button
-            variant="outlined"
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 5 } }}>
+      <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3, xl: 4 } }}>
+        {/* 페이지 헤더 */}
+        <Box sx={{ mb: { xs: 2.5, md: 3.5 }, display: 'flex', alignItems: 'center', gap: 2 }}>
+          <IconButton
             onClick={goBack}
-            startIcon={<ArrowBackIcon />}
-            size={mobile ? 'small' : 'medium'}
-            sx={{
-              borderColor: 'divider',
-              color: 'text.primary',
-              '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
-            }}
+            size="small"
+            sx={(t) => ({
+              border: `1px solid ${alpha(t.palette.divider, 0.6)}`,
+              borderRadius: 1.5,
+              p: 0.75,
+              '&:hover': { bgcolor: 'action.hover', borderColor: 'primary.main' },
+            })}
           >
-            뒤로가기
-          </Button>
-          <Typography
-            variant="h5"
-            component="h1"
-            sx={{ fontWeight: 600, fontSize: { xs: '20px', md: '28px' }, color: 'text.primary' }}
-          >
-            몬스터 상세 정보
-          </Typography>
+            <ArrowBackIcon fontSize="small" />
+          </IconButton>
+          <Box>
+            <Typography variant={mobile ? 'h6' : 'h5'} component="h1" fontWeight={700}>
+              방어덱 상세
+            </Typography>
+            {enemyData && (
+              <Typography variant="caption" color="text.secondary">
+                {[enemyData.m1_kr_name, enemyData.m2_kr_name, enemyData.m3_kr_name].filter(Boolean).join(' · ')}
+              </Typography>
+            )}
+          </Box>
         </Box>
 
         <Box
           sx={{
             display: 'grid',
-            /* PC: 기본정보 전폭 → 추천공덱 | 공성률 1:1 */
-            gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'repeat(2, minmax(0, 1fr))',
+              lg: 'repeat(3, minmax(0, 1fr))',
+            },
             gap: { xs: 2, md: 3 },
           }}
         >
-          {/* 기본 정보 — md+ 한 줄 전폭 */}
-          <Box sx={{ gridColumn: { md: '1 / -1' }, minWidth: 0 }}>
-            <Card sx={{ height: '100%', boxShadow: 2 }}>
-              <CardHeader
-                title="기본 정보"
-                sx={siegeDetailCardHeaderSx}
-                titleTypographyProps={{ variant: mobile ? 'subtitle1' : 'h6', fontWeight: 600 }}
-              />
+          {/* ── 기본 정보 ── */}
+          <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
+            <Card sx={(t) => sectionCardSx(t)}>
+              <Box sx={(t) => sectionHeaderSx(t)}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.primary">기본 정보</Typography>
+              </Box>
               {basic.isLoading && !enemyData ? (
                 <BasicInfoSkeleton />
               ) : enemyData ? (
-                <CardContent sx={{ '&:last-child': { paddingBottom: '16px' } }}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      flexDirection: { xs: 'column', md: 'row' },
-                      alignItems: { md: 'stretch' },
-                      gap: { xs: 2, md: 3 },
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        gap: { xs: 1, md: 2 },
-                        flexShrink: 0,
-                      }}
-                    >
+                <CardContent sx={{ p: { xs: 2.5, md: 3 }, '&:last-child': { pb: { xs: 2.5, md: 3 } } }}>
+                  {/* 상단: 몬스터 이미지 + 통계 */}
+                  <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 2.5, sm: 3 }, alignItems: { sm: 'center' }, mb: enemyData.leader_skill_description ? { xs: 2, md: 2.5 } : 0 }}>
+                    {/* 몬스터 이미지 */}
+                    <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' }, gap: { xs: 3, md: 4 }, flexShrink: 0 }}>
                       {[1, 2, 3].map((index) => {
                         const imageUrl = enemyData[`image_url${index}` as keyof EnemyData] as string | undefined;
                         const monsterName = enemyData[`m${index}_kr_name` as keyof EnemyData] as string | undefined;
                         return (
                           <Box key={index} sx={{ textAlign: 'center' }}>
-                            {imageUrl && (
-                              <Avatar
-                                src={getMonsterImageUrl(imageUrl)}
-                                sx={{
-                                  width: { xs: 80, md: 96 },
-                                  height: { xs: 80, md: 96 },
-                                  border: '2px solid',
-                                  borderColor: 'primary.main',
-                                  boxShadow: 2,
-                                  bgcolor: 'background.paper',
-                                  '& img': { objectFit: 'contain' },
-                                }}
-                              />
-                            )}
+                            <Avatar
+                              src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
+                              sx={(t) => ({
+                                width: { xs: 80, md: 100 },
+                                height: { xs: 80, md: 100 },
+                                border: `2px solid ${alpha(t.palette.primary.main, 0.45)}`,
+                                boxShadow: `0 6px 20px ${alpha(t.palette.primary.main, 0.18)}`,
+                                bgcolor: alpha(t.palette.background.default, 0.5),
+                                '& img': { objectFit: 'contain' },
+                              })}
+                            />
                             {monsterName && (
-                              <Typography
-                                variant="caption"
-                                sx={{
-                                  mt: 0.5,
-                                  display: 'block',
-                                  fontSize: { xs: '11px', md: '12px' },
-                                  color: 'text.primary',
-                                  fontWeight: 500,
-                                }}
-                              >
+                              <Typography variant="caption" display="block" mt={1} fontWeight={600} color="text.secondary" sx={{ fontSize: '0.72rem' }}>
                                 {monsterName}
                               </Typography>
                             )}
@@ -479,100 +498,65 @@ export default function MonsterDetailPage() {
                         );
                       })}
                     </Box>
-                    {enemyData?.leader_skill_description && (
-                      <Box
-                        sx={(t) => ({
-                          p: 2,
-                          display: 'flex',
-                          gap: 2,
-                          alignItems: 'center',
-                          flex: 1,
-                          minWidth: 0,
-                          ...siegeDetailMutedPanelSx(t),
-                        })}
-                      >
-                        {enemyData?.leader_icon && (
-                          <Box
-                            component="img"
-                            src={getMonsterImageUrl(enemyData.leader_icon)}
-                            alt="리더 스킬"
-                            sx={{
-                              width: { xs: 48, md: 56 },
-                              height: { xs: 48, md: 56 },
-                              border: '2px solid',
-                              borderColor: 'primary.main',
-                              boxShadow: 1,
-                              bgcolor: 'background.paper',
-                              borderRadius: 0,
-                              objectFit: 'contain',
-                              flexShrink: 0,
-                            }}
-                          />
-                        )}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              fontWeight: 600,
-                              display: 'block',
-                              mb: 1,
-                              color: 'text.secondary',
-                              fontSize: { xs: '12px', md: '14px' },
-                            }}
-                          >
-                            리더 스킬
-                          </Typography>
-                          <Typography
-                            variant="body2"
-                            sx={{ fontSize: { xs: '12px', md: '14px' }, color: 'text.primary', lineHeight: 1.6 }}
-                          >
-                            {enemyData.leader_skill_description}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-                    <Box
-                      sx={{
-                        display: 'grid',
-                        gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, minmax(72px, 1fr))' },
-                        gap: 2,
-                        flexShrink: 0,
-                        width: { xs: '100%', md: 'auto' },
-                        minWidth: { md: 280 },
-                      }}
-                    >
+
+                    {/* 통계 — 오른쪽 또는 아래 */}
+                    <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: { xs: 1.5, md: 2 } }}>
                       {[
-                        { value: enemyData?.total_rate || 0, label: '공성률' },
-                        { value: enemyData?.total_count || 0, label: '총 게임' },
-                        { value: enemyData?.win_count || 0, label: '승리' },
-                        { value: enemyData?.lose_count || 0, label: '패배' },
-                      ].map((item) => (
-                        <Box key={item.label}>
-                          <Box
-                            sx={(t) => ({
-                              textAlign: 'center',
-                              p: { xs: 2, md: 1.5 },
-                              height: '100%',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'center',
-                              ...siegeDetailMutedPanelSx(t),
-                            })}
-                          >
-                            <Typography
-                              variant={mobile ? 'h6' : 'h5'}
-                              sx={{ fontWeight: 700, mb: 0.5, color: 'text.primary' }}
-                            >
-                              {item.value}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              {item.label}
-                            </Typography>
-                          </Box>
+                        { value: `${enemyData.total_rate ?? 0}%`, label: '공성률', highlight: true },
+                        { value: enemyData.total_count ?? 0, label: '총 게임', highlight: false },
+                        { value: enemyData.win_count ?? 0, label: '승리', highlight: false },
+                        { value: enemyData.lose_count ?? 0, label: '패배', highlight: false },
+                      ].map((s) => (
+                        <Box key={s.label} sx={(t) => ({ ...statBoxSx(t, s.highlight), display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, py: { xs: 1.5, md: 2 } })}>
+                          <Typography variant="h6" fontWeight={800} color={s.highlight ? 'primary.main' : 'text.primary'} lineHeight={1}>
+                            {s.value}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                            {s.label}
+                          </Typography>
                         </Box>
                       ))}
                     </Box>
                   </Box>
+
+                  {/* 하단: 리더 스킬 */}
+                  {enemyData.leader_skill_description && (
+                    <Box
+                      sx={(t) => ({
+                        display: 'flex',
+                        gap: 2,
+                        alignItems: 'center',
+                        p: { xs: 1.5, md: 2 },
+                        borderRadius: 1.5,
+                        border: `1px solid ${alpha(t.palette.divider, 0.5)}`,
+                        bgcolor: alpha(t.palette.background.default, t.palette.mode === 'dark' ? 0.4 : 0.5),
+                      })}
+                    >
+                      {enemyData.leader_icon && (
+                        <Box
+                          component="img"
+                          src={getMonsterImageUrl(enemyData.leader_icon)}
+                          alt="리더 스킬"
+                          sx={(t) => ({
+                            width: { xs: 44, md: 52 },
+                            height: { xs: 44, md: 52 },
+                            border: `1.5px solid ${alpha(t.palette.primary.main, 0.35)}`,
+                            borderRadius: 0.75,
+                            objectFit: 'contain',
+                            flexShrink: 0,
+                          })}
+                        />
+                      )}
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" fontWeight={700} color="text.secondary" display="block" mb={0.5} sx={{ fontSize: '0.68rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                          리더 스킬
+                        </Typography>
+                        <Typography variant="body2" color="text.primary" sx={{ fontSize: { xs: '0.82rem', md: '0.9rem' }, lineHeight: 1.6 }}>
+                          {enemyData.leader_skill_description}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
                 </CardContent>
               ) : (
                 <BasicInfoSkeleton />
@@ -580,99 +564,102 @@ export default function MonsterDetailPage() {
             </Card>
           </Box>
 
-          {/* 추천 공덱 — md+ 좌 50% */}
+          {/* ── 추천 공덱 ── */}
           <Box sx={{ minWidth: 0 }}>
-            <Card sx={{ height: '100%', boxShadow: 2 }}>
-              <CardHeader
-                title={
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                    <span>추천 공덱</span>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={() => setAddPopupOpen(true)}
-                      sx={(t) => ({
-                        bgcolor: alpha(t.palette.common.white, 0.18),
-                        color: t.palette.primary.contrastText,
-                        '&:hover': { bgcolor: alpha(t.palette.common.white, 0.28) },
-                      })}
-                    >
-                      추가
-                    </Button>
-                  </Box>
-                }
-                sx={siegeDetailCardHeaderSx}
-                titleTypographyProps={{ variant: mobile ? 'subtitle1' : 'h6', fontWeight: 600 }}
-              />
+            <Card sx={(t) => ({ ...sectionCardSx(t), height: '100%' })}>
+              <Box sx={(t) => sectionHeaderSx(t)}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.primary">추천 공덱</Typography>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setAddPopupOpen(true)}
+                  sx={{ fontSize: '0.75rem', px: 1.5, py: 0.4, minWidth: 0 }}
+                >
+                  + 추가
+                </Button>
+              </Box>
               {recommended.isLoading && !recommended.data ? (
                 <RecommendedSkeleton />
               ) : (
-                <CardContent>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: { xs: 2, md: 2.5 } } }}>
                   {recommendedList.length === 0 ? (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        추천 공덱이 없습니다
-                      </Typography>
+                    <Box sx={{ textAlign: 'center', py: 5 }}>
+                      <Typography variant="body2" color="text.disabled">추천 공덱이 없습니다</Typography>
                     </Box>
                   ) : (
                     <>
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
                         {recommendedList.map((item: RecommendedItem, idx: number) => (
-                          <Card key={idx} variant="outlined" sx={siegeDetailListCardSx}>
-                            <CardContent sx={{ py: 1.5, '&:last-child': { paddingBottom: '12px' } }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                  {[1, 2, 3].map((i) => {
-                                    const imageUrl = item[`image_url${i}` as keyof RecommendedItem] as string | undefined;
-                                    return (
-                                      imageUrl && (
-                                        <Avatar
-                                          key={i}
-                                          src={getMonsterImageUrl(imageUrl)}
-                                          sx={{
-                                            width: { xs: 34, sm: 38, md: 50 },
-                                            height: { xs: 34, sm: 38, md: 50 },
-                                            border: '2px solid',
-                                            borderColor: 'primary.main',
-                                            borderWidth: { xs: 1.5, md: 2 },
-                                            boxShadow: 1,
-                                            flexShrink: 0,
-                                            bgcolor: 'background.paper',
-                                            '& img': { objectFit: 'contain' },
-                                          }}
-                                        />
-                                      )
-                                    );
-                                  })}
-                                </Box>
-                                <Button
+                          <Box
+                            key={idx}
+                            onClick={() => { setSelectedDeckItem(item); setDeckDetailPopupOpen(true); }}
+                            sx={(t) => ({
+                              ...listRowSx(t),
+                              px: 1.5,
+                              py: 1.25,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              cursor: 'pointer',
+                            })}
+                          >
+                            <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                              {[1, 2, 3].map((i) => {
+                                const imageUrl = item[`image_url${i}` as keyof RecommendedItem] as string | undefined;
+                                return imageUrl ? (
+                                  <Avatar
+                                    key={i}
+                                    src={getMonsterImageUrl(imageUrl)}
+                                    sx={(t) => ({
+                                      width: { xs: 36, md: 44 },
+                                      height: { xs: 36, md: 44 },
+                                      border: `1.5px solid ${alpha(t.palette.primary.main, 0.4)}`,
+                                      bgcolor: 'background.paper',
+                                      '& img': { objectFit: 'contain' },
+                                    })}
+                                  />
+                                ) : null;
+                              })}
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              {item.win_rate != null && (
+                                <Chip
+                                  label={`${item.win_rate}%`}
                                   size="small"
-                                  variant="outlined"
-                                  onClick={() => {
-                                    setSelectedDeckItem(item);
-                                    setDeckDetailPopupOpen(true);
-                                  }}
-                                  sx={{
-                                    borderColor: 'divider',
-                                    color: 'text.primary',
-                                    '&:hover': { borderColor: 'primary.main', bgcolor: 'action.hover' },
-                                  }}
-                                >
-                                  상세보기
-                                </Button>
+                                  sx={(t) => ({
+                                    height: 22,
+                                    fontSize: '0.72rem',
+                                    fontWeight: 700,
+                                    bgcolor: (item.win_rate ?? 0) >= 50
+                                      ? alpha(t.palette.primary.main, 0.12)
+                                      : alpha(t.palette.text.secondary, 0.1),
+                                    color: (item.win_rate ?? 0) >= 50 ? 'primary.main' : 'text.secondary',
+                                    border: `1px solid ${(item.win_rate ?? 0) >= 50 ? alpha(t.palette.primary.main, 0.3) : 'transparent'}`,
+                                  })}
+                                />
+                              )}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }}>
+                                <ThumbUpIcon sx={{ fontSize: 11, color: 'primary.main', opacity: 0.8 }} />
+                                <Typography variant="caption" sx={{ fontSize: '0.68rem', color: 'primary.main', fontWeight: 600 }}>
+                                  {item.recommend_count ?? 0}
+                                </Typography>
+                                <ThumbDownIcon sx={{ fontSize: 11, color: 'error.main', opacity: 0.8, ml: 0.5 }} />
+                                <Typography variant="caption" sx={{ fontSize: '0.68rem', color: 'error.main', fontWeight: 600 }}>
+                                  {item.not_recommend_count ?? 0}
+                                </Typography>
                               </Box>
-                            </CardContent>
-                          </Card>
+                            </Box>
+                          </Box>
                         ))}
                       </Box>
                       {recommendedTotalCount > recommendedLimit && (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                           <Pagination
                             count={Math.ceil(recommendedTotalCount / recommendedLimit)}
                             page={recommendedPage}
                             onChange={(_, page) => setRecommendedPage(page)}
                             color="primary"
-                            size={mobile ? 'small' : 'medium'}
+                            size="small"
                           />
                         </Box>
                       )}
@@ -683,144 +670,127 @@ export default function MonsterDetailPage() {
             </Card>
           </Box>
 
-          {/* 공성률 정보 — md+ 우 50% */}
+          {/* ── 공성률 정보 ── */}
           <Box sx={{ minWidth: 0 }}>
-            <Card sx={{ height: '100%', boxShadow: 2 }}>
-              <CardHeader
-                title="공성률 정보"
-                sx={siegeDetailCardHeaderSx}
-                titleTypographyProps={{ variant: mobile ? 'subtitle1' : 'h6', fontWeight: 600 }}
-              />
+            <Card sx={(t) => ({ ...sectionCardSx(t), height: '100%' })}>
+              <Box sx={(t) => sectionHeaderSx(t)}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.primary">공성률 정보</Typography>
+                {history.isFetching && <CircularProgress size={14} sx={{ opacity: 0.5 }} />}
+              </Box>
               {history.isLoading && !history.data ? (
                 <HistorySkeleton />
               ) : (
-                <CardContent>
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: { xs: 2, md: 2.5 } } }}>
                   {historyList.length === 0 ? (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        공격 이력이 없습니다
-                      </Typography>
+                    <Box sx={{ textAlign: 'center', py: 5 }}>
+                      <Typography variant="body2" color="text.disabled">공격 이력이 없습니다</Typography>
                     </Box>
                   ) : (
                     <>
-                      {history.isFetching && (
-                        <Box sx={{ position: 'relative', mb: 1 }}>
-                          <LinearProgress
-                            sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 1 }}
-                          />
-                        </Box>
-                      )}
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                        {historyList.map((item: HistoryItem, idx: number) => (
-                          <Card key={idx} variant="outlined" sx={siegeDetailListCardSx}>
-                            <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { paddingBottom: '12px' } }}>
-                              <Box
-                                sx={{
-                                  display: 'grid',
-                                  gridTemplateColumns: {
-                                    xs: '1fr',
-                                    sm: 'auto minmax(0, 1fr) auto',
-                                  },
-                                  gap: { xs: 1.25, sm: 2 },
-                                  alignItems: 'center',
-                                }}
-                              >
-                                <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, justifyContent: { xs: 'center', sm: 'flex-start' } }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
+                        {historyList.map((item: HistoryItem, idx: number) => {
+                          const rate = item.total_rate ?? 0;
+                          const isHigh = rate >= 50;
+                          const canVote = Boolean(schData.dm1 && schData.dm2 && schData.dm3) &&
+                            Boolean(item.atk_monster_1 && item.atk_monster_2 && item.atk_monster_3);
+                          const myV = String(item.my_vote ?? '').trim().toUpperCase();
+                          const upN = Number(item.recommend_count ?? 0);
+                          const downN = Number(item.not_recommend_count ?? 0);
+                          const busy = deckVoteMutation.isPending;
+                          const historyDeckId = getHistoryRowDeckId(item);
+                          const handleHistoryRowClick = historyDeckId ? () => {
+                            const deckItem: RecommendedItem = {
+                              deck_id: historyDeckId,
+                              def_monster_1: schData.dm1,
+                              def_monster_2: schData.dm2,
+                              def_monster_3: schData.dm3,
+                              atk_monster_1: item.atk_monster_1 ? String(item.atk_monster_1) : undefined,
+                              atk_monster_2: item.atk_monster_2 ? String(item.atk_monster_2) : undefined,
+                              atk_monster_3: item.atk_monster_3 ? String(item.atk_monster_3) : undefined,
+                              image_url1: item.image_url1,
+                              image_url2: item.image_url2,
+                              image_url3: item.image_url3,
+                            };
+                            setSelectedDeckItem(deckItem);
+                            setDeckDetailPopupOpen(true);
+                          } : undefined;
+                          return (
+                            <Box
+                              key={idx}
+                              onClick={handleHistoryRowClick}
+                              sx={(t) => ({
+                                ...listRowSx(t),
+                                px: 1.5,
+                                py: 1.25,
+                                cursor: historyDeckId ? 'pointer' : 'default',
+                              })}
+                            >
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 1.5 } }}>
+                                {/* 몬스터 아이콘 */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                                  {historyDeckId && (
+                                    <StarIcon sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0 }} />
+                                  )}
+                                  <Box sx={{ display: 'flex' }}>
                                   {[1, 2, 3].map((i) => {
-                                    const imageUrl = item[`image_url${i}` as keyof HistoryItem] as string | undefined;
-                                    if (i === 3 && !imageUrl) return null;
+                                    const url = item[`image_url${i}` as keyof HistoryItem] as string | undefined;
+                                    if (i === 3 && !url) return null;
                                     return (
                                       <Avatar
                                         key={i}
-                                        src={imageUrl ? getMonsterImageUrl(imageUrl) : undefined}
-                                        sx={{
-                                          width: { xs: 44, md: 52 },
-                                          height: { xs: 44, md: 52 },
-                                          border: '2px solid',
-                                          borderColor: 'primary.main',
-                                          boxShadow: 1,
-                                          ml: i > 1 ? -0.5 : 0,
-                                          flexShrink: 0,
+                                        src={url ? getMonsterImageUrl(url) : undefined}
+                                        sx={(t) => ({
+                                          width: { xs: 38, md: 46 },
+                                          height: { xs: 38, md: 46 },
+                                          border: `1.5px solid ${alpha(t.palette.primary.main, 0.35)}`,
+                                          ml: i > 1 ? -1 : 0,
                                           bgcolor: 'background.paper',
                                           '& img': { objectFit: 'contain' },
-                                        }}
+                                        })}
                                       />
                                     );
                                   })}
+                                  </Box>
                                 </Box>
-                                <Box sx={{ minWidth: 0, width: '100%' }}>
-                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1 }}>
-                                    <Chip
-                                      label={`${item.total_rate || 0}%`}
-                                      size="small"
-                                      sx={(t) => ({
-                                        fontWeight: 600,
-                                        height: 24,
-                                        bgcolor:
-                                          item.total_rate && item.total_rate >= 50
-                                            ? t.palette.primary.main
-                                            : alpha(t.palette.text.secondary, 0.25),
-                                        color:
-                                          item.total_rate && item.total_rate >= 50
-                                            ? t.palette.primary.contrastText
-                                            : t.palette.text.primary,
-                                      })}
-                                    />
-                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem', flexShrink: 0 }}>
-                                      {item.win_count || 0}승 {item.lose_count || 0}패
+
+                                {/* 승률 바 */}
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+                                    <Typography variant="caption" fontWeight={700} color={isHigh ? 'primary.main' : 'text.secondary'} sx={{ fontSize: '0.78rem' }}>
+                                      {rate}%
+                                    </Typography>
+                                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
+                                      {item.win_count ?? 0}승 {item.lose_count ?? 0}패
                                     </Typography>
                                   </Box>
                                   <LinearProgress
                                     variant="determinate"
-                                    value={item.total_rate || 0}
-                                    color={item.total_rate && item.total_rate >= 50 ? 'primary' : 'inherit'}
+                                    value={rate}
                                     sx={(t) => ({
-                                      height: 6,
-                                      borderRadius: 1,
-                                      bgcolor: alpha(t.palette.divider, 0.8),
-                                      ...(!(item.total_rate && item.total_rate >= 50) && {
-                                        '& .MuiLinearProgress-bar': {
-                                          bgcolor: t.palette.text.disabled,
-                                        },
-                                      }),
+                                      height: 5,
+                                      borderRadius: 99,
+                                      bgcolor: alpha(t.palette.divider, 0.5),
+                                      '& .MuiLinearProgress-bar': {
+                                        borderRadius: 99,
+                                        bgcolor: isHigh ? t.palette.primary.main : alpha(t.palette.text.secondary, 0.4),
+                                      },
                                     })}
                                   />
                                 </Box>
-                                <Box
-                                  sx={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 0.75,
-                                    flexShrink: 0,
-                                    justifyContent: { xs: 'center', sm: 'flex-end' },
-                                  }}
-                                >
+
+                                {/* 투표 버튼 */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
                                   {(() => {
-                                    const canVote =
-                                      Boolean(schData.dm1 && schData.dm2 && schData.dm3) &&
-                                      Boolean(
-                                        item.atk_monster_1 &&
-                                          item.atk_monster_2 &&
-                                          item.atk_monster_3,
-                                      );
-                                    const myV = String(item.my_vote ?? '')
-                                      .trim()
-                                      .toUpperCase();
-                                    const upN = Number(item.recommend_count ?? 0);
-                                    const downN = Number(item.not_recommend_count ?? 0);
-                                    const busy = deckVoteMutation.isPending;
-                                    const buttons = (
+                                    const voteButtons = (
                                       <>
                                         <Button
                                           size="small"
                                           variant={myV === 'UP' ? 'contained' : 'outlined'}
                                           color="primary"
-                                          startIcon={<ThumbUpIcon sx={{ fontSize: 18 }} />}
-                                          onClick={() =>
-                                            sendHistoryVote(item, myV === 'UP' ? 'CLEAR' : 'UP')
-                                          }
+                                          startIcon={<ThumbUpIcon sx={{ fontSize: 14 }} />}
+                                          onClick={() => sendHistoryVote(item, myV === 'UP' ? 'CLEAR' : 'UP')}
                                           disabled={busy || !canVote}
-                                          sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: '0.8rem' }}
+                                          sx={{ minWidth: 0, px: 0.75, py: 0.25, fontSize: '0.72rem' }}
                                         >
                                           {upN}
                                         </Button>
@@ -828,47 +798,242 @@ export default function MonsterDetailPage() {
                                           size="small"
                                           variant={myV === 'DOWN' ? 'contained' : 'outlined'}
                                           color="error"
-                                          startIcon={<ThumbDownIcon sx={{ fontSize: 18 }} />}
-                                          onClick={() =>
-                                            sendHistoryVote(item, myV === 'DOWN' ? 'CLEAR' : 'DOWN')
-                                          }
+                                          startIcon={<ThumbDownIcon sx={{ fontSize: 14 }} />}
+                                          onClick={() => sendHistoryVote(item, myV === 'DOWN' ? 'CLEAR' : 'DOWN')}
                                           disabled={busy || !canVote}
-                                          sx={{ minWidth: 0, px: 1, py: 0.25, fontSize: '0.8rem' }}
+                                          sx={{ minWidth: 0, px: 0.75, py: 0.25, fontSize: '0.72rem' }}
                                         >
                                           {downN}
                                         </Button>
                                       </>
                                     );
-                                    if (!canVote) {
-                                      return (
-                                        <Tooltip
-                                          title="전투 이력에서 공격 덱(3마리) 정보를 찾을 수 없을 때는 투표할 수 없습니다."
-                                          arrow
-                                          placement="top"
-                                        >
-                                          <Box
-                                            component="span"
-                                            sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}
-                                          >
-                                            {buttons}
-                                          </Box>
-                                        </Tooltip>
-                                      );
-                                    }
-                                    return buttons;
+                                    return canVote ? voteButtons : (
+                                      <Tooltip title="공격 덱 정보가 없어 투표할 수 없습니다." arrow placement="top">
+                                        <Box component="span" sx={{ display: 'inline-flex', gap: 0.5 }}>{voteButtons}</Box>
+                                      </Tooltip>
+                                    );
                                   })()}
                                 </Box>
                               </Box>
-                            </CardContent>
-                          </Card>
-                        ))}
+                            </Box>
+                          );
+                        })}
                       </Box>
                       {historyTotalCount > historyLimit && (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
                           <Pagination
                             count={Math.ceil(historyTotalCount / historyLimit)}
                             page={historyPage}
                             onChange={(_, page) => setHistoryPage(page)}
+                            color="primary"
+                            size="small"
+                          />
+                        </Box>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              )}
+            </Card>
+          </Box>
+
+          {/* ── 최근 전적 ── */}
+          <Box sx={{ gridColumn: { md: '1 / -1', lg: 'auto' }, minWidth: 0 }}>
+            <Card sx={(t) => sectionCardSx(t)}>
+              <Box sx={(t) => sectionHeaderSx(t)}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.primary">최근 전적</Typography>
+                {recentBattles.isFetching && <CircularProgress size={14} sx={{ opacity: 0.5 }} />}
+              </Box>
+              {recentBattles.isLoading && !recentBattles.data ? (
+                <HistorySkeleton />
+              ) : (
+                <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: { xs: 2, md: 2.5 } } }}>
+                  {recentBattleList.length === 0 ? (
+                    <Box sx={{ textAlign: 'center', py: 4 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        전적이 없습니다
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <>
+                      {recentBattles.isFetching && (
+                        <Box sx={{ position: 'relative', mb: 1 }}>
+                          <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, zIndex: 1 }} />
+                        </Box>
+                      )}
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {recentBattleList.map((item: RecentBattleItem, idx: number) => {
+                          const isWin = String(item.win_lose) === '1';
+                          const tsNum = typeof item.log_timestamp === 'number'
+                            ? item.log_timestamp * 1000
+                            : item.log_timestamp
+                              ? new Date(item.log_timestamp as string).getTime()
+                              : null;
+                          const dateStr = tsNum && !Number.isNaN(tsNum)
+                            ? new Date(tsNum).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })
+                            : null;
+                          const timeStr = tsNum && !Number.isNaN(tsNum)
+                            ? new Date(tsNum).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
+                            : null;
+                          const atkUrls = [item.atk_image_url1, item.atk_image_url2, item.atk_image_url3];
+                          const defUrls = [enemyData?.image_url1, enemyData?.image_url2, enemyData?.image_url3];
+                          return (
+                            <Box
+                              key={idx}
+                              sx={(t) => ({
+                                display: 'flex',
+                                flexDirection: 'row',
+                                alignItems: 'stretch',
+                                borderRadius: 2,
+                                overflow: 'hidden',
+                                border: '1px solid',
+                                borderColor: alpha(t.palette.divider, 0.5),
+                              })}
+                            >
+                              {/* 공격측 (항상 왼쪽) */}
+                              <Box
+                                sx={(t) => ({
+                                  flex: 1,
+                                  background: isWin
+                                    ? t.palette.mode === 'dark'
+                                      ? `linear-gradient(135deg, ${alpha('#059669', 0.35)} 0%, ${alpha('#064e3b', 0.5)} 100%)`
+                                      : `linear-gradient(135deg, ${alpha('#ecfdf5', 1)} 0%, ${alpha('#a7f3d0', 0.6)} 100%)`
+                                    : t.palette.mode === 'dark'
+                                      ? `linear-gradient(135deg, ${alpha('#475569', 0.35)} 0%, ${alpha('#7f1d1d', 0.2)} 100%)`
+                                      : `linear-gradient(135deg, ${alpha('#f8fafc', 1)} 0%, ${alpha('#fecdd3', 0.5)} 100%)`,
+                                  px: { xs: 1.25, md: 1.5 },
+                                  py: 1.25,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 0.75,
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                })}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                                  <Chip
+                                    size="small"
+                                    label={isWin ? '성공' : '실패'}
+                                    sx={{
+                                      height: 20,
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      flexShrink: 0,
+                                      background: isWin
+                                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                                        : 'linear-gradient(135deg, #f87171, #dc2626)',
+                                      '& .MuiChip-label': { px: 0.75 },
+                                    }}
+                                  />
+                                  <Typography
+                                    variant="caption"
+                                    fontWeight={700}
+                                    sx={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  >
+                                    {item.atk_guild_name || '—'}
+                                  </Typography>
+                                </Box>
+                                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem' }}>
+                                  {item.wizard_name || '—'}
+                                </Typography>
+                                <BattleHistoryMonsterCell urls={atkUrls} borderColor={isWin ? 'success.main' : 'error.main'} size={34} />
+                              </Box>
+
+                              {/* 가운데: VS + 날짜 */}
+                              <Box
+                                sx={(t) => ({
+                                  flexShrink: 0,
+                                  width: { xs: 48, sm: 60 },
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: 0.5,
+                                  borderLeft: `1px solid ${alpha(t.palette.divider, 0.25)}`,
+                                  borderRight: `1px solid ${alpha(t.palette.divider, 0.25)}`,
+                                  bgcolor: alpha(t.palette.background.paper, 0.3),
+                                })}
+                              >
+                                <Typography variant="overline" sx={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.15em', color: 'text.secondary', lineHeight: 1 }}>
+                                  VS
+                                </Typography>
+                                {dateStr && (
+                                  <>
+                                    <Typography variant="caption" sx={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
+                                      {dateStr}
+                                    </Typography>
+                                    {timeStr && (
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.58rem', textAlign: 'center', lineHeight: 1 }}>
+                                        {timeStr}
+                                      </Typography>
+                                    )}
+                                  </>
+                                )}
+                              </Box>
+
+                              {/* 방어측 (항상 오른쪽) */}
+                              <Box
+                                sx={(t) => ({
+                                  flex: 1,
+                                  background: !isWin
+                                    ? t.palette.mode === 'dark'
+                                      ? `linear-gradient(135deg, ${alpha('#064e3b', 0.5)} 0%, ${alpha('#059669', 0.35)} 100%)`
+                                      : `linear-gradient(135deg, ${alpha('#a7f3d0', 0.6)} 0%, ${alpha('#ecfdf5', 1)} 100%)`
+                                    : t.palette.mode === 'dark'
+                                      ? `linear-gradient(135deg, ${alpha('#7f1d1d', 0.2)} 0%, ${alpha('#475569', 0.35)} 100%)`
+                                      : `linear-gradient(135deg, ${alpha('#fecdd3', 0.5)} 0%, ${alpha('#f8fafc', 1)} 100%)`,
+                                  px: { xs: 1.25, md: 1.5 },
+                                  py: 1.25,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'flex-end',
+                                  gap: 0.75,
+                                  minWidth: 0,
+                                  overflow: 'hidden',
+                                })}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, justifyContent: 'flex-end' }}>
+                                  <Typography
+                                    variant="caption"
+                                    fontWeight={700}
+                                    sx={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  >
+                                    {item.opp_guild_name || '—'}
+                                  </Typography>
+                                  <Chip
+                                    size="small"
+                                    label={!isWin ? '방어 성공' : '방어 실패'}
+                                    sx={{
+                                      height: 20,
+                                      fontSize: '0.65rem',
+                                      fontWeight: 800,
+                                      color: '#fff',
+                                      flexShrink: 0,
+                                      background: !isWin
+                                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                                        : 'linear-gradient(135deg, #f87171, #dc2626)',
+                                      '& .MuiChip-label': { px: 0.75 },
+                                    }}
+                                  />
+                                </Box>
+                                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem' }}>
+                                  {item.opp_wizard_name || '—'}
+                                </Typography>
+                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                  <BattleHistoryMonsterCell urls={defUrls} borderColor={!isWin ? 'success.main' : 'error.main'} size={34} />
+                                </Box>
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                      {recentBattleTotalCount > recentLimit && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                          <Pagination
+                            count={Math.ceil(recentBattleTotalCount / recentLimit)}
+                            page={recentPage}
+                            onChange={(_, page) => setRecentPage(page)}
                             color="primary"
                             size={mobile ? 'small' : 'medium'}
                           />
@@ -881,6 +1046,7 @@ export default function MonsterDetailPage() {
             </Card>
           </Box>
         </Box>
+        {/* /grid */}
 
         <AddDeckPopup
           open={addPopupOpen}

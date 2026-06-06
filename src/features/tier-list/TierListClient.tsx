@@ -118,6 +118,7 @@ const ELEMENT_LABEL: Record<AttributeType, string> = {
 const STAR_FILTERS = [2, 3, 4, 5] as const;
 
 const HISTORY_QUERY_KEY = ['tier-list-history'];
+const DEFAULT_LIST_TITLE = '내 티어리스트';
 
 // ─── Codec ────────────────────────────────────────────────────────────────────
 
@@ -261,63 +262,6 @@ function CtrlBtn({ children, onClick, disabled, title }: {
   );
 }
 
-// ─── SaveModal ────────────────────────────────────────────────────────────────
-
-function SaveModal({
-  onClose, onSave, defaultTitle,
-}: {
-  onClose: () => void;
-  onSave: (title: string) => void;
-  defaultTitle: string;
-}) {
-  const [title, setTitle] = useState(defaultTitle);
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
-    }} onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: '#1e293b', borderRadius: 12, padding: 24,
-          width: 320, border: '1px solid rgba(255,255,255,0.1)',
-          display: 'flex', flexDirection: 'column', gap: 16,
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f1f5f9' }}>티어리스트 저장</h3>
-        <div>
-          <label style={{ fontSize: 12, color: '#94a3b8', display: 'block', marginBottom: 6 }}>제목</label>
-          <input
-            autoFocus
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') onSave(title); if (e.key === 'Escape') onClose(); }}
-            maxLength={200}
-            placeholder="내 티어리스트"
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: 8, padding: '8px 12px',
-              color: '#e2e8f0', fontSize: 14, outline: 'none',
-            }}
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{
-            padding: '7px 16px', borderRadius: 7, border: '1px solid rgba(255,255,255,0.1)',
-            background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: 13,
-          }}>취소</button>
-          <button onClick={() => onSave(title)} style={{
-            padding: '7px 16px', borderRadius: 7, border: 'none',
-            background: '#3b82f6', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-          }}>저장</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── HistoryPanel ─────────────────────────────────────────────────────────────
 
 function HistoryPanel({
@@ -325,7 +269,7 @@ function HistoryPanel({
   onLoad,
 }: {
   loggedIn: boolean;
-  onLoad: (tiers: TierRow[]) => void;
+  onLoad: (tiers: TierRow[], title: string) => void;
 }) {
   const qc = useQueryClient();
   const [renamingId, setRenamingId] = useState<number | null>(null);
@@ -364,7 +308,7 @@ function HistoryPanel({
   const handleLoad = (item: SavedTierList) => {
     const tiers = jsonToTiers(item.tier_data);
     if (!tiers) { toast.error('티어 데이터를 불러올 수 없습니다.'); return; }
-    onLoad(tiers);
+    onLoad(tiers, item.title);
     toast.success(`"${item.title}" 불러왔습니다.`);
   };
 
@@ -715,7 +659,7 @@ export default function TierListClient() {
   const [dragOverTierId, setDragOverTierId] = useState<string | null>(null);
   const [dragOverPool, setDragOverPool] = useState(false);
   const [touchGhost, setTouchGhost] = useState<TouchGhost | null>(null);
-  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [listTitle, setListTitle] = useState(DEFAULT_LIST_TITLE);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
@@ -743,6 +687,16 @@ export default function TierListClient() {
       const decoded = decodeTiers(state);
       if (decoded) setTiers(decoded);
     }
+    const titleParam = params.get('title');
+    if (titleParam) {
+      try {
+        const decodedTitle = decodeURIComponent(titleParam).trim();
+        if (decodedTitle) setListTitle(decodedTitle);
+      } catch {
+        const trimmed = titleParam.trim();
+        if (trimmed) setListTitle(trimmed);
+      }
+    }
   }, []);
 
   // ── Save mutation ─────────────────────────────────────────────────────────
@@ -753,7 +707,6 @@ export default function TierListClient() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
         toast.success('저장되었습니다!');
-        setShowSaveModal(false);
       },
       onError: () => toast.error('저장에 실패했습니다.'),
     },
@@ -1041,17 +994,21 @@ export default function TierListClient() {
 
   const clearAll = useCallback(() => setTiers((prev) => prev.map((t) => ({ ...t, monsterIds: [] }))), []);
 
-  const resetAll = useCallback(() => setTiers(DEFAULT_TIERS.map((t) => ({ ...t }))), []);
+  const resetAll = useCallback(() => {
+    setTiers(DEFAULT_TIERS.map((t) => ({ ...t })));
+    setListTitle(DEFAULT_LIST_TITLE);
+  }, []);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
   const handleShare = useCallback(() => {
     const encoded = encodeTiers(tiers);
-    const url = `${window.location.origin}${window.location.pathname}?state=${encoded}`;
+    const title = listTitle.trim() || DEFAULT_LIST_TITLE;
+    const url = `${window.location.origin}${window.location.pathname}?state=${encoded}&title=${encodeURIComponent(title)}`;
     navigator.clipboard.writeText(url)
       .then(() => toast.success('링크가 클립보드에 복사되었습니다!'))
       .catch(() => window.prompt('아래 링크를 복사하세요', url));
-  }, [tiers]);
+  }, [tiers, listTitle]);
 
   const handleExportPng = useCallback(async () => {
     if (!tierListRef.current) return;
@@ -1096,12 +1053,14 @@ export default function TierListClient() {
     }
   }, []);
 
-  const handleSave = useCallback((title: string) => {
-    saveMutation.mutate({ title: title.trim() || '내 티어리스트', tier_data: tiersToJson(tiers) });
-  }, [tiers, saveMutation]);
+  const handleSaveToHistory = useCallback(() => {
+    const title = listTitle.trim() || DEFAULT_LIST_TITLE;
+    saveMutation.mutate({ title, tier_data: tiersToJson(tiers) });
+  }, [listTitle, tiers, saveMutation]);
 
-  const handleLoadHistory = useCallback((loaded: TierRow[]) => {
+  const handleLoadHistory = useCallback((loaded: TierRow[], title: string) => {
     setTiers(loaded);
+    setListTitle(title.trim() || DEFAULT_LIST_TITLE);
   }, []);
 
   // ── Style helpers ─────────────────────────────────────────────────────────
@@ -1168,7 +1127,7 @@ export default function TierListClient() {
                 </svg>
                 불러오기
               </HoverBtn>
-              <HoverBtn style={{ ...btnBase, borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} hoverStyle={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd' }} onClick={() => setShowSaveModal(true)}>
+              <HoverBtn style={{ ...btnBase, borderColor: 'rgba(59,130,246,0.4)', color: '#60a5fa' }} hoverStyle={{ background: 'rgba(59,130,246,0.1)', color: '#93c5fd' }} onClick={handleSaveToHistory}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
                   <polyline points="17 21 17 13 7 13 7 21" />
@@ -1203,6 +1162,27 @@ export default function TierListClient() {
         </p>
       )}
       <div ref={tierListRef} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <input
+          value={listTitle}
+          onChange={(e) => setListTitle(e.target.value)}
+          placeholder={DEFAULT_LIST_TITLE}
+          maxLength={200}
+          aria-label="티어리스트 제목"
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            margin: '0 0 8px',
+            padding: '10px 12px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 10,
+            color: '#f1f5f9',
+            fontSize: 22,
+            fontWeight: 700,
+            textAlign: 'center',
+            outline: 'none',
+          }}
+        />
         {tiers.map((tier, idx) => (
           <TierRowItem
             key={tier.id} tier={tier}
@@ -1387,18 +1367,9 @@ export default function TierListClient() {
                 }}
               >×</button>
             </div>
-            <HistoryPanel loggedIn={loggedIn} onLoad={(tiers) => { handleLoadHistory(tiers); setShowHistoryModal(false); }} />
+            <HistoryPanel loggedIn={loggedIn} onLoad={(tiers, title) => { handleLoadHistory(tiers, title); setShowHistoryModal(false); }} />
           </div>
         </div>
-      )}
-
-      {/* Save modal */}
-      {showSaveModal && (
-        <SaveModal
-          defaultTitle="내 티어리스트"
-          onClose={() => setShowSaveModal(false)}
-          onSave={handleSave}
-        />
       )}
 
       {/* Touch drag ghost */}

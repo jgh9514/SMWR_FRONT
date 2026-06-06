@@ -7,7 +7,7 @@ import { useRtaSeasons } from '@/features/rta/hooks/useRtaData';
 
 const RtaSeasonsQueryContext = createContext<UseQueryResult<RtaSeasonsResponse, Error> | null>(null);
 
-/** /rta 레이아웃에서 한 번만 마운트 — 하위 화면은 {@link useRtaSeasonsContext} 로 동일 쿼리 결과를 쓴다. */
+/** AppProviders 에서 앱 전역 1회 마운트 — {@link useRtaSeasonsContext} 로 시즌 쿼리 결과를 공유한다. */
 export function RtaSeasonsProvider({ children }: { children: ReactNode }) {
   const query = useRtaSeasons();
   return <RtaSeasonsQueryContext.Provider value={query}>{children}</RtaSeasonsQueryContext.Provider>;
@@ -16,7 +16,7 @@ export function RtaSeasonsProvider({ children }: { children: ReactNode }) {
 export function useRtaSeasonsContext(): UseQueryResult<RtaSeasonsResponse, Error> {
   const ctx = useContext(RtaSeasonsQueryContext);
   if (!ctx) {
-    throw new Error('useRtaSeasonsContext는 RtaSeasonsProvider(/rta 레이아웃) 안에서만 사용하세요.');
+    throw new Error('useRtaSeasonsContext는 RtaSeasonsProvider(AppProviders) 안에서만 사용하세요.');
   }
   return ctx;
 }

@@ -27,6 +27,7 @@ import {
   UpdateGuildMemberRoleParams,
   TransferGuildLeadershipParams,
   KickGuildMemberParams,
+  UpdateGuildMemberNameParams,
   SendEmailVerificationParams,
   VerifyEmailCodeParams,
   EmailVerificationResponse,
@@ -293,6 +294,16 @@ export const useTransferGuildLeadership = (
  */
 export const useKickGuildMember = (options?: Parameters<typeof useApiPostMutation<ApiResult, KickGuildMemberParams>>[1]) => {
   return useApiPostMutation<ApiResult, KickGuildMemberParams>('/smw/guild/member/kick', options);
+};
+
+/**
+ * 길드 멤버 표시명 수정 Mutation (길드장/매니저)
+ * 백엔드: /api/v1/smw/guild/member/name/update
+ */
+export const useUpdateGuildMemberName = (
+  options?: Parameters<typeof useApiPostMutation<ApiResult, UpdateGuildMemberNameParams>>[1],
+) => {
+  return useApiPostMutation<ApiResult, UpdateGuildMemberNameParams>('/smw/guild/member/name/update', options);
 };
 
 /**

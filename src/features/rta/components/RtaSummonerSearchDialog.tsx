@@ -296,7 +296,7 @@ export default function RtaSummonerSearchDialog({ open, onClose }: RtaSummonerSe
       }}
     >
       <DialogContent sx={{ p: 0, overflow: 'visible', bgcolor: 'transparent' }}>
-        <SearchDialogContent onClose={onClose} />
+        {open ? <SearchDialogContent onClose={onClose} /> : null}
       </DialogContent>
     </Dialog>
   );

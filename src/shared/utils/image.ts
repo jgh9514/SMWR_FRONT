@@ -111,7 +111,7 @@ export function getSwexPlayerImageUrl(
   return `${SWEX_PLAYER_IMAGE_BASE}/${file}.jpg`;
 }
 
-const CDN_IMAGE_PATH_PREFIXES = ['/images/', '/monster/', '/siege/'] as const;
+const CDN_IMAGE_PATH_PREFIXES = ['/images/', '/monster/', '/siege/', '/rune/'] as const;
 
 /** CloudFront·상대 경로 → `/images/...` 또는 `/monster/...` (허용 프리픽스만) */
 export function extractMonsterImagePath(src: string | null | undefined): string | null {

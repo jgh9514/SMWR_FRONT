@@ -41,13 +41,14 @@ import FilterAltOffIcon from '@mui/icons-material/FilterAltOff';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   useBatchConfig,
-  useBatchRun,
   useBatchHistory,
   useBatchHistoryDetailMutation,
   BatchConfigItem,
   BatchRunResponse,
   BatchHistoryItem,
 } from '@/features/admin/hooks/useBatch';
+import { apiClient } from '@/shared/lib/api/client';
+import { BATCH_MANUAL_RUN_TIMEOUT_MS } from '@/shared/constants';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import { PageHeader } from '@/shared/ui';
@@ -92,16 +93,6 @@ function formatDuration(start?: string, end?: string, isClient = true): string {
   return remMin > 0 ? `${hour}시간 ${remMin}분` : `${hour}시간`;
 }
 
-/**
- * 배치 SSE URL. EventSource는 크로스 오리진(예: :3000 페이지 → :8080 API)에서
- * 표준 API로 HttpOnly 쿠키를 보내지 않습니다. Axios(withCredentials)와 달리 인증이 빠집니다.
- * 페이지와 동일 출처의 `/api/v1`(Next 프록시)으로 붙여 쿠키가 전달되게 합니다.
- */
-function getBatchLogStreamUrl(streamId: string): string {
-  if (typeof window === 'undefined') return '';
-  return `${window.location.origin}/api/v1/batch/logs/stream/${encodeURIComponent(streamId)}`;
-}
-
 export default function BatchManagementPage() {
   const router = useRouter();
   const theme = useTheme();
@@ -117,13 +108,10 @@ export default function BatchManagementPage() {
   const [streamLogOpen, setStreamLogOpen] = useState(false);
   const [streamLogText, setStreamLogText] = useState('');
   const [streamLogStatus, setStreamLogStatus] = useState<
-    'idle' | 'connecting' | 'running' | 'success' | 'fail' | 'error'
+    'idle' | 'running' | 'success' | 'fail' | 'error'
   >('idle');
-  const streamEsRef = useRef<EventSource | null>(null);
-  const streamRunStartedRef = useRef(false);
+  const [manualRunPending, setManualRunPending] = useState(false);
   const streamLogPreRef = useRef<HTMLPreElement | null>(null);
-  const streamBatIdRef = useRef<string | null>(null);
-  const streamManualStartedAtRef = useRef<number>(0);
   const runConfirmOpenRef = useRef(false);
   const incident = searchParams.get('incident');
   const historyFilter = searchParams.get('filter');
@@ -148,14 +136,6 @@ export default function BatchManagementPage() {
     }
     return null;
   }, [incident]);
-
-  const closeStreamLog = useCallback(() => {
-    if (streamEsRef.current) {
-      streamEsRef.current.close();
-      streamEsRef.current = null;
-    }
-    streamRunStartedRef.current = false;
-  }, []);
 
   useEffect(() => {
     if (streamLogPreRef.current && streamLogOpen) {
@@ -193,55 +173,6 @@ export default function BatchManagementPage() {
   );
 
   const historyDetailMutation = useBatchHistoryDetailMutation();
-
-  /** SSE 미수신 시 run-his 폴링으로 완료·로그 보완 (Pod 분리·장시간 Job 대비) */
-  useEffect(() => {
-    if (!streamLogOpen || streamLogStatus !== 'running') {
-      return;
-    }
-    const batId = streamBatIdRef.current;
-    if (!batId) {
-      return;
-    }
-    const poll = async () => {
-      try {
-        const { apiClient } = await import('@/shared/lib/api/client');
-        const list = await apiClient.post<BatchHistoryItem[]>('/batch/run-his', {
-          bat_id: batId,
-          limit: 5,
-        });
-        const startedAfter = streamManualStartedAtRef.current;
-        const candidate = list.find((row) => {
-          if (String(row.bat_id) !== batId) return false;
-          if (!row.exe_dtm) return false;
-          const t = new Date(row.exe_dtm).getTime();
-          return !Number.isNaN(t) && t >= startedAfter - 5000;
-        });
-        if (!candidate || candidate.rslt_cd === 'RUNNING') {
-          return;
-        }
-        const detail = await apiClient.post<BatchHistoryItem>('/batch/run-his/detail', {
-          runSn: candidate.bat_exe_log_sn,
-        });
-        const fullLog = detail?.rslt_txt?.trim();
-        if (fullLog) {
-          setStreamLogText(fullLog);
-        }
-        const code = candidate.rslt_cd;
-        if (code === 'SUCCESS') {
-          setStreamLogStatus('success');
-        } else if (code === 'ABORTED' || code === 'FAIL') {
-          setStreamLogStatus('fail');
-        }
-        closeStreamLog();
-        void refetchHistory();
-      } catch {
-        // 폴링 실패는 SSE 경로 유지
-      }
-    };
-    const id = window.setInterval(() => void poll(), 8000);
-    return () => window.clearInterval(id);
-  }, [streamLogOpen, streamLogStatus, closeStreamLog, refetchHistory]);
 
   const latestRunByBatId = useMemo(() => {
     const map = new Map<string, BatchHistoryItem>();
@@ -347,26 +278,6 @@ export default function BatchManagementPage() {
     return cronExpr;
   };
 
-  const runMutation = useBatchRun({
-    onSuccess: (response: BatchRunResponse) => {
-      if (response.result === 'SUCCESS') {
-        showToast.success(
-          response.message ??
-            '배치가 백그라운드에서 시작되었습니다. 잠시 후 실행 이력을 새로고침해 결과를 확인하세요.',
-        );
-        void refetchHistory();
-        window.setTimeout(() => void refetchHistory(), 4000);
-        window.setTimeout(() => void refetchHistory(), 15000);
-      } else {
-        showToast.error(response.message || '배치 실행에 실패했습니다.');
-      }
-    },
-    onError: (error: unknown) => {
-      logger.error('배치 실행 실패', error, { context: 'BatchManagementPage' });
-      showToast.error('배치 실행에 실패했습니다.');
-    },
-  });
-
   const handleRefresh = useCallback(() => {
     refetchConfig();
     refetchHistory();
@@ -380,81 +291,43 @@ export default function BatchManagementPage() {
       runConfirmOpenRef.current = false;
       if (!res) return;
 
-      streamBatIdRef.current = String(config.bat_id);
-      streamManualStartedAtRef.current = Date.now();
-      const streamId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       setStreamLogOpen(true);
-      setStreamLogText('');
-      setStreamLogStatus('connecting');
-
-      const url = getBatchLogStreamUrl(streamId);
-      if (!url) {
-        showToast.error('API 주소를 확인할 수 없습니다.');
-        setStreamLogOpen(false);
-        setStreamLogStatus('idle');
-        return;
-      }
-      const es = new EventSource(url);
-      streamEsRef.current = es;
-      streamRunStartedRef.current = false;
-
-      es.addEventListener('log', (ev: MessageEvent) => {
-        const msg = typeof ev.data === 'string' ? ev.data : '';
-        setStreamLogText((prev) => (prev ? `${prev}\n` : '') + msg);
-      });
-
-      es.addEventListener('done', (ev: MessageEvent) => {
-        try {
-          const data = typeof ev.data === 'string' ? JSON.parse(ev.data) : ev.data;
-          const st = data?.status as string | undefined;
-          setStreamLogStatus(st === 'SUCCESS' ? 'success' : 'fail');
-        } catch {
-          setStreamLogStatus('fail');
-        }
-        es.close();
-        streamEsRef.current = null;
-        void refetchHistory();
-        window.setTimeout(() => void refetchHistory(), 4000);
-        window.setTimeout(() => void refetchHistory(), 15000);
-      });
-
-      es.onopen = () => {
-        if (streamRunStartedRef.current) return;
-        streamRunStartedRef.current = true;
-        setStreamLogStatus('running');
-        runMutation.mutate(
-          { job_key: config.bat_id, stream_id: streamId },
-          {
-            onError: () => {
-              setStreamLogStatus('error');
-              closeStreamLog();
-              showToast.error('배치 실행 요청에 실패했습니다.');
-            },
-          },
+      setStreamLogText('배치 실행 중… 완료될 때까지 기다립니다.');
+      setStreamLogStatus('running');
+      setManualRunPending(true);
+      try {
+        const response = await apiClient.post<BatchRunResponse>(
+          '/batch/run',
+          { job_key: config.bat_id },
+          { timeout: BATCH_MANUAL_RUN_TIMEOUT_MS },
         );
-      };
-
-      es.onerror = () => {
-        if (es.readyState === EventSource.CLOSED) {
-          streamEsRef.current = null;
-          if (!streamRunStartedRef.current) {
-            setStreamLogStatus('error');
-            showToast.error('실시간 로그 연결에 실패했습니다.');
-          }
+        const logText = response.rslt_txt?.trim() || response.message || '결과가 없습니다.';
+        setStreamLogText(logText);
+        const ok = response.result === 'SUCCESS' && response.rslt_cd === 'SUCCESS';
+        setStreamLogStatus(ok ? 'success' : 'fail');
+        if (ok) {
+          showToast.success(response.message ?? '배치가 완료되었습니다.');
+        } else {
+          showToast.error(response.message ?? '배치 실행에 실패했습니다.');
         }
-      };
+        void refetchHistory();
+      } catch (error: unknown) {
+        logger.error('배치 실행 실패', error, { context: 'BatchManagementPage' });
+        setStreamLogStatus('error');
+        setStreamLogText('배치 실행 요청에 실패했거나 대기 시간을 초과했습니다.');
+        showToast.error('배치 실행에 실패했습니다.');
+      } finally {
+        setManualRunPending(false);
+      }
     },
-    [runMutation, refetchHistory, closeStreamLog],
+    [refetchHistory],
   );
 
   const handleCloseStreamLogDialog = useCallback(() => {
-    closeStreamLog();
-    streamBatIdRef.current = null;
-    streamManualStartedAtRef.current = 0;
     setStreamLogOpen(false);
     setStreamLogText('');
     setStreamLogStatus('idle');
-  }, [closeStreamLog]);
+  }, []);
 
   const handleViewResult = useCallback(
     async (runSn: string | number, previewText?: string) => {
@@ -713,7 +586,7 @@ export default function BatchManagementPage() {
                                 color="primary"
                                 size="small"
                                 onClick={() => handleRowRun(config)}
-                                disabled={runMutation.isPending}
+                                disabled={manualRunPending}
                                 aria-label="배치 실행"
                               >
                                 <PlayArrowIcon fontSize="small" />
@@ -948,25 +821,32 @@ export default function BatchManagementPage() {
           </Card>
         </Box>
 
-        {/* 수동 실행 실시간 로그 (SSE) */}
-        <Dialog open={streamLogOpen} onClose={handleCloseStreamLogDialog} maxWidth="md" fullWidth fullScreen={mobile}>
+        {/* 수동 실행 로그 (동기 — 완료 후 표시) */}
+        <Dialog open={streamLogOpen} onClose={manualRunPending ? undefined : handleCloseStreamLogDialog} maxWidth="md" fullWidth fullScreen={mobile}>
           <DialogTitle>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, flexWrap: 'wrap' }}>
-              <Typography variant="h6">배치 실행 로그 (실시간)</Typography>
+              <Typography variant="h6">배치 실행 로그</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {streamLogStatus === 'connecting' && <Chip size="small" label="연결 중" color="default" />}
                 {streamLogStatus === 'running' && <Chip size="small" label="실행 중" color="warning" />}
                 {streamLogStatus === 'success' && <Chip size="small" label="완료" color="success" />}
                 {(streamLogStatus === 'fail' || streamLogStatus === 'error') && (
                   <Chip size="small" label={streamLogStatus === 'error' ? '오류' : '실패'} color="error" />
                 )}
-                <IconButton onClick={handleCloseStreamLogDialog} size="small" aria-label="닫기">
+                <IconButton onClick={handleCloseStreamLogDialog} size="small" aria-label="닫기" disabled={manualRunPending}>
                   <CloseIcon />
                 </IconButton>
               </Box>
             </Box>
           </DialogTitle>
           <DialogContent>
+            {manualRunPending && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <CircularProgress size={20} />
+                <Typography variant="body2" color="text.secondary">
+                  서버에서 배치가 끝날 때까지 대기 중입니다…
+                </Typography>
+              </Box>
+            )}
             <Box
               ref={streamLogPreRef}
               component="pre"
@@ -985,11 +865,11 @@ export default function BatchManagementPage() {
                 fontSize: '0.8125rem',
               }}
             >
-              {streamLogText || (streamLogStatus === 'connecting' ? 'SSE 연결 대기 중…' : '로그가 없습니다.')}
+              {streamLogText || '로그가 없습니다.'}
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseStreamLogDialog} variant="contained">
+            <Button onClick={handleCloseStreamLogDialog} variant="contained" disabled={manualRunPending}>
               닫기
             </Button>
           </DialogActions>

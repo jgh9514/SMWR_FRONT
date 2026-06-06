@@ -26,7 +26,11 @@ import { useMonsterList, type MonsterOption, useApiPostMutation } from '@/hooks/
 import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
-import type { DeckMonsterStats } from '@/features/siege/types/siege';
+import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
+import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
+import { runeSelectionErrorMessage, selectionFromDeckMonsterStats } from '@/features/siege/utils/runeValidation';
+import { createEmptyDeckMonsterStats, type DeckMonsterStats } from '@/features/siege/types/siege';
+import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
 
 interface AddDeckPopupProps {
   open: boolean;
@@ -48,15 +52,16 @@ export default function AddDeckPopup({
   const [step, setStep] = useState(1);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
   const [monsterStats, setMonsterStats] = useState<DeckMonsterStats[]>([
-    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-    { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+    createEmptyDeckMonsterStats(),
+    createEmptyDeckMonsterStats(),
+    createEmptyDeckMonsterStats(),
   ]);
   const type = propType === 'bang' ? 1 : propType === 'empty' ? 2 : 0;
   const defenseMonster = propDefenseMonster ?? null;
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
+  const { runeById } = useRuneMasterList();
 
   // 덱 저장 Mutation
   const saveDeckMutation = useApiPostMutation<string, {
@@ -117,10 +122,31 @@ export default function AddDeckPopup({
     setStep(1);
   };
 
+  const handleRuneChange = (index: number, selection: DeckMonsterRuneSelection) => {
+    setMonsterStats((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        runeId1: selection.runeId1,
+        runeId2: selection.runeId2,
+        runeId3: selection.runeId3,
+      };
+      return next;
+    });
+  };
+
   const save = () => {
     if (selectedMonsterList.length !== 3) {
       showToast.error('몬스터를 선택해주세요.');
       return;
+    }
+
+    for (let i = 0; i < monsterStats.length; i += 1) {
+      const err = runeSelectionErrorMessage(selectionFromDeckMonsterStats(monsterStats[i]), runeById);
+      if (err) {
+        showToast.error(`${selectedMonsterList[i]?.kr_name ?? `몬스터 ${i + 1}`}: ${err}`);
+        return;
+      }
     }
 
     const saveData = {
@@ -143,9 +169,9 @@ export default function AddDeckPopup({
     setSelectedMonsterList([]);
     setStep(1);
     setMonsterStats([
-      { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-      { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
-      { hp: 0, atk: 0, def: 0, spd: 0, critRate: 0, critDmg: 0, resistance: 0, accuracy: 0 },
+      createEmptyDeckMonsterStats(),
+      createEmptyDeckMonsterStats(),
+      createEmptyDeckMonsterStats(),
     ]);
     onClose();
   };
@@ -485,6 +511,10 @@ export default function AddDeckPopup({
                         />
                       </Box>
                     </Box>
+                    <RuneSetPicker
+                      value={selectionFromDeckMonsterStats(monsterStats[index])}
+                      onChange={(selection) => handleRuneChange(index, selection)}
+                    />
                   </Box>
                 </AccordionDetails>
               </Accordion>

@@ -17,6 +17,9 @@ export interface Comment {
   mdf_date?: string;
   crt_user_id?: string;
   mdf_user_id?: string;
+  recommend_count?: number;
+  not_recommend_count?: number;
+  my_vote?: string;
   replies?: Comment[]; // 대댓글 목록
 }
 
@@ -49,5 +52,12 @@ export interface CommentResponse {
   result: string;
   message?: string;
   comment_id?: string;
+}
+
+export type CommentVoteType = 'UP' | 'DOWN' | 'CLEAR';
+
+export interface CommentVoteParams {
+  comment_id: string;
+  vote: CommentVoteType;
 }
 

@@ -5,6 +5,8 @@
 export interface UserItem {
   wizard_id: string;
   wizard_name: string;
+  /** SWEX playerImage — 없으면 wizard_id 로 폴백 */
+  channel_uid?: string | null;
   total_rate: number;
   win_count: number;
   lose_count: number;

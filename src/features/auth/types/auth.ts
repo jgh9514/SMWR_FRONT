@@ -178,6 +178,7 @@ export interface ProcessGuildApplicationParams {
 export interface GuildSettings {
   guild_id?: string;
   guild_name?: string;
+  guild_description?: string;
   auto_approve?: boolean; // 자동 승인 여부
   join_type?: string; // 'APPROVAL' | 'INVITE' (APPROVAL: 승인 필요, INVITE: 초대 코드로만 가입)
   max_members?: number;
@@ -248,6 +249,11 @@ export interface TransferGuildLeadershipParams {
 export interface KickGuildMemberParams {
   user_id: string;
   leave_reason?: string;
+}
+
+export interface UpdateGuildMemberNameParams {
+  user_id: string;
+  user_nm: string;
 }
 
 /**

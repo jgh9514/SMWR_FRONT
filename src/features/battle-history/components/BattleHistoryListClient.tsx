@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  Avatar,
   Box,
   Card,
   CardContent,
@@ -18,7 +19,8 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { EmptyState, PageBanner, PageHeader } from '@/shared/ui';
+import { EmptyState, PageHeader } from '@/shared/ui';
+import { getSwexPlayerImageUrl } from '@/shared/utils/image';
 import type { UserItem } from '@/features/battle-history/types/battle-history';
 
 interface BattleHistoryListClientProps {
@@ -44,8 +46,6 @@ export default function BattleHistoryListClient({
 
   return (
     <Box>
-      <PageBanner />
-
       <Container maxWidth="lg" sx={{ px: { xs: 1, md: 2 }, pb: { xs: 3, md: 4 } }}>
         <PageHeader title="전적 목록" />
         {children}
@@ -96,12 +96,26 @@ export default function BattleHistoryListClient({
                           {index + 1}
                         </TableCell>
                         <TableCell>
-                          <Link
-                            href={detailHref(item.wizard_id)}
-                            style={{ textDecoration: 'none', color: 'inherit', fontWeight: 600 }}
-                          >
-                            {item.wizard_name}
-                          </Link>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, minWidth: 0 }}>
+                            <Avatar
+                              src={getSwexPlayerImageUrl(item.channel_uid ?? item.wizard_id)}
+                              alt=""
+                              sx={{ width: mobile ? 28 : 32, height: mobile ? 28 : 32, flexShrink: 0 }}
+                            />
+                            <Link
+                              href={detailHref(item.wizard_id)}
+                              style={{
+                                textDecoration: 'none',
+                                color: 'inherit',
+                                fontWeight: 600,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              {item.wizard_name}
+                            </Link>
+                          </Box>
                         </TableCell>
                         <TableCell align="center" sx={{ color: 'success.main', fontWeight: 600 }}>
                           {wins}

@@ -49,6 +49,7 @@ import {
 } from '@/hooks/api';
 import { useResponsive } from '@/shared/hooks/useResponsive';
 import { RichTextDisplay } from '@/shared/ui/editor/RichTextDisplay';
+import { isAuthenticated } from '@/shared/utils/auth';
 import { validateAndSanitizeInput } from '@/shared/utils/validation';
 import { MAX_TITLE_LENGTH, DEFAULT_PAGE_SIZE } from '@/shared/constants/validation';
 import type { UserInfo } from '@/features/auth/types/auth';
@@ -92,6 +93,7 @@ export default function InquiryPage() {
     () => userInfo?.roles?.some((role) => role.role_id === 'RL0001') || false,
     [userInfo],
   );
+  const canUseInquiryApi = isClient && isAuthenticated();
 
   const [formData, setFormData] = useState({
     title: '',
@@ -106,13 +108,14 @@ export default function InquiryPage() {
   const inquiryListQuery = useInquiryList(
     { page, limit, status: statusFilter === 'ALL' ? undefined : statusFilter },
     {
+      enabled: canUseInquiryApi,
       refetchOnWindowFocus: false,
     },
   );
 
   // 1대1문의 상세 조회
   const inquiryDetailQuery = useInquiryDetail(selectedInquiryId || '', {
-    enabled: !!selectedInquiryId && (detailDialogOpen || answerDialogOpen),
+    enabled: canUseInquiryApi && !!selectedInquiryId && (detailDialogOpen || answerDialogOpen),
   });
 
   // 1대1문의 작성 Mutation

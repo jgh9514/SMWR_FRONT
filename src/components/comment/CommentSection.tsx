@@ -29,7 +29,8 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { useCommentList, useSaveComment, useUpdateComment, useDeleteComment } from '@/hooks/api';
+import { useCommentList, useSaveComment, useUpdateComment, useDeleteComment, useCommentVote } from '@/hooks/api';
+import type { CommentVoteType } from '@/features/community/types/comment';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import type { Comment, BoardType, CommentSaveParams } from '@/features/community/types/comment';
@@ -430,6 +431,60 @@ function ReplyAvatarColumn({
   );
 }
 
+interface CommentVoteButtonsProps {
+  comment: Comment;
+  disabled?: boolean;
+  canVote: boolean;
+  onVote: (commentId: string, vote: CommentVoteType) => void;
+}
+
+function CommentVoteButtons({ comment, disabled = false, canVote, onVote }: CommentVoteButtonsProps) {
+  const myV = String(comment.my_vote ?? '').trim().toUpperCase();
+  const upN = Number(comment.recommend_count ?? 0);
+  const downN = Number(comment.not_recommend_count ?? 0);
+
+  const handleVote = (vote: CommentVoteType) => {
+    if (!canVote) {
+      showToast.error('로그인이 필요합니다.');
+      return;
+    }
+    onVote(comment.comment_id, vote);
+  };
+
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.25}>
+      <IconButton
+        size="small"
+        sx={{ color: myV === 'UP' ? 'primary.main' : 'text.secondary' }}
+        disabled={disabled}
+        onClick={() => handleVote(myV === 'UP' ? 'CLEAR' : 'UP')}
+        aria-label="추천"
+      >
+        <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
+      </IconButton>
+      {upN > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 12, mr: 0.5 }}>
+          {upN}
+        </Typography>
+      )}
+      <IconButton
+        size="small"
+        sx={{ color: myV === 'DOWN' ? 'error.main' : 'text.secondary' }}
+        disabled={disabled}
+        onClick={() => handleVote(myV === 'DOWN' ? 'CLEAR' : 'DOWN')}
+        aria-label="비추천"
+      >
+        <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />
+      </IconButton>
+      {downN > 0 && (
+        <Typography variant="caption" color="text.secondary" sx={{ minWidth: 12 }}>
+          {downN}
+        </Typography>
+      )}
+    </Stack>
+  );
+}
+
 function ReplyThreadSkeleton({ count }: { count: number }) {
   const rows = Math.max(1, Math.min(count, 3));
   return (
@@ -454,6 +509,8 @@ interface ReplyContentProps {
   comment: Comment;
   userInfo?: UserInfo;
   isMutating?: boolean;
+  canVote: boolean;
+  onVote: (commentId: string, vote: CommentVoteType) => void;
   onReply: () => void;
   onUpdate: (commentId: string, text: string) => void;
   onDelete: (commentId: string) => void;
@@ -463,6 +520,8 @@ function ReplyContent({
   comment,
   userInfo,
   isMutating = false,
+  canVote,
+  onVote,
   onReply,
   onUpdate,
   onDelete,
@@ -515,12 +574,12 @@ function ReplyContent({
 
         {!isEditing && (
           <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
-            <IconButton size="small" sx={{ color: 'text.secondary' }}>
-              <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
-            <IconButton size="small" sx={{ color: 'text.secondary' }}>
-              <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />
-            </IconButton>
+            <CommentVoteButtons
+              comment={comment}
+              disabled={isMutating}
+              canVote={canVote}
+              onVote={onVote}
+            />
             {userInfo && (
               <Button
                 size="small"
@@ -567,6 +626,8 @@ function ReplyContent({
 interface ThreadReplySharedProps {
   userInfo?: UserInfo;
   isMutating?: boolean;
+  canVote: boolean;
+  onVote: (commentId: string, vote: CommentVoteType) => void;
   replyTargetId: string | null;
   replyInitial: string;
   onReplyTo: (comment: Comment) => void;
@@ -586,6 +647,8 @@ function ThreadReplyNode({
   branchOffsetPx,
   userInfo,
   isMutating = false,
+  canVote,
+  onVote,
   replyTargetId,
   replyInitial,
   onReplyTo,
@@ -633,6 +696,8 @@ function ThreadReplyNode({
             comment={comment}
             userInfo={userInfo}
             isMutating={isMutating}
+            canVote={canVote}
+            onVote={onVote}
             onReply={() => onReplyTo(comment)}
             onUpdate={onUpdate}
             onDelete={onDelete}
@@ -692,6 +757,8 @@ function ThreadReplyNode({
                         branchOffsetPx={NESTED_REPLY_BRANCH_OFFSET}
                         userInfo={userInfo}
                         isMutating={isMutating}
+                        canVote={canVote}
+                        onVote={onVote}
                         replyTargetId={replyTargetId}
                         replyInitial={replyInitial}
                         onReplyTo={onReplyTo}
@@ -738,6 +805,8 @@ function ReplyThread({
   replies,
   userInfo,
   isMutating = false,
+  canVote,
+  onVote,
   replyTargetId,
   replyInitial,
   onReplyTo,
@@ -758,6 +827,8 @@ function ReplyThread({
             branchOffsetPx={ROOT_TO_REPLY_BRANCH_OFFSET}
             userInfo={userInfo}
             isMutating={isMutating}
+            canVote={canVote}
+            onVote={onVote}
             replyTargetId={replyTargetId}
             replyInitial={replyInitial}
             onReplyTo={onReplyTo}
@@ -793,6 +864,8 @@ function ReplyThread({
 interface CommentItemProps {
   comment: CommentWithReplies;
   userInfo?: UserInfo;
+  canVote: boolean;
+  onVote: (commentId: string, vote: CommentVoteType) => void;
   onSaveReply: (parentId: string, text: string) => void;
   onUpdate: (commentId: string, text: string) => void;
   onDelete: (commentId: string) => void;
@@ -802,6 +875,8 @@ interface CommentItemProps {
 function CommentItem({
   comment,
   userInfo,
+  canVote,
+  onVote,
   onSaveReply,
   onUpdate,
   onDelete,
@@ -929,12 +1004,12 @@ function CommentItem({
 
           {!isEditing && (
             <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <ThumbUpOutlinedIcon sx={{ fontSize: 16 }} />
-              </IconButton>
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <ThumbDownOutlinedIcon sx={{ fontSize: 16 }} />
-              </IconButton>
+              <CommentVoteButtons
+                comment={comment}
+                disabled={isMutating}
+                canVote={canVote}
+                onVote={onVote}
+              />
               {userInfo && (
                 <Button
                   size="small"
@@ -990,6 +1065,8 @@ function CommentItem({
               replies={comment.replies}
               userInfo={userInfo}
               isMutating={isMutating}
+              canVote={canVote}
+              onVote={onVote}
               replyTargetId={replyTargetId}
               replyInitial={replyInitial}
               onReplyTo={startReplyTo}
@@ -1085,6 +1162,20 @@ export default function CommentSection({ boardType, boardId, userInfo }: Comment
     },
   });
 
+  const commentVoteMutation = useCommentVote({
+    onSuccess: (data) => {
+      if (data?.result !== 'SUCCESS') {
+        showToast.error(data?.message || '투표 처리에 실패했습니다.');
+        return;
+      }
+      commentListQuery.refetch();
+    },
+    onError: (error: Error) => {
+      logger.error('댓글 투표 실패', error);
+      showToast.error(error.message || '투표 처리에 실패했습니다.');
+    },
+  });
+
   const organizedComments = useMemo((): CommentWithReplies[] => {
     if (!commentListQuery.data?.list) return [];
     const comments = commentListQuery.data.list;
@@ -1106,7 +1197,14 @@ export default function CommentSection({ boardType, boardId, userInfo }: Comment
   const isMutating =
     saveCommentMutation.isPending ||
     updateCommentMutation.isPending ||
-    deleteCommentMutation.isPending;
+    deleteCommentMutation.isPending ||
+    commentVoteMutation.isPending;
+
+  const canVote = Boolean(userInfo?.user_id);
+
+  const handleVote = (commentId: string, vote: CommentVoteType) => {
+    commentVoteMutation.mutate({ comment_id: commentId, vote });
+  };
 
   const handleNewComment = (text: string) => {
     saveCommentMutation.mutate({
@@ -1173,6 +1271,8 @@ export default function CommentSection({ boardType, boardId, userInfo }: Comment
               key={comment.comment_id}
               comment={comment}
               userInfo={userInfo}
+              canVote={canVote}
+              onVote={handleVote}
               onSaveReply={handleSaveReply}
               onUpdate={handleUpdate}
               onDelete={handleDelete}
