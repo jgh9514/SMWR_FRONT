@@ -79,13 +79,17 @@ export const MONSTER_LIST_SIEGE_PARAMS: Record<string, unknown> = {
   siegeDedupeSecondAwakening: true,
 };
 
-export const useMonsterList = (params: Record<string, unknown> = MONSTER_LIST_SIEGE_PARAMS) => {
+export const useMonsterList = (
+  params: Record<string, unknown> = MONSTER_LIST_SIEGE_PARAMS,
+  options?: { enabled?: boolean },
+) => {
   // monster-list는 고정 데이터에 가깝고, siegeDedupeSecondAwakening 일 때만 로컬 TTL 캐시(빈 body로 호출하면 캐시·SQL 모두 비권장)
   const isCacheable = params?.siegeDedupeSecondAwakening === true;
   const [cacheSnapshot] = useState(() => (isCacheable ? readMonsterListCache() : null));
+  const queryEnabled = options?.enabled ?? true;
 
   const q = useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, {
-    enabled: !(isCacheable && cacheSnapshot?.isFresh),
+    enabled: queryEnabled && !(isCacheable && cacheSnapshot?.isFresh),
     initialData: isCacheable ? cacheSnapshot?.data : undefined,
     placeholderData: isCacheable ? cacheSnapshot?.data : undefined,
     select: (data) => normalizeMonsterList(data, { awakenedOnly: true }),

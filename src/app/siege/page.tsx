@@ -302,6 +302,7 @@ function SiegeContent() {
   const [deckStarFilter, setDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
   const [onlyLoseAtLeastOnce, setOnlyLoseAtLeastOnce] = useState(false);
   const [manualDefenseDeckDialogOpen, setManualDefenseDeckDialogOpen] = useState(false);
+  const [monsterPickerActive, setMonsterPickerActive] = useState(false);
 
   // 검색 적용값(applied): "검색 버튼"을 눌렀을 때만 이 값이 바뀌고, 실제 조회는 이 값으로만 수행
   const [appliedMonsterIds, setAppliedMonsterIds] = useState<string[]>([]);
@@ -309,8 +310,8 @@ function SiegeContent() {
   const [appliedDeckStarFilter, setAppliedDeckStarFilter] = useState<'ALL' | 'FOUR_STAR' | 'FIVE_STAR'>('ALL');
   const [appliedOnlyLoseAtLeastOnce, setAppliedOnlyLoseAtLeastOnce] = useState(false);
 
-  // 몬스터 목록 조회 (React Query 사용)
-  const { data: monsterList = [] } = useMonsterList();
+  // 몬스터 목록 — Autocomplete 열 때만 fetch(로컬 캐시 있으면 즉시 사용)
+  const { data: monsterList = [] } = useMonsterList(undefined, { enabled: monsterPickerActive });
   const availableGuilds = useMemo<GuildInfo[]>(() => {
     if (typeof window === 'undefined' || !matchIdFromQuery) {
       return [];
@@ -628,6 +629,7 @@ function SiegeContent() {
         <Autocomplete
           multiple
           options={monsterList}
+          onOpen={() => setMonsterPickerActive(true)}
           getOptionLabel={(option) =>
             `${option.monster_id}|${option.kr_name} ${option.un_name} ${option.modified_kr_name || ''}`.trim()
           }
@@ -672,6 +674,7 @@ function SiegeContent() {
               inputProps={{
                 ...params.inputProps,
                 onFocus: (e) => {
+                  setMonsterPickerActive(true);
                   params.inputProps?.onFocus?.(e as React.FocusEvent<HTMLInputElement>);
                   if (isMobile && e.target instanceof HTMLInputElement) {
                     e.target.scrollIntoView({ block: 'center', behavior: 'smooth' });

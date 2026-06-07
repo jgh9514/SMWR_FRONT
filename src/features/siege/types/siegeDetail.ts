@@ -102,13 +102,13 @@ export interface MonsterDetailBasicResponse {
 /** 추천 공덱만 */
 export interface MonsterDetailRecommendedResponse {
   recommendedList: RecommendedItem[];
-  recommendedTotalCount: number;
+  recommendedHasNext: boolean;
 }
 
 /** 공성률 이력만 */
 export interface MonsterDetailHistoryResponse {
   historyList: HistoryItem[];
-  historyTotalCount: number;
+  historyHasNext: boolean;
 }
 
 export interface RecentBattleItem {
@@ -126,6 +126,6 @@ export interface RecentBattleItem {
 /** 최근 전적 */
 export interface MonsterDetailRecentBattlesResponse {
   recentBattleList: RecentBattleItem[];
-  recentBattleTotalCount: number;
+  recentBattleHasNext: boolean;
 }
 

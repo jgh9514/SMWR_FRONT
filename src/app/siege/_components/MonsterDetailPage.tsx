@@ -11,7 +11,6 @@ import {
   Typography,
   Avatar,
   LinearProgress,
-  Pagination,
   Chip,
   IconButton,
   useMediaQuery,
@@ -271,11 +270,11 @@ export default function MonsterDetailPage() {
       ? (basic.data.enemyData[0] as EnemyData)
       : null;
   const recommendedList = recommended.data?.recommendedList || [];
-  const recommendedTotalCount = recommended.data?.recommendedTotalCount || 0;
+  const recommendedHasNext = recommended.data?.recommendedHasNext ?? false;
   const historyList = history.data?.historyList || [];
-  const historyTotalCount = history.data?.historyTotalCount || 0;
+  const historyHasNext = history.data?.historyHasNext ?? false;
   const recentBattleList = recentBattles.data?.recentBattleList || [];
-  const recentBattleTotalCount = recentBattles.data?.recentBattleTotalCount || 0;
+  const recentBattleHasNext = recentBattles.data?.recentBattleHasNext ?? false;
 
   const [addPopupOpen, setAddPopupOpen] = useState(false);
   const [deckDetailPopupOpen, setDeckDetailPopupOpen] = useState(false);
@@ -651,15 +650,27 @@ export default function MonsterDetailPage() {
                           </Box>
                         ))}
                       </Box>
-                      {recommendedTotalCount > recommendedLimit && (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                          <Pagination
-                            count={Math.ceil(recommendedTotalCount / recommendedLimit)}
-                            page={recommendedPage}
-                            onChange={(_, page) => setRecommendedPage(page)}
-                            color="primary"
+                      {recommendedList.length > 0 && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mt: 2 }}>
+                          <Button
+                            variant="outlined"
                             size="small"
-                          />
+                            onClick={() => setRecommendedPage((p) => Math.max(1, p - 1))}
+                            disabled={recommendedPage <= 1 || recommended.isFetching}
+                          >
+                            이전
+                          </Button>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            {recommendedPage}페이지
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setRecommendedPage((p) => p + 1)}
+                            disabled={!recommendedHasNext || recommended.isFetching}
+                          >
+                            다음
+                          </Button>
                         </Box>
                       )}
                     </>
@@ -676,7 +687,7 @@ export default function MonsterDetailPage() {
                 <Box sx={{ minWidth: 0 }}>
                   <Typography variant="subtitle2" fontWeight={700} color="text.primary">공성률 정보</Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontSize: '0.68rem' }}>
-                    공격 덱별 승률 · {historyTotalCount > 0 ? `${historyTotalCount}개 조합` : '조합 없음'}
+                    공격 덱별 승률
                     {enemyData?.total_count != null ? ` · 상단 총 ${enemyData.total_count}경기` : ''}
                   </Typography>
                 </Box>
@@ -861,15 +872,27 @@ export default function MonsterDetailPage() {
                           );
                         })}
                       </Box>
-                      {historyTotalCount > historyLimit && (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                          <Pagination
-                            count={Math.ceil(historyTotalCount / historyLimit)}
-                            page={historyPage}
-                            onChange={(_, page) => setHistoryPage(page)}
-                            color="primary"
+                      {historyList.length > 0 && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mt: 2 }}>
+                          <Button
+                            variant="outlined"
                             size="small"
-                          />
+                            onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                            disabled={historyPage <= 1 || history.isFetching}
+                          >
+                            이전
+                          </Button>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                            {historyPage}페이지
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setHistoryPage((p) => p + 1)}
+                            disabled={!historyHasNext || history.isFetching}
+                          >
+                            다음
+                          </Button>
                         </Box>
                       )}
                     </>
@@ -1074,15 +1097,27 @@ export default function MonsterDetailPage() {
                           );
                         })}
                       </Box>
-                      {recentBattleTotalCount > recentLimit && (
-                        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-                          <Pagination
-                            count={Math.ceil(recentBattleTotalCount / recentLimit)}
-                            page={recentPage}
-                            onChange={(_, page) => setRecentPage(page)}
-                            color="primary"
+                      {recentBattleList.length > 0 && (
+                        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mt: 3 }}>
+                          <Button
+                            variant="outlined"
                             size={mobile ? 'small' : 'medium'}
-                          />
+                            onClick={() => setRecentPage((p) => Math.max(1, p - 1))}
+                            disabled={recentPage <= 1 || recentBattles.isFetching}
+                          >
+                            이전
+                          </Button>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {recentPage}페이지
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            size={mobile ? 'small' : 'medium'}
+                            onClick={() => setRecentPage((p) => p + 1)}
+                            disabled={!recentBattleHasNext || recentBattles.isFetching}
+                          >
+                            다음
+                          </Button>
                         </Box>
                       )}
                     </>
