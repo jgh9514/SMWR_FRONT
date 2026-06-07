@@ -10,17 +10,19 @@ const SLIDE_DURATION_MS = 400;
 export default function SiegeDetailSlotLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const hasContent = pathname?.startsWith('/siege/siege-detail/') ?? false;
+  const isDetailPath = pathname?.startsWith('/siege/siege-detail/') ?? false;
+  /** intercept(soft nav)일 때만 @detail children이 채워짐 — hard nav는 children 슬롯 전체 페이지 */
+  const showDrawer = isDetailPath && children != null;
 
-  // 상세 패널 열릴 때 배경(body) 스크롤 막기 → y축 스크롤 중복 방지
+  // 드로어 열릴 때만 배경(body) 스크롤 막기
   useEffect(() => {
-    if (!hasContent) return;
+    if (!showDrawer) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prev;
     };
-  }, [hasContent]);
+  }, [showDrawer]);
 
   const close = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -30,7 +32,7 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
     router.push('/siege');
   };
 
-  if (!hasContent) return null;
+  if (!showDrawer) return null;
 
   return (
     <>
@@ -41,7 +43,7 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
         sx={{
           position: 'fixed',
           inset: 0,
-          zIndex: 1199,
+          zIndex: (t) => t.zIndex.modal,
           bgcolor: 'rgba(0,0,0,0.5)',
           animation: 'siegeDetailBackdropIn 0.25s ease-out forwards',
           '@keyframes siegeDetailBackdropIn': {
@@ -62,7 +64,7 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
           bottom: 0,
           width: { xs: '100%', md: 'min(1120px, 96vw)' },
           maxWidth: '100%',
-          zIndex: 1200,
+          zIndex: (t) => t.zIndex.modal + 1,
           bgcolor: 'background.default',
           overflowY: 'auto',
           overflowX: 'hidden',

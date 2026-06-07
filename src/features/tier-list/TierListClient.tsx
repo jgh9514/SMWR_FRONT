@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMonsterList } from '@/features/siege/hooks/useSiegeList';
@@ -29,7 +29,7 @@ interface DragInfo {
   fromTierId?: string;
 }
 
-type DropTarget = { type: 'tier'; tierId: string } | { type: 'pool' };
+type DropTarget = { type: 'tier'; tierId: string; insertIndex?: number } | { type: 'pool' };
 
 interface TouchPending {
   monsterId: string;
@@ -73,7 +73,13 @@ function applyMonsterMove(prev: TierRow[], info: DragInfo, target: DropTarget): 
     if (src) src.monsterIds = src.monsterIds.filter((id) => id !== info.monsterId);
   }
   const dst = next.find((t) => t.id === target.tierId);
-  if (dst && !dst.monsterIds.includes(info.monsterId)) dst.monsterIds.push(info.monsterId);
+  if (dst && !dst.monsterIds.includes(info.monsterId)) {
+    if (target.insertIndex !== undefined) {
+      dst.monsterIds.splice(target.insertIndex, 0, info.monsterId);
+    } else {
+      dst.monsterIds.push(info.monsterId);
+    }
+  }
   return next;
 }
 
@@ -481,9 +487,10 @@ interface TierRowItemProps {
   onDragStart: (e: React.DragEvent, monsterId: string, from: 'pool' | 'tier', tierId?: string) => void;
   onTouchDragStart: (e: React.TouchEvent, monsterId: string, from: 'pool' | 'tier', tierId?: string) => void;
   touchDraggingId: string | null;
-  onDragOver: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent, insertIndex: number) => void;
   onDragLeave: () => void;
-  onDrop: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent, insertIndex: number) => void;
+  dragOverInsertIndex?: number;
   hideHoverOverlay?: boolean;
   isSelected?: boolean;
   onSelect?: () => void;
@@ -497,6 +504,7 @@ function TierRowItem({
   onStartEdit, onApplyEdit, onCancelEdit,
   onDelete, onMoveUp, onMoveDown,
   onRemoveMonster, onDragStart, onTouchDragStart, touchDraggingId, onDragOver, onDragLeave, onDrop,
+  dragOverInsertIndex,
   hideHoverOverlay = false,
   isSelected = false,
   onSelect,
@@ -614,31 +622,66 @@ function TierRowItem({
       {/* Drop zone */}
       <div
         {...{ [TIER_DROP_ZONE_ATTR]: `tier:${tier.id}` }}
-        onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          const icons = Array.from(e.currentTarget.querySelectorAll('[data-monster-icon]'));
+          let insertIdx = icons.length;
+          for (let i = 0; i < icons.length; i++) {
+            const rect = icons[i].getBoundingClientRect();
+            if (e.clientX < rect.left + rect.width / 2) { insertIdx = i; break; }
+          }
+          onDragOver(e, insertIdx);
+        }}
+        onDragLeave={onDragLeave}
+        onDrop={(e) => {
+          e.preventDefault();
+          const icons = Array.from(e.currentTarget.querySelectorAll('[data-monster-icon]'));
+          let insertIdx = icons.length;
+          for (let i = 0; i < icons.length; i++) {
+            const rect = icons[i].getBoundingClientRect();
+            if (e.clientX < rect.left + rect.width / 2) { insertIdx = i; break; }
+          }
+          onDrop(e, insertIdx);
+        }}
         style={{
           flex: 1, display: 'flex', flexWrap: 'wrap', alignItems: 'center',
           gap: 6, padding: 8, minHeight: 64,
         }}
       >
         {tier.monsterIds.length === 0 ? (
-          <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.35)', paddingLeft: 8 }}>
-            여기에 몬스터를 드롭하세요
-          </span>
+          <>
+            {isDragOver && (
+              <div style={{ width: 3, alignSelf: 'stretch', minHeight: 44, background: '#3b82f6', borderRadius: 2, flexShrink: 0 }} />
+            )}
+            <span style={{ fontSize: 12, color: 'rgba(148,163,184,0.35)', paddingLeft: isDragOver ? 4 : 8 }}>
+              여기에 몬스터를 드롭하세요
+            </span>
+          </>
         ) : (
-          tier.monsterIds.map((mid) => {
-            const monster = monsterById[mid];
-            if (!monster) return null;
-            return (
-              <MonsterIcon
-                key={mid} monster={monster} size={44} draggable
-                dimmed={touchDraggingId === mid}
-                onDragStart={(e) => onDragStart(e, mid, 'tier', tier.id)}
-                onTouchDragStart={(e) => onTouchDragStart(e, mid, 'tier', tier.id)}
-                onRemove={() => onRemoveMonster(mid)}
-                onAssignClick={onMonsterAssignClick ? () => onMonsterAssignClick(mid) : undefined}
-              />
-            );
-          })
+          <>
+            {tier.monsterIds.map((mid, idx) => {
+              const monster = monsterById[mid];
+              if (!monster) return null;
+              return (
+                <React.Fragment key={mid}>
+                  {isDragOver && dragOverInsertIndex === idx && (
+                    <div style={{ width: 3, height: 44, background: '#3b82f6', borderRadius: 2, flexShrink: 0 }} />
+                  )}
+                  <MonsterIcon
+                    monster={monster} size={44} draggable
+                    dimmed={touchDraggingId === mid}
+                    onDragStart={(e) => onDragStart(e, mid, 'tier', tier.id)}
+                    onTouchDragStart={(e) => onTouchDragStart(e, mid, 'tier', tier.id)}
+                    onRemove={() => onRemoveMonster(mid)}
+                    onAssignClick={onMonsterAssignClick ? () => onMonsterAssignClick(mid) : undefined}
+                  />
+                </React.Fragment>
+              );
+            })}
+            {isDragOver && dragOverInsertIndex === tier.monsterIds.length && (
+              <div style={{ width: 3, height: 44, background: '#3b82f6', borderRadius: 2, flexShrink: 0 }} />
+            )}
+          </>
         )}
       </div>
     </div>
@@ -657,6 +700,7 @@ export default function TierListClient() {
   const [editLabel, setEditLabel] = useState('');
   const [editColor, setEditColor] = useState('');
   const [dragOverTierId, setDragOverTierId] = useState<string | null>(null);
+  const [dragOverInsertIndex, setDragOverInsertIndex] = useState<number>(0);
   const [dragOverPool, setDragOverPool] = useState(false);
   const [touchGhost, setTouchGhost] = useState<TouchGhost | null>(null);
   const [listTitle, setListTitle] = useState(DEFAULT_LIST_TITLE);
@@ -789,26 +833,29 @@ export default function TierListClient() {
     }, [],
   );
 
-  const handleDragOver = useCallback((e: React.DragEvent, tierId: string) => {
+  const handleDragOver = useCallback((e: React.DragEvent, tierId: string, insertIndex: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverTierId(tierId);
+    setDragOverInsertIndex(insertIndex);
     setDragOverPool(false);
   }, []);
 
   const handleDragLeave = useCallback(() => {
     setDragOverTierId(null);
+    setDragOverInsertIndex(0);
     setDragOverPool(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, toTierId: string) => {
+  const handleDrop = useCallback((e: React.DragEvent, toTierId: string, insertIndex: number) => {
     e.preventDefault();
     setDragOverTierId(null);
+    setDragOverInsertIndex(0);
     setDragOverPool(false);
     const info = dragInfo.current;
     if (!info) return;
     dragInfo.current = null;
-    setTiers((prev) => applyMonsterMove(prev, info, { type: 'tier', tierId: toTierId }));
+    setTiers((prev) => applyMonsterMove(prev, info, { type: 'tier', tierId: toTierId, insertIndex }));
   }, []);
 
   const handleDropToPool = useCallback((e: React.DragEvent) => {
@@ -825,6 +872,7 @@ export default function TierListClient() {
     touchGhostRef.current = null;
     setTouchGhost(null);
     setDragOverTierId(null);
+    setDragOverInsertIndex(0);
     setDragOverPool(false);
   }, []);
 
@@ -1199,9 +1247,10 @@ export default function TierListClient() {
             onDragStart={handleDragStart}
             onTouchDragStart={handleMonsterTouchStart}
             touchDraggingId={touchGhost?.monster.monster_id ?? null}
-            onDragOver={(e) => handleDragOver(e, tier.id)}
+            onDragOver={(e, insertIndex) => handleDragOver(e, tier.id, insertIndex)}
             onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, tier.id)}
+            onDrop={(e, insertIndex) => handleDrop(e, tier.id, insertIndex)}
+            dragOverInsertIndex={dragOverTierId === tier.id ? dragOverInsertIndex : undefined}
             hideHoverOverlay={isExporting}
             isSelected={selectedTierId === tier.id}
             onSelect={() => toggleTierSelection(tier.id)}

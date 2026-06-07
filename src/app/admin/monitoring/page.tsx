@@ -58,9 +58,11 @@ export default function AdminMonitoringPage() {
             WAS에 Grafana Service Account 토큰(glsa)과 스택 URL을 설정하세요. 프론트에는 토큰을 두지 않습니다.
           </Typography>
           {data?.message ? (
-            <Typography variant="body2" color="text.secondary">
-              {data.message}
-            </Typography>
+            <Alert severity="warning" sx={{ mt: 1, py: 0.5 }}>
+              <Typography variant="body2" component="span">
+                {data.message}
+              </Typography>
+            </Alert>
           ) : null}
           <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.5, mt: 1 }}>
             <Typography component="li" variant="body2">
