@@ -55,7 +55,7 @@ export default function AdminMonitoringPage() {
             Grafana Cloud가 비활성화되었습니다
           </Typography>
           <Typography variant="body2" component="div" sx={{ mb: 1 }}>
-            WAS에 Cloud Access Policy 토큰(glsa)과 스택 URL을 설정하세요. 프론트에는 토큰을 두지 않습니다.
+            WAS에 Grafana Service Account 토큰(glsa)과 스택 URL을 설정하세요. 프론트에는 토큰을 두지 않습니다.
           </Typography>
           {data?.message ? (
             <Typography variant="body2" color="text.secondary">
@@ -70,7 +70,7 @@ export default function AdminMonitoringPage() {
               <code>SMW_GRAFANA_CLOUD_BASE_URL</code> — 예: https://&lt;stack&gt;.grafana.net
             </Typography>
             <Typography component="li" variant="body2">
-              <code>SMW_GRAFANA_CLOUD_ACCESS_TOKEN</code> — glsa_… (Secret)
+              <code>SMW_GRAFANA_CLOUD_ACCESS_TOKEN</code> — Service Account glsa_… (Secret, otel CAP 토큰 아님)
             </Typography>
             <Typography component="li" variant="body2">
               <code>SMW_GRAFANA_DASHBOARD_WAS_UID</code> / <code>SMW_GRAFANA_DASHBOARD_BATCH_UID</code> (선택, 없으면 search API)

@@ -3,8 +3,7 @@
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Box, IconButton, Typography } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
+import { Box } from '@mui/material';
 
 const SLIDE_DURATION_MS = 400;
 
@@ -55,18 +54,22 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
       <Box
         role="dialog"
         aria-modal="true"
-        aria-label="상세"
+        aria-label="방어덱 상세"
         sx={{
           position: 'fixed',
           top: 0,
           right: 0,
           bottom: 0,
-          width: '100vw',
-          maxWidth: '100vw',
+          width: { xs: '100%', md: 'min(1120px, 96vw)' },
+          maxWidth: '100%',
           zIndex: 1200,
-          bgcolor: 'background.paper',
-          overflow: 'auto',
+          bgcolor: 'background.default',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch',
           boxShadow: 24,
+          pb: 'env(safe-area-inset-bottom, 0px)',
           animation: `siegeDetailSlideIn ${SLIDE_DURATION_MS}ms cubic-bezier(0.4, 0, 0.2, 1) forwards`,
           '@keyframes siegeDetailSlideIn': {
             from: { transform: 'translateX(100%)' },
@@ -74,29 +77,6 @@ export default function SiegeDetailSlotLayout({ children }: { children: ReactNod
           },
         }}
       >
-        <Box
-          component="header"
-          sx={{
-            position: 'sticky',
-            top: 0,
-            zIndex: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            px: 2,
-            py: 1,
-            borderBottom: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper',
-          }}
-        >
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            상세
-          </Typography>
-          <IconButton onClick={close} aria-label="닫기">
-            <CloseIcon />
-          </IconButton>
-        </Box>
         {children}
       </Box>
     </>

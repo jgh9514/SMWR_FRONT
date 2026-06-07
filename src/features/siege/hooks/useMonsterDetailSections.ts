@@ -45,11 +45,18 @@ export const useMonsterDetailHistory = (params: MonsterDetailParams | null) => {
   );
 };
 
-/** 최근 전적 (개별 전투 로그) */
-export const useMonsterDetailRecentBattles = (params: MonsterDetailParams | null) => {
+/** 최근 전적 (개별 전투 로그) — 기본정보 로드 후 조회해 DB 동시 부하 분산 */
+export const useMonsterDetailRecentBattles = (
+  params: MonsterDetailParams | null,
+  options?: { enabled?: boolean },
+) => {
   return useApiPostQuery<MonsterDetailRecentBattlesResponse>(
     '/summonerswar/monster-detail-recent-battles',
     params,
-    { enabled: !!params, ...SHARED_OPTIONS },
+    {
+      enabled: options?.enabled ?? !!params,
+      staleTime: 2 * 60 * 1000,
+      ...SHARED_OPTIONS,
+    },
   );
 };

@@ -262,7 +262,9 @@ export default function MonsterDetailPage() {
   const basic = useMonsterDetailBasic(baseParams);
   const recommended = useMonsterDetailRecommended(recommendedParams);
   const history = useMonsterDetailHistory(historyParams);
-  const recentBattles = useMonsterDetailRecentBattles(recentParams);
+  const recentBattles = useMonsterDetailRecentBattles(recentParams, {
+    enabled: !!recentParams && basic.isFetched,
+  });
 
   const enemyData =
     basic.data?.enemyData && Array.isArray(basic.data.enemyData) && basic.data.enemyData.length > 0
@@ -416,8 +418,8 @@ export default function MonsterDetailPage() {
   }
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', py: { xs: 2, md: 5 } }}>
-      <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3, xl: 4 } }}>
+    <Box sx={{ bgcolor: 'background.default', py: { xs: 2, md: 3 }, pb: { xs: 4, md: 5 } }}>
+      <Container maxWidth="xl" disableGutters sx={{ px: { xs: 1.5, sm: 2, md: 3, xl: 4 }, maxWidth: '100%' }}>
         {/* 페이지 헤더 */}
         <Box sx={{ mb: { xs: 2.5, md: 3.5 }, display: 'flex', alignItems: 'center', gap: 2 }}>
           <IconButton
@@ -450,9 +452,8 @@ export default function MonsterDetailPage() {
             gridTemplateColumns: {
               xs: '1fr',
               md: 'repeat(2, minmax(0, 1fr))',
-              lg: 'repeat(3, minmax(0, 1fr))',
             },
-            gap: { xs: 2, md: 3 },
+            gap: { xs: 2, md: 2.5 },
           }}
         >
           {/* ── 기본 정보 ── */}
@@ -496,7 +497,7 @@ export default function MonsterDetailPage() {
                     </Box>
 
                     {/* 통계 — 오른쪽 또는 아래 */}
-                    <Box sx={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: { xs: 1.5, md: 2 } }}>
+                    <Box sx={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: { xs: 1.5, md: 2 } }}>
                       {[
                         { value: `${enemyData.total_rate ?? 0}%`, label: '공성률', highlight: true },
                         { value: enemyData.total_count ?? 0, label: '총 게임', highlight: false },
@@ -594,12 +595,14 @@ export default function MonsterDetailPage() {
                               px: 1.5,
                               py: 1.25,
                               display: 'flex',
+                              flexWrap: 'wrap',
                               alignItems: 'center',
                               justifyContent: 'space-between',
+                              gap: 1,
                               cursor: 'pointer',
                             })}
                           >
-                            <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center' }}>
+                            <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'center', flexShrink: 0 }}>
                               {[1, 2, 3].map((i) => {
                                 const imageUrl = resolveMonsterImageUrl(item as Record<string, unknown>, i as 1 | 2 | 3);
                                 return imageUrl ? (
@@ -617,7 +620,7 @@ export default function MonsterDetailPage() {
                                 ) : null;
                               })}
                             </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0, ml: 'auto' }}>
                               {item.win_rate != null && (
                                 <Chip
                                   label={`${item.win_rate}%`}
@@ -728,11 +731,28 @@ export default function MonsterDetailPage() {
                                 cursor: historyDeckId ? 'pointer' : 'default',
                               })}
                             >
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, md: 1.5 } }}>
-                                {/* 몬스터 아이콘 */}
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  flexDirection: { xs: 'column', lg: 'row' },
+                                  alignItems: { xs: 'stretch', lg: 'center' },
+                                  gap: { xs: 1, lg: 1.5 },
+                                }}
+                              >
+                                {/* 몬스터 아이콘 (별은 아바타 좌상단 배지 — 가로 공간 절약) */}
+                                <Box sx={{ position: 'relative', display: 'inline-flex', flexShrink: 0, alignSelf: { xs: 'flex-start', lg: 'center' } }}>
                                   {historyDeckId && (
-                                    <StarIcon sx={{ fontSize: 16, color: 'warning.main', flexShrink: 0 }} />
+                                    <StarIcon
+                                      sx={(t) => ({
+                                        position: 'absolute',
+                                        top: -6,
+                                        left: -6,
+                                        fontSize: 15,
+                                        color: 'warning.main',
+                                        zIndex: 1,
+                                        filter: `drop-shadow(0 1px 2px ${alpha(t.palette.common.black, 0.35)})`,
+                                      })}
+                                    />
                                   )}
                                   <Box sx={{ display: 'flex' }}>
                                   {[1, 2, 3].map((i) => {
@@ -758,11 +778,30 @@ export default function MonsterDetailPage() {
 
                                 {/* 승률 바 */}
                                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                                    <Typography variant="caption" fontWeight={700} color={isHigh ? 'primary.main' : 'text.secondary'} sx={{ fontSize: '0.78rem' }}>
+                                  <Box
+                                    sx={{
+                                      display: 'flex',
+                                      flexDirection: { xs: 'column', sm: 'row' },
+                                      alignItems: { xs: 'flex-start', sm: 'center' },
+                                      justifyContent: 'space-between',
+                                      gap: { xs: 0.25, sm: 0.5 },
+                                      mb: 0.5,
+                                    }}
+                                  >
+                                    <Typography variant="caption" fontWeight={700} color={isHigh ? 'primary.main' : 'text.secondary'} sx={{ fontSize: '0.78rem', flexShrink: 0 }}>
                                       {rate}%
                                     </Typography>
-                                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.7rem' }}>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.disabled"
+                                      sx={{
+                                        fontSize: '0.7rem',
+                                        lineHeight: 1.35,
+                                        wordBreak: 'keep-all',
+                                        whiteSpace: { xs: 'normal', sm: 'nowrap' },
+                                        textAlign: { xs: 'left', sm: 'right' },
+                                      }}
+                                    >
                                       {totalGames}경기 · {item.win_count ?? 0}승 {item.lose_count ?? 0}패
                                     </Typography>
                                   </Box>
@@ -782,7 +821,7 @@ export default function MonsterDetailPage() {
                                 </Box>
 
                                 {/* 투표 버튼 */}
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, alignSelf: { xs: 'flex-end', lg: 'center' } }}>
                                   {(() => {
                                     const voteButtons = (
                                       <>
@@ -841,7 +880,7 @@ export default function MonsterDetailPage() {
           </Box>
 
           {/* ── 최근 전적 ── */}
-          <Box sx={{ gridColumn: { md: '1 / -1', lg: 'auto' }, minWidth: 0 }}>
+          <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
             <Card sx={(t) => sectionCardSx(t)}>
               <Box sx={(t) => sectionHeaderSx(t)}>
                 <Typography variant="subtitle2" fontWeight={700} color="text.primary">최근 전적</Typography>
@@ -885,7 +924,7 @@ export default function MonsterDetailPage() {
                               key={idx}
                               sx={(t) => ({
                                 display: 'flex',
-                                flexDirection: 'row',
+                                flexDirection: { xs: 'column', sm: 'row' },
                                 alignItems: 'stretch',
                                 borderRadius: 2,
                                 overflow: 'hidden',
@@ -947,14 +986,18 @@ export default function MonsterDetailPage() {
                               <Box
                                 sx={(t) => ({
                                   flexShrink: 0,
-                                  width: { xs: 48, sm: 60 },
+                                  width: { xs: '100%', sm: 60 },
+                                  minHeight: { xs: 40, sm: 'auto' },
                                   display: 'flex',
-                                  flexDirection: 'column',
+                                  flexDirection: 'row',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  gap: 0.5,
-                                  borderLeft: `1px solid ${alpha(t.palette.divider, 0.25)}`,
-                                  borderRight: `1px solid ${alpha(t.palette.divider, 0.25)}`,
+                                  gap: { xs: 1, sm: 0.5 },
+                                  py: { xs: 0.75, sm: 0 },
+                                  borderTop: { xs: `1px solid ${alpha(t.palette.divider, 0.25)}`, sm: 'none' },
+                                  borderBottom: { xs: `1px solid ${alpha(t.palette.divider, 0.25)}`, sm: 'none' },
+                                  borderLeft: { xs: 'none', sm: `1px solid ${alpha(t.palette.divider, 0.25)}` },
+                                  borderRight: { xs: 'none', sm: `1px solid ${alpha(t.palette.divider, 0.25)}` },
                                   bgcolor: alpha(t.palette.background.paper, 0.3),
                                 })}
                               >
