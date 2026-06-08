@@ -18,6 +18,7 @@ import {
   AccordionDetails,
   TextField,
   useTheme,
+  useMediaQuery,
   alpha,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -117,6 +118,7 @@ interface DeckDetailPopupProps {
 
 export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem, defenseMonsters }: DeckDetailPopupProps) {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [lastSelectedItem, setLastSelectedItem] = useState<RecommendedItem | null>(null);
   const [imageLoadErrors, setImageLoadErrors] = useState<Set<string>>(new Set());
   const [isEditing, setIsEditing] = useState(false);
@@ -385,16 +387,17 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       onClose={handleClose}
       maxWidth="lg"
       fullWidth
-      sx={{ zIndex: (t) => t.zIndex.modal + 1 }}
+      fullScreen={isMobile}
+      sx={{ zIndex: (t) => t.zIndex.modal + 20 }}
       PaperProps={{
         sx: {
-          borderRadius: 2,
+          borderRadius: isMobile ? 0 : 2,
           overflow: 'hidden',
           border: '1px solid',
           borderColor: 'divider',
           boxShadow: theme.shadows[8],
-          m: { xs: 1, sm: 2 },
-          maxHeight: { xs: 'calc(100vh - 16px)', sm: 'calc(100vh - 48px)' },
+          m: isMobile ? 0 : { xs: 1, sm: 2 },
+          maxHeight: isMobile ? '100vh' : { xs: 'calc(100vh - 16px)', sm: 'calc(100vh - 48px)' },
         },
       }}
     >
@@ -422,6 +425,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       <DialogContent
         sx={{
           p: { xs: 1.5, sm: 2 },
+          pt: { xs: 2, sm: 2.25 },
           bgcolor: 'background.default',
           overflowY: 'auto',
           overflowX: 'hidden',
@@ -463,7 +467,8 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
             {/* 공격 순서 */}
             <Box
               sx={{
-                p: 2,
+                mt: 0.25,
+                p: { xs: 1.5, sm: 2 },
                 borderRadius: 2,
                 bgcolor: 'background.paper',
                 border: '1px solid',
@@ -472,7 +477,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
             >
               <Typography
                 variant="caption"
-                sx={{ display: 'block', mb: 1.5, fontWeight: 700, color: 'text.secondary', letterSpacing: 1, textTransform: 'uppercase' }}
+                sx={{ display: 'block', mb: 1.75, fontWeight: 700, color: 'text.secondary', letterSpacing: 0.6, textTransform: 'uppercase' }}
               >
                 공격 순서
               </Typography>
@@ -481,10 +486,13 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: { xs: 1.5, sm: 2.5 },
+                  gap: { xs: 1.25, sm: 2 },
                   flexWrap: 'nowrap',
                   overflowX: 'auto',
-                  pb: 0.5,
+                  p: 0.75,
+                  pb: 1,
+                  borderRadius: 1.5,
+                  bgcolor: (t) => alpha(t.palette.action.hover, 0.25),
                 }}
               >
                 {monsterImageUrls.map((imageUrl, index) => {
@@ -494,15 +502,15 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                       {index > 0 && (
                         <ChevronRightIcon sx={{ color: 'text.disabled', fontSize: { xs: 24, sm: 32 }, flexShrink: 0 }} />
                       )}
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, flexShrink: 0, minWidth: { xs: 72, sm: 88 } }}>
                         <Box sx={{ position: 'relative' }}>
                           {imageUrl && !imageLoadErrors.has(imageUrl) ? (
                             <Avatar
                               src={imageUrl}
                               alt={name || `몬스터 ${index + 1}`}
                               sx={{
-                                width: { xs: 72, sm: 88 },
-                                height: { xs: 72, sm: 88 },
+                                width: { xs: 68, sm: 84 },
+                                height: { xs: 68, sm: 84 },
                                 borderRadius: 2,
                                 border: '2px solid',
                                 borderColor: index === 0 ? 'warning.main' : 'divider',
@@ -513,8 +521,8 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                           ) : (
                             <Box
                               sx={{
-                                width: { xs: 72, sm: 88 },
-                                height: { xs: 72, sm: 88 },
+                                width: { xs: 68, sm: 84 },
+                                height: { xs: 68, sm: 84 },
                                 borderRadius: 2,
                                 bgcolor: 'action.hover',
                                 border: '2px dashed',
@@ -534,11 +542,11 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                               color="warning"
                               sx={{
                                 position: 'absolute',
-                                top: -6,
-                                left: -6,
-                                height: 20,
-                                minWidth: 20,
-                                fontSize: '0.65rem',
+                                top: 3,
+                                left: 3,
+                                height: 18,
+                                minWidth: 18,
+                                fontSize: '0.62rem',
                                 fontWeight: 700,
                                 '& .MuiChip-label': { px: 0.5 },
                               }}
@@ -579,7 +587,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                 <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
                   이 공덱 추천이 도움이 되었나요?
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {(() => {
                     const did = resolveDeckId(detailDataRecord);
                     const def = resolveDefMonsters(detailDataRecord);

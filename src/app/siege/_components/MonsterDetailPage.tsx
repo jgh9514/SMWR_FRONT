@@ -45,6 +45,8 @@ import { resolveDeckId, resolveMonsterImageUrl } from '@/features/siege/utils/de
 /** 상단 총 경기 수와 맞추기 — 한 번에 불러올 최대 건수(초과 시 prev/next) */
 const RECENT_BATTLES_MAX = 200;
 const RECENT_BATTLES_FALLBACK = 50;
+const RECENT_BATTLES_MOBILE_PAGE_SIZE = 20;
+const RECENT_BATTLES_PAGE_SIZE = 5;
 
 /** 이력 API deck_id — MyBatis camelCase·lowerCase 키 대응 */
 function getHistoryRowDeckId(item: HistoryItem): string | null {
@@ -262,22 +264,19 @@ export default function MonsterDetailPage() {
       : null;
 
   const totalRecentGames = typeof enemyData?.total_count === 'number' ? enemyData.total_count : 0;
-  const recentNeedsPagination = totalRecentGames > RECENT_BATTLES_MAX;
+  const recentNeedsPagination = totalRecentGames > RECENT_BATTLES_PAGE_SIZE;
   const recentPageSize = useMemo(() => {
-    if (totalRecentGames > 0) {
-      return Math.min(totalRecentGames, RECENT_BATTLES_MAX);
-    }
-    return RECENT_BATTLES_FALLBACK;
-  }, [totalRecentGames]);
+    return RECENT_BATTLES_PAGE_SIZE;
+  }, []);
 
   const recentParams = useMemo<MonsterDetailParams | null>(() => {
     if (!baseParams) return null;
     return {
       ...baseParams,
-      recentLimit: recentNeedsPagination ? RECENT_BATTLES_MAX : recentPageSize,
+      recentLimit: recentNeedsPagination ? recentPageSize : recentPageSize,
       recentOffset: recentPage,
     };
-  }, [baseParams, recentNeedsPagination, recentPageSize, recentPage]);
+  }, [baseParams, recentPageSize, recentPage, recentNeedsPagination]);
 
   const recentBattles = useMonsterDetailRecentBattles(recentParams, {
     enabled: !!recentParams && basic.isFetched,
@@ -805,10 +804,10 @@ export default function MonsterDetailPage() {
                                   <Box
                                     sx={{
                                       display: 'flex',
-                                      flexDirection: { xs: 'column', sm: 'row' },
-                                      alignItems: { xs: 'flex-start', sm: 'center' },
+                                    flexDirection: { xs: 'row', sm: 'row' },
+                                    alignItems: { xs: 'center', sm: 'center' },
                                       justifyContent: 'space-between',
-                                      gap: { xs: 0.25, sm: 0.5 },
+                                    gap: { xs: 0.5, sm: 0.5 },
                                       mb: 0.5,
                                     }}
                                   >
@@ -819,14 +818,16 @@ export default function MonsterDetailPage() {
                                       variant="caption"
                                       color="text.disabled"
                                       sx={{
-                                        fontSize: '0.7rem',
-                                        lineHeight: 1.35,
+                                        fontSize: '0.68rem',
+                                        lineHeight: 1.25,
                                         wordBreak: 'keep-all',
-                                        whiteSpace: { xs: 'normal', sm: 'nowrap' },
-                                        textAlign: { xs: 'left', sm: 'right' },
+                                        whiteSpace: 'nowrap',
+                                        textAlign: 'right',
                                       }}
                                     >
-                                      {totalGames}경기 · {item.win_count ?? 0}승 {item.lose_count ?? 0}패
+                                      {mobile
+                                        ? `${totalGames}G · ${item.win_count ?? 0}W ${item.lose_count ?? 0}L`
+                                        : `${totalGames}경기 · ${item.win_count ?? 0}승 ${item.lose_count ?? 0}패`}
                                     </Typography>
                                   </Box>
                                   <LinearProgress
@@ -964,6 +965,10 @@ export default function MonsterDetailPage() {
                           const rowKey = item.log_id
                             ? `${item.log_id}-${item.log_timestamp ?? idx}`
                             : `${item.log_timestamp ?? 'row'}-${idx}`;
+                          const atkGuild = item.atk_guild_name || '—';
+                          const atkWizard = item.wizard_name || '—';
+                          const defGuild = item.opp_guild_name || '—';
+                          const defWizard = item.opp_wizard_name || '—';
                           return (
                             <Box
                               key={rowKey}
@@ -977,144 +982,255 @@ export default function MonsterDetailPage() {
                                 borderColor: alpha(t.palette.divider, 0.5),
                               })}
                             >
-                              {/* 공격측 (항상 왼쪽) */}
-                              <Box
-                                sx={(t) => ({
-                                  flex: 1,
-                                  background: isWin
-                                    ? t.palette.mode === 'dark'
-                                      ? `linear-gradient(135deg, ${alpha('#059669', 0.35)} 0%, ${alpha('#064e3b', 0.5)} 100%)`
-                                      : `linear-gradient(135deg, ${alpha('#ecfdf5', 1)} 0%, ${alpha('#a7f3d0', 0.6)} 100%)`
-                                    : t.palette.mode === 'dark'
-                                      ? `linear-gradient(135deg, ${alpha('#475569', 0.35)} 0%, ${alpha('#7f1d1d', 0.2)} 100%)`
-                                      : `linear-gradient(135deg, ${alpha('#f8fafc', 1)} 0%, ${alpha('#fecdd3', 0.5)} 100%)`,
-                                  px: { xs: 1.25, md: 1.5 },
-                                  py: 1.25,
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: 0.75,
-                                  minWidth: 0,
-                                  overflow: 'hidden',
-                                })}
-                              >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
-                                  <Chip
-                                    size="small"
-                                    label={isWin ? '성공' : '실패'}
-                                    sx={{
-                                      height: 20,
-                                      fontSize: '0.65rem',
-                                      fontWeight: 800,
-                                      color: '#fff',
-                                      flexShrink: 0,
-                                      background: isWin
-                                        ? 'linear-gradient(135deg, #10b981, #059669)'
-                                        : 'linear-gradient(135deg, #f87171, #dc2626)',
-                                      '& .MuiChip-label': { px: 0.75 },
-                                    }}
-                                  />
-                                  <Typography
-                                    variant="caption"
-                                    fontWeight={700}
-                                    sx={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                                  >
-                                    {item.atk_guild_name || '—'}
-                                  </Typography>
-                                </Box>
-                                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem' }}>
-                                  {item.wizard_name || '—'}
-                                </Typography>
-                                <BattleHistoryMonsterCell urls={atkUrls} borderColor={isWin ? 'success.main' : 'error.main'} size={34} />
-                              </Box>
-
-                              {/* 가운데: VS + 날짜 */}
-                              <Box
-                                sx={(t) => ({
-                                  flexShrink: 0,
-                                  width: { xs: '100%', sm: 60 },
-                                  minHeight: { xs: 40, sm: 'auto' },
-                                  display: 'flex',
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: { xs: 1, sm: 0.5 },
-                                  py: { xs: 0.75, sm: 0 },
-                                  borderTop: { xs: `1px solid ${alpha(t.palette.divider, 0.25)}`, sm: 'none' },
-                                  borderBottom: { xs: `1px solid ${alpha(t.palette.divider, 0.25)}`, sm: 'none' },
-                                  borderLeft: { xs: 'none', sm: `1px solid ${alpha(t.palette.divider, 0.25)}` },
-                                  borderRight: { xs: 'none', sm: `1px solid ${alpha(t.palette.divider, 0.25)}` },
-                                  bgcolor: alpha(t.palette.background.paper, 0.3),
-                                })}
-                              >
-                                <Typography variant="overline" sx={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.15em', color: 'text.secondary', lineHeight: 1 }}>
-                                  VS
-                                </Typography>
-                                {dateStr && (
-                                  <>
-                                    <Typography variant="caption" sx={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
-                                      {dateStr}
-                                    </Typography>
-                                    {timeStr && (
-                                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.58rem', textAlign: 'center', lineHeight: 1 }}>
-                                        {timeStr}
+                              {mobile ? (
+                                <Box
+                                  sx={(t) => ({
+                                    width: '100%',
+                                    px: 1.25,
+                                    py: 1,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 0.9,
+                                    background: isWin
+                                      ? t.palette.mode === 'dark'
+                                        ? `linear-gradient(135deg, ${alpha('#064e3b', 0.55)} 0%, ${alpha('#065f46', 0.35)} 100%)`
+                                        : `linear-gradient(135deg, ${alpha('#ecfdf5', 1)} 0%, ${alpha('#bbf7d0', 0.65)} 100%)`
+                                      : t.palette.mode === 'dark'
+                                        ? `linear-gradient(135deg, ${alpha('#7f1d1d', 0.3)} 0%, ${alpha('#334155', 0.45)} 100%)`
+                                        : `linear-gradient(135deg, ${alpha('#fff1f2', 1)} 0%, ${alpha('#fecdd3', 0.6)} 100%)`,
+                                  })}
+                                >
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0.75 }}>
+                                    <Chip
+                                      size="small"
+                                      label={isWin ? '공격승' : '공격패'}
+                                      sx={{
+                                        height: 20,
+                                        fontSize: '0.64rem',
+                                        fontWeight: 800,
+                                        color: '#fff',
+                                        flexShrink: 0,
+                                        background: isWin
+                                          ? 'linear-gradient(135deg, #10b981, #059669)'
+                                          : 'linear-gradient(135deg, #f87171, #dc2626)',
+                                        '& .MuiChip-label': { px: 0.75 },
+                                      }}
+                                    />
+                                    {(dateStr || timeStr) && (
+                                      <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.64rem', lineHeight: 1, textAlign: 'right', flexShrink: 0 }}>
+                                        {[dateStr, timeStr].filter(Boolean).join(' ')}
                                       </Typography>
                                     )}
-                                  </>
-                                )}
-                              </Box>
+                                  </Box>
 
-                              {/* 방어측 (항상 오른쪽) */}
-                              <Box
-                                sx={(t) => ({
-                                  flex: 1,
-                                  background: !isWin
-                                    ? t.palette.mode === 'dark'
-                                      ? `linear-gradient(135deg, ${alpha('#064e3b', 0.5)} 0%, ${alpha('#059669', 0.35)} 100%)`
-                                      : `linear-gradient(135deg, ${alpha('#a7f3d0', 0.6)} 0%, ${alpha('#ecfdf5', 1)} 100%)`
-                                    : t.palette.mode === 'dark'
-                                      ? `linear-gradient(135deg, ${alpha('#7f1d1d', 0.2)} 0%, ${alpha('#475569', 0.35)} 100%)`
-                                      : `linear-gradient(135deg, ${alpha('#fecdd3', 0.5)} 0%, ${alpha('#f8fafc', 1)} 100%)`,
-                                  px: { xs: 1.25, md: 1.5 },
-                                  py: 1.25,
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'flex-end',
-                                  gap: 0.75,
-                                  minWidth: 0,
-                                  overflow: 'hidden',
-                                })}
-                              >
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, justifyContent: 'flex-end' }}>
-                                  <Typography
-                                    variant="caption"
-                                    fontWeight={700}
-                                    sx={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                  <Box sx={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'start', gap: 0.75 }}>
+                                    <Box sx={{ minWidth: 0 }}>
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                      >
+                                        {atkGuild}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ display: 'block', fontSize: '0.66rem', mb: 0.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                      >
+                                        {atkWizard}
+                                      </Typography>
+                                      <BattleHistoryMonsterCell
+                                        urls={atkUrls}
+                                        borderColor={isWin ? 'success.main' : 'error.main'}
+                                        size={28}
+                                        justifyContent="flex-start"
+                                      />
+                                    </Box>
+
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ fontSize: '0.64rem', fontWeight: 700, lineHeight: 1, mt: 1.4 }}
+                                    >
+                                      VS
+                                    </Typography>
+
+                                    <Box sx={{ minWidth: 0, textAlign: 'right' }}>
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                      >
+                                        {defGuild}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                        sx={{ display: 'block', fontSize: '0.66rem', mb: 0.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                      >
+                                        {defWizard}
+                                      </Typography>
+                                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                        <BattleHistoryMonsterCell
+                                          urls={defUrls}
+                                          borderColor={!isWin ? 'success.main' : 'error.main'}
+                                          size={28}
+                                          justifyContent="flex-end"
+                                        />
+                                      </Box>
+                                    </Box>
+                                  </Box>
+                                </Box>
+                              ) : (
+                                <>
+                                  {/* 공격측 (항상 왼쪽) */}
+                                  <Box
+                                    sx={(t) => ({
+                                      flex: 1,
+                                      background: isWin
+                                        ? t.palette.mode === 'dark'
+                                          ? `linear-gradient(135deg, ${alpha('#059669', 0.35)} 0%, ${alpha('#064e3b', 0.5)} 100%)`
+                                          : `linear-gradient(135deg, ${alpha('#ecfdf5', 1)} 0%, ${alpha('#a7f3d0', 0.6)} 100%)`
+                                        : t.palette.mode === 'dark'
+                                          ? `linear-gradient(135deg, ${alpha('#475569', 0.35)} 0%, ${alpha('#7f1d1d', 0.2)} 100%)`
+                                          : `linear-gradient(135deg, ${alpha('#f8fafc', 1)} 0%, ${alpha('#fecdd3', 0.5)} 100%)`,
+                                      px: { xs: 1.25, md: 1.5 },
+                                      py: 1.25,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      gap: 0.75,
+                                      minWidth: 0,
+                                      overflow: 'hidden',
+                                    })}
                                   >
-                                    {item.opp_guild_name || '—'}
-                                  </Typography>
-                                  <Chip
-                                    size="small"
-                                    label={!isWin ? '방어 성공' : '방어 실패'}
-                                    sx={{
-                                      height: 20,
-                                      fontSize: '0.65rem',
-                                      fontWeight: 800,
-                                      color: '#fff',
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                                      <Chip
+                                        size="small"
+                                        label={isWin ? '성공' : '실패'}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800,
+                                          color: '#fff',
+                                          flexShrink: 0,
+                                          background: isWin
+                                            ? 'linear-gradient(135deg, #10b981, #059669)'
+                                            : 'linear-gradient(135deg, #f87171, #dc2626)',
+                                          '& .MuiChip-label': { px: 0.75 },
+                                        }}
+                                      />
+                                      <Typography
+                                        variant="caption"
+                                        fontWeight={700}
+                                        sx={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                      >
+                                        {atkGuild}
+                                      </Typography>
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem' }}>
+                                      {atkWizard}
+                                    </Typography>
+                                    <BattleHistoryMonsterCell
+                                      urls={atkUrls}
+                                      borderColor={isWin ? 'success.main' : 'error.main'}
+                                      size={34}
+                                      justifyContent="flex-start"
+                                    />
+                                  </Box>
+
+                                  {/* 가운데: VS + 날짜 */}
+                                  <Box
+                                    sx={(t) => ({
                                       flexShrink: 0,
+                                      width: { xs: '100%', sm: 60 },
+                                      minHeight: { xs: 40, sm: 'auto' },
+                                      display: 'flex',
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      gap: { xs: 1, sm: 0.5 },
+                                      py: { xs: 0.75, sm: 0 },
+                                      borderTop: { xs: `1px solid ${alpha(t.palette.divider, 0.25)}`, sm: 'none' },
+                                      borderBottom: { xs: `1px solid ${alpha(t.palette.divider, 0.25)}`, sm: 'none' },
+                                      borderLeft: { xs: 'none', sm: `1px solid ${alpha(t.palette.divider, 0.25)}` },
+                                      borderRight: { xs: 'none', sm: `1px solid ${alpha(t.palette.divider, 0.25)}` },
+                                      bgcolor: alpha(t.palette.background.paper, 0.3),
+                                    })}
+                                  >
+                                    <Typography variant="overline" sx={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.15em', color: 'text.secondary', lineHeight: 1 }}>
+                                      VS
+                                    </Typography>
+                                    {dateStr && (
+                                      <>
+                                        <Typography variant="caption" sx={{ fontSize: '0.62rem', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>
+                                          {dateStr}
+                                        </Typography>
+                                        {timeStr && (
+                                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.58rem', textAlign: 'center', lineHeight: 1 }}>
+                                            {timeStr}
+                                          </Typography>
+                                        )}
+                                      </>
+                                    )}
+                                  </Box>
+
+                                  {/* 방어측 (항상 오른쪽) */}
+                                  <Box
+                                    sx={(t) => ({
+                                      flex: 1,
                                       background: !isWin
-                                        ? 'linear-gradient(135deg, #10b981, #059669)'
-                                        : 'linear-gradient(135deg, #f87171, #dc2626)',
-                                      '& .MuiChip-label': { px: 0.75 },
-                                    }}
-                                  />
-                                </Box>
-                                <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem' }}>
-                                  {item.opp_wizard_name || '—'}
-                                </Typography>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                                  <BattleHistoryMonsterCell urls={defUrls} borderColor={!isWin ? 'success.main' : 'error.main'} size={34} />
-                                </Box>
-                              </Box>
+                                        ? t.palette.mode === 'dark'
+                                          ? `linear-gradient(135deg, ${alpha('#064e3b', 0.5)} 0%, ${alpha('#059669', 0.35)} 100%)`
+                                          : `linear-gradient(135deg, ${alpha('#a7f3d0', 0.6)} 0%, ${alpha('#ecfdf5', 1)} 100%)`
+                                        : t.palette.mode === 'dark'
+                                          ? `linear-gradient(135deg, ${alpha('#7f1d1d', 0.2)} 0%, ${alpha('#475569', 0.35)} 100%)`
+                                          : `linear-gradient(135deg, ${alpha('#fecdd3', 0.5)} 0%, ${alpha('#f8fafc', 1)} 100%)`,
+                                      px: { xs: 1.25, md: 1.5 },
+                                      py: 1.25,
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      alignItems: 'flex-end',
+                                      gap: 0.75,
+                                      minWidth: 0,
+                                      overflow: 'hidden',
+                                    })}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0, justifyContent: 'flex-end' }}>
+                                      <Typography
+                                        variant="caption"
+                                        fontWeight={700}
+                                        sx={{ fontSize: '0.78rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                      >
+                                        {defGuild}
+                                      </Typography>
+                                      <Chip
+                                        size="small"
+                                        label={!isWin ? '방어 성공' : '방어 실패'}
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.65rem',
+                                          fontWeight: 800,
+                                          color: '#fff',
+                                          flexShrink: 0,
+                                          background: !isWin
+                                            ? 'linear-gradient(135deg, #10b981, #059669)'
+                                            : 'linear-gradient(135deg, #f87171, #dc2626)',
+                                          '& .MuiChip-label': { px: 0.75 },
+                                        }}
+                                      />
+                                    </Box>
+                                    <Typography variant="caption" color="text.secondary" noWrap sx={{ fontSize: '0.72rem' }}>
+                                      {defWizard}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                      <BattleHistoryMonsterCell
+                                        urls={defUrls}
+                                        borderColor={!isWin ? 'success.main' : 'error.main'}
+                                        size={34}
+                                        justifyContent="flex-end"
+                                      />
+                                    </Box>
+                                  </Box>
+                                </>
+                              )}
                             </Box>
                           );
                         })}

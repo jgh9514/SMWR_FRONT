@@ -7,9 +7,15 @@ type Props = {
   urls: (string | undefined)[];
   borderColor: string;
   size?: number;
+  justifyContent?: 'flex-start' | 'center' | 'flex-end';
 };
 
-export default function BattleHistoryMonsterCell({ urls, borderColor, size = 36 }: Props) {
+export default function BattleHistoryMonsterCell({
+  urls,
+  borderColor,
+  size = 36,
+  justifyContent = 'center',
+}: Props) {
   const monsters = urls.filter(Boolean) as string[];
   if (monsters.length === 0) {
     return (
@@ -19,7 +25,7 @@ export default function BattleHistoryMonsterCell({ urls, borderColor, size = 36 
     );
   }
   return (
-    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', flexWrap: 'nowrap' }}>
+    <Box sx={{ display: 'flex', gap: 0.5, justifyContent, flexWrap: 'nowrap' }}>
       {monsters.map((url, i) => (
         <Avatar
           key={`${url}-${i}`}
