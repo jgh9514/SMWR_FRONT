@@ -322,6 +322,9 @@ export default function AppProviders({ children }: AppProvidersProps) {
     return guildRequiredPrefixes.some((prefix) => currentPath === prefix || currentPath.startsWith(`${prefix}/`));
   }, [pathname]);
 
+  /** 로그인·길드 검증이 끝나기 전까지 화면 렌더를 막아야 하는 경로만 (홈·RTA 등 공개 탐색은 즉시 표시) */
+  const needsAuthBootstrapBlock = isProtectedPath || isGuildRequiredPath;
+
   /** 메인 영역 + 푸터를 세로 flex로 묶어 푸터를 화면 하단에 붙임 */
   const shellSx = useMemo(() => ({
     display: 'flex',
@@ -440,8 +443,8 @@ export default function AppProviders({ children }: AppProvidersProps) {
     }
   }, [authBootstrapped, isAdminPath, isGuildRequiredPath, isProtectedPath, isPublicPath, pathname, router]);
 
-  // 인증 bootstrap 전에는 "아예" 화면을 그리지 않음(헤더/페이지/list 호출 방지)
-  if (!authBootstrapped && !isPublicPath && !isAdminPath) {
+  // 보호·길드 필수 경로만 bootstrap 완료 전 렌더 차단 (홈/RTA 등은 login-check와 병렬로 표시)
+  if (!authBootstrapped && needsAuthBootstrapBlock) {
     return (
       <MuiThemeProvider theme={muiTheme}>
         <CssBaseline />

@@ -42,6 +42,10 @@ import type { MonsterDetailParams, HistoryItem, RecommendedItem, EnemyData, Rece
 import { useSiegeApiContextParams } from '@/shared/hooks/useSiegeApiContextParams';
 import { resolveDeckId, resolveMonsterImageUrl } from '@/features/siege/utils/deckRecord';
 
+/** 상단 총 경기 수와 맞추기 — 한 번에 불러올 최대 건수(초과 시 prev/next) */
+const RECENT_BATTLES_MAX = 200;
+const RECENT_BATTLES_FALLBACK = 50;
+
 /** 이력 API deck_id — MyBatis camelCase·lowerCase 키 대응 */
 function getHistoryRowDeckId(item: HistoryItem): string | null {
   return resolveDeckId(item as Record<string, unknown>);
@@ -214,7 +218,6 @@ export default function MonsterDetailPage() {
   const [recentPage, setRecentPage] = useState(1);
   const historyLimit = DEFAULT_PAGE_SIZE;
   const recommendedLimit = 5;
-  const recentLimit = DEFAULT_PAGE_SIZE;
 
   const baseParams = useMemo<MonsterDetailParams | null>(() => {
     const dm1 = schData.dm1?.trim();
@@ -249,26 +252,36 @@ export default function MonsterDetailPage() {
     };
   }, [baseParams, historyLimit, historyPage]);
 
-  const recentParams = useMemo<MonsterDetailParams | null>(() => {
-    if (!baseParams) return null;
-    return {
-      ...baseParams,
-      recentLimit,
-      recentOffset: recentPage,
-    };
-  }, [baseParams, recentLimit, recentPage]);
-
   const basic = useMonsterDetailBasic(baseParams);
   const recommended = useMonsterDetailRecommended(recommendedParams);
   const history = useMonsterDetailHistory(historyParams);
-  const recentBattles = useMonsterDetailRecentBattles(recentParams, {
-    enabled: !!recentParams && basic.isFetched,
-  });
 
   const enemyData =
     basic.data?.enemyData && Array.isArray(basic.data.enemyData) && basic.data.enemyData.length > 0
       ? (basic.data.enemyData[0] as EnemyData)
       : null;
+
+  const totalRecentGames = typeof enemyData?.total_count === 'number' ? enemyData.total_count : 0;
+  const recentNeedsPagination = totalRecentGames > RECENT_BATTLES_MAX;
+  const recentPageSize = useMemo(() => {
+    if (totalRecentGames > 0) {
+      return Math.min(totalRecentGames, RECENT_BATTLES_MAX);
+    }
+    return RECENT_BATTLES_FALLBACK;
+  }, [totalRecentGames]);
+
+  const recentParams = useMemo<MonsterDetailParams | null>(() => {
+    if (!baseParams) return null;
+    return {
+      ...baseParams,
+      recentLimit: recentNeedsPagination ? RECENT_BATTLES_MAX : recentPageSize,
+      recentOffset: recentPage,
+    };
+  }, [baseParams, recentNeedsPagination, recentPageSize, recentPage]);
+
+  const recentBattles = useMonsterDetailRecentBattles(recentParams, {
+    enabled: !!recentParams && basic.isFetched,
+  });
   const recommendedList = recommended.data?.recommendedList || [];
   const recommendedHasNext = recommended.data?.recommendedHasNext ?? false;
   const historyList = history.data?.historyList || [];
@@ -906,7 +919,10 @@ export default function MonsterDetailPage() {
           <Box sx={{ gridColumn: '1 / -1', minWidth: 0 }}>
             <Card sx={(t) => sectionCardSx(t)}>
               <Box sx={(t) => sectionHeaderSx(t)}>
-                <Typography variant="subtitle2" fontWeight={700} color="text.primary">최근 전적</Typography>
+                <Typography variant="subtitle2" fontWeight={700} color="text.primary">
+                  최근 전적
+                  {totalRecentGames > 0 ? ` · ${totalRecentGames}경기` : ''}
+                </Typography>
                 {recentBattles.isFetching && <CircularProgress size={14} sx={{ opacity: 0.5 }} />}
               </Box>
               {recentBattles.isLoading && !recentBattles.data ? (
@@ -941,10 +957,16 @@ export default function MonsterDetailPage() {
                             ? new Date(tsNum).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
                             : null;
                           const atkUrls = [item.atk_image_url1, item.atk_image_url2, item.atk_image_url3];
-                          const defUrls = [enemyData?.image_url1, enemyData?.image_url2, enemyData?.image_url3];
+                          const defUrlsFromRow = [item.def_image_url1, item.def_image_url2, item.def_image_url3];
+                          const defUrls = defUrlsFromRow.some(Boolean)
+                            ? defUrlsFromRow
+                            : [enemyData?.image_url1, enemyData?.image_url2, enemyData?.image_url3];
+                          const rowKey = item.log_id
+                            ? `${item.log_id}-${item.log_timestamp ?? idx}`
+                            : `${item.log_timestamp ?? 'row'}-${idx}`;
                           return (
                             <Box
-                              key={idx}
+                              key={rowKey}
                               sx={(t) => ({
                                 display: 'flex',
                                 flexDirection: { xs: 'column', sm: 'row' },
@@ -1097,7 +1119,7 @@ export default function MonsterDetailPage() {
                           );
                         })}
                       </Box>
-                      {recentBattleList.length > 0 && (
+                      {recentNeedsPagination && recentBattleList.length > 0 && (
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mt: 3 }}>
                           <Button
                             variant="outlined"

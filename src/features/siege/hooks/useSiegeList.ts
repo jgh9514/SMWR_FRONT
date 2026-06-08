@@ -128,14 +128,17 @@ export const useSiegeMonsterList = (params: SiegeSearchParams, enabled = false) 
   return useApiPostQuery<MonsterItem[]>('/summonerswar/siege-list', params, { enabled });
 };
 
+const ENEMY_TEAM_QUERY_STALE_MS = 10 * 60 * 1000;
+const ENEMY_TEAM_QUERY_GC_MS = 15 * 60 * 1000;
+
 /**
  * 적 팀 목록 조회 (방어덱 정보)
  */
 export const useEnemyTeamList = (params: SiegeSearchParams & { paging?: number; offset?: number }, enabled = false) => {
   return useApiPostQuery<MonsterItem[]>('/summonerswar/enemyTeam-list', params, { 
     enabled,
-    staleTime: 2 * 60 * 1000, // 2분
-    gcTime: 5 * 60 * 1000, // 5분
+    staleTime: ENEMY_TEAM_QUERY_STALE_MS,
+    gcTime: ENEMY_TEAM_QUERY_GC_MS,
     placeholderData: (previousData) => previousData, // 이전 데이터 유지 (페이지네이션 시 깜빡임 방지)
   });
 };
@@ -146,8 +149,8 @@ export const useEnemyTeamList = (params: SiegeSearchParams & { paging?: number; 
  */
 export const useEnemyTeamListSuspense = (params: SiegeSearchParams & { paging?: number; offset?: number }) => {
   return useApiPostSuspenseQuery<MonsterItem[]>('/summonerswar/enemyTeam-list', params, {
-    staleTime: 2 * 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: ENEMY_TEAM_QUERY_STALE_MS,
+    gcTime: ENEMY_TEAM_QUERY_GC_MS,
     // 페이지네이션/조건 변경 시 이전 데이터 유지 -> Suspense로 매번 화면이 날아가는 걸 방지
     placeholderData: (previousData) => previousData,
   });

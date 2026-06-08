@@ -3,7 +3,23 @@
 import { Box, Button, Typography, Alert } from '@mui/material';
 import Link from 'next/link';
 import { useUserGuild } from '@/features/auth/hooks/useAuth';
+import type { UserInfo } from '@/features/auth/types/auth';
 import { isAuthenticated } from '@/shared/utils/auth';
+
+const GUILD_QUERY_STALE_MS = 10 * 60 * 1000;
+
+function readGuildIdHint(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem('userInfo');
+    if (!raw) return null;
+    const userInfo = JSON.parse(raw) as UserInfo;
+    const guildId = userInfo?.guild_id?.trim();
+    return guildId || null;
+  } catch {
+    return null;
+  }
+}
 
 type Props = {
   children: React.ReactNode;
@@ -16,7 +32,11 @@ type Props = {
  */
 export default function GuildRequiredGate({ children, title = '길드 가입이 필요합니다' }: Props) {
   const loggedIn = isAuthenticated();
-  const { data: guild, isLoading, isFetched } = useUserGuild();
+  const guildHint = loggedIn ? readGuildIdHint() : null;
+  const { data: guild, isLoading, isFetched } = useUserGuild({
+    staleTime: GUILD_QUERY_STALE_MS,
+    gcTime: GUILD_QUERY_STALE_MS * 2,
+  });
 
   if (!loggedIn) {
     return (
@@ -29,6 +49,11 @@ export default function GuildRequiredGate({ children, title = '길드 가입이 
         </Button>
       </Box>
     );
+  }
+
+  // userInfo에 guild_id가 있으면 검증 API와 목록 API를 병렬로 시작
+  if (guildHint && isLoading) {
+    return <>{children}</>;
   }
 
   if (isLoading || !isFetched) {

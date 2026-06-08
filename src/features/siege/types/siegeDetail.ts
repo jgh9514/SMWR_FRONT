@@ -112,6 +112,7 @@ export interface MonsterDetailHistoryResponse {
 }
 
 export interface RecentBattleItem {
+  log_id?: string;
   log_timestamp?: string | number;
   wizard_name?: string;
   opp_wizard_name?: string;
@@ -121,6 +122,9 @@ export interface RecentBattleItem {
   atk_image_url1?: string;
   atk_image_url2?: string;
   atk_image_url3?: string;
+  def_image_url1?: string;
+  def_image_url2?: string;
+  def_image_url3?: string;
 }
 
 /** 최근 전적 */
