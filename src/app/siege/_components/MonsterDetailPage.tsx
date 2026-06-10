@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import {
   Box,
@@ -220,6 +220,14 @@ export default function MonsterDetailPage() {
   const [recentPage, setRecentPage] = useState(1);
   const historyLimit = DEFAULT_PAGE_SIZE;
   const recommendedLimit = 5;
+
+  // 상세 대상(방덱) 또는 조회 범위가 바뀌면 페이지를 1로 초기화한다.
+  // 이전 상세에서 눌렀던 페이지 번호가 유지되면 "개수가 모자라 보이는" 현상이 생긴다.
+  useEffect(() => {
+    setHistoryPage(1);
+    setRecommendedPage(1);
+    setRecentPage(1);
+  }, [detailParam, siegeApiContextParams]);
 
   const baseParams = useMemo<MonsterDetailParams | null>(() => {
     const dm1 = schData.dm1?.trim();
