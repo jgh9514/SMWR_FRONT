@@ -17,11 +17,15 @@ function parseRuneId(raw: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export function extractRuneSelectionFromDetail(detail: DetailRecord, monsterIndex: 1 | 2 | 3): DeckMonsterRuneSelection {
+export function extractRuneSelectionFromDetail(
+  detail: DetailRecord,
+  monsterIndex: 1 | 2 | 3,
+  prefix = '',
+): DeckMonsterRuneSelection {
   return {
-    runeId1: parseRuneId(pickDetailField(detail, monsterIndex, 'rune_id_1')),
-    runeId2: parseRuneId(pickDetailField(detail, monsterIndex, 'rune_id_2')),
-    runeId3: parseRuneId(pickDetailField(detail, monsterIndex, 'rune_id_3')),
+    runeId1: parseRuneId(pickDetailField(detail, monsterIndex, `${prefix}rune_id_1`)),
+    runeId2: parseRuneId(pickDetailField(detail, monsterIndex, `${prefix}rune_id_2`)),
+    runeId3: parseRuneId(pickDetailField(detail, monsterIndex, `${prefix}rune_id_3`)),
   };
 }
 

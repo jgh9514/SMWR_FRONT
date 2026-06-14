@@ -19,7 +19,13 @@ import { MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11y';
 /** Dialog 안 Select — 메뉴가 모달 뒤로 가려지지 않도록 z-index 상향 */
 const DIALOG_SELECT_MENU_PROPS = {
   ...MUI_MENU_A11Y_PROPS,
-  sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 2 },
+  sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
+  slotProps: {
+    ...(MUI_MENU_A11Y_PROPS.slotProps ?? {}),
+    paper: {
+      sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
+    },
+  },
 };
 
 interface RuneSetPickerProps {
@@ -76,10 +82,6 @@ export default function RuneSetPicker({ value, onChange, disabled = false }: Run
     onChange({ ...value, [slot]: Number.isNaN(nextId) ? null : nextId });
   };
 
-  const selectedElsewhere = (runeId: number, currentSlot: typeof SLOT_KEYS[number]) => {
-    return SLOT_KEYS.some((key) => key !== currentSlot && value[key] === runeId);
-  };
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
@@ -123,9 +125,8 @@ export default function RuneSetPicker({ value, onChange, disabled = false }: Run
             {runes.map((rune) => {
               const id = Number(rune.rune_id);
               if (!Number.isFinite(id) || id <= 0) return null;
-              const taken = selectedElsewhere(id, slotKey);
               return (
-                <MenuItem key={id} value={String(id)} disabled={taken}>
+                <MenuItem key={id} value={String(id)}>
                   <RuneOptionLabel
                     nameKo={rune.name_ko}
                     requiredPieces={rune.required_pieces}

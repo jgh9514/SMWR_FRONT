@@ -125,6 +125,7 @@ function getNavGroups(
           { title: '트리오', path: '/rta/monster-stats/trio', icon: <GroupsIcon /> },
         ],
       },
+      { title: 'RTA 시뮬레이션 추천', path: '/rta/simulation-recommend', icon: <HandymanIcon /> },
       { title: 'RTA 소환사 랭킹', path: '/rta/summoner-ranking', icon: <EmojiEventsIcon /> },
       { title: 'RTA 랭크 컷', path: '/rta/rank-cutoffs', icon: <TrendingUpIcon /> },
     ],

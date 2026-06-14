@@ -34,7 +34,15 @@ export default function RuneIconRow({
             src={rune.imageUrl ?? undefined}
             alt={rune.nameKo}
             variant="rounded"
-            sx={{ width: iconSize, height: iconSize, border: '1px solid', borderColor: 'divider' }}
+            sx={{
+              width: iconSize,
+              height: iconSize,
+              border: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+              p: 0.25,
+              '& img': { objectFit: 'contain' },
+            }}
           />
         </Tooltip>
       ))}

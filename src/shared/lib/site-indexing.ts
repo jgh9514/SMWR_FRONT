@@ -4,6 +4,7 @@ export const PUBLIC_SITEMAP_STATIC_ROUTES = [
   { path: '/monster-search', name: '몬스터 검색', changeFrequency: 'weekly' as const, priority: 0.8 },
   { path: '/rta', name: 'RTA 분석', changeFrequency: 'daily' as const, priority: 0.9 },
   { path: '/rta/monster-stats', name: 'RTA 몬스터 통계', changeFrequency: 'daily' as const, priority: 0.9 },
+  { path: '/rta/simulation-recommend', name: 'RTA 시뮬레이션 추천', changeFrequency: 'daily' as const, priority: 0.82 },
   { path: '/rta/rank-cutoffs', name: 'RTA 랭크 컷', changeFrequency: 'daily' as const, priority: 0.8 },
   { path: '/rta/summoner-ranking', name: 'RTA 소환사 랭킹', changeFrequency: 'daily' as const, priority: 0.82 },
   { path: '/battle-history', name: '전적 조회', changeFrequency: 'daily' as const, priority: 0.8 },

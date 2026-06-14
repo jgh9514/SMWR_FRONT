@@ -77,7 +77,7 @@ export interface GuildSearchItem {
 export interface SignupParams {
   user_id: string;
   password: string;
-  // 닉네임 입력을 제거했으므로 선택값으로 처리 (백엔드에서 비어있으면 user_id로 기본값 설정)
+  // 닉네임은 중복 허용 (백엔드에서 비어있으면 user_id를 기본값으로 사용)
   user_name?: string;
   email: string;
 }

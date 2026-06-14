@@ -484,6 +484,9 @@ function SiegeContent() {
   // 길드 선택 변경만으로는 자동 조회하지 않음 (검색 버튼으로만 적용)
 
   const handleSearch = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     // 검색 버튼 클릭 시에만 조건을 적용하고 조회
     setAppliedMonsterIds(selectedMonsterList.map((m) => m.monster_id));
     setAppliedSelectedGuilds(selectedGuilds);
@@ -852,12 +855,7 @@ function SiegeContent() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Box
               sx={{
-                display: 'flex',
-                flexDirection: { xs: 'column', sm: 'row' },
-                alignItems: { xs: 'stretch', sm: 'flex-start' },
-                justifyContent: 'space-between',
-                gap: { xs: 1.5, sm: 2 },
-                mb: { xs: 3, md: 4 },
+                mb: { xs: 2, md: 2.5 },
               }}
             >
               <Typography
@@ -873,15 +871,6 @@ function SiegeContent() {
               >
                 길드 공성전 방어덱 분석
               </Typography>
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={() => setManualDefenseDeckDialogOpen(true)}
-                sx={{ flexShrink: 0, alignSelf: { xs: 'stretch', sm: 'center' } }}
-                aria-label="방덱 수동 등록 열기"
-              >
-                방덱 수동 등록
-              </Button>
             </Box>
 
             <SiegeManualDefenseDeckDialog
@@ -1065,6 +1054,19 @@ function SiegeContent() {
                   </Select>
                 </FormControl>
               </Box>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: { xs: 'stretch', sm: 'flex-end' }, mt: { xs: 1, md: 1.5 } }}>
+              <Button
+                variant="outlined"
+                color="primary"
+                onClick={() => setManualDefenseDeckDialogOpen(true)}
+                sx={{ alignSelf: 'center' }}
+                fullWidth={isMobile}
+                aria-label="방덱 수동 등록 열기"
+              >
+                방덱 수동 등록
+              </Button>
             </Box>
           </Box>
         </Box>

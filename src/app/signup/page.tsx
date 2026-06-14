@@ -33,6 +33,7 @@ export default function SignupPage() {
   // 회원가입 폼 데이터
   const [signupFormData, setSignupFormData] = useState({
     user_id: '',
+    user_name: '',
     password: '',
     password_confirm: '',
     verification_code: '',
@@ -345,6 +346,7 @@ export default function SignupPage() {
     const params: SignupParams = {
       user_id: signupFormData.user_id,
       password: signupFormData.password,
+      user_name: signupFormData.user_name.trim() || undefined,
       email: composedEmail,
     };
 
@@ -355,10 +357,11 @@ export default function SignupPage() {
     <Box
       sx={{
         minHeight: '100vh',
-        bgcolor: '#f6f7fb',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'flex-start',
+        bgcolor: 'background.default',
+        background: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56,189,248,0.12) 0%, transparent 70%), #0f172a',
         py: { xs: 4, md: 8 },
         px: { xs: 2, sm: 3 },
       }}
@@ -367,10 +370,12 @@ export default function SignupPage() {
         sx={{
           width: '100%',
           maxWidth: 440,
-          borderRadius: 3,
+          borderRadius: 4,
           border: '1px solid',
           borderColor: 'divider',
-          boxShadow: '0 8px 30px rgba(16, 24, 40, 0.08)',
+          bgcolor: 'rgba(30,41,59,0.7)',
+          backdropFilter: 'blur(20px)',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.5)',
         }}
       >
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
@@ -454,6 +459,20 @@ export default function SignupPage() {
                 </Button>
               </Box>
             </Box>
+
+            <TextField
+              label="닉네임"
+              placeholder="닉네임을 입력하세요 (중복 허용, 미입력 시 아이디 사용)"
+              name="signup_user_name"
+              value={signupFormData.user_name}
+              onChange={(e) =>
+                setSignupFormData({ ...signupFormData, user_name: e.target.value })
+              }
+              disabled={signupMutation.isPending}
+              fullWidth
+              size="medium"
+              helperText="중복 닉네임 허용"
+            />
 
               <TextField
                 label="비밀번호"
@@ -573,7 +592,7 @@ export default function SignupPage() {
                 <Box
                   sx={{
                     display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 24px minmax(0, 1fr) auto' },
+                    gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) 24px minmax(0, 1fr)' },
                     columnGap: { xs: 0, sm: 1 },
                     rowGap: { xs: 1.25, sm: 0 },
                     alignItems: { xs: 'stretch', sm: 'center' },
@@ -655,35 +674,33 @@ export default function SignupPage() {
                     </FormControl>
                   )}
 
-                  {!emailVerified ? (
-                    <Button
-                      variant="outlined"
-                      onClick={handleSendCode}
-                      disabled={
-                        signupMutation.isPending ||
-                        isEmpty(emailId) ||
-                        isEmpty(emailDomain) ||
-                        (isCustomDomain && isEmpty(customDomain)) ||
-                        isEmpty(composedEmail) ||
-                        !isValidEmail(composedEmail) ||
-                        sendCodeMutation.isPending ||
-                        (codeSent && countdown > 0) // 최초 발송 후에는 아래 '재발송' 버튼 사용
-                      }
-                      sx={{
-                        minWidth: { xs: '100%', sm: 110 },
-                        width: { xs: '100%', sm: 'auto' },
-                        height: 56,
-                        flexShrink: 0,
-                        borderRadius: 2,
-                        mt: { xs: 0.5, sm: 0 },
-                      }}
-                    >
-                      {countdown > 0 ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '인증코드 발송'}
-                    </Button>
-                  ) : (
-                    <Box sx={{ height: 56, mt: { xs: 0.5, sm: 0 } }} />
-                  )}
                 </Box>
+                {!emailVerified ? (
+                  <Button
+                    variant="outlined"
+                    onClick={handleSendCode}
+                    disabled={
+                      signupMutation.isPending ||
+                      isEmpty(emailId) ||
+                      isEmpty(emailDomain) ||
+                      (isCustomDomain && isEmpty(customDomain)) ||
+                      isEmpty(composedEmail) ||
+                      !isValidEmail(composedEmail) ||
+                      sendCodeMutation.isPending ||
+                      (codeSent && countdown > 0) // 최초 발송 후에는 아래 '재발송' 버튼 사용
+                    }
+                    sx={{
+                      mt: 1.25,
+                      width: '100%',
+                      height: 56,
+                      borderRadius: 2,
+                    }}
+                  >
+                    {countdown > 0 ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '인증코드 발송'}
+                  </Button>
+                ) : (
+                  <Box sx={{ height: 56, mt: 1.25 }} />
+                )}
                 {emailVerified && (
                   <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Chip

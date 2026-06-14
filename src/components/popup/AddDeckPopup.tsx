@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,17 @@ interface AddDeckPopupProps {
   defenseMonster?: { dm1: string; dm2: string; dm3: string };
 }
 
+const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> = [
+  { key: 'hp', label: '체력 (HP)' },
+  { key: 'atk', label: '공격력 (ATK)' },
+  { key: 'def', label: '방어력 (DEF)' },
+  { key: 'spd', label: '공격속도 (SPD)' },
+  { key: 'critRate', label: '치명타 확률 (%)' },
+  { key: 'critDmg', label: '치명타 피해 (%)' },
+  { key: 'resistance', label: '효과 저항 (%)' },
+  { key: 'accuracy', label: '효과 적중 (%)' },
+];
+
 export default function AddDeckPopup({
   open,
   onClose,
@@ -51,17 +62,38 @@ export default function AddDeckPopup({
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [step, setStep] = useState(1);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
+  const [targetingOrder, setTargetingOrder] = useState('');
+  const [deckComment, setDeckComment] = useState('');
   const [monsterStats, setMonsterStats] = useState<DeckMonsterStats[]>([
     createEmptyDeckMonsterStats(),
     createEmptyDeckMonsterStats(),
     createEmptyDeckMonsterStats(),
   ]);
+  const [monsterStatsOrList, setMonsterStatsOrList] = useState<DeckMonsterStats[][]>([[], [], []]);
   const type = propType === 'bang' ? 1 : propType === 'empty' ? 2 : 0;
   const defenseMonster = propDefenseMonster ?? null;
+  const [targetingOrderIds, setTargetingOrderIds] = useState<string[]>([]);
 
   // 몬스터 목록 조회 (React Query 사용)
   const { data: monsterList = [] } = useMonsterList();
   const { runeById } = useRuneMasterList();
+  const monsterById = useMemo(() => {
+    const map = new Map<string, MonsterOption>();
+    for (const m of monsterList) {
+      map.set(String(m.monster_id), m);
+    }
+    return map;
+  }, [monsterList]);
+  const defenseTargetCandidates = useMemo(
+    () => [defenseMonster?.dm1, defenseMonster?.dm2, defenseMonster?.dm3].filter((v): v is string => !!v && v.trim() !== ''),
+    [defenseMonster?.dm1, defenseMonster?.dm2, defenseMonster?.dm3],
+  );
+
+  useEffect(() => {
+    if (defenseTargetCandidates.length !== 3) return;
+    setTargetingOrderIds(defenseTargetCandidates);
+    setTargetingOrder(defenseTargetCandidates.join(' > '));
+  }, [defenseTargetCandidates]);
 
   // 덱 저장 Mutation
   const saveDeckMutation = useApiPostMutation<string, {
@@ -75,6 +107,11 @@ export default function AddDeckPopup({
     monster_1_stats: DeckMonsterStats;
     monster_2_stats: DeckMonsterStats;
     monster_3_stats: DeckMonsterStats;
+    monster_1_stats_or_list?: DeckMonsterStats[];
+    monster_2_stats_or_list?: DeckMonsterStats[];
+    monster_3_stats_or_list?: DeckMonsterStats[];
+    targeting_order?: string;
+    deck_comment?: string;
   }>('/summonerswar/enemyTeam-save', {
     onSuccess: (res) => {
       if (res === 'SUCCESS') {
@@ -135,6 +172,46 @@ export default function AddDeckPopup({
     });
   };
 
+  const handleRuneOrChange = (index: number, orIndex: number, selection: DeckMonsterRuneSelection) => {
+    setMonsterStatsOrList((prev) => {
+      const next = prev.map((list) => [...list]);
+      const target = next[index]?.[orIndex];
+      if (!target) return prev;
+      next[index][orIndex] = {
+        ...target,
+        runeId1: selection.runeId1,
+        runeId2: selection.runeId2,
+        runeId3: selection.runeId3,
+      };
+      return next;
+    });
+  };
+
+  const updateMonsterStat = (
+    target: 'primary' | 'or',
+    index: number,
+    key: keyof DeckMonsterStats,
+    value: number,
+    orIndex?: number,
+  ) => {
+    if (target === 'primary') {
+      setMonsterStats((prev) => {
+        const next = [...prev];
+        next[index] = { ...next[index], [key]: value };
+        return next;
+      });
+      return;
+    }
+    if (orIndex == null) return;
+    setMonsterStatsOrList((prev) => {
+      const next = prev.map((list) => [...list]);
+      const targetStats = next[index]?.[orIndex];
+      if (!targetStats) return prev;
+      next[index][orIndex] = { ...targetStats, [key]: value };
+      return next;
+    });
+  };
+
   const save = () => {
     if (selectedMonsterList.length !== 3) {
       showToast.error('몬스터를 선택해주세요.');
@@ -146,6 +223,13 @@ export default function AddDeckPopup({
       if (err) {
         showToast.error(`${selectedMonsterList[i]?.kr_name ?? `몬스터 ${i + 1}`}: ${err}`);
         return;
+      }
+      for (let j = 0; j < (monsterStatsOrList[i]?.length ?? 0); j += 1) {
+        const errOr = runeSelectionErrorMessage(selectionFromDeckMonsterStats(monsterStatsOrList[i][j]), runeById);
+        if (errOr) {
+          showToast.error(`${selectedMonsterList[i]?.kr_name ?? `몬스터 ${i + 1}`} OR${j + 1}: ${errOr}`);
+          return;
+        }
       }
     }
 
@@ -160,9 +244,25 @@ export default function AddDeckPopup({
       monster_1_stats: monsterStats[0],
       monster_2_stats: monsterStats[1],
       monster_3_stats: monsterStats[2],
+      ...(monsterStatsOrList[0]?.length ? { monster_1_stats_or_list: monsterStatsOrList[0] } : {}),
+      ...(monsterStatsOrList[1]?.length ? { monster_2_stats_or_list: monsterStatsOrList[1] } : {}),
+      ...(monsterStatsOrList[2]?.length ? { monster_3_stats_or_list: monsterStatsOrList[2] } : {}),
+      ...(targetingOrder.trim() ? { targeting_order: targetingOrder.trim() } : {}),
+      ...(deckComment.trim() ? { deck_comment: deckComment.trim() } : {}),
     };
 
     saveDeckMutation.mutate(saveData);
+  };
+
+  const moveTargetingOrder = (index: number, direction: -1 | 1) => {
+    setTargetingOrderIds((prev) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      setTargetingOrder(next.join(' > '));
+      return next;
+    });
   };
 
   const handleClose = () => {
@@ -173,6 +273,9 @@ export default function AddDeckPopup({
       createEmptyDeckMonsterStats(),
       createEmptyDeckMonsterStats(),
     ]);
+    setMonsterStatsOrList([[], [], []]);
+    setTargetingOrder('');
+    setDeckComment('');
     onClose();
   };
 
@@ -185,7 +288,14 @@ export default function AddDeckPopup({
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth fullScreen>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="sm"
+      fullWidth
+      fullScreen
+      sx={{ zIndex: (t) => t.zIndex.modal + 20 }}
+    >
       <DialogTitle
         sx={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -398,127 +508,174 @@ export default function AddDeckPopup({
                 <AccordionDetails>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="체력 (HP)"
-                          type="number"
-                          value={monsterStats[index].hp}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].hp = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="공격력 (ATK)"
-                          type="number"
-                          value={monsterStats[index].atk}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].atk = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="방어력 (DEF)"
-                          type="number"
-                          value={monsterStats[index].def}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].def = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="공격속도 (SPD)"
-                          type="number"
-                          value={monsterStats[index].spd}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].spd = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="치명타 확률 (%)"
-                          type="number"
-                          value={monsterStats[index].critRate}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].critRate = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="치명타 피해 (%)"
-                          type="number"
-                          value={monsterStats[index].critDmg}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].critDmg = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="효과 저항 (%)"
-                          type="number"
-                          value={monsterStats[index].resistance}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].resistance = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
-                      <Box sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                        <TextField
-                          label="효과 적중 (%)"
-                          type="number"
-                          value={monsterStats[index].accuracy}
-                          onChange={(e) => {
-                            const newStats = [...monsterStats];
-                            newStats[index].accuracy = Number(e.target.value);
-                            setMonsterStats(newStats);
-                          }}
-                          fullWidth
-                          size="small"
-                        />
-                      </Box>
+                      {STAT_INPUT_FIELDS.map((field) => (
+                        <Box key={field.key} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
+                          <TextField
+                            label={field.label}
+                            type="number"
+                            value={monsterStats[index][field.key] as number}
+                            onChange={(e) => updateMonsterStat('primary', index, field.key, Number(e.target.value))}
+                            fullWidth
+                            size="small"
+                          />
+                        </Box>
+                      ))}
                     </Box>
                     <RuneSetPicker
                       value={selectionFromDeckMonsterStats(monsterStats[index])}
                       onChange={(selection) => handleRuneChange(index, selection)}
                     />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setMonsterStatsOrList((prev) => {
+                            const next = [...prev];
+                            next[index] = [...next[index], { ...monsterStats[index] }];
+                            return next;
+                          });
+                        }}
+                      >
+                        OR 조건 추가
+                      </Button>
+                    </Box>
+                    {(monsterStatsOrList[index] ?? []).map((orStats, orIdx) => (
+                      <Box key={`or-${index}-${orIdx}`} sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1.5, p: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                            OR{orIdx + 1} 대안 스탯 / 룬 세트
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.75 }}>
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => {
+                                setMonsterStatsOrList((prev) => {
+                                  const next = prev.map((list) => [...list]);
+                                  next[index][orIdx] = { ...monsterStats[index] };
+                                  return next;
+                                });
+                              }}
+                            >
+                              스탯 동일하게
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="text"
+                              onClick={() => {
+                                setMonsterStatsOrList((prev) => {
+                                  const next = prev.map((list) => [...list]);
+                                  next[index] = next[index].filter((_, idx2) => idx2 !== orIdx);
+                                  return next;
+                                });
+                              }}
+                            >
+                              삭제
+                            </Button>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                          {STAT_INPUT_FIELDS.map((field) => (
+                            <Box key={`or-${orIdx}-${field.key}`} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
+                              <TextField
+                                label={field.label}
+                                type="number"
+                                value={orStats[field.key] as number}
+                                onChange={(e) => updateMonsterStat('or', index, field.key, Number(e.target.value), orIdx)}
+                                fullWidth
+                                size="small"
+                              />
+                            </Box>
+                          ))}
+                        </Box>
+                        <RuneSetPicker
+                          value={selectionFromDeckMonsterStats(orStats)}
+                          onChange={(selection) => handleRuneOrChange(index, orIdx, selection)}
+                        />
+                      </Box>
+                    ))}
                   </Box>
                 </AccordionDetails>
               </Accordion>
             ))}
+            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {targetingOrderIds.length === 3 ? (
+                <Box
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1.5,
+                    p: 1.25,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    타겟팅 순서 (방덱 몬스터 기준)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {targetingOrderIds.map((monsterId, idx) => {
+                      const m = monsterById.get(monsterId);
+                      return (
+                        <Box
+                          key={`targeting-${monsterId}-${idx}`}
+                          sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            px: 1,
+                            py: 0.75,
+                            minWidth: 160,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.75,
+                          }}
+                        >
+                          <Chip size="small" color="primary" label={idx + 1} sx={{ height: 20 }} />
+                          <Avatar
+                            src={m?.image_url ? getMonsterImageUrl(m.image_url) : undefined}
+                            sx={{ width: 26, height: 26, '& img': { objectFit: 'contain' } }}
+                          />
+                          <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                            {m?.kr_name || monsterId}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.25 }}>
+                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, -1)} disabled={idx === 0}>
+                              <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, 1)} disabled={idx === targetingOrderIds.length - 1}>
+                              <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              ) : (
+                <TextField
+                  label="타겟팅 순서"
+                  placeholder="예: 2번 > 1번 > 3번"
+                  value={targetingOrder}
+                  onChange={(e) => setTargetingOrder(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+              )}
+              <TextField
+                label="코멘트"
+                placeholder="운용 팁/주의사항"
+                value={deckComment}
+                onChange={(e) => setDeckComment(e.target.value)}
+                fullWidth
+                size="small"
+                multiline
+                minRows={2}
+              />
+            </Box>
           </Box>
         )}
       </DialogContent>

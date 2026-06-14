@@ -26,6 +26,7 @@ import BrokenImageIcon from '@mui/icons-material/BrokenImage';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
@@ -37,6 +38,7 @@ import {
   useDeckVoteMutation,
   useApiPostMutation,
   type DeckDetailQueryParams,
+  useMonsterList,
 } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
@@ -44,14 +46,14 @@ import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
 import RuneIconRow from '@/features/siege/components/RuneIconRow';
 import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
 import { runeSelectionErrorMessage, selectionFromDeckMonsterStats } from '@/features/siege/utils/runeValidation';
-import { extractRuneDisplaysFromDetail, extractRuneSelectionFromDetail } from '@/features/siege/utils/runeDetail';
+import { extractRuneDisplaysFromDetail } from '@/features/siege/utils/runeDetail';
 import type { RecommendedItem } from '@/features/siege/types/siegeDetail';
 import {
   createEmptyDeckMonsterStats,
   type DeckEditableStatKey,
   type DeckMonsterStats,
 } from '@/features/siege/types/siege';
-import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
+import type { DeckMonsterRuneDisplay, DeckMonsterRuneSelection } from '@/features/siege/types/rune';
 import {
   buildDeckDetailQueryParams,
   pickDeckStat,
@@ -107,6 +109,21 @@ const STAT_ROWS: { key: DeckEditableStatKey; label: string; suffix?: string }[] 
   { key: 'accuracy', label: '효과 적중', suffix: '%' },
 ];
 
+const STAT_KEY_TO_SNAKE: Record<DeckEditableStatKey, string> = {
+  hp: 'hp',
+  atk: 'atk',
+  def: 'def',
+  spd: 'spd',
+  critRate: 'crit_rate',
+  critDmg: 'crit_dmg',
+  resistance: 'resistance',
+  accuracy: 'accuracy',
+};
+
+function formatStatValue(value: number, suffix?: string): string {
+  return `${value.toLocaleString('ko-KR')}${suffix ?? ''}`;
+}
+
 interface DeckDetailPopupProps {
   open: boolean;
   onClose: () => void;
@@ -124,7 +141,12 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const [isEditing, setIsEditing] = useState(false);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
   const [editStats, setEditStats] = useState<DeckMonsterStats[]>(createInitialDeckStats);
+  const [editStatsOrList, setEditStatsOrList] = useState<DeckMonsterStats[][]>([[], [], []]);
+  const [targetingOrder, setTargetingOrder] = useState('');
+  const [targetingOrderIds, setTargetingOrderIds] = useState<string[]>([]);
+  const [deckComment, setDeckComment] = useState('');
   const { runeById } = useRuneMasterList();
+  const { data: monsterList = [] } = useMonsterList();
 
   const activeItem = selectedItem ?? lastSelectedItem;
 
@@ -191,9 +213,14 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     throw new Error('deck_id 또는 공격 몬스터 조합이 필요합니다.');
   };
 
-  const extractStatsFromDetail = useCallback((detail: DeckDetailRecord, index: 1 | 2 | 3): DeckMonsterStats => {
-    const get = (key: string) => normalizeStatValue(pickDeckStat(detail, index, key), 0);
-    const runes = extractRuneSelectionFromDetail(detail, index);
+  const extractStatsFromDetail = useCallback((detail: DeckDetailRecord, index: 1 | 2 | 3, prefix = ''): DeckMonsterStats => {
+    const get = (key: string) => normalizeStatValue(pickDeckStat(detail, index, `${prefix}${key}`), 0);
+    const runeId1Raw = pickDeckStat(detail, index, `${prefix}rune_id_1`);
+    const runeId2Raw = pickDeckStat(detail, index, `${prefix}rune_id_2`);
+    const runeId3Raw = pickDeckStat(detail, index, `${prefix}rune_id_3`);
+    const runeId1 = runeId1Raw == null || runeId1Raw === '' ? null : Number(runeId1Raw);
+    const runeId2 = runeId2Raw == null || runeId2Raw === '' ? null : Number(runeId2Raw);
+    const runeId3 = runeId3Raw == null || runeId3Raw === '' ? null : Number(runeId3Raw);
     return {
       hp: get('hp'),
       atk: get('atk'),
@@ -203,11 +230,70 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       critDmg: get('crit_dmg'),
       resistance: get('resistance'),
       accuracy: get('accuracy'),
-      runeId1: runes.runeId1,
-      runeId2: runes.runeId2,
-      runeId3: runes.runeId3,
+      runeId1: typeof runeId1 === 'number' && Number.isFinite(runeId1) && runeId1 > 0 ? runeId1 : null,
+      runeId2: typeof runeId2 === 'number' && Number.isFinite(runeId2) && runeId2 > 0 ? runeId2 : null,
+      runeId3: typeof runeId3 === 'number' && Number.isFinite(runeId3) && runeId3 > 0 ? runeId3 : null,
     };
   }, []);
+
+  const extractOrStatsListFromDetail = useCallback((detail: DeckDetailRecord, index: 1 | 2 | 3): DeckMonsterStats[] => {
+    const raw = pickDeckStat(detail, index, 'or_options_json');
+    const parseItem = (item: Record<string, unknown>): DeckMonsterStats => ({
+      hp: normalizeStatValue(item.hp),
+      atk: normalizeStatValue(item.atk),
+      def: normalizeStatValue(item.def),
+      spd: normalizeStatValue(item.spd),
+      critRate: normalizeStatValue(item.crit_rate ?? item.critRate),
+      critDmg: normalizeStatValue(item.crit_dmg ?? item.critDmg),
+      resistance: normalizeStatValue(item.resistance),
+      accuracy: normalizeStatValue(item.accuracy),
+      runeId1: normalizeStatValue(item.rune_id_1 ?? item.runeId1, 0) || null,
+      runeId2: normalizeStatValue(item.rune_id_2 ?? item.runeId2, 0) || null,
+      runeId3: normalizeStatValue(item.rune_id_3 ?? item.runeId3, 0) || null,
+    });
+    const normalizeList = (arr: unknown[]): DeckMonsterStats[] => {
+      return arr
+        .filter((v): v is Record<string, unknown> => !!v && typeof v === 'object')
+        .map(parseItem);
+    };
+
+    if (Array.isArray(raw)) {
+      return normalizeList(raw);
+    }
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return normalizeList(parsed);
+      } catch {
+        // ignore parse error and fallback to legacy key
+      }
+    }
+    if (raw != null && typeof raw === 'object' && typeof (raw as { toString?: () => string }).toString === 'function') {
+      try {
+        const parsed = JSON.parse(String(raw));
+        if (Array.isArray(parsed)) return normalizeList(parsed);
+      } catch {
+        // fallback to legacy key
+      }
+    }
+    // 하위 호환: 단일 OR 컬럼
+    const legacy = extractStatsFromDetail(detail, index, 'or_');
+    const hasLegacy =
+      legacy.hp !== 0 || legacy.atk !== 0 || legacy.def !== 0 || legacy.spd !== 0 ||
+      legacy.critRate !== 0 || legacy.critDmg !== 0 || legacy.resistance !== 0 || legacy.accuracy !== 0 ||
+      legacy.runeId1 != null || legacy.runeId2 != null || legacy.runeId3 != null;
+    return hasLegacy ? [legacy] : [];
+  }, [extractStatsFromDetail]);
+
+  const resolveBaseStat = useCallback(
+    (detail: DeckDetailRecord | null | undefined, index: 1 | 2 | 3, key: DeckEditableStatKey): number => {
+      const snakeKey = STAT_KEY_TO_SNAKE[key];
+      const raw = pickDeckStat(detail, index, `base_${snakeKey}`);
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : 0;
+    },
+    [],
+  );
 
   const monsterImageUrls = (() => {
     const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
@@ -228,6 +314,60 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     if (!detailDataRecord) return [[], [], []];
     return ([1, 2, 3] as const).map((i) => extractRuneDisplaysFromDetail(detailDataRecord, i));
   })();
+
+  const monsterRuneDisplaysOr: DeckMonsterRuneDisplay[][][] = (() => {
+    if (!detailDataRecord) return [[], [], []];
+    return ([1, 2, 3] as const).map((i) => {
+      const orList = extractOrStatsListFromDetail(detailDataRecord, i);
+      return orList.map((stats) => {
+        const ids = [stats.runeId1, stats.runeId2, stats.runeId3].filter((id): id is number => id != null && id > 0);
+        return ids.map((id) => {
+          const rune = runeById.get(id);
+          return {
+            runeId: id,
+            nameKo: rune?.name_ko ?? `룬 ${id}`,
+            imageUrl: rune?.image_url ? getMonsterImageUrl(rune.image_url) : null,
+            requiredPieces: rune?.required_pieces ?? 0,
+          };
+        });
+      });
+    });
+  })();
+
+  const monsterById = useMemo(() => {
+    const map = new Map<string, { kr_name?: string; image_url?: string }>();
+    for (const m of monsterList as Array<{ monster_id?: string; kr_name?: string; image_url?: string }>) {
+      if (!m?.monster_id) continue;
+      map.set(String(m.monster_id), m);
+    }
+    return map;
+  }, [monsterList]);
+
+  const defenseTargetCandidates = useMemo(() => {
+    const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
+    if (!row) return [];
+    const d1 = row.def_monster_1 ?? row.defMonster1;
+    const d2 = row.def_monster_2 ?? row.defMonster2;
+    const d3 = row.def_monster_3 ?? row.defMonster3;
+    return [d1, d2, d3].filter((v): v is string => !!v && String(v).trim() !== '').map(String);
+  }, [activeItem, detailDataRecord]);
+
+  const readonlyTargetingOrderIds = useMemo(() => {
+    if (!detailDataRecord) return [];
+    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
+    const parsed = rawOrder ? rawOrder.split('>').map((s) => s.trim()).filter(Boolean) : [];
+    return parsed.length === 3 ? parsed : defenseTargetCandidates;
+  }, [defenseTargetCandidates, detailDataRecord]);
+
+  const hasDeckMetaInfo = Boolean(
+    detailDataRecord &&
+    (
+      detailDataRecord.targeting_order ??
+      detailDataRecord.targetingOrder ??
+      detailDataRecord.deck_comment ??
+      detailDataRecord.deckComment
+    ),
+  );
 
   const hasValidData =
     monsterNames.some((n) => n !== '') ||
@@ -251,16 +391,37 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     setLastSelectedItem(null);
     setImageLoadErrors(new Set());
     setEditStats(createInitialDeckStats());
+    setEditStatsOrList([[], [], []]);
+    setTargetingOrder('');
+    setTargetingOrderIds([]);
+    setDeckComment('');
     setIsEditing(false);
     onClose();
   };
 
-  const handleEditStatChange = (monsterIndex: number, key: DeckEditableStatKey, value: number) => {
-    setEditStats((prev) =>
-      prev.map((stats, index) =>
-        index === monsterIndex ? { ...stats, [key]: value } : stats,
-      ),
-    );
+  const handleEditStatChange = (
+    target: 'primary' | 'or',
+    monsterIndex: number,
+    key: DeckEditableStatKey,
+    value: number,
+    orIndex?: number,
+  ) => {
+    if (target === 'primary') {
+      setEditStats((prev) =>
+        prev.map((stats, index) =>
+          index === monsterIndex ? { ...stats, [key]: value } : stats,
+        ),
+      );
+      return;
+    }
+    if (orIndex == null) return;
+    setEditStatsOrList((prev) => {
+      const next = prev.map((list) => [...list]);
+      const targetStats = next[monsterIndex]?.[orIndex];
+      if (!targetStats) return prev;
+      next[monsterIndex][orIndex] = { ...targetStats, [key]: value };
+      return next;
+    });
   };
 
   const handleImageError = (imageUrl: string) => {
@@ -289,6 +450,11 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     monster_1_stats: DeckMonsterStats;
     monster_2_stats: DeckMonsterStats;
     monster_3_stats: DeckMonsterStats;
+    monster_1_stats_or_list?: DeckMonsterStats[];
+    monster_2_stats_or_list?: DeckMonsterStats[];
+    monster_3_stats_or_list?: DeckMonsterStats[];
+    targeting_order?: string;
+    deck_comment?: string;
   }>('/summonerswar/deck-detail-update', {
     onSuccess: (res) => {
       if (res === 'SUCCESS') {
@@ -312,22 +478,56 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       extractStatsFromDetail(detailDataRecord, 2),
       extractStatsFromDetail(detailDataRecord, 3),
     ]);
+    setEditStatsOrList([
+      extractOrStatsListFromDetail(detailDataRecord, 1),
+      extractOrStatsListFromDetail(detailDataRecord, 2),
+      extractOrStatsListFromDetail(detailDataRecord, 3),
+    ]);
+    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
+    const parsed = rawOrder ? rawOrder.split('>').map((s) => s.trim()).filter(Boolean) : [];
+    const seq = parsed.length === 3 ? parsed : defenseTargetCandidates;
+    setTargetingOrderIds(seq);
+    setTargetingOrder(seq.length ? seq.join(' > ') : rawOrder);
+    setDeckComment(String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment ?? ''));
     setExpandedPanel([0, 1, 2]);
     setIsEditing(true);
   };
 
   const onEditCancel = () => {
     setIsEditing(false);
+    setEditStatsOrList([[], [], []]);
+    setTargetingOrderIds([]);
   };
 
-  const handleEditRuneChange = (monsterIndex: number, selection: DeckMonsterRuneSelection) => {
-    setEditStats((prev) =>
-      prev.map((stats, index) =>
-        index === monsterIndex
-          ? { ...stats, runeId1: selection.runeId1, runeId2: selection.runeId2, runeId3: selection.runeId3 }
-          : stats,
-      ),
-    );
+  const handleEditRuneChange = (
+    target: 'primary' | 'or',
+    monsterIndex: number,
+    selection: DeckMonsterRuneSelection,
+    orIndex?: number,
+  ) => {
+    if (target === 'primary') {
+      setEditStats((prev) =>
+        prev.map((stats, index) =>
+          index === monsterIndex
+            ? { ...stats, runeId1: selection.runeId1, runeId2: selection.runeId2, runeId3: selection.runeId3 }
+            : stats,
+        ),
+      );
+      return;
+    }
+    if (orIndex == null) return;
+    setEditStatsOrList((prev) => {
+      const next = prev.map((list) => [...list]);
+      const targetStats = next[monsterIndex]?.[orIndex];
+      if (!targetStats) return prev;
+      next[monsterIndex][orIndex] = {
+        ...targetStats,
+        runeId1: selection.runeId1,
+        runeId2: selection.runeId2,
+        runeId3: selection.runeId3,
+      };
+      return next;
+    });
   };
 
   const onEditSave = () => {
@@ -343,6 +543,14 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         showToast.error(`${name ? String(name) : `몬스터 ${i + 1}`}: ${err}`);
         return;
       }
+      for (let j = 0; j < (editStatsOrList[i]?.length ?? 0); j += 1) {
+        const errOr = runeSelectionErrorMessage(selectionFromDeckMonsterStats(editStatsOrList[i][j]), runeById);
+        if (errOr) {
+          const name = detailDataRecord?.[`m${i + 1}_kr_name`];
+          showToast.error(`${name ? String(name) : `몬스터 ${i + 1}`} OR${j + 1}: ${errOr}`);
+          return;
+        }
+      }
     }
     try {
       const deleteParams = validateParams(target);
@@ -355,6 +563,11 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         monster_1_stats: editStats[0],
         monster_2_stats: editStats[1],
         monster_3_stats: editStats[2],
+        ...(editStatsOrList[0]?.length ? { monster_1_stats_or_list: editStatsOrList[0] } : {}),
+        ...(editStatsOrList[1]?.length ? { monster_2_stats_or_list: editStatsOrList[1] } : {}),
+        ...(editStatsOrList[2]?.length ? { monster_3_stats_or_list: editStatsOrList[2] } : {}),
+        targeting_order: targetingOrder.trim() || undefined,
+        deck_comment: deckComment.trim() || undefined,
       });
     } catch (err) {
       console.error('공덱 스탯 수정 실패:', err);
@@ -370,7 +583,29 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       extractStatsFromDetail(detailDataRecord, 2),
       extractStatsFromDetail(detailDataRecord, 3),
     ]);
-  }, [detailDataRecord, extractStatsFromDetail, isEditing]);
+    setEditStatsOrList([
+      extractOrStatsListFromDetail(detailDataRecord, 1),
+      extractOrStatsListFromDetail(detailDataRecord, 2),
+      extractOrStatsListFromDetail(detailDataRecord, 3),
+    ]);
+    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
+    const parsed = rawOrder ? rawOrder.split('>').map((s) => s.trim()).filter(Boolean) : [];
+    const seq = parsed.length === 3 ? parsed : defenseTargetCandidates;
+    setTargetingOrderIds(seq);
+    setTargetingOrder(seq.length ? seq.join(' > ') : rawOrder);
+    setDeckComment(String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment ?? ''));
+  }, [defenseTargetCandidates, detailDataRecord, extractOrStatsListFromDetail, extractStatsFromDetail, isEditing]);
+
+  const moveTargetingOrder = (index: number, direction: -1 | 1) => {
+    setTargetingOrderIds((prev) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      setTargetingOrder(next.join(' > '));
+      return next;
+    });
+  };
 
   const isDark = theme.palette.mode === 'dark';
   const cardBg = isDark ? alpha('#78350F', 0.35) : alpha('#FEF3C7', 0.6);
@@ -464,7 +699,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         {!loading && !error && detailDataRecord && hasValidData && !isEditing && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-            {/* 공격 순서 */}
+            {/* 턴 순서 */}
             <Box
               sx={{
                 mt: 0.25,
@@ -479,7 +714,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                 variant="caption"
                 sx={{ display: 'block', mb: 1.75, fontWeight: 700, color: 'text.secondary', letterSpacing: 0.6, textTransform: 'uppercase' }}
               >
-                공격 순서
+               턴 순서
               </Typography>
               <Box
                 sx={{
@@ -643,6 +878,69 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
               </Box>
             )}
 
+            {hasDeckMetaInfo && (
+              <Box
+                sx={{
+                  px: 2,
+                  py: 1.25,
+                  borderRadius: 2,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.75,
+                }}
+              >
+                {readonlyTargetingOrderIds.length === 3 && (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                      타겟팅 순서
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap' }}>
+                      {readonlyTargetingOrderIds.map((monsterId, idx) => {
+                        const m = monsterById.get(monsterId);
+                        return (
+                          <Fragment key={`readonly-target-${monsterId}-${idx}`}>
+                            <Box
+                              sx={{
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                borderRadius: 1,
+                                px: 1,
+                                py: 0.65,
+                                minWidth: 132,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.6,
+                              }}
+                            >
+                              <Chip size="small" color="primary" label={idx + 1} sx={{ height: 18 }} />
+                              <Avatar
+                                src={m?.image_url ? getMonsterImageUrl(m.image_url) : undefined}
+                                sx={{ width: 24, height: 24, '& img': { objectFit: 'contain' } }}
+                              />
+                              <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                                {m?.kr_name || monsterId}
+                              </Typography>
+                            </Box>
+                            {idx < readonlyTargetingOrderIds.length - 1 && (
+                              <ChevronRightIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </Box>
+                  </Box>
+                )}
+                {Boolean(detailDataRecord?.deck_comment ?? detailDataRecord?.deckComment) && (
+                  <Typography variant="body2" color="text.secondary">
+                    코멘트: {String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment)}
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {/* 룬 & 아티팩트 */}
             <Box>
               <Typography
@@ -663,7 +961,10 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                   const name = monsterNames[i];
                   const imageUrl = monsterImageUrls[i];
                   const runeDisplays = monsterRuneDisplays[i];
+                  const runeDisplaysOrList = monsterRuneDisplaysOr[i];
                   const stats = editStats[i];
+                  const coreStatRows = STAT_ROWS.slice(0, 4);
+                  const subStatRows = STAT_ROWS.slice(4);
                   const hasImage = imageUrl && !imageLoadErrors.has(imageUrl);
 
                   return (
@@ -717,6 +1018,12 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                         }}
                       >
                         <RuneIconRow runes={runeDisplays} iconSize={26} />
+                        {runeDisplaysOrList.map((orRunes, orIdx) => (
+                          <Box key={`or-rune-${i}-${orIdx}`} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.75 }}>
+                            <Chip label={`OR${orIdx + 1}`} size="small" color="success" sx={{ height: 18, fontSize: '0.62rem' }} />
+                            <RuneIconRow runes={orRunes} iconSize={22} emptyLabel="" />
+                          </Box>
+                        ))}
                       </Box>
 
                       {/* Monster image + stats */}
@@ -755,28 +1062,63 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                         </Box>
 
                         {/* Stats table */}
-                        <Box sx={{ flex: 1, minWidth: 0 }}>
-                          {STAT_ROWS.map((row) => (
-                            <Box
-                              key={row.key}
-                              sx={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                py: 0.2,
-                              }}
-                            >
-                              <Typography variant="caption" sx={{ color: labelColor, fontSize: '0.68rem' }}>
-                                {row.label}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                sx={{ color: valueColor, fontWeight: 700, fontSize: '0.72rem', fontVariantNumeric: 'tabular-nums' }}
-                              >
-                                {stats[row.key] ?? 0}{row.suffix ?? ''}
-                              </Typography>
+                        <Box sx={{ flex: 1, minWidth: 0, mt: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.2 }}>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              {[...coreStatRows, ...subStatRows].map((row, rowIdx) => {
+                                const totalValue = Number(stats[row.key] ?? 0);
+                                const baseValue = resolveBaseStat(detailDataRecord, idx as 1 | 2 | 3, row.key);
+                                const isSubStart = rowIdx === coreStatRows.length;
+                                const displayValue = rowIdx < coreStatRows.length
+                                  ? baseValue
+                                  : (totalValue === 0 ? baseValue : totalValue);
+                                return (
+                                  <Box
+                                    key={row.key}
+                                    sx={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      py: 0.2,
+                                      mt: isSubStart ? 0.9 : 0,
+                                    }}
+                                  >
+                                    <Typography variant="caption" sx={{ color: labelColor, fontSize: '0.68rem' }}>
+                                      {row.label}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{ color: labelColor, fontSize: '0.68rem', fontVariantNumeric: 'tabular-nums' }}
+                                    >
+                                      {formatStatValue(displayValue, row.suffix)}
+                                    </Typography>
+                                  </Box>
+                                );
+                              })}
                             </Box>
-                          ))}
+                            <Box sx={{ flexShrink: 0, pt: 0.05 }}>
+                              {coreStatRows.map((row, rowIdx) => {
+                                const totalValue = Number(stats[row.key] ?? 0);
+                                return (
+                                  <Typography
+                                    key={`add-${row.key}`}
+                                    variant="caption"
+                                    sx={{
+                                      display: 'block',
+                                      color: 'success.main',
+                                      fontWeight: 700,
+                                      fontSize: '0.68rem',
+                                      fontVariantNumeric: 'tabular-nums',
+                                      py: 0.2,
+                                      textAlign: 'right',
+                                    }}
+                                  >
+                                    {`${totalValue >= 0 ? '+' : ''}${formatStatValue(totalValue, row.suffix)}`}
+                                  </Typography>
+                                );
+                              })}
+                            </Box>
+                          </Box>
                         </Box>
                       </Box>
                     </Box>
@@ -790,6 +1132,82 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         {/* Edit mode */}
         {!loading && !error && detailDataRecord && hasValidData && isEditing && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 0.5 }}>
+              {targetingOrderIds.length === 3 ? (
+                <Box
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1.5,
+                    p: 1.25,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    타겟팅 순서 (방덱 몬스터 기준)
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {targetingOrderIds.map((monsterId, idx) => {
+                      const m = monsterById.get(monsterId);
+                      return (
+                        <Box
+                          key={`targeting-edit-${monsterId}-${idx}`}
+                          sx={{
+                            border: '1px solid',
+                            borderColor: 'divider',
+                            borderRadius: 1,
+                            px: 1,
+                            py: 0.75,
+                            minWidth: 160,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.75,
+                          }}
+                        >
+                          <Chip size="small" color="primary" label={idx + 1} sx={{ height: 20 }} />
+                          <Avatar
+                            src={m?.image_url ? getMonsterImageUrl(m.image_url) : undefined}
+                            sx={{ width: 26, height: 26, '& img': { objectFit: 'contain' } }}
+                          />
+                          <Typography variant="caption" sx={{ flex: 1 }} noWrap>
+                            {m?.kr_name || monsterId}
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.25 }}>
+                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, -1)} disabled={idx === 0}>
+                              <ChevronLeftIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, 1)} disabled={idx === targetingOrderIds.length - 1}>
+                              <ChevronRightIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              ) : (
+                <TextField
+                  label="타겟팅 순서"
+                  placeholder="예: 2번 > 1번 > 3번"
+                  value={targetingOrder}
+                  onChange={(e) => setTargetingOrder(e.target.value)}
+                  fullWidth
+                  size="small"
+                />
+              )}
+              <TextField
+                label="코멘트"
+                placeholder="운용 팁/주의사항"
+                value={deckComment}
+                onChange={(e) => setDeckComment(e.target.value)}
+                fullWidth
+                size="small"
+                multiline
+                minRows={2}
+              />
+            </Box>
             {[1, 2, 3].map((idx) => {
               const index = idx - 1;
               const name = resolveMonsterKrName(detailDataRecord, idx as 1 | 2 | 3);
@@ -830,7 +1248,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                             label={f.label}
                             type="number"
                             value={editStats[index][f.key] ?? 0}
-                            onChange={(e) => handleEditStatChange(index, f.key, Number(e.target.value))}
+                            onChange={(e) => handleEditStatChange('primary', index, f.key, Number(e.target.value))}
                             fullWidth
                             size="small"
                           />
@@ -839,8 +1257,79 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                     </Box>
                     <RuneSetPicker
                       value={selectionFromDeckMonsterStats(editStats[index])}
-                      onChange={(selection) => handleEditRuneChange(index, selection)}
+                      onChange={(selection) => handleEditRuneChange('primary', index, selection)}
                     />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          setEditStatsOrList((prev) => {
+                            const next = [...prev];
+                            next[index] = [...next[index], { ...editStats[index] }];
+                            return next;
+                          });
+                        }}
+                      >
+                        OR 조건 추가
+                      </Button>
+                    </Box>
+                    {(editStatsOrList[index] ?? []).map((orStats, orIdx) => (
+                      <Box key={`or-block-${index}-${orIdx}`} sx={{ mt: 1.25, border: '1px dashed', borderColor: 'divider', borderRadius: 1.5, p: 1.25 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                            OR{orIdx + 1} 대안 스탯 / 룬 세트
+                          </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.75 }}>
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => {
+                                setEditStatsOrList((prev) => {
+                                  const next = prev.map((list) => [...list]);
+                                  next[index][orIdx] = { ...editStats[index] };
+                                  return next;
+                                });
+                              }}
+                            >
+                              스탯 동일하게
+                            </Button>
+                            <Button
+                              size="small"
+                              color="error"
+                              variant="text"
+                              onClick={() => {
+                                setEditStatsOrList((prev) => {
+                                  const next = prev.map((list) => [...list]);
+                                  next[index] = next[index].filter((_, idx2) => idx2 !== orIdx);
+                                  return next;
+                                });
+                              }}
+                            >
+                              삭제
+                            </Button>
+                          </Box>
+                        </Box>
+                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                          {STAT_ROWS.map((f) => (
+                            <Box key={`or-${orIdx}-${f.key}`} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
+                              <TextField
+                                label={f.label}
+                                type="number"
+                                value={orStats[f.key] ?? 0}
+                                onChange={(e) => handleEditStatChange('or', index, f.key, Number(e.target.value), orIdx)}
+                                fullWidth
+                                size="small"
+                              />
+                            </Box>
+                          ))}
+                        </Box>
+                        <RuneSetPicker
+                          value={selectionFromDeckMonsterStats(orStats)}
+                          onChange={(selection) => handleEditRuneChange('or', index, selection, orIdx)}
+                        />
+                      </Box>
+                    ))}
                   </AccordionDetails>
                 </Accordion>
               );

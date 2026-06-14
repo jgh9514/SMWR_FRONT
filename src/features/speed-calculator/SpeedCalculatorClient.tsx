@@ -615,7 +615,7 @@ export default function SpeedCalculatorClient() {
                 {/* 아군 */}
                 <Box>
                   <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', mb: 1 }}>
-                    아군 (공격 순서 순)
+                    아군 (턴 순서 순)
                   </Typography>
                   <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 1 }}>
                     {[0, 1, 2].map((i) => (

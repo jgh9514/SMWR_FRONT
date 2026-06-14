@@ -12,18 +12,19 @@ import { getCdnImageUrl } from '@/shared/lib/env';
  * @returns CloudFront CDN을 통한 완전한 이미지 URL (예: https://dyjduzi8vf2k4.cloudfront.net/images/Wind_a/Julien_Wind_a_Icon.png)
  */
 export const getMonsterImageUrl = (imageUrl: string | null | undefined): string => {
-  if (!imageUrl) {
+  const raw = normalizeImageUrlInput(imageUrl);
+  if (!raw) {
     // 기본 이미지도 CloudFront CDN 사용
     return getCdnImageUrl('/images/default-monster.png');
   }
 
   // 이미 전체 URL인 경우 그대로 반환
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw;
   }
 
   // CloudFront CDN URL 사용
-  const cdnUrl = getCdnImageUrl(imageUrl);
+  const cdnUrl = getCdnImageUrl(raw);
   
   return cdnUrl;
 };
@@ -34,15 +35,16 @@ export const getMonsterImageUrl = (imageUrl: string | null | undefined): string 
  * - 절대 URL만 그대로 통과시킨다.
  */
 export const getRenderableImageUrl = (imageUrl: string | null | undefined): string => {
-  if (!imageUrl) {
+  const normalized = normalizeImageUrlInput(imageUrl);
+  if (!normalized) {
     return '/images/default-monster.png';
   }
 
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl;
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized;
   }
 
-  return imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
 };
 
 /**
@@ -96,6 +98,20 @@ function pickNonEmpty(
     if (t !== '') return t;
   }
   return undefined;
+}
+
+function normalizeImageUrlInput(imageUrl: string | null | undefined): string {
+  if (typeof imageUrl !== 'string') return '';
+  let v = imageUrl.trim();
+  if (!v) return '';
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    v = v.slice(1, -1).trim();
+  }
+  v = v.replace(/\\\//g, '/');
+  if (v.startsWith('//')) {
+    v = `https:${v}`;
+  }
+  return v;
 }
 
 /** SWEX OSS 프로필 이미지 (channel_uid = 파일명, wizard_id 와 별개) */
