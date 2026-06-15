@@ -17,6 +17,8 @@ import {
   Typography,
   Autocomplete,
   IconButton,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -26,6 +28,7 @@ import { useMonsterList, type MonsterOption, useApiPostMutation } from '@/hooks/
 import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
+import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
 import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
 import { runeSelectionErrorMessage, selectionFromDeckMonsterStats } from '@/features/siege/utils/runeValidation';
@@ -45,6 +48,33 @@ const DIALOG_AUTOCOMPLETE_POPPER_SLOT = {
   sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
 };
 
+const SECTION_CARD_SX = {
+  p: { xs: 1.5, sm: 2 },
+  borderRadius: 2,
+  bgcolor: 'background.paper',
+  border: '1px solid',
+  borderColor: 'divider',
+} as const;
+
+const SECTION_LABEL_SX = {
+  display: 'block',
+  mb: 1.5,
+  fontWeight: 700,
+  color: 'text.secondary',
+  letterSpacing: 0.4,
+  fontSize: '0.72rem',
+  textTransform: 'uppercase',
+} as const;
+
+const ACCORDION_SX = {
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: '8px !important',
+  overflow: 'hidden',
+  bgcolor: 'background.paper',
+  '&:before': { display: 'none' },
+} as const;
+
 const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> = [
   { key: 'hp', label: '체력 (HP)' },
   { key: 'atk', label: '공격력 (ATK)' },
@@ -63,6 +93,7 @@ export default function AddDeckPopup({
   type: propType,
   defenseMonster: propDefenseMonster,
 }: AddDeckPopupProps) {
+  const theme = useTheme();
   const { isMobile } = useResponsive();
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [step, setStep] = useState(1);
@@ -296,83 +327,180 @@ export default function AddDeckPopup({
     <Dialog
       open={open}
       onClose={handleClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
-      fullScreen
+      fullScreen={isMobile}
       sx={{ zIndex: (t) => t.zIndex.modal + 20 }}
+      PaperProps={{
+        sx: {
+          borderRadius: isMobile ? 0 : 2,
+          overflow: 'hidden',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: theme.shadows[8],
+          m: isMobile ? 0 : { xs: 1, sm: 2 },
+          maxHeight: isMobile ? '100vh' : { xs: 'calc(100vh - 16px)', sm: 'calc(100vh - 48px)' },
+        },
+      }}
     >
       <DialogTitle
         sx={{
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
           display: 'flex',
-          justifyContent: 'space-between',
           alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          px: 2,
+          py: 1.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
         }}
       >
-        <Typography variant="h6" component="span">
-          점령전 {type === 1 ? '방덱' : '공덱'} 추가 - {step === 1 ? '몬스터 선택' : '스펙 입력'}
-        </Typography>
-        <IconButton onClick={handleClose} sx={{ color: 'white' }}>
-          <CloseIcon />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="subtitle1" component="span" sx={{ fontWeight: 700, display: 'block' }} noWrap>
+            추천 공덱 {type === 1 ? '방덱' : '공덱'} 추가
+          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.75, mt: 0.75 }}>
+            <Chip
+              size="small"
+              label="1. 몬스터"
+              color={step === 1 ? 'primary' : 'default'}
+              variant={step === 1 ? 'filled' : 'outlined'}
+              sx={{ height: 22, fontSize: '0.68rem' }}
+            />
+            <Chip
+              size="small"
+              label="2. 스펙"
+              color={step === 2 ? 'primary' : 'default'}
+              variant={step === 2 ? 'filled' : 'outlined'}
+              sx={{ height: 22, fontSize: '0.68rem' }}
+            />
+          </Box>
+        </Box>
+        <IconButton onClick={handleClose} size="small" aria-label="닫기" sx={{ color: 'text.secondary', flexShrink: 0 }}>
+          <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent
+        sx={{
+          p: { xs: 1.5, sm: 2 },
+          pt: { xs: 2, sm: 2.25 },
+          bgcolor: 'background.default',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
         {step === 1 && (
-          <Box>
-            {/* 선택된 몬스터 표시 */}
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={SECTION_CARD_SX}>
+              <Typography component="span" sx={SECTION_LABEL_SX}>
                 선택된 몬스터 ({selectedMonsterList.length}/3)
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'center' }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: { xs: 1.25, sm: 2 },
+                  flexWrap: 'nowrap',
+                  overflowX: 'auto',
+                  p: 0.75,
+                  borderRadius: 1.5,
+                  bgcolor: (t) => alpha(t.palette.action.hover, 0.25),
+                }}
+              >
                 {[0, 1, 2].map((index) => (
                   <Box
                     key={index}
                     sx={{
-                      position: 'relative',
-                      width: 80,
-                      height: 80,
-                      background: '#574424',
-                      border: index === 0 ? '4px solid #d79f34' : '4px solid #6d5424',
-                      borderRadius: 1.5,
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
+                      gap: 0.75,
+                      flexShrink: 0,
+                      minWidth: { xs: 72, sm: 88 },
                     }}
-                    onClick={() => removeMonster(index)}
                   >
-                    {selectedMonsterList[index] ? (
-                      <Avatar
-                        src={getMonsterImageUrl(selectedMonsterList[index].image_url)}
-                        sx={{ width: 60, height: 60 }}
-                      />
-                    ) : (
-                      <Avatar src={getMonsterImageUrl('/images/unit_select_icon.png')} sx={{ width: 60, height: 60 }} />
-                    )}
-                    {index === 0 && !selectedMonsterList[0] && (
-                      <Typography
-                        sx={{
-                          position: 'absolute',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: 'white',
-                          textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-                        }}
-                      >
-                        Leader
-                      </Typography>
-                    )}
+                    <Box
+                      sx={{ position: 'relative', cursor: 'pointer' }}
+                      onClick={() => removeMonster(index)}
+                      role="button"
+                      aria-label={index === 0 ? '리더 슬롯' : `몬스터 슬롯 ${index + 1}`}
+                    >
+                      {selectedMonsterList[index] ? (
+                        <Avatar
+                          src={getMonsterImageUrl(selectedMonsterList[index].image_url)}
+                          alt={selectedMonsterList[index].kr_name}
+                          sx={{
+                            width: { xs: 68, sm: 84 },
+                            height: { xs: 68, sm: 84 },
+                            borderRadius: 2,
+                            border: '2px solid',
+                            borderColor: index === 0 ? 'warning.main' : 'divider',
+                            boxShadow: index === 0 ? `0 0 0 2px ${alpha(theme.palette.warning.main, 0.25)}` : 'none',
+                            bgcolor: 'background.paper',
+                            '& img': { objectFit: 'contain' },
+                          }}
+                        />
+                      ) : (
+                        <Box
+                          sx={{
+                            width: { xs: 68, sm: 84 },
+                            height: { xs: 68, sm: 84 },
+                            borderRadius: 2,
+                            bgcolor: 'action.hover',
+                            border: '2px dashed',
+                            borderColor: 'divider',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Avatar
+                            src={getMonsterImageUrl('/images/unit_select_icon.png')}
+                            sx={{ width: 48, height: 48, bgcolor: 'transparent' }}
+                          />
+                        </Box>
+                      )}
+                      {index === 0 && (
+                        <Chip
+                          label="L"
+                          size="small"
+                          color="warning"
+                          sx={{
+                            position: 'absolute',
+                            top: 3,
+                            left: 3,
+                            height: 18,
+                            minWidth: 18,
+                            fontSize: '0.62rem',
+                            fontWeight: 700,
+                            '& .MuiChip-label': { px: 0.5 },
+                          }}
+                        />
+                      )}
+                    </Box>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: 'text.secondary',
+                        fontWeight: 500,
+                        textAlign: 'center',
+                        maxWidth: 88,
+                        lineHeight: 1.2,
+                      }}
+                      noWrap
+                    >
+                      {selectedMonsterList[index]?.kr_name ?? (index === 0 ? '리더' : `슬롯 ${index + 1}`)}
+                    </Typography>
                   </Box>
                 ))}
               </Box>
             </Box>
 
-            {/* 몬스터 검색 */}
-            <Box>
-              <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
+            <Box sx={SECTION_CARD_SX}>
+              <Typography component="span" sx={SECTION_LABEL_SX}>
                 몬스터 검색
               </Typography>
               <Autocomplete
@@ -485,7 +613,52 @@ export default function AddDeckPopup({
         )}
 
         {step === 2 && (
-          <Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={SECTION_CARD_SX}>
+              <Typography component="span" sx={SECTION_LABEL_SX}>
+                턴 순서
+              </Typography>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: { xs: 1, sm: 1.5 },
+                  flexWrap: 'nowrap',
+                  overflowX: 'auto',
+                  p: 0.75,
+                  borderRadius: 1.5,
+                  bgcolor: (t) => alpha(t.palette.action.hover, 0.25),
+                }}
+              >
+                {selectedMonsterList.map((monster, index) => (
+                  <Box key={monster.monster_id} sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, flexShrink: 0 }}>
+                    {index > 0 && (
+                      <ChevronRightIcon sx={{ color: 'text.disabled', fontSize: { xs: 20, sm: 24 } }} />
+                    )}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, minWidth: { xs: 64, sm: 76 } }}>
+                      <Avatar
+                        src={getMonsterImageUrl(monster.image_url)}
+                        alt={monster.kr_name}
+                        sx={{
+                          width: { xs: 52, sm: 64 },
+                          height: { xs: 52, sm: 64 },
+                          borderRadius: 2,
+                          border: '2px solid',
+                          borderColor: index === 0 ? 'warning.main' : 'divider',
+                          bgcolor: 'background.paper',
+                          '& img': { objectFit: 'contain' },
+                        }}
+                      />
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 76, fontSize: '0.68rem' }}>
+                        {monster.kr_name}
+                      </Typography>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+
             {selectedMonsterList.map((monster, index) => (
               <Accordion
                 key={monster.monster_id}
@@ -495,34 +668,38 @@ export default function AddDeckPopup({
                     isExpanded ? [...prev, index] : prev.filter((p) => p !== index),
                   );
                 }}
-                sx={{ mb: 1 }}
+                disableGutters
+                elevation={0}
+                sx={ACCORDION_SX}
               >
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                    <Avatar src={getMonsterImageUrl(monster.image_url)} sx={{ width: 48, height: 48 }} />
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center' }}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: { xs: 1.5, sm: 2 }, minHeight: 52 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%', minWidth: 0 }}>
+                    <Avatar
+                      src={getMonsterImageUrl(monster.image_url)}
+                      sx={{ width: 40, height: 40, borderRadius: 1.5, '& img': { objectFit: 'contain' } }}
+                    />
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
                         {monster.kr_name}
-                        {index === 0 && (
-                          <Chip label="리더" size="small" color="warning" sx={{ ml: 1 }} />
-                        )}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.secondary" noWrap>
                         {monster.un_name}
                       </Typography>
                     </Box>
+                    {index === 0 && (
+                      <Chip label="리더" size="small" color="warning" sx={{ mr: 0.5, flexShrink: 0 }} />
+                    )}
                   </Box>
                 </AccordionSummary>
-                <AccordionDetails>
+                <AccordionDetails sx={{ px: { xs: 1.5, sm: 2 }, pt: 0, pb: 2 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                       {STAT_INPUT_FIELDS.map((field) => (
                         <Box key={field.key} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                          <TextField
+                          <DeckStatNumberField
                             label={field.label}
-                            type="number"
                             value={monsterStats[index][field.key] as number}
-                            onChange={(e) => updateMonsterStat('primary', index, field.key, Number(e.target.value))}
+                            onChange={(v) => updateMonsterStat('primary', index, field.key, v)}
                             fullWidth
                             size="small"
                           />
@@ -549,7 +726,16 @@ export default function AddDeckPopup({
                       </Button>
                     </Box>
                     {(monsterStatsOrList[index] ?? []).map((orStats, orIdx) => (
-                      <Box key={`or-${index}-${orIdx}`} sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 1.5, p: 1.5 }}>
+                      <Box
+                        key={`or-${index}-${orIdx}`}
+                        sx={{
+                          border: '1px dashed',
+                          borderColor: 'divider',
+                          borderRadius: 1.5,
+                          p: { xs: 1.25, sm: 1.5 },
+                          bgcolor: (t) => alpha(t.palette.action.hover, 0.15),
+                        }}
+                      >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                             OR{orIdx + 1} 대안 스탯 / 룬 세트
@@ -587,11 +773,10 @@ export default function AddDeckPopup({
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
                           {STAT_INPUT_FIELDS.map((field) => (
                             <Box key={`or-${orIdx}-${field.key}`} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                              <TextField
+                              <DeckStatNumberField
                                 label={field.label}
-                                type="number"
                                 value={orStats[field.key] as number}
-                                onChange={(e) => updateMonsterStat('or', index, field.key, Number(e.target.value), orIdx)}
+                                onChange={(v) => updateMonsterStat('or', index, field.key, v, orIdx)}
                                 fullWidth
                                 size="small"
                               />
@@ -608,7 +793,10 @@ export default function AddDeckPopup({
                 </AccordionDetails>
               </Accordion>
             ))}
-            <Box sx={{ mt: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            <Box sx={{ ...SECTION_CARD_SX, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Typography component="span" sx={{ ...SECTION_LABEL_SX, mb: 0 }}>
+                추가 정보
+              </Typography>
               {targetingOrderIds.length === 3 ? (
                 <Box
                   sx={{
@@ -619,6 +807,7 @@ export default function AddDeckPopup({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 1,
+                    bgcolor: (t) => alpha(t.palette.action.hover, 0.12),
                   }}
                 >
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
@@ -688,26 +877,37 @@ export default function AddDeckPopup({
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+      <DialogActions
+        sx={{
+          px: 2,
+          py: 1.5,
+          gap: 1,
+          flexWrap: 'wrap',
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+        }}
+      >
         {step === 2 && (
-          <Button variant="outlined" onClick={goToStep1} startIcon={<ChevronLeftIcon />}>
+          <Button variant="text" color="inherit" onClick={goToStep1} startIcon={<ChevronLeftIcon />} size="medium">
             이전
           </Button>
         )}
-        <Box sx={{ flex: 1 }} />
+        <Box sx={{ flex: 1, minWidth: 8 }} />
         {step === 1 && (
           <Button
             variant="contained"
             onClick={goToStep2}
             endIcon={<ChevronRightIcon />}
             disabled={selectedMonsterList.length !== 3}
+            size="medium"
           >
             다음
           </Button>
         )}
         {step === 2 && (
-          <Button variant="contained" onClick={save} disabled={saveDeckMutation.isPending}>
-            {saveDeckMutation.isPending ? '저장 중...' : '저장'}
+          <Button variant="contained" onClick={save} disabled={saveDeckMutation.isPending} size="medium">
+            {saveDeckMutation.isPending ? '저장 중…' : '저장'}
           </Button>
         )}
       </DialogActions>

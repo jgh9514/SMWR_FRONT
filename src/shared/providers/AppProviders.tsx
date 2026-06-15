@@ -211,6 +211,16 @@ const muiTheme = createTheme({
         },
       },
     },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: ({ theme }) => ({
+          // MUI 기본: .MuiDialogTitle-root + .MuiDialogContent-root { padding-top: 0 } — 상단 여백 유지
+          '& + .MuiDialogContent-root': {
+            paddingTop: theme.spacing(2),
+          },
+        }),
+      },
+    },
   },
 });
 

@@ -42,6 +42,7 @@ import {
 } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
 import { getMonsterImageUrl } from '@/shared/utils/image';
+import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
 import RuneIconRow from '@/features/siege/components/RuneIconRow';
 import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
@@ -1244,11 +1245,10 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                       {STAT_ROWS.map((f) => (
                         <Box key={f.key} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                          <TextField
+                          <DeckStatNumberField
                             label={f.label}
-                            type="number"
                             value={editStats[index][f.key] ?? 0}
-                            onChange={(e) => handleEditStatChange('primary', index, f.key, Number(e.target.value))}
+                            onChange={(v) => handleEditStatChange('primary', index, f.key, v)}
                             fullWidth
                             size="small"
                           />
@@ -1313,11 +1313,10 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
                           {STAT_ROWS.map((f) => (
                             <Box key={`or-${orIdx}-${f.key}`} sx={{ flex: { xs: '1 1 calc(50% - 8px)', sm: '1 1 calc(25% - 12px)' } }}>
-                              <TextField
+                              <DeckStatNumberField
                                 label={f.label}
-                                type="number"
                                 value={orStats[f.key] ?? 0}
-                                onChange={(e) => handleEditStatChange('or', index, f.key, Number(e.target.value), orIdx)}
+                                onChange={(v) => handleEditStatChange('or', index, f.key, v, orIdx)}
                                 fullWidth
                                 size="small"
                               />

@@ -24,9 +24,9 @@ export default function RuneIconRow({
 
   return (
     <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', alignItems: 'center' }}>
-      {runes.map((rune) => (
+      {runes.map((rune, index) => (
         <Tooltip
-          key={rune.runeId}
+          key={`${index}-${rune.runeId}`}
           title={`${rune.nameKo} (${rune.requiredPieces}피스)`}
           arrow
         >
