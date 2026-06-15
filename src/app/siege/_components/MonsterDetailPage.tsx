@@ -271,8 +271,11 @@ export default function MonsterDetailPage() {
       ? (basic.data.enemyData[0] as EnemyData)
       : null;
 
-  const totalRecentGames = typeof enemyData?.total_count === 'number' ? enemyData.total_count : 0;
-  const recentNeedsPagination = totalRecentGames > RECENT_BATTLES_PAGE_SIZE;
+  const historyTotalCount = typeof history.data?.historyTotalCount === 'number'
+    ? history.data.historyTotalCount
+    : 0;
+  const fallbackTotalGames = typeof enemyData?.total_count === 'number' ? enemyData.total_count : 0;
+  const recentNeedsPagination = fallbackTotalGames > RECENT_BATTLES_PAGE_SIZE;
   const recentPageSize = useMemo(() => {
     return RECENT_BATTLES_PAGE_SIZE;
   }, []);
@@ -289,6 +292,12 @@ export default function MonsterDetailPage() {
   const recentBattles = useMonsterDetailRecentBattles(recentParams, {
     enabled: !!recentParams && basic.isFetched,
   });
+  const recentBattleTotalCount = typeof recentBattles.data?.recentBattleTotalCount === 'number'
+    ? recentBattles.data.recentBattleTotalCount
+    : 0;
+  const summaryTotalGames = fallbackTotalGames;
+  const recentDisplayTotalGames = fallbackTotalGames;
+  const recentNeedsPaginationDisplay = recentDisplayTotalGames > RECENT_BATTLES_PAGE_SIZE;
   const recommendedList = recommended.data?.recommendedList || [];
   const recommendedHasNext = recommended.data?.recommendedHasNext ?? false;
   const historyList = history.data?.historyList || [];
@@ -519,7 +528,7 @@ export default function MonsterDetailPage() {
                     <Box sx={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' }, gap: { xs: 1.5, md: 2 } }}>
                       {[
                         { value: `${enemyData.total_rate ?? 0}%`, label: '공성률', highlight: true },
-                        { value: enemyData.total_count ?? 0, label: '총 게임', highlight: false },
+                        { value: summaryTotalGames, label: '총 게임', highlight: false },
                         { value: enemyData.win_count ?? 0, label: '승리', highlight: false },
                         { value: enemyData.lose_count ?? 0, label: '패배', highlight: false },
                       ].map((s) => (
@@ -708,7 +717,8 @@ export default function MonsterDetailPage() {
                   <Typography variant="subtitle2" fontWeight={700} color="text.primary">공성률 정보</Typography>
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25, fontSize: '0.68rem' }}>
                     공격 덱별 승률
-                    {enemyData?.total_count != null ? ` · 상단 총 ${enemyData.total_count}경기` : ''}
+                    {summaryTotalGames > 0 ? ` · 총 ${summaryTotalGames}경기` : ''}
+                    {historyTotalCount > 0 ? ` / ${historyTotalCount}조합` : ''}
                   </Typography>
                 </Box>
                 {history.isFetching && <CircularProgress size={14} sx={{ opacity: 0.5 }} />}
@@ -930,7 +940,7 @@ export default function MonsterDetailPage() {
               <Box sx={(t) => sectionHeaderSx(t)}>
                 <Typography variant="subtitle2" fontWeight={700} color="text.primary">
                   최근 전적
-                  {totalRecentGames > 0 ? ` · ${totalRecentGames}경기` : ''}
+                  {recentDisplayTotalGames > 0 ? ` · ${recentDisplayTotalGames}경기` : ''}
                 </Typography>
                 {recentBattles.isFetching && <CircularProgress size={14} sx={{ opacity: 0.5 }} />}
               </Box>
@@ -1243,7 +1253,7 @@ export default function MonsterDetailPage() {
                           );
                         })}
                       </Box>
-                      {recentNeedsPagination && recentBattleList.length > 0 && (
+                      {recentNeedsPaginationDisplay && recentBattleList.length > 0 && (
                         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1.5, mt: 3 }}>
                           <Button
                             variant="outlined"

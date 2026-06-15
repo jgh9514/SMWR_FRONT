@@ -109,6 +109,7 @@ export interface MonsterDetailRecommendedResponse {
 export interface MonsterDetailHistoryResponse {
   historyList: HistoryItem[];
   historyHasNext: boolean;
+  historyTotalCount?: number;
 }
 
 export interface RecentBattleItem {
@@ -131,5 +132,6 @@ export interface RecentBattleItem {
 export interface MonsterDetailRecentBattlesResponse {
   recentBattleList: RecentBattleItem[];
   recentBattleHasNext: boolean;
+  recentBattleTotalCount?: number;
 }
 
