@@ -87,11 +87,13 @@ export const useMonsterList = (
   const isCacheable = params?.siegeDedupeSecondAwakening === true;
   const [cacheSnapshot] = useState(() => (isCacheable ? readMonsterListCache() : null));
   const queryEnabled = options?.enabled ?? true;
+  const hasFreshNonEmptyCache =
+    isCacheable && cacheSnapshot?.isFresh === true && (cacheSnapshot.data?.length ?? 0) > 0;
 
   const q = useApiPostQuery<MonsterOption[]>('/summonerswar/monster-list', params, {
-    enabled: queryEnabled && !(isCacheable && cacheSnapshot?.isFresh),
-    initialData: isCacheable ? cacheSnapshot?.data : undefined,
-    placeholderData: isCacheable ? cacheSnapshot?.data : undefined,
+    enabled: queryEnabled && !hasFreshNonEmptyCache,
+    initialData: hasFreshNonEmptyCache ? cacheSnapshot?.data : undefined,
+    placeholderData: hasFreshNonEmptyCache ? cacheSnapshot?.data : undefined,
     select: (data) => normalizeMonsterList(data, { awakenedOnly: true }),
     staleTime: 30 * 60 * 1000, // 30분 (몬스터 목록은 자주 변경되지 않음)
     gcTime: 60 * 60 * 1000, // 1시간

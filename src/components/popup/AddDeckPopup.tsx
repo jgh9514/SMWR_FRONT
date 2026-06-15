@@ -40,6 +40,11 @@ interface AddDeckPopupProps {
   defenseMonster?: { dm1: string; dm2: string; dm3: string };
 }
 
+/** Dialog(zIndex modal+20) 위에 Autocomplete 목록이 보이도록 — RuneSetPicker Select 메뉴와 동일 */
+const DIALOG_AUTOCOMPLETE_POPPER_SLOT = {
+  sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
+};
+
 const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> = [
   { key: 'hp', label: '체력 (HP)' },
   { key: 'atk', label: '공격력 (ATK)' },
@@ -74,8 +79,8 @@ export default function AddDeckPopup({
   const defenseMonster = propDefenseMonster ?? null;
   const [targetingOrderIds, setTargetingOrderIds] = useState<string[]>([]);
 
-  // 몬스터 목록 조회 (React Query 사용)
-  const { data: monsterList = [] } = useMonsterList();
+  // 몬스터 목록 — 팝업 열릴 때만 조회(로컬 캐시 있으면 즉시 표시)
+  const { data: monsterList = [], isLoading: monsterListLoading } = useMonsterList(undefined, { enabled: open });
   const { runeById } = useRuneMasterList();
   const monsterById = useMemo(() => {
     const map = new Map<string, MonsterOption>();
@@ -389,12 +394,15 @@ export default function AddDeckPopup({
                 }}
                 slotProps={{
                   popper: {
+                    ...DIALOG_AUTOCOMPLETE_POPPER_SLOT,
                     placement: isMobile ? 'top-start' : 'bottom-start',
                     modifiers: isMobile
                       ? [{ name: 'flip', enabled: false }, { name: 'preventOverflow', enabled: true }]
                       : undefined,
                   },
                 }}
+                loading={monsterListLoading}
+                noOptionsText={monsterListLoading ? '몬스터 목록 불러오는 중…' : '검색 결과가 없습니다'}
                 ListboxProps={{
                   style: { maxHeight: isMobile ? 300 : 400, overflow: 'auto' },
                 }}
