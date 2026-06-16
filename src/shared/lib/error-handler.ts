@@ -45,6 +45,12 @@ export function handleApiError(error: unknown): ApiError {
       }
     }
 
+    if (status === 429) {
+      if (!fromBody || message === 'Request failed with status code 429' || /^too many requests$/i.test(message)) {
+        message = '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해 주세요.';
+      }
+    }
+
     return {
       message,
       status,

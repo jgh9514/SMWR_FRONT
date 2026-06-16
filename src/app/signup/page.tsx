@@ -24,6 +24,7 @@ import { useSignup, useLogin, useSendEmailVerification, useVerifyEmailCode, useC
 import { isEmpty } from '@/shared/utils/util';
 import { isValidEmail, isValidPassword } from '@/shared/utils/validation';
 import { showToast } from '@/shared/lib/notification';
+import { handleApiError } from '@/shared/lib/error-handler';
 import { logger } from '@/shared/lib/logger';
 import type { SignupParams } from '@/types';
 
@@ -109,7 +110,7 @@ export default function SignupPage() {
     },
     onError: (error: Error) => {
       logger.error('인증 코드 발송 실패', error);
-      showToast.error(error.message || '인증 코드 발송에 실패했습니다.');
+      showToast.error(handleApiError(error).message);
     },
   });
 
@@ -127,7 +128,7 @@ export default function SignupPage() {
     },
     onError: (error: Error) => {
       logger.error('인증 코드 확인 실패', error);
-      showToast.error(error.message || '인증 코드가 일치하지 않습니다.');
+      showToast.error(handleApiError(error).message);
     },
   });
 
@@ -149,7 +150,7 @@ export default function SignupPage() {
     },
     onError: (error: Error) => {
       logger.error('아이디 중복체크 실패', error);
-      showToast.error(error.message || '아이디 중복체크에 실패했습니다.');
+      showToast.error(handleApiError(error).message);
       setUserIdChecked(false);
       setUserIdAvailable(null);
     },
@@ -172,7 +173,7 @@ export default function SignupPage() {
     },
     onError: (error: Error) => {
       logger.error('회원가입 실패', error, { context: 'SignupPage' });
-      showToast.error(error.message || '회원가입에 실패했습니다.');
+      showToast.error(handleApiError(error).message);
     },
   });
 
