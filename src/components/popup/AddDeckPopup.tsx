@@ -37,6 +37,7 @@ import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
 import { runeSelectionErrorMessage, selectionFromDeckMonsterStats } from '@/features/siege/utils/runeValidation';
 import { createEmptyDeckMonsterStats, type DeckMonsterStats } from '@/features/siege/types/siege';
 import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
+import { SiegeDeckOrderRow } from '@/features/siege/components/SiegeDeckOrderRow';
 
 interface AddDeckPopupProps {
   open: boolean;
@@ -91,12 +92,8 @@ const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> =
 
 const DECK_STEPS = ['몬스터 선택', '스펙 입력', '공략 작성'] as const;
 
-function moveItemToFront<T>(items: T[], index: number): T[] {
-  if (index <= 0 || index >= items.length) return items;
-  const next = [...items];
-  const [picked] = next.splice(index, 1);
-  next.unshift(picked);
-  return next;
+function reorderDeckRows<T>(items: T[], orderedIndices: number[]): T[] {
+  return orderedIndices.map((index) => items[index]);
 }
 
 export default function AddDeckPopup({
@@ -196,14 +193,49 @@ export default function AddDeckPopup({
     }
   };
 
-  const prioritizeAttackOrder = (monsterId: string) => {
-    const index = selectedMonsterList.findIndex((monster) => monster.monster_id === monsterId);
-    if (index <= 0) return;
+  const handleAttackOrderReorder = (orderedIds: string[]) => {
+    const indexById = new Map(selectedMonsterList.map((monster, index) => [monster.monster_id, index]));
+    const indices = orderedIds
+      .map((id) => indexById.get(id))
+      .filter((index): index is number => index !== undefined);
+    if (indices.length !== selectedMonsterList.length) {
+      return;
+    }
 
-    setSelectedMonsterList((prev) => moveItemToFront(prev, index));
-    setMonsterStats((prev) => moveItemToFront(prev, index));
-    setMonsterStatsOrList((prev) => moveItemToFront(prev, index));
+    setSelectedMonsterList((prev) => reorderDeckRows(prev, indices));
+    setMonsterStats((prev) => reorderDeckRows(prev, indices));
+    setMonsterStatsOrList((prev) => reorderDeckRows(prev, indices));
+    setExpandedPanel(indices);
   };
+
+  const handleTargetingOrderReorder = (orderedIds: string[]) => {
+    setTargetingOrderIds(orderedIds);
+  };
+
+  const attackOrderItems = useMemo(
+    () =>
+      selectedMonsterList.map((monster, index) => ({
+        id: monster.monster_id,
+        label: monster.kr_name,
+        imageUrl: monster.image_url,
+        leader: index === 0,
+      })),
+    [selectedMonsterList],
+  );
+
+  const targetingOrderItems = useMemo(
+    () =>
+      targetingOrderIds.map((monsterId, index) => {
+        const monster = monsterById.get(monsterId);
+        return {
+          id: monsterId,
+          label: monster?.kr_name || monsterId,
+          imageUrl: monster?.image_url,
+          rankLabel: `${index + 1}순위`,
+        };
+      }),
+    [monsterById, targetingOrderIds],
+  );
 
   const goToNextStep = () => {
     if (step === 0 && selectedMonsterList.length !== 3) {
@@ -310,14 +342,6 @@ export default function AddDeckPopup({
     };
 
     saveDeckMutation.mutate(saveData);
-  };
-
-  const prioritizeTargetingOrder = (monsterId: string) => {
-    setTargetingOrderIds((prev) => {
-      const index = prev.findIndex((id) => id === monsterId);
-      if (index <= 0) return prev;
-      return moveItemToFront(prev, index);
-    });
   };
 
   useEffect(() => {
@@ -648,53 +672,11 @@ export default function AddDeckPopup({
               <Typography component="span" sx={SECTION_LABEL_SX}>
                 턴 순서
               </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                카드 클릭 시 해당 몬스터가 1순위(선턴)로 이동합니다.
-              </Typography>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: { xs: 1, sm: 1.5 },
-                  flexWrap: 'nowrap',
-                  overflowX: 'auto',
-                  p: 0.75,
-                  borderRadius: 1.5,
-                  bgcolor: (t) => alpha(t.palette.action.hover, 0.25),
-                }}
-              >
-                {selectedMonsterList.map((monster, index) => (
-                  <Box key={monster.monster_id} sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 }, flexShrink: 0 }}>
-                    {index > 0 && (
-                      <ChevronRightIcon sx={{ color: 'text.disabled', fontSize: { xs: 20, sm: 24 } }} />
-                    )}
-                    <Box
-                      sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, minWidth: { xs: 64, sm: 76 } }}
-                    >
-                      <Chip label={`${index + 1}순위`} size="small" color={index === 0 ? 'warning' : 'default'} sx={{ height: 20 }} />
-                      <Avatar
-                        src={getMonsterImageUrl(monster.image_url)}
-                        alt={monster.kr_name}
-                        onClick={() => prioritizeAttackOrder(monster.monster_id)}
-                        sx={{
-                          width: { xs: 52, sm: 64 },
-                          height: { xs: 52, sm: 64 },
-                          borderRadius: 2,
-                          border: '2px solid',
-                          borderColor: index === 0 ? 'warning.main' : 'divider',
-                          cursor: index === 0 ? 'default' : 'pointer',
-                          bgcolor: 'background.paper',
-                          '& img': { objectFit: 'contain' },
-                        }}
-                      />
-                      <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 76, fontSize: '0.68rem' }}>
-                        {monster.kr_name}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))}
-              </Box>
+              <SiegeDeckOrderRow
+                items={attackOrderItems}
+                onReorder={handleAttackOrderReorder}
+                helperText="드래그하여 공격 턴 순서를 변경하세요. 1순위가 선턴입니다."
+              />
             </Box>
 
             {selectedMonsterList.map((monster, index) => (
@@ -855,23 +837,7 @@ export default function AddDeckPopup({
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                   공격 턴 순서
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
-                  {selectedMonsterList.map((monster, idx) => (
-                    <Fragment key={`turn-order-${monster.monster_id}`}>
-                      <Chip
-                        avatar={
-                          <Avatar src={getMonsterImageUrl(monster.image_url)} sx={{ '& img': { objectFit: 'contain' } }} />
-                        }
-                        label={`${idx + 1}. ${monster.kr_name}`}
-                        size="small"
-                        color={idx === 0 ? 'warning' : 'default'}
-                      />
-                      {idx < selectedMonsterList.length - 1 && (
-                        <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
-                      )}
-                    </Fragment>
-                  ))}
-                </Box>
+                <SiegeDeckOrderRow items={attackOrderItems} disabled />
               </Box>
 
               {targetingOrderIds.length === 3 ? (
@@ -889,47 +855,11 @@ export default function AddDeckPopup({
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                     타겟팅 순서 (방덱 몬스터 기준)
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    카드를 클릭하면 1순위 타겟으로 올립니다.
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {targetingOrderIds.map((monsterId, idx) => {
-                      const m = monsterById.get(monsterId);
-                      return (
-                        <Box
-                          key={`targeting-${monsterId}-${idx}`}
-                          sx={{
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            px: 1,
-                            py: 0.75,
-                            minWidth: 160,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.75,
-                          }}
-                        >
-                          <Chip size="small" color="primary" label={idx + 1} sx={{ height: 20 }} />
-                          <Avatar
-                            src={m?.image_url ? getMonsterImageUrl(m.image_url) : undefined}
-                            sx={{ width: 26, height: 26, '& img': { objectFit: 'contain' } }}
-                          />
-                          <Typography variant="caption" sx={{ flex: 1 }} noWrap>
-                            {m?.kr_name || monsterId}
-                          </Typography>
-                          <Button
-                            size="small"
-                            variant="text"
-                            disabled={idx === 0}
-                            onClick={() => prioritizeTargetingOrder(monsterId)}
-                          >
-                            1순위로
-                          </Button>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                  <SiegeDeckOrderRow
+                    items={targetingOrderItems}
+                    onReorder={handleTargetingOrderReorder}
+                    helperText="드래그하여 타겟 우선순위를 변경하세요."
+                  />
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       size="small"

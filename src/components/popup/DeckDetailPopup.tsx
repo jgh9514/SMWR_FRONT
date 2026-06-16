@@ -27,7 +27,6 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import WarningIcon from '@mui/icons-material/Warning';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import {
@@ -64,6 +63,7 @@ import {
   resolveMonsterImageUrl,
   resolveMonsterKrName,
 } from '@/features/siege/utils/deckRecord';
+import { SiegeDeckOrderRow } from '@/features/siege/components/SiegeDeckOrderRow';
 
 type DeckDetailRecord = Record<string, unknown>;
 
@@ -72,14 +72,6 @@ const createInitialDeckStats = (): DeckMonsterStats[] => [
   createEmptyDeckMonsterStats(),
   createEmptyDeckMonsterStats(),
 ];
-
-function moveItemToFront<T>(items: T[], index: number): T[] {
-  if (index <= 0 || index >= items.length) return items;
-  const next = [...items];
-  const [picked] = next.splice(index, 1);
-  next.unshift(picked);
-  return next;
-}
 
 function pickDeckNumeric(r: DeckDetailRecord | null | undefined, ...keys: string[]): number {
   if (!r) return 0;
@@ -368,6 +360,47 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     return parsed.length === 3 ? parsed : defenseTargetCandidates;
   }, [defenseTargetCandidates, detailDataRecord]);
 
+  const turnOrderItems = useMemo(() => {
+    const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
+    if (!row) return [];
+    const atk = resolveAtkMonsters(row);
+    if (!atk) return [];
+
+    return ([1, 2, 3] as const).map((slot, index) => {
+      const id = String(atk[`atk_monster_${slot}` as keyof typeof atk] ?? '');
+      return {
+        id: id || `slot-${slot}`,
+        label: monsterNames[index] || id || `몬스터 ${slot}`,
+        imageUrl: resolveMonsterImageUrl(row, slot) ?? undefined,
+        leader: index === 0,
+      };
+    });
+  }, [activeItem, detailDataRecord, monsterNames]);
+
+  const buildTargetingOrderItems = useCallback(
+    (ids: string[]) =>
+      ids.map((monsterId, index) => {
+        const monster = monsterById.get(monsterId);
+        return {
+          id: monsterId,
+          label: monster?.kr_name || monsterId,
+          imageUrl: monster?.image_url,
+          rankLabel: `${index + 1}순위`,
+        };
+      }),
+    [monsterById],
+  );
+
+  const readonlyTargetingOrderItems = useMemo(
+    () => buildTargetingOrderItems(readonlyTargetingOrderIds),
+    [buildTargetingOrderItems, readonlyTargetingOrderIds],
+  );
+
+  const editTargetingOrderItems = useMemo(
+    () => buildTargetingOrderItems(targetingOrderIds),
+    [buildTargetingOrderItems, targetingOrderIds],
+  );
+
   const hasDeckMetaInfo = Boolean(
     detailDataRecord &&
     (
@@ -605,12 +638,8 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     setDeckComment(String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment ?? ''));
   }, [defenseTargetCandidates, detailDataRecord, extractOrStatsListFromDetail, extractStatsFromDetail, isEditing]);
 
-  const prioritizeTargetingOrder = (monsterId: string) => {
-    setTargetingOrderIds((prev) => {
-      const index = prev.findIndex((id) => id === monsterId);
-      if (index <= 0) return prev;
-      return moveItemToFront(prev, index);
-    });
+  const handleTargetingOrderReorder = (orderedIds: string[]) => {
+    setTargetingOrderIds(orderedIds);
   };
 
   useEffect(() => {
@@ -728,90 +757,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
               >
                턴 순서
               </Typography>
-              <Box
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: { xs: 1.25, sm: 2 },
-                  flexWrap: 'nowrap',
-                  overflowX: 'auto',
-                  p: 0.75,
-                  pb: 1,
-                  borderRadius: 1.5,
-                  bgcolor: (t) => alpha(t.palette.action.hover, 0.25),
-                }}
-              >
-                {monsterImageUrls.map((imageUrl, index) => {
-                  const name = monsterNames[index];
-                  return (
-                    <Fragment key={index}>
-                      {index > 0 && (
-                        <ChevronRightIcon sx={{ color: 'text.disabled', fontSize: { xs: 24, sm: 32 }, flexShrink: 0 }} />
-                      )}
-                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75, flexShrink: 0, minWidth: { xs: 72, sm: 88 } }}>
-                        <Box sx={{ position: 'relative' }}>
-                          {imageUrl && !imageLoadErrors.has(imageUrl) ? (
-                            <Avatar
-                              src={imageUrl}
-                              alt={name || `몬스터 ${index + 1}`}
-                              sx={{
-                                width: { xs: 68, sm: 84 },
-                                height: { xs: 68, sm: 84 },
-                                borderRadius: 2,
-                                border: '2px solid',
-                                borderColor: index === 0 ? 'warning.main' : 'divider',
-                                boxShadow: index === 0 ? `0 0 0 2px ${alpha(theme.palette.warning.main, 0.25)}` : 'none',
-                              }}
-                              onError={() => imageUrl && handleImageError(imageUrl)}
-                            />
-                          ) : (
-                            <Box
-                              sx={{
-                                width: { xs: 68, sm: 84 },
-                                height: { xs: 68, sm: 84 },
-                                borderRadius: 2,
-                                bgcolor: 'action.hover',
-                                border: '2px dashed',
-                                borderColor: 'divider',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <BrokenImageIcon sx={{ color: 'text.disabled', fontSize: 28 }} />
-                            </Box>
-                          )}
-                          {index === 0 && (
-                            <Chip
-                              label="L"
-                              size="small"
-                              color="warning"
-                              sx={{
-                                position: 'absolute',
-                                top: 3,
-                                left: 3,
-                                height: 18,
-                                minWidth: 18,
-                                fontSize: '0.62rem',
-                                fontWeight: 700,
-                                '& .MuiChip-label': { px: 0.5 },
-                              }}
-                            />
-                          )}
-                        </Box>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: 'text.secondary', fontWeight: 500, textAlign: 'center', maxWidth: 88, lineHeight: 1.2 }}
-                          noWrap
-                        >
-                          {name || `몬스터 ${index + 1}`}
-                        </Typography>
-                      </Box>
-                    </Fragment>
-                  );
-                })}
-              </Box>
+              <SiegeDeckOrderRow items={turnOrderItems} disabled />
             </Box>
 
             {/* 투표 */}
@@ -909,40 +855,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                       타겟팅 순서
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.6, flexWrap: 'wrap' }}>
-                      {readonlyTargetingOrderIds.map((monsterId, idx) => {
-                        const m = monsterById.get(monsterId);
-                        return (
-                          <Fragment key={`readonly-target-${monsterId}-${idx}`}>
-                            <Box
-                              sx={{
-                                border: '1px solid',
-                                borderColor: 'divider',
-                                borderRadius: 1,
-                                px: 1,
-                                py: 0.65,
-                                minWidth: 132,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.6,
-                              }}
-                            >
-                              <Chip size="small" color="primary" label={idx + 1} sx={{ height: 18 }} />
-                              <Avatar
-                                src={m?.image_url ? getMonsterImageUrl(m.image_url) : undefined}
-                                sx={{ width: 24, height: 24, '& img': { objectFit: 'contain' } }}
-                              />
-                              <Typography variant="caption" sx={{ flex: 1 }} noWrap>
-                                {m?.kr_name || monsterId}
-                              </Typography>
-                            </Box>
-                            {idx < readonlyTargetingOrderIds.length - 1 && (
-                              <ChevronRightIcon sx={{ fontSize: 14, color: 'text.disabled' }} />
-                            )}
-                          </Fragment>
-                        );
-                      })}
-                    </Box>
+                    <SiegeDeckOrderRow items={readonlyTargetingOrderItems} disabled />
                   </Box>
                 )}
                 {Boolean(detailDataRecord?.deck_comment ?? detailDataRecord?.deckComment) && (
@@ -1160,47 +1073,11 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                     타겟팅 순서 (방덱 몬스터 기준)
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    카드를 눌러 1순위 타겟으로 이동시켜 주세요.
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {targetingOrderIds.map((monsterId, idx) => {
-                      const m = monsterById.get(monsterId);
-                      return (
-                        <Box
-                          key={`targeting-edit-${monsterId}-${idx}`}
-                          sx={{
-                            border: '1px solid',
-                            borderColor: 'divider',
-                            borderRadius: 1,
-                            px: 1,
-                            py: 0.75,
-                            minWidth: 160,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.75,
-                          }}
-                        >
-                          <Chip size="small" color="primary" label={idx + 1} sx={{ height: 20 }} />
-                          <Avatar
-                            src={m?.image_url ? getMonsterImageUrl(m.image_url) : undefined}
-                            sx={{ width: 26, height: 26, '& img': { objectFit: 'contain' } }}
-                          />
-                          <Typography variant="caption" sx={{ flex: 1 }} noWrap>
-                            {m?.kr_name || monsterId}
-                          </Typography>
-                          <Button
-                            size="small"
-                            variant="text"
-                            disabled={idx === 0}
-                            onClick={() => prioritizeTargetingOrder(monsterId)}
-                          >
-                            1순위로
-                          </Button>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                  <SiegeDeckOrderRow
+                    items={editTargetingOrderItems}
+                    onReorder={handleTargetingOrderReorder}
+                    helperText="드래그하여 타겟 우선순위를 변경하세요."
+                  />
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       size="small"
