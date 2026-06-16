@@ -91,6 +91,14 @@ const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> =
 
 const DECK_STEPS = ['몬스터 선택', '스펙 입력', '공략 작성'] as const;
 
+function moveItemToFront<T>(items: T[], index: number): T[] {
+  if (index <= 0 || index >= items.length) return items;
+  const next = [...items];
+  const [picked] = next.splice(index, 1);
+  next.unshift(picked);
+  return next;
+}
+
 export default function AddDeckPopup({
   open,
   onClose,
@@ -188,25 +196,13 @@ export default function AddDeckPopup({
     }
   };
 
-  const moveAttackOrder = (index: number, direction: -1 | 1) => {
-    const nextIndex = index + direction;
-    if (nextIndex < 0 || nextIndex >= selectedMonsterList.length) return;
+  const prioritizeAttackOrder = (monsterId: string) => {
+    const index = selectedMonsterList.findIndex((monster) => monster.monster_id === monsterId);
+    if (index <= 0) return;
 
-    setSelectedMonsterList((prev) => {
-      const next = [...prev];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
-    setMonsterStats((prev) => {
-      const next = [...prev];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
-    setMonsterStatsOrList((prev) => {
-      const next = prev.map((list) => [...list]);
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
+    setSelectedMonsterList((prev) => moveItemToFront(prev, index));
+    setMonsterStats((prev) => moveItemToFront(prev, index));
+    setMonsterStatsOrList((prev) => moveItemToFront(prev, index));
   };
 
   const goToNextStep = () => {
@@ -316,16 +312,19 @@ export default function AddDeckPopup({
     saveDeckMutation.mutate(saveData);
   };
 
-  const moveTargetingOrder = (index: number, direction: -1 | 1) => {
+  const prioritizeTargetingOrder = (monsterId: string) => {
     setTargetingOrderIds((prev) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      setTargetingOrder(next.join(' > '));
-      return next;
+      const index = prev.findIndex((id) => id === monsterId);
+      if (index <= 0) return prev;
+      return moveItemToFront(prev, index);
     });
   };
+
+  useEffect(() => {
+    if (targetingOrderIds.length === 3) {
+      setTargetingOrder(targetingOrderIds.join(' > '));
+    }
+  }, [targetingOrderIds]);
 
   const handleClose = () => {
     setSelectedMonsterList([]);
@@ -647,6 +646,9 @@ export default function AddDeckPopup({
               <Typography component="span" sx={SECTION_LABEL_SX}>
                 턴 순서
               </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                카드 클릭 시 해당 몬스터가 1순위(선턴)로 이동합니다.
+              </Typography>
               <Box
                 sx={{
                   display: 'flex',
@@ -665,16 +667,21 @@ export default function AddDeckPopup({
                     {index > 0 && (
                       <ChevronRightIcon sx={{ color: 'text.disabled', fontSize: { xs: 20, sm: 24 } }} />
                     )}
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, minWidth: { xs: 64, sm: 76 } }}>
+                    <Box
+                      sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5, minWidth: { xs: 64, sm: 76 } }}
+                    >
+                      <Chip label={`${index + 1}순위`} size="small" color={index === 0 ? 'warning' : 'default'} sx={{ height: 20 }} />
                       <Avatar
                         src={getMonsterImageUrl(monster.image_url)}
                         alt={monster.kr_name}
+                        onClick={() => prioritizeAttackOrder(monster.monster_id)}
                         sx={{
                           width: { xs: 52, sm: 64 },
                           height: { xs: 52, sm: 64 },
                           borderRadius: 2,
                           border: '2px solid',
                           borderColor: index === 0 ? 'warning.main' : 'divider',
+                          cursor: index === 0 ? 'default' : 'pointer',
                           bgcolor: 'background.paper',
                           '& img': { objectFit: 'contain' },
                         }}
@@ -682,24 +689,6 @@ export default function AddDeckPopup({
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 76, fontSize: '0.68rem' }}>
                         {monster.kr_name}
                       </Typography>
-                      <Box sx={{ display: 'flex', gap: 0.25 }}>
-                        <IconButton
-                          size="small"
-                          onClick={() => moveAttackOrder(index, -1)}
-                          disabled={index === 0}
-                          aria-label={`${monster.kr_name} 턴 순서 왼쪽 이동`}
-                        >
-                          <ChevronLeftIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => moveAttackOrder(index, 1)}
-                          disabled={index === selectedMonsterList.length - 1}
-                          aria-label={`${monster.kr_name} 턴 순서 오른쪽 이동`}
-                        >
-                          <ChevronRightIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
                     </Box>
                   </Box>
                 ))}
@@ -898,6 +887,9 @@ export default function AddDeckPopup({
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                     타겟팅 순서 (방덱 몬스터 기준)
                   </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    카드를 클릭하면 1순위 타겟으로 올립니다.
+                  </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {targetingOrderIds.map((monsterId, idx) => {
                       const m = monsterById.get(monsterId);
@@ -924,17 +916,26 @@ export default function AddDeckPopup({
                           <Typography variant="caption" sx={{ flex: 1 }} noWrap>
                             {m?.kr_name || monsterId}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.25 }}>
-                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, -1)} disabled={idx === 0}>
-                              <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, 1)} disabled={idx === targetingOrderIds.length - 1}>
-                              <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
+                          <Button
+                            size="small"
+                            variant="text"
+                            disabled={idx === 0}
+                            onClick={() => prioritizeTargetingOrder(monsterId)}
+                          >
+                            1순위로
+                          </Button>
                         </Box>
                       );
                     })}
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => setTargetingOrderIds(defenseTargetCandidates)}
+                    >
+                      기본 순서 복원
+                    </Button>
                   </Box>
                 </Box>
               ) : (

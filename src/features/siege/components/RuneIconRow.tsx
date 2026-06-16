@@ -27,7 +27,7 @@ export default function RuneIconRow({
       {runes.map((rune, index) => (
         <Tooltip
           key={`${index}-${rune.runeId}`}
-          title={`${rune.nameKo} (${rune.requiredPieces}피스)`}
+          title={rune.nameKo}
           arrow
         >
           <Avatar

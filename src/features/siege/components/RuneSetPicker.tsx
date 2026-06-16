@@ -1,31 +1,21 @@
 'use client';
 
 import {
+  Autocomplete,
+  Chip,
   Box,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
   Typography,
   Avatar,
+  TextField,
 } from '@mui/material';
-import type { SelectChangeEvent } from '@mui/material/Select';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
 import { useRuneMasterList } from '@/features/siege/hooks/useRuneMaster';
-import { runeSelectionErrorMessage, sumRunePieces } from '@/features/siege/utils/runeValidation';
+import { runeSelectionErrorMessage } from '@/features/siege/utils/runeValidation';
 import { MUI_MENU_A11Y_PROPS } from '@/shared/ui/muiMenuA11y';
 
-/** Dialog 안 Select — 메뉴가 모달 뒤로 가려지지 않도록 z-index 상향 */
-const DIALOG_SELECT_MENU_PROPS = {
-  ...MUI_MENU_A11Y_PROPS,
+const DIALOG_AUTOCOMPLETE_POPPER_SLOT = {
   sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
-  slotProps: {
-    ...(MUI_MENU_A11Y_PROPS.slotProps ?? {}),
-    paper: {
-      sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
-    },
-  },
 };
 
 interface RuneSetPickerProps {
@@ -35,7 +25,6 @@ interface RuneSetPickerProps {
 }
 
 const SLOT_KEYS = ['runeId1', 'runeId2', 'runeId3'] as const;
-const SLOT_LABELS = ['룬 세트 1', '룬 세트 2', '룬 세트 3'];
 
 const RUNE_ICON_SX = {
   width: 28,
@@ -49,11 +38,9 @@ const RUNE_ICON_SX = {
 
 function RuneOptionLabel({
   nameKo,
-  requiredPieces,
   imageUrl,
 }: {
   nameKo: string;
-  requiredPieces: number;
   imageUrl?: string | null;
 }) {
   return (
@@ -65,7 +52,7 @@ function RuneOptionLabel({
         sx={RUNE_ICON_SX}
       />
       <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {nameKo} ({requiredPieces}피스)
+        {nameKo}
       </Box>
     </Box>
   );
@@ -73,71 +60,73 @@ function RuneOptionLabel({
 
 export default function RuneSetPicker({ value, onChange, disabled = false }: RuneSetPickerProps) {
   const { data: runes = [], runeById, isLoading } = useRuneMasterList();
-  const pieceSum = sumRunePieces(value, runeById);
   const errorMsg = runeSelectionErrorMessage(value, runeById);
-
-  const handleSlotChange = (slot: typeof SLOT_KEYS[number]) => (e: SelectChangeEvent<string>) => {
-    const raw = e.target.value;
-    const nextId = raw === '' ? null : Number(raw);
-    onChange({ ...value, [slot]: Number.isNaN(nextId) ? null : nextId });
-  };
+  const selectedRuneIds = SLOT_KEYS
+    .map((slot) => value[slot])
+    .filter((id): id is number => id != null && Number.isFinite(id));
+  const selectedRunes = selectedRuneIds
+    .map((id) => runeById.get(id))
+    .filter((rune): rune is NonNullable<typeof runes[number]> => !!rune);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
       <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-        룬 세트 (최대 3종 · 합산 {pieceSum}/6)
+        룬 세트 (최대 3종)
       </Typography>
-      {SLOT_KEYS.map((slotKey, idx) => (
-        <FormControl key={slotKey} size="small" fullWidth disabled={disabled || isLoading}>
-          <InputLabel id={`rune-slot-${idx}`}>{SLOT_LABELS[idx]}</InputLabel>
-          <Select
-            labelId={`rune-slot-${idx}`}
-            label={SLOT_LABELS[idx]}
-            value={value[slotKey] != null ? String(value[slotKey]) : ''}
-            onChange={handleSlotChange(slotKey)}
-            MenuProps={DIALOG_SELECT_MENU_PROPS}
-            displayEmpty
-            renderValue={(selected) => {
-              if (!selected) {
-                return <em>선택 안 함</em>;
-              }
-              const rune = runeById.get(Number(selected));
-              if (!rune) {
-                return String(selected);
-              }
-              return (
-                <RuneOptionLabel
-                  nameKo={rune.name_ko}
-                  requiredPieces={rune.required_pieces}
-                  imageUrl={rune.image_url}
+      <Autocomplete
+        multiple
+        options={runes}
+        disabled={disabled || isLoading}
+        value={selectedRunes}
+        disableCloseOnSelect
+        filterSelectedOptions
+        isOptionEqualToValue={(option, selected) => option.rune_id === selected.rune_id}
+        getOptionLabel={(option) => option.name_ko}
+        onChange={(_, next) => {
+          const limited = next.slice(0, 3);
+          const ids = limited.map((rune) => Number(rune.rune_id)).filter((id) => Number.isFinite(id) && id > 0);
+          onChange({
+            runeId1: ids[0] ?? null,
+            runeId2: ids[1] ?? null,
+            runeId3: ids[2] ?? null,
+          });
+        }}
+        slotProps={{
+          popper: DIALOG_AUTOCOMPLETE_POPPER_SLOT,
+          paper: MUI_MENU_A11Y_PROPS.slotProps?.paper,
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            size="small"
+            placeholder={selectedRunes.length >= 3 ? '최대 3개 선택됨' : '룬 세트 검색 후 선택'}
+          />
+        )}
+        renderOption={(props, option) => (
+          <Box component="li" {...props}>
+            <RuneOptionLabel
+              nameKo={option.name_ko}
+              imageUrl={option.image_url}
+            />
+          </Box>
+        )}
+        renderTags={(tagValue, getTagProps) =>
+          tagValue.map((option, index) => (
+            <Chip
+              {...getTagProps({ index })}
+              key={option.rune_id}
+              size="small"
+              label={option.name_ko}
+              avatar={
+                <Avatar
+                  src={option.image_url ? getMonsterImageUrl(option.image_url) : undefined}
+                  sx={{ '& img': { objectFit: 'contain' } }}
                 />
-              );
-            }}
-          >
-            <MenuItem value="">
-              <em>선택 안 함</em>
-            </MenuItem>
-            {runes.length === 0 && !isLoading ? (
-              <MenuItem value="__empty__" disabled>
-                룬 목록을 불러오지 못했습니다
-              </MenuItem>
-            ) : null}
-            {runes.map((rune) => {
-              const id = Number(rune.rune_id);
-              if (!Number.isFinite(id) || id <= 0) return null;
-              return (
-                <MenuItem key={id} value={String(id)}>
-                  <RuneOptionLabel
-                    nameKo={rune.name_ko}
-                    requiredPieces={rune.required_pieces}
-                    imageUrl={rune.image_url}
-                  />
-                </MenuItem>
-              );
-            })}
-          </Select>
-        </FormControl>
-      ))}
+              }
+            />
+          ))
+        }
+      />
       {errorMsg && (
         <Typography variant="caption" color="error">
           {errorMsg}

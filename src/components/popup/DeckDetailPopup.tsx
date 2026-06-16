@@ -73,6 +73,14 @@ const createInitialDeckStats = (): DeckMonsterStats[] => [
   createEmptyDeckMonsterStats(),
 ];
 
+function moveItemToFront<T>(items: T[], index: number): T[] {
+  if (index <= 0 || index >= items.length) return items;
+  const next = [...items];
+  const [picked] = next.splice(index, 1);
+  next.unshift(picked);
+  return next;
+}
+
 function pickDeckNumeric(r: DeckDetailRecord | null | undefined, ...keys: string[]): number {
   if (!r) return 0;
   for (const k of keys) {
@@ -597,16 +605,19 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     setDeckComment(String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment ?? ''));
   }, [defenseTargetCandidates, detailDataRecord, extractOrStatsListFromDetail, extractStatsFromDetail, isEditing]);
 
-  const moveTargetingOrder = (index: number, direction: -1 | 1) => {
+  const prioritizeTargetingOrder = (monsterId: string) => {
     setTargetingOrderIds((prev) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      setTargetingOrder(next.join(' > '));
-      return next;
+      const index = prev.findIndex((id) => id === monsterId);
+      if (index <= 0) return prev;
+      return moveItemToFront(prev, index);
     });
   };
+
+  useEffect(() => {
+    if (targetingOrderIds.length === 3) {
+      setTargetingOrder(targetingOrderIds.join(' > '));
+    }
+  }, [targetingOrderIds]);
 
   const isDark = theme.palette.mode === 'dark';
   const cardBg = isDark ? alpha('#78350F', 0.35) : alpha('#FEF3C7', 0.6);
@@ -1149,6 +1160,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                     타겟팅 순서 (방덱 몬스터 기준)
                   </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    카드를 눌러 1순위 타겟으로 이동시켜 주세요.
+                  </Typography>
                   <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                     {targetingOrderIds.map((monsterId, idx) => {
                       const m = monsterById.get(monsterId);
@@ -1175,17 +1189,26 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                           <Typography variant="caption" sx={{ flex: 1 }} noWrap>
                             {m?.kr_name || monsterId}
                           </Typography>
-                          <Box sx={{ display: 'flex', gap: 0.25 }}>
-                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, -1)} disabled={idx === 0}>
-                              <ChevronLeftIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton size="small" onClick={() => moveTargetingOrder(idx, 1)} disabled={idx === targetingOrderIds.length - 1}>
-                              <ChevronRightIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
+                          <Button
+                            size="small"
+                            variant="text"
+                            disabled={idx === 0}
+                            onClick={() => prioritizeTargetingOrder(monsterId)}
+                          >
+                            1순위로
+                          </Button>
                         </Box>
                       );
                     })}
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => setTargetingOrderIds(defenseTargetCandidates)}
+                    >
+                      기본 순서 복원
+                    </Button>
                   </Box>
                 </Box>
               ) : (
