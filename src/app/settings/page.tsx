@@ -48,6 +48,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/shared/ui';
 import { showToast } from '@/shared/lib/notification';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import {
   useUserGuild,
   useGuildSearch,
@@ -315,14 +316,14 @@ export default function SettingsPage() {
   // 길드 가입 신청 Mutation (승인 대기)
   const applyJoinGuildMutation = useApplyGuildJoinApplication({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('길드 가입 신청이 완료되었습니다. 승인 대기 중입니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '길드 가입 신청이 완료되었습니다. 승인 대기 중입니다.'));
         setGuildJoinDialog(false);
         setGuildSearchKeyword('');
         setSelectedGuild(null);
         myJoinStatusQuery.refetch();
       } else {
-        throw new Error(res?.message || '길드 가입 신청에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '길드 가입 신청에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {

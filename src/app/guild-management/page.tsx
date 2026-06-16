@@ -54,6 +54,7 @@ import {
   useUpdateGuildMemberName,
 } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import { logger } from '@/shared/lib/logger';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import type { GuildJoinApplication, GuildMember, GuildSettings, UserInfo } from '@/features/auth/types/auth';
@@ -274,12 +275,12 @@ export default function GuildManagementPage() {
   // 가입 신청 승인/반려 Mutation
   const processJoinApplicationMutation = useProcessGuildJoinApplication({
     onSuccess: (res, variables) => {
-      if (res?.result === 'SUCCESS') {
+      if (isApiSuccess(res)) {
         const fallback =
           variables.status === 'APPROVED' ? '가입 신청을 승인했습니다.' : '가입 신청을 반려했습니다.';
-        showToast.success(res.message || fallback);
+        showToast.success(getApiResultMessage(res, fallback));
       } else {
-        showToast.error(res?.message || '처리에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '처리에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {

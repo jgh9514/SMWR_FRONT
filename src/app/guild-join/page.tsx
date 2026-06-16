@@ -37,6 +37,7 @@ import {
 } from '@/features/auth/hooks/useAuth';
 import { isAuthenticated } from '@/shared/utils/auth';
 import { handleApiError } from '@/shared/lib/error-handler';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import type { UserInfo } from '@/features/auth/types/auth';
@@ -88,11 +89,13 @@ export default function GuildJoinPage() {
 
   const applyMutation = useApplyGuildJoinApplication({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success('길드 가입 신청이 완료되었습니다. 길드장/매니저 승인을 기다려주세요.');
+      if (isApiSuccess(res)) {
+        showToast.success(
+          getApiResultMessage(res, '길드 가입 신청이 완료되었습니다. 길드장/매니저 승인을 기다려주세요.'),
+        );
         refetchStatus();
       } else {
-        showToast.error(res?.message || '가입 신청에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '가입 신청에 실패했습니다.'));
       }
     },
     onError: (e: Error) => {

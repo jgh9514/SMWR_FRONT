@@ -53,17 +53,21 @@ class ApiClient {
     if (typeof response === 'object' && response !== null && 'result' in response) {
       const apiResponse = response as ApiResponse<T>;
       const keys = Object.keys(apiResponse);
-      const isDataPayloadWrapper =
-        this.hasPayloadData(apiResponse.data) &&
-        keys.length <= 3 &&
-        keys.every((key) => key === 'result' || key === 'data' || key === 'message');
 
-      if (isDataPayloadWrapper) {
-        if (apiResponse.result === 'SUCCESS' || apiResponse.data !== undefined) {
-          return apiResponse.data as T;
-        }
+      // ApiResult ({ result, message? }) — unwrap 금지 (data: null 오판 방지)
+      if (keys.every((key) => key === 'result' || key === 'message')) {
+        return response as unknown as T;
       }
 
+      // { result, data, message? } — data가 객체·배열일 때만 unwrap
+      if (
+        keys.every((key) => key === 'result' || key === 'data' || key === 'message') &&
+        this.hasPayloadData(apiResponse.data)
+      ) {
+        return apiResponse.data as T;
+      }
+
+      // login-check, my-status 등 복합 응답
       return response as unknown as T;
     }
 

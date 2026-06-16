@@ -68,15 +68,16 @@ function extractApiData<T>(response: ApiResponse<T> | T): T {
   if (typeof response === 'object' && response !== null && 'result' in response) {
     const apiResponse = response as ApiResponse<T>;
     const keys = Object.keys(apiResponse);
-    const isDataPayloadWrapper =
-      hasPayloadData(apiResponse.data) &&
-      keys.length <= 3 &&
-      keys.every((key) => key === 'result' || key === 'data' || key === 'message');
 
-    if (isDataPayloadWrapper) {
-      if (apiResponse.result === 'SUCCESS' || apiResponse.data !== undefined) {
-        return apiResponse.data as T;
-      }
+    if (keys.every((key) => key === 'result' || key === 'message')) {
+      return response as T;
+    }
+
+    if (
+      keys.every((key) => key === 'result' || key === 'data' || key === 'message') &&
+      hasPayloadData(apiResponse.data)
+    ) {
+      return apiResponse.data as T;
     }
 
     return response as T;
