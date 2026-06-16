@@ -64,6 +64,10 @@ import {
   resolveMonsterKrName,
 } from '@/features/siege/utils/deckRecord';
 import { SiegeDeckOrderRow } from '@/features/siege/components/SiegeDeckOrderRow';
+import {
+  buildMonsterOrderString,
+  parseMonsterOrderString,
+} from '@/features/siege/utils/deckOrder';
 
 type DeckDetailRecord = Record<string, unknown>;
 
@@ -144,7 +148,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const [editStats, setEditStats] = useState<DeckMonsterStats[]>(createInitialDeckStats);
   const [editStatsOrList, setEditStatsOrList] = useState<DeckMonsterStats[][]>([[], [], []]);
   const [targetingOrder, setTargetingOrder] = useState('');
+  const [turnOrder, setTurnOrder] = useState('');
   const [targetingOrderIds, setTargetingOrderIds] = useState<string[]>([]);
+  const [turnOrderIds, setTurnOrderIds] = useState<string[]>([]);
   const [deckComment, setDeckComment] = useState('');
   const { runeById } = useRuneMasterList();
   const { data: monsterList = [] } = useMonsterList();
@@ -353,29 +359,60 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     return [d1, d2, d3].filter((v): v is string => !!v && String(v).trim() !== '').map(String);
   }, [activeItem, detailDataRecord]);
 
-  const readonlyTargetingOrderIds = useMemo(() => {
-    if (!detailDataRecord) return [];
-    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
-    const parsed = rawOrder ? rawOrder.split('>').map((s) => s.trim()).filter(Boolean) : [];
-    return parsed.length === 3 ? parsed : defenseTargetCandidates;
-  }, [defenseTargetCandidates, detailDataRecord]);
-
-  const turnOrderItems = useMemo(() => {
+  const compositionMonsterIds = useMemo(() => {
     const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
     if (!row) return [];
     const atk = resolveAtkMonsters(row);
     if (!atk) return [];
+    return [atk.atk_monster_1, atk.atk_monster_2, atk.atk_monster_3].map(String);
+  }, [activeItem, detailDataRecord]);
 
-    return ([1, 2, 3] as const).map((slot, index) => {
-      const id = String(atk[`atk_monster_${slot}` as keyof typeof atk] ?? '');
-      return {
-        id: id || `slot-${slot}`,
-        label: monsterNames[index] || id || `몬스터 ${slot}`,
-        imageUrl: resolveMonsterImageUrl(row, slot) ?? undefined,
-        leader: index === 0,
-      };
-    });
-  }, [activeItem, detailDataRecord, monsterNames]);
+  const readonlyTurnOrderIds = useMemo(() => {
+    if (!detailDataRecord) return [];
+    const rawOrder = String(detailDataRecord.turn_order ?? detailDataRecord.turnOrder ?? '').trim();
+    return parseMonsterOrderString(rawOrder, compositionMonsterIds);
+  }, [compositionMonsterIds, detailDataRecord]);
+
+  const readonlyTargetingOrderIds = useMemo(() => {
+    if (!detailDataRecord) return [];
+    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
+    return parseMonsterOrderString(rawOrder, defenseTargetCandidates);
+  }, [defenseTargetCandidates, detailDataRecord]);
+
+  const buildTurnOrderItems = useCallback(
+    (ids: string[]) => {
+      const row = detailDataRecord ?? (activeItem as DeckDetailRecord | null);
+      const leaderId = compositionMonsterIds[0];
+      return ids.map((monsterId, index) => {
+        const slotIndex = compositionMonsterIds.findIndex((id) => id === monsterId);
+        const slot = slotIndex >= 0 ? ((slotIndex + 1) as 1 | 2 | 3) : undefined;
+        const monster = monsterById.get(monsterId);
+        return {
+          id: monsterId,
+          label:
+            (slot && row ? resolveMonsterKrName(row, slot) : undefined) ||
+            monster?.kr_name ||
+            monsterId,
+          imageUrl:
+            (slot && row ? resolveMonsterImageUrl(row, slot) : undefined) ||
+            monster?.image_url,
+          leader: monsterId === leaderId,
+          rankLabel: `${index + 1}순위`,
+        };
+      });
+    },
+    [activeItem, compositionMonsterIds, detailDataRecord, monsterById],
+  );
+
+  const turnOrderItems = useMemo(
+    () => buildTurnOrderItems(readonlyTurnOrderIds),
+    [buildTurnOrderItems, readonlyTurnOrderIds],
+  );
+
+  const editTurnOrderItems = useMemo(
+    () => buildTurnOrderItems(turnOrderIds),
+    [buildTurnOrderItems, turnOrderIds],
+  );
 
   const buildTargetingOrderItems = useCallback(
     (ids: string[]) =>
@@ -404,6 +441,8 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const hasDeckMetaInfo = Boolean(
     detailDataRecord &&
     (
+      detailDataRecord.turn_order ??
+      detailDataRecord.turnOrder ??
       detailDataRecord.targeting_order ??
       detailDataRecord.targetingOrder ??
       detailDataRecord.deck_comment ??
@@ -435,7 +474,9 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     setEditStats(createInitialDeckStats());
     setEditStatsOrList([[], [], []]);
     setTargetingOrder('');
+    setTurnOrder('');
     setTargetingOrderIds([]);
+    setTurnOrderIds([]);
     setDeckComment('');
     setIsEditing(false);
     onClose();
@@ -496,6 +537,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     monster_2_stats_or_list?: DeckMonsterStats[];
     monster_3_stats_or_list?: DeckMonsterStats[];
     targeting_order?: string;
+    turn_order?: string;
     deck_comment?: string;
   }>('/summonerswar/deck-detail-update', {
     onSuccess: (res) => {
@@ -525,11 +567,14 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       extractOrStatsListFromDetail(detailDataRecord, 2),
       extractOrStatsListFromDetail(detailDataRecord, 3),
     ]);
-    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
-    const parsed = rawOrder ? rawOrder.split('>').map((s) => s.trim()).filter(Boolean) : [];
-    const seq = parsed.length === 3 ? parsed : defenseTargetCandidates;
-    setTargetingOrderIds(seq);
-    setTargetingOrder(seq.length ? seq.join(' > ') : rawOrder);
+    const targetingRaw = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
+    const turnRaw = String(detailDataRecord.turn_order ?? detailDataRecord.turnOrder ?? '').trim();
+    const targetingSeq = parseMonsterOrderString(targetingRaw, defenseTargetCandidates);
+    const turnSeq = parseMonsterOrderString(turnRaw, compositionMonsterIds);
+    setTargetingOrderIds(targetingSeq);
+    setTargetingOrder(targetingSeq.length ? buildMonsterOrderString(targetingSeq) : targetingRaw);
+    setTurnOrderIds(turnSeq);
+    setTurnOrder(turnSeq.length ? buildMonsterOrderString(turnSeq) : turnRaw);
     setDeckComment(String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment ?? ''));
     setExpandedPanel([0, 1, 2]);
     setIsEditing(true);
@@ -539,6 +584,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     setIsEditing(false);
     setEditStatsOrList([[], [], []]);
     setTargetingOrderIds([]);
+    setTurnOrderIds([]);
   };
 
   const handleEditRuneChange = (
@@ -609,6 +655,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         ...(editStatsOrList[1]?.length ? { monster_2_stats_or_list: editStatsOrList[1] } : {}),
         ...(editStatsOrList[2]?.length ? { monster_3_stats_or_list: editStatsOrList[2] } : {}),
         targeting_order: targetingOrder.trim() || undefined,
+        turn_order: turnOrder.trim() || undefined,
         deck_comment: deckComment.trim() || undefined,
       });
     } catch (err) {
@@ -630,13 +677,27 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       extractOrStatsListFromDetail(detailDataRecord, 2),
       extractOrStatsListFromDetail(detailDataRecord, 3),
     ]);
-    const rawOrder = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
-    const parsed = rawOrder ? rawOrder.split('>').map((s) => s.trim()).filter(Boolean) : [];
-    const seq = parsed.length === 3 ? parsed : defenseTargetCandidates;
-    setTargetingOrderIds(seq);
-    setTargetingOrder(seq.length ? seq.join(' > ') : rawOrder);
+    const targetingRaw = String(detailDataRecord.targeting_order ?? detailDataRecord.targetingOrder ?? '').trim();
+    const turnRaw = String(detailDataRecord.turn_order ?? detailDataRecord.turnOrder ?? '').trim();
+    const targetingSeq = parseMonsterOrderString(targetingRaw, defenseTargetCandidates);
+    const turnSeq = parseMonsterOrderString(turnRaw, compositionMonsterIds);
+    setTargetingOrderIds(targetingSeq);
+    setTargetingOrder(targetingSeq.length ? buildMonsterOrderString(targetingSeq) : targetingRaw);
+    setTurnOrderIds(turnSeq);
+    setTurnOrder(turnSeq.length ? buildMonsterOrderString(turnSeq) : turnRaw);
     setDeckComment(String(detailDataRecord.deck_comment ?? detailDataRecord.deckComment ?? ''));
-  }, [defenseTargetCandidates, detailDataRecord, extractOrStatsListFromDetail, extractStatsFromDetail, isEditing]);
+  }, [
+    compositionMonsterIds,
+    defenseTargetCandidates,
+    detailDataRecord,
+    extractOrStatsListFromDetail,
+    extractStatsFromDetail,
+    isEditing,
+  ]);
+
+  const handleTurnOrderReorder = (orderedIds: string[]) => {
+    setTurnOrderIds(orderedIds);
+  };
 
   const handleTargetingOrderReorder = (orderedIds: string[]) => {
     setTargetingOrderIds(orderedIds);
@@ -644,9 +705,15 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
 
   useEffect(() => {
     if (targetingOrderIds.length === 3) {
-      setTargetingOrder(targetingOrderIds.join(' > '));
+      setTargetingOrder(buildMonsterOrderString(targetingOrderIds));
     }
   }, [targetingOrderIds]);
+
+  useEffect(() => {
+    if (turnOrderIds.length === 3) {
+      setTurnOrder(buildMonsterOrderString(turnOrderIds));
+    }
+  }, [turnOrderIds]);
 
   const isDark = theme.palette.mode === 'dark';
   const cardBg = isDark ? alpha('#78350F', 0.35) : alpha('#FEF3C7', 0.6);
@@ -701,7 +768,6 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
       <DialogContent
         sx={{
           p: { xs: 1.5, sm: 2 },
-          pt: { xs: 2, sm: 2.25 },
           bgcolor: 'background.default',
           overflowY: 'auto',
           overflowX: 'hidden',
@@ -1058,6 +1124,27 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
         {!loading && !error && detailDataRecord && hasValidData && isEditing && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 0.5 }}>
+              {turnOrderIds.length === 3 ? (
+                <Box
+                  sx={{
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    borderRadius: 1.5,
+                    p: 1.25,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1,
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                    턴 순서
+                  </Typography>
+                  <SiegeDeckOrderRow
+                    items={editTurnOrderItems}
+                    onReorder={handleTurnOrderReorder}
+                  />
+                </Box>
+              ) : null}
               {targetingOrderIds.length === 3 ? (
                 <Box
                   sx={{
@@ -1076,17 +1163,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
                   <SiegeDeckOrderRow
                     items={editTargetingOrderItems}
                     onReorder={handleTargetingOrderReorder}
-                    helperText="드래그하여 타겟 우선순위를 변경하세요."
                   />
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => setTargetingOrderIds(defenseTargetCandidates)}
-                    >
-                      기본 순서 복원
-                    </Button>
-                  </Box>
                 </Box>
               ) : (
                 <TextField

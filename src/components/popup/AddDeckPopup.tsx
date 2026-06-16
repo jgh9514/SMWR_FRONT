@@ -38,6 +38,11 @@ import { runeSelectionErrorMessage, selectionFromDeckMonsterStats } from '@/feat
 import { createEmptyDeckMonsterStats, type DeckMonsterStats } from '@/features/siege/types/siege';
 import type { DeckMonsterRuneSelection } from '@/features/siege/types/rune';
 import { SiegeDeckOrderRow } from '@/features/siege/components/SiegeDeckOrderRow';
+import {
+  buildMonsterOrderString,
+  mergeMonsterOrderIds,
+  parseMonsterOrderString,
+} from '@/features/siege/utils/deckOrder';
 
 interface AddDeckPopupProps {
   open: boolean;
@@ -47,7 +52,7 @@ interface AddDeckPopupProps {
   defenseMonster?: { dm1: string; dm2: string; dm3: string };
 }
 
-/** Dialog(zIndex modal+20) 위에 Autocomplete 목록이 보이도록 — RuneSetPicker Select 메뉴와 동일 */
+/** Dialog(zIndex modal+20) 위에 Autocomplete·룬 Menu가 보이도록 */
 const DIALOG_AUTOCOMPLETE_POPPER_SLOT = {
   sx: { zIndex: (theme: { zIndex: { modal: number } }) => theme.zIndex.modal + 40 },
 };
@@ -92,10 +97,6 @@ const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> =
 
 const DECK_STEPS = ['몬스터 선택', '스펙 입력', '공략 작성'] as const;
 
-function reorderDeckRows<T>(items: T[], orderedIndices: number[]): T[] {
-  return orderedIndices.map((index) => items[index]);
-}
-
 export default function AddDeckPopup({
   open,
   onClose,
@@ -109,6 +110,7 @@ export default function AddDeckPopup({
   const [step, setStep] = useState(0);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
   const [targetingOrder, setTargetingOrder] = useState('');
+  const [turnOrder, setTurnOrder] = useState('');
   const [deckComment, setDeckComment] = useState('');
   const [monsterStats, setMonsterStats] = useState<DeckMonsterStats[]>([
     createEmptyDeckMonsterStats(),
@@ -119,6 +121,7 @@ export default function AddDeckPopup({
   const type = propType === 'bang' ? 1 : propType === 'empty' ? 2 : 0;
   const defenseMonster = propDefenseMonster ?? null;
   const [targetingOrderIds, setTargetingOrderIds] = useState<string[]>([]);
+  const [turnOrderIds, setTurnOrderIds] = useState<string[]>([]);
 
   // 몬스터 목록 — 팝업 열릴 때만 조회(로컬 캐시 있으면 즉시 표시)
   const { data: monsterList = [], isLoading: monsterListLoading } = useMonsterList(undefined, { enabled: open });
@@ -138,8 +141,22 @@ export default function AddDeckPopup({
   useEffect(() => {
     if (defenseTargetCandidates.length !== 3) return;
     setTargetingOrderIds(defenseTargetCandidates);
-    setTargetingOrder(defenseTargetCandidates.join(' > '));
+    setTargetingOrder(buildMonsterOrderString(defenseTargetCandidates));
   }, [defenseTargetCandidates]);
+
+  const compositionMonsterIds = useMemo(
+    () => selectedMonsterList.map((monster) => monster.monster_id),
+    [selectedMonsterList],
+  );
+
+  useEffect(() => {
+    if (compositionMonsterIds.length !== 3) {
+      setTurnOrderIds([]);
+      setTurnOrder('');
+      return;
+    }
+    setTurnOrderIds((prev) => mergeMonsterOrderIds(prev, compositionMonsterIds));
+  }, [compositionMonsterIds]);
 
   // 덱 저장 Mutation
   const saveDeckMutation = useApiPostMutation<string, {
@@ -157,6 +174,7 @@ export default function AddDeckPopup({
     monster_2_stats_or_list?: DeckMonsterStats[];
     monster_3_stats_or_list?: DeckMonsterStats[];
     targeting_order?: string;
+    turn_order?: string;
     deck_comment?: string;
   }>('/summonerswar/enemyTeam-save', {
     onSuccess: (res) => {
@@ -194,33 +212,29 @@ export default function AddDeckPopup({
   };
 
   const handleAttackOrderReorder = (orderedIds: string[]) => {
-    const indexById = new Map(selectedMonsterList.map((monster, index) => [monster.monster_id, index]));
-    const indices = orderedIds
-      .map((id) => indexById.get(id))
-      .filter((index): index is number => index !== undefined);
-    if (indices.length !== selectedMonsterList.length) {
-      return;
-    }
-
-    setSelectedMonsterList((prev) => reorderDeckRows(prev, indices));
-    setMonsterStats((prev) => reorderDeckRows(prev, indices));
-    setMonsterStatsOrList((prev) => reorderDeckRows(prev, indices));
-    setExpandedPanel(indices);
+    setTurnOrderIds(orderedIds);
   };
 
   const handleTargetingOrderReorder = (orderedIds: string[]) => {
     setTargetingOrderIds(orderedIds);
   };
 
-  const attackOrderItems = useMemo(
+  const compositionLeaderId = selectedMonsterList[0]?.monster_id;
+
+  const turnOrderItems = useMemo(
     () =>
-      selectedMonsterList.map((monster, index) => ({
-        id: monster.monster_id,
-        label: monster.kr_name,
-        imageUrl: monster.image_url,
-        leader: index === 0,
-      })),
-    [selectedMonsterList],
+      turnOrderIds.map((monsterId, index) => {
+        const monster =
+          selectedMonsterList.find((item) => item.monster_id === monsterId) ?? monsterById.get(monsterId);
+        return {
+          id: monsterId,
+          label: monster?.kr_name || monsterId,
+          imageUrl: monster?.image_url,
+          leader: monsterId === compositionLeaderId,
+          rankLabel: `${index + 1}순위`,
+        };
+      }),
+    [compositionLeaderId, monsterById, selectedMonsterList, turnOrderIds],
   );
 
   const targetingOrderItems = useMemo(
@@ -338,6 +352,7 @@ export default function AddDeckPopup({
       ...(monsterStatsOrList[1]?.length ? { monster_2_stats_or_list: monsterStatsOrList[1] } : {}),
       ...(monsterStatsOrList[2]?.length ? { monster_3_stats_or_list: monsterStatsOrList[2] } : {}),
       ...(targetingOrder.trim() ? { targeting_order: targetingOrder.trim() } : {}),
+      ...(turnOrder.trim() ? { turn_order: turnOrder.trim() } : {}),
       ...(deckComment.trim() ? { deck_comment: deckComment.trim() } : {}),
     };
 
@@ -346,9 +361,15 @@ export default function AddDeckPopup({
 
   useEffect(() => {
     if (targetingOrderIds.length === 3) {
-      setTargetingOrder(targetingOrderIds.join(' > '));
+      setTargetingOrder(buildMonsterOrderString(targetingOrderIds));
     }
   }, [targetingOrderIds]);
+
+  useEffect(() => {
+    if (turnOrderIds.length === 3) {
+      setTurnOrder(buildMonsterOrderString(turnOrderIds));
+    }
+  }, [turnOrderIds]);
 
   const handleClose = () => {
     setSelectedMonsterList([]);
@@ -360,6 +381,8 @@ export default function AddDeckPopup({
     ]);
     setMonsterStatsOrList([[], [], []]);
     setTargetingOrder('');
+    setTurnOrder('');
+    setTurnOrderIds([]);
     setDeckComment('');
     onClose();
   };
@@ -418,7 +441,6 @@ export default function AddDeckPopup({
       <DialogContent
         sx={{
           p: { xs: 1.5, sm: 2 },
-          pt: { xs: 2, sm: 2.25 },
           bgcolor: 'background.default',
           overflowY: 'auto',
           overflowX: 'hidden',
@@ -673,9 +695,8 @@ export default function AddDeckPopup({
                 턴 순서
               </Typography>
               <SiegeDeckOrderRow
-                items={attackOrderItems}
+                items={turnOrderItems}
                 onReorder={handleAttackOrderReorder}
-                helperText="드래그하여 공격 턴 순서를 변경하세요. 1순위가 선턴입니다."
               />
             </Box>
 
@@ -837,7 +858,7 @@ export default function AddDeckPopup({
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                   공격 턴 순서
                 </Typography>
-                <SiegeDeckOrderRow items={attackOrderItems} disabled />
+                <SiegeDeckOrderRow items={turnOrderItems} disabled />
               </Box>
 
               {targetingOrderIds.length === 3 ? (
@@ -858,17 +879,7 @@ export default function AddDeckPopup({
                   <SiegeDeckOrderRow
                     items={targetingOrderItems}
                     onReorder={handleTargetingOrderReorder}
-                    helperText="드래그하여 타겟 우선순위를 변경하세요."
                   />
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => setTargetingOrderIds(defenseTargetCandidates)}
-                    >
-                      기본 순서 복원
-                    </Button>
-                  </Box>
                 </Box>
               ) : (
                 <TextField

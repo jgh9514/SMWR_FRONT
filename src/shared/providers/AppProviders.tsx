@@ -211,11 +211,11 @@ const muiTheme = createTheme({
         },
       },
     },
-    MuiDialogTitle: {
+    MuiDialogContent: {
       styleOverrides: {
         root: ({ theme }) => ({
-          // MUI 기본: .MuiDialogTitle-root + .MuiDialogContent-root { padding-top: 0 } — 상단 여백 유지
-          '& + .MuiDialogContent-root': {
+          // MUI 기본 .MuiDialogTitle-root + & { padding-top: 0 } — specificity 때문에 sx pt만으로는 안 먹음
+          '.MuiDialogTitle-root + &': {
             paddingTop: theme.spacing(2),
           },
         }),

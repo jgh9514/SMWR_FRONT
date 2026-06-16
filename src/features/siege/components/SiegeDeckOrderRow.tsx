@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Avatar, Box, Chip, Typography } from '@mui/material';
+import { Avatar, Box, Chip, IconButton, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { getMonsterImageUrl } from '@/shared/utils/image';
@@ -87,6 +88,23 @@ export function SiegeDeckOrderRow({ items, onReorder, disabled = false, helperTe
       setDragOverIndex(null);
     },
     [draggedId, isInteractive, items, onReorder],
+  );
+
+  const handleMove = useCallback(
+    (index: number, direction: -1 | 1) => {
+      if (!isInteractive || !onReorder) return;
+
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= items.length) return;
+
+      const nextIds = reorderArray(
+        items.map((item) => item.id),
+        index,
+        targetIndex,
+      );
+      onReorder(nextIds);
+    },
+    [isInteractive, items, onReorder],
   );
 
   if (items.length === 0) {
@@ -199,6 +217,31 @@ export function SiegeDeckOrderRow({ items, onReorder, disabled = false, helperTe
                 >
                   {item.label}
                 </Typography>
+                {isInteractive && (
+                  <Box
+                    sx={{ display: 'flex', alignItems: 'center', gap: 0.25, mt: 0.25 }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                  >
+                    <IconButton
+                      size="small"
+                      disabled={index === 0}
+                      onClick={() => handleMove(index, -1)}
+                      aria-label={`${item.label} 순서 앞으로`}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ChevronLeftIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      disabled={index === items.length - 1}
+                      onClick={() => handleMove(index, 1)}
+                      aria-label={`${item.label} 순서 뒤로`}
+                      sx={{ p: 0.25 }}
+                    >
+                      <ChevronRightIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Box>
+                )}
               </Box>
             </Box>
           );
