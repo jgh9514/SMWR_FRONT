@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,9 @@ import {
   Typography,
   Autocomplete,
   IconButton,
+  Stepper,
+  Step,
+  StepLabel,
   useTheme,
   alpha,
 } from '@mui/material';
@@ -86,6 +89,8 @@ const STAT_INPUT_FIELDS: Array<{ key: keyof DeckMonsterStats; label: string }> =
   { key: 'accuracy', label: '효과 적중 (%)' },
 ];
 
+const DECK_STEPS = ['몬스터 선택', '스펙 입력', '공략 작성'] as const;
+
 export default function AddDeckPopup({
   open,
   onClose,
@@ -96,7 +101,7 @@ export default function AddDeckPopup({
   const theme = useTheme();
   const { isMobile } = useResponsive();
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
   const [targetingOrder, setTargetingOrder] = useState('');
   const [deckComment, setDeckComment] = useState('');
@@ -183,16 +188,37 @@ export default function AddDeckPopup({
     }
   };
 
-  const goToStep2 = () => {
-    if (selectedMonsterList.length !== 3) {
+  const moveAttackOrder = (index: number, direction: -1 | 1) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= selectedMonsterList.length) return;
+
+    setSelectedMonsterList((prev) => {
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+    setMonsterStats((prev) => {
+      const next = [...prev];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+    setMonsterStatsOrList((prev) => {
+      const next = prev.map((list) => [...list]);
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const goToNextStep = () => {
+    if (step === 0 && selectedMonsterList.length !== 3) {
       showToast.error('3개의 몬스터를 선택해주세요.');
       return;
     }
-    setStep(2);
+    setStep((prev) => Math.min(prev + 1, DECK_STEPS.length - 1));
   };
 
-  const goToStep1 = () => {
-    setStep(1);
+  const goToPrevStep = () => {
+    setStep((prev) => Math.max(prev - 1, 0));
   };
 
   const handleRuneChange = (index: number, selection: DeckMonsterRuneSelection) => {
@@ -303,7 +329,7 @@ export default function AddDeckPopup({
 
   const handleClose = () => {
     setSelectedMonsterList([]);
-    setStep(1);
+    setStep(0);
     setMonsterStats([
       createEmptyDeckMonsterStats(),
       createEmptyDeckMonsterStats(),
@@ -360,22 +386,6 @@ export default function AddDeckPopup({
           <Typography variant="subtitle1" component="span" sx={{ fontWeight: 700, display: 'block' }} noWrap>
             추천 공덱 {type === 1 ? '방덱' : '공덱'} 추가
           </Typography>
-          <Box sx={{ display: 'flex', gap: 0.75, mt: 0.75 }}>
-            <Chip
-              size="small"
-              label="1. 몬스터"
-              color={step === 1 ? 'primary' : 'default'}
-              variant={step === 1 ? 'filled' : 'outlined'}
-              sx={{ height: 22, fontSize: '0.68rem' }}
-            />
-            <Chip
-              size="small"
-              label="2. 스펙"
-              color={step === 2 ? 'primary' : 'default'}
-              variant={step === 2 ? 'filled' : 'outlined'}
-              sx={{ height: 22, fontSize: '0.68rem' }}
-            />
-          </Box>
         </Box>
         <IconButton onClick={handleClose} size="small" aria-label="닫기" sx={{ color: 'text.secondary', flexShrink: 0 }}>
           <CloseIcon fontSize="small" />
@@ -391,7 +401,26 @@ export default function AddDeckPopup({
           overflowX: 'hidden',
         }}
       >
-        {step === 1 && (
+        <Box
+          sx={{
+            mb: 2,
+            p: { xs: 1.25, sm: 1.5 },
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Stepper activeStep={step} alternativeLabel={isMobile} sx={{ px: { xs: 0, sm: 1 } }}>
+            {DECK_STEPS.map((label) => (
+              <Step key={label}>
+                <StepLabel>{label}</StepLabel>
+              </Step>
+            ))}
+          </Stepper>
+        </Box>
+
+        {step === 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={SECTION_CARD_SX}>
               <Typography component="span" sx={SECTION_LABEL_SX}>
@@ -612,7 +641,7 @@ export default function AddDeckPopup({
           </Box>
         )}
 
-        {step === 2 && (
+        {step === 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={SECTION_CARD_SX}>
               <Typography component="span" sx={SECTION_LABEL_SX}>
@@ -653,6 +682,24 @@ export default function AddDeckPopup({
                       <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: 76, fontSize: '0.68rem' }}>
                         {monster.kr_name}
                       </Typography>
+                      <Box sx={{ display: 'flex', gap: 0.25 }}>
+                        <IconButton
+                          size="small"
+                          onClick={() => moveAttackOrder(index, -1)}
+                          disabled={index === 0}
+                          aria-label={`${monster.kr_name} 턴 순서 왼쪽 이동`}
+                        >
+                          <ChevronLeftIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => moveAttackOrder(index, 1)}
+                          disabled={index === selectedMonsterList.length - 1}
+                          aria-label={`${monster.kr_name} 턴 순서 오른쪽 이동`}
+                        >
+                          <ChevronRightIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </Box>
                   </Box>
                 ))}
@@ -793,10 +840,49 @@ export default function AddDeckPopup({
                 </AccordionDetails>
               </Accordion>
             ))}
+          </Box>
+        )}
+
+        {step === 2 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={{ ...SECTION_CARD_SX, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <Typography component="span" sx={{ ...SECTION_LABEL_SX, mb: 0 }}>
-                추가 정보
+                공략 요약
               </Typography>
+              <Box
+                sx={{
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  borderRadius: 1.5,
+                  p: 1.25,
+                  bgcolor: (t) => alpha(t.palette.action.hover, 0.12),
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                  공격 턴 순서
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
+                  {selectedMonsterList.map((monster, idx) => (
+                    <Fragment key={`turn-order-${monster.monster_id}`}>
+                      <Chip
+                        avatar={
+                          <Avatar src={getMonsterImageUrl(monster.image_url)} sx={{ '& img': { objectFit: 'contain' } }} />
+                        }
+                        label={`${idx + 1}. ${monster.kr_name}`}
+                        size="small"
+                        color={idx === 0 ? 'warning' : 'default'}
+                      />
+                      {idx < selectedMonsterList.length - 1 && (
+                        <ChevronRightIcon sx={{ fontSize: 16, color: 'text.disabled' }} />
+                      )}
+                    </Fragment>
+                  ))}
+                </Box>
+              </Box>
+
               {targetingOrderIds.length === 3 ? (
                 <Box
                   sx={{
@@ -807,7 +893,6 @@ export default function AddDeckPopup({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 1,
-                    bgcolor: (t) => alpha(t.palette.action.hover, 0.12),
                   }}
                 >
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
@@ -862,15 +947,16 @@ export default function AddDeckPopup({
                   size="small"
                 />
               )}
+
               <TextField
                 label="코멘트"
-                placeholder="운용 팁/주의사항"
+                placeholder="턴 운용, 스킬 우선순위, 예외 상황 등을 적어주세요."
                 value={deckComment}
                 onChange={(e) => setDeckComment(e.target.value)}
                 fullWidth
                 size="small"
                 multiline
-                minRows={2}
+                minRows={3}
               />
             </Box>
           </Box>
@@ -888,24 +974,23 @@ export default function AddDeckPopup({
           bgcolor: 'background.paper',
         }}
       >
-        {step === 2 && (
-          <Button variant="text" color="inherit" onClick={goToStep1} startIcon={<ChevronLeftIcon />} size="medium">
+        {step > 0 && (
+          <Button variant="text" color="inherit" onClick={goToPrevStep} startIcon={<ChevronLeftIcon />} size="medium">
             이전
           </Button>
         )}
         <Box sx={{ flex: 1, minWidth: 8 }} />
-        {step === 1 && (
+        {step < DECK_STEPS.length - 1 && (
           <Button
             variant="contained"
-            onClick={goToStep2}
+            onClick={goToNextStep}
             endIcon={<ChevronRightIcon />}
-            disabled={selectedMonsterList.length !== 3}
             size="medium"
           >
             다음
           </Button>
         )}
-        {step === 2 && (
+        {step === DECK_STEPS.length - 1 && (
           <Button variant="contained" onClick={save} disabled={saveDeckMutation.isPending} size="medium">
             {saveDeckMutation.isPending ? '저장 중…' : '저장'}
           </Button>

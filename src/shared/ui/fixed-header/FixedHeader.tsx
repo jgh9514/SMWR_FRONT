@@ -133,6 +133,7 @@ function getNavGroups(
 
   const siegeItems: NavLeaf[] = [
       { title: '전체 점령전', path: '/siege', icon: <CastleIcon /> },
+      { title: '공덱 조합 보기', path: '/siege/attack-decks', icon: <SportsEsportsIcon />, requiresGuild: true },
       { title: '최근 점령전', path: '/recent-siege', icon: <HistoryIcon />, requiresGuild: true },
       { title: '점령전 지도', path: '/siege/map', icon: <MapIcon />, requiresGuild: true },
       { title: '지도 히스토리', path: '/siege/map/history', icon: <HistoryIcon />, requiresGuild: true },

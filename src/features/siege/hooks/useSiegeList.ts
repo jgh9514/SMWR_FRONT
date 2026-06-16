@@ -7,6 +7,7 @@ import { useApiPostQuery, useApiPostSuspenseQuery } from '@/hooks/api/useApiQuer
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { GuildItem, MonsterItem, SiegeSearchParams } from '@/types';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
+import type { PopularAttackDeckCombosResponse } from '@/features/siege/types/siegeDetail';
 
 export type MonsterOption = {
   monster_id: string;
@@ -276,5 +277,33 @@ export const useDeckVoteMutation = (
   options?: Parameters<typeof useApiPostMutation<{ result: string }, DeckVotePayload>>[1],
 ) => {
   return useApiPostMutation<{ result: string }, DeckVotePayload>('/summonerswar/deck-vote', options);
+};
+
+export type PopularAttackDeckCombosParams = {
+  paging?: number;
+  offset?: number;
+  monster_id?: string;
+  min_usage_count?: number;
+  sort?: 'USAGE_DESC' | 'LATEST_DESC';
+};
+
+/**
+ * 자주 사용되는 공덱 조합 목록 조회
+ */
+export const usePopularAttackDeckCombos = (
+  params: PopularAttackDeckCombosParams,
+  enabled = true,
+) => {
+  return useApiPostQuery<PopularAttackDeckCombosResponse>(
+    '/summonerswar/popular-attack-decks',
+    params,
+    {
+      enabled,
+      placeholderData: (previousData) => previousData,
+      staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
 };
 

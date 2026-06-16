@@ -527,7 +527,7 @@ function SiegeContent() {
   const searchConditionCard = (
     <Box sx={{ mb: { xs: 2, md: 3 } }}>
       <Typography variant={isMobile ? 'subtitle2' : 'h6'} sx={{ mb: { xs: 1.5, md: 2 }, fontWeight: 600 }}>
-        몬스터 선택 (리더 1마리 + 나머지 2마리)
+        몬스터 선택
       </Typography>
 
       {/* 선택된 몬스터 슬롯 */}

@@ -69,6 +69,26 @@ export interface RecommendedItem {
   [key: string]: unknown;
 }
 
+export interface PopularAttackDeckComboItem {
+  deck_id?: string | number;
+  atk_monster_1?: string;
+  atk_monster_2?: string;
+  atk_monster_3?: string;
+  image_url1?: string;
+  image_url2?: string;
+  image_url3?: string;
+  m1_kr_name?: string;
+  m2_kr_name?: string;
+  m3_kr_name?: string;
+  usage_count?: number;
+}
+
+export interface PopularAttackDeckCombosResponse {
+  comboList: PopularAttackDeckComboItem[];
+  hasNext: boolean;
+  totalCount: number;
+}
+
 export interface MonsterDetailResponse {
   enemyData: EnemyData;
   historyList: HistoryItem[];
