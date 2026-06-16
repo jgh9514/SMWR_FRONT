@@ -42,32 +42,36 @@ class ApiClient {
 
   /**
    * 응답 데이터 추출
+   * - { result, message } 형태(ApiResult)는 unwrap 하지 않음
+   * - { result, data } 래퍼만 data 페이로드 unwrap (data가 null이면 전체 반환)
    */
   private extractData<T>(response: ApiResponse<T> | T): T {
-    // 배열이 직접 반환된 경우 (예: 길드 검색)
     if (Array.isArray(response)) {
       return response as unknown as T;
     }
 
-    // ApiResponse 형식인 경우
     if (typeof response === 'object' && response !== null && 'result' in response) {
       const apiResponse = response as ApiResponse<T>;
-      // result가 SUCCESS인 경우 data 반환
-      if (apiResponse.result === 'SUCCESS' && apiResponse.data !== undefined) {
-        return apiResponse.data;
+      const keys = Object.keys(apiResponse);
+      const isDataPayloadWrapper =
+        this.hasPayloadData(apiResponse.data) &&
+        keys.length <= 3 &&
+        keys.every((key) => key === 'result' || key === 'data' || key === 'message');
+
+      if (isDataPayloadWrapper) {
+        if (apiResponse.result === 'SUCCESS' || apiResponse.data !== undefined) {
+          return apiResponse.data as T;
+        }
       }
 
-      // data가 직접 있는 경우
-      if (apiResponse.data !== undefined) {
-        return apiResponse.data;
-      }
-
-      // 전체 응답 반환 (result만 있는 경우)
       return response as unknown as T;
     }
 
-    // 그 외의 경우 (직접 데이터 반환)
-    return response as unknown as T;
+    return response as T;
+  }
+
+  private hasPayloadData(data: unknown): boolean {
+    return data !== undefined && data !== null && typeof data === 'object';
   }
 }
 

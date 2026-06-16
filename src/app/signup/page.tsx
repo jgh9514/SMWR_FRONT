@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import CancelIcon from '@mui/icons-material/Cancel';
-import { useSignup, useLogin, useSendEmailVerification, useVerifyEmailCode, useCheckUserIdDuplicate } from '@/hooks/api';
+import { useSignup, useSendEmailVerification, useVerifyEmailCode, useCheckUserIdDuplicate } from '@/hooks/api';
 import { isEmpty } from '@/shared/utils/util';
 import { isValidEmail, isValidPassword } from '@/shared/utils/validation';
 import { showToast } from '@/shared/lib/notification';
@@ -160,13 +160,8 @@ export default function SignupPage() {
   const signupMutation = useSignup({
     onSuccess: (res) => {
       if (res && res.result === 'SUCCESS') {
-        showToast.success('회원가입이 완료되었습니다.');
-        // 회원가입 직후 바로 로그인 시도
-        loginMutation.mutate({
-          user_id: signupFormData.user_id,
-          password: signupFormData.password,
-          auto_login: 'false',
-        });
+        showToast.success('회원가입이 완료되었습니다. 로그인해 주세요.');
+        router.push('/login');
       } else {
         throw new Error(res.message || '회원가입에 실패했습니다.');
       }
@@ -174,27 +169,6 @@ export default function SignupPage() {
     onError: (error: Error) => {
       logger.error('회원가입 실패', error, { context: 'SignupPage' });
       showToast.error(handleApiError(error).message);
-    },
-  });
-
-  // 회원가입 후 즉시 로그인
-  const loginMutation = useLogin({
-    onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS' && res.userInfo) {
-        if (typeof window !== 'undefined') {
-          // 로그인 상태 저장
-          localStorage.setItem('isLoggedIn', 'true');
-          localStorage.setItem('userInfo', JSON.stringify(res.userInfo));
-          sessionStorage.setItem('loginJustCompleted', 'true');
-        }
-        router.push('/');
-      } else {
-        // 자동 로그인 실패 시 로그인 화면으로
-        router.push('/login');
-      }
-    },
-    onError: () => {
-      router.push('/login');
     },
   });
 

@@ -36,6 +36,7 @@ import {
   useCancelMyGuildJoinApplication,
 } from '@/features/auth/hooks/useAuth';
 import { isAuthenticated } from '@/shared/utils/auth';
+import { handleApiError } from '@/shared/lib/error-handler';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
 import type { UserInfo } from '@/features/auth/types/auth';
@@ -95,7 +96,7 @@ export default function GuildJoinPage() {
       }
     },
     onError: (e: Error) => {
-      showToast.error(e.message || '가입 신청에 실패했습니다.');
+      showToast.error(handleApiError(e).message);
     },
   });
 
@@ -289,6 +290,7 @@ export default function GuildJoinPage() {
                                 myStatus?.application?.guild_id === guild.guild_id
                               }
                               onClick={() => {
+                                if (applyMutation.isPending) return;
                                 applyMutation.mutate({
                                   guild_id: guild.guild_id,
                                   message: appliedMessage[guild.guild_id] ?? '',

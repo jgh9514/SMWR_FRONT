@@ -273,18 +273,22 @@ export default function GuildManagementPage() {
 
   // 가입 신청 승인/반려 Mutation
   const processJoinApplicationMutation = useProcessGuildJoinApplication({
-    onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('처리되었습니다.');
-        guildJoinApplicationListQuery.refetch();
-        guildMembersQuery.refetch();
+    onSuccess: (res, variables) => {
+      if (res?.result === 'SUCCESS') {
+        const fallback =
+          variables.status === 'APPROVED' ? '가입 신청을 승인했습니다.' : '가입 신청을 반려했습니다.';
+        showToast.success(res.message || fallback);
       } else {
-        throw new Error(res.message || '처리에 실패했습니다.');
+        showToast.error(res?.message || '처리에 실패했습니다.');
       }
     },
     onError: (error: Error) => {
       logger.error('가입 신청 처리 실패', error);
       showToast.error(error.message || '처리에 실패했습니다.');
+    },
+    onSettled: () => {
+      guildJoinApplicationListQuery.refetch();
+      guildMembersQuery.refetch();
     },
   });
 
