@@ -279,12 +279,15 @@ export const useDeckVoteMutation = (
   return useApiPostMutation<{ result: string }, DeckVotePayload>('/summonerswar/deck-vote', options);
 };
 
+export type AttackDeckComboSource = 'RECOMMENDED' | 'RECORD';
+
 export type PopularAttackDeckCombosParams = {
   paging?: number;
   offset?: number;
   monster_id?: string;
   min_usage_count?: number;
   sort?: 'USAGE_DESC' | 'LATEST_DESC';
+  source?: AttackDeckComboSource;
 };
 
 /**

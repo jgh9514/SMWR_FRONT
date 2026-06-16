@@ -81,6 +81,8 @@ export interface PopularAttackDeckComboItem {
   m2_kr_name?: string;
   m3_kr_name?: string;
   usage_count?: number;
+  win_count?: number;
+  lose_count?: number;
 }
 
 export interface PopularAttackDeckCombosResponse {

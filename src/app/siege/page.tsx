@@ -466,22 +466,21 @@ function SiegeContent() {
     pagination.reset();
   };
 
-  // 길드 선택 토글 (원본 Vue 코드와 동일)
+  // 상대 길드 선택: 클릭 즉시 필터 적용
   const toggleGuildSelection = useCallback(
     (guildName: string) => {
-      setSelectedGuilds((prev) => {
-        const index = prev.indexOf(guildName);
-        if (index > -1) {
-          return prev.filter((name) => name !== guildName);
-        } else {
-          return [...prev, guildName];
-        }
-      });
-    },
-    [],
-  );
+      const nextSelected =
+        selectedGuilds.indexOf(guildName) > -1
+          ? selectedGuilds.filter((name) => name !== guildName)
+          : [...selectedGuilds, guildName];
 
-  // 길드 선택 변경만으로는 자동 조회하지 않음 (검색 버튼으로만 적용)
+      setSelectedGuilds(nextSelected);
+      setAppliedSelectedGuilds(nextSelected);
+      setShouldSearch(true);
+      pagination.reset();
+    },
+    [selectedGuilds, pagination],
+  );
 
   const handleSearch = useCallback(() => {
     if (typeof window !== 'undefined') {

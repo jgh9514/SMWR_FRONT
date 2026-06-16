@@ -433,7 +433,9 @@ export default function AddDeckPopup({
                   gap: { xs: 1.25, sm: 2 },
                   flexWrap: 'nowrap',
                   overflowX: 'auto',
-                  p: 0.75,
+                  px: 0.75,
+                  pt: 1.25,
+                  pb: 0.75,
                   borderRadius: 1.5,
                   bgcolor: (t) => alpha(t.palette.action.hover, 0.25),
                 }}
@@ -727,7 +729,7 @@ export default function AddDeckPopup({
                     )}
                   </Box>
                 </AccordionSummary>
-                <AccordionDetails sx={{ px: { xs: 1.5, sm: 2 }, pt: 0, pb: 2 }}>
+                <AccordionDetails sx={{ px: { xs: 1.5, sm: 2 }, pt: 1, pb: 2 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
                       {STAT_INPUT_FIELDS.map((field) => (
