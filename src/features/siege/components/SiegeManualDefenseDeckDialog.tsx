@@ -24,6 +24,7 @@ import {
 } from '@/hooks/api';
 import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
+import { isPlainApiSuccess } from '@/shared/lib/api/result';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 
 const LEADER_INDEX = 0;
@@ -45,7 +46,7 @@ export function SiegeManualDefenseDeckDialog({ open, onClose }: SiegeManualDefen
 
   const registerMutation = useRegisterSiegeDefenseDeckManual({
     onSuccess: (res) => {
-      if (res === 'SUCCESS') {
+      if (isPlainApiSuccess(res)) {
         showToast.success('방덱이 등록되었습니다.');
         void queryClient.invalidateQueries({ queryKey: ['/summonerswar/enemyTeam-list'] });
         setSelectedMonsterList([]);

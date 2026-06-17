@@ -33,6 +33,8 @@ import { useCommentList, useSaveComment, useUpdateComment, useDeleteComment, use
 import type { CommentVoteType } from '@/features/community/types/comment';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import type { Comment, BoardType, CommentSaveParams } from '@/features/community/types/comment';
 import { MAX_COMMENT_LENGTH } from '@/shared/constants/validation';
 import type { UserInfo } from '@/features/auth/types/auth';
@@ -1130,49 +1132,61 @@ export default function CommentSection({ boardType, boardId, userInfo }: Comment
   );
 
   const saveCommentMutation = useSaveComment({
-    onSuccess: () => {
-      showToast.success('댓글이 등록되었습니다.');
-      commentListQuery.refetch();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '댓글이 등록되었습니다.'));
+        commentListQuery.refetch();
+      } else {
+        showToast.error(getApiResultMessage(res, '댓글 등록에 실패했습니다.'));
+      }
     },
     onError: (error: Error) => {
       logger.error('댓글 등록 실패', error);
-      showToast.error(error.message || '댓글 등록에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '댓글 등록에 실패했습니다.');
     },
   });
 
   const updateCommentMutation = useUpdateComment({
-    onSuccess: () => {
-      showToast.success('댓글이 수정되었습니다.');
-      commentListQuery.refetch();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '댓글이 수정되었습니다.'));
+        commentListQuery.refetch();
+      } else {
+        showToast.error(getApiResultMessage(res, '댓글 수정에 실패했습니다.'));
+      }
     },
     onError: (error: Error) => {
       logger.error('댓글 수정 실패', error);
-      showToast.error(error.message || '댓글 수정에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '댓글 수정에 실패했습니다.');
     },
   });
 
   const deleteCommentMutation = useDeleteComment({
-    onSuccess: () => {
-      showToast.success('댓글이 삭제되었습니다.');
-      commentListQuery.refetch();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '댓글이 삭제되었습니다.'));
+        commentListQuery.refetch();
+      } else {
+        showToast.error(getApiResultMessage(res, '댓글 삭제에 실패했습니다.'));
+      }
     },
     onError: (error: Error) => {
       logger.error('댓글 삭제 실패', error);
-      showToast.error(error.message || '댓글 삭제에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '댓글 삭제에 실패했습니다.');
     },
   });
 
   const commentVoteMutation = useCommentVote({
-    onSuccess: (data) => {
-      if (data?.result !== 'SUCCESS') {
-        showToast.error(data?.message || '투표 처리에 실패했습니다.');
+    onSuccess: (res) => {
+      if (!isApiSuccess(res)) {
+        showToast.error(getApiResultMessage(res, '투표 처리에 실패했습니다.'));
         return;
       }
       commentListQuery.refetch();
     },
     onError: (error: Error) => {
       logger.error('댓글 투표 실패', error);
-      showToast.error(error.message || '투표 처리에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '투표 처리에 실패했습니다.');
     },
   });
 

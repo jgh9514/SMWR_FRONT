@@ -40,6 +40,7 @@ import {
   useMonsterList,
 } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { isPlainApiSuccess } from '@/shared/lib/api/result';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
@@ -541,7 +542,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     deck_comment?: string;
   }>('/summonerswar/deck-detail-update', {
     onSuccess: (res) => {
-      if (res === 'SUCCESS') {
+      if (isPlainApiSuccess(res)) {
         showToast.success('스탯이 수정되었습니다.');
         setIsEditing(false);
         refetch();

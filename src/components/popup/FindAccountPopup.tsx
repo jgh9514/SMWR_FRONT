@@ -20,6 +20,8 @@ import { useFindUserId, useFindPassword } from '@/features/auth/hooks/useAuth';
 import { showToast } from '@/shared/lib/notification';
 import { isEmpty } from '@/shared/utils/util';
 import { validateAndSanitizeInput } from '@/shared/utils/validation';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 
 interface FindAccountPopupProps {
   open: boolean;
@@ -57,29 +59,30 @@ export default function FindAccountPopup({ open, onClose }: FindAccountPopupProp
 
   const findUserIdMutation = useFindUserId({
     onSuccess: (res) => {
-      if (res.result === 'SUCCESS' && res.user_id) {
-        setFoundUserId(res.user_id);
-        showToast.success('아이디를 찾았습니다.');
+      const userId = (res as { user_id?: string }).user_id;
+      if (isApiSuccess(res) && userId) {
+        setFoundUserId(userId);
+        showToast.success(getApiResultMessage(res, '아이디를 찾았습니다.'));
       } else {
-        showToast.error(res.message || '아이디를 찾을 수 없습니다.');
+        showToast.error(getApiResultMessage(res, '아이디를 찾을 수 없습니다.'));
       }
     },
     onError: (error: Error) => {
-      showToast.error(error.message || '아이디 찾기에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '아이디 찾기에 실패했습니다.');
     },
   });
 
   const findPasswordMutation = useFindPassword({
     onSuccess: (res) => {
-      if (res.result === 'SUCCESS') {
-        showToast.success(res.message || '비밀번호 재설정 링크가 이메일로 발송되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '비밀번호 재설정 링크가 이메일로 발송되었습니다.'));
         handleClose();
       } else {
-        showToast.error(res.message || '비밀번호 찾기에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '비밀번호 찾기에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
-      showToast.error(error.message || '비밀번호 찾기에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '비밀번호 찾기에 실패했습니다.');
     },
   });
 

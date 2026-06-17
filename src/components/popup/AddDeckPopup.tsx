@@ -30,6 +30,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useMonsterList, type MonsterOption, useApiPostMutation } from '@/hooks/api';
 import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
+import { isPlainApiSuccess } from '@/shared/lib/api/result';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
@@ -178,7 +179,7 @@ export default function AddDeckPopup({
     deck_comment?: string;
   }>('/summonerswar/enemyTeam-save', {
     onSuccess: (res) => {
-      if (res === 'SUCCESS') {
+      if (isPlainApiSuccess(res)) {
         showToast.success('저장되었습니다.');
         handleClose();
         onSave?.();

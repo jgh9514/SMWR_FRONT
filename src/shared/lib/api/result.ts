@@ -9,6 +9,14 @@ export function isApiSuccess(res: unknown): res is ApiResult {
   return String(result ?? '').toUpperCase() === 'SUCCESS';
 }
 
+/** 문자열 SUCCESS 또는 ApiResult SUCCESS (공덱 저장 등 레거시 API) */
+export function isPlainApiSuccess(res: unknown, expected = 'SUCCESS'): boolean {
+  if (typeof res === 'string') {
+    return res.toUpperCase() === expected.toUpperCase();
+  }
+  return isApiSuccess(res);
+}
+
 export function getApiResultMessage(res: unknown, fallback: string): string {
   if (res != null && typeof res === 'object' && 'message' in res) {
     const message = (res as ApiResult).message;

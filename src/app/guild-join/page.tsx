@@ -341,7 +341,7 @@ export default function GuildJoinPage() {
 
                 {inviteCode && inviteGuildInfo && (
                   <Card variant="outlined" sx={{ p: 2 }}>
-                    {inviteGuildInfo.result === 'SUCCESS' && inviteGuildInfo.guild ? (
+                    {isApiSuccess(inviteGuildInfo) && inviteGuildInfo.guild ? (
                       <Box>
                         <Typography fontWeight={700} sx={{ mb: 0.5 }}>
                           {inviteGuildInfo.guild.guild_name}

@@ -2,6 +2,7 @@ import { useApiMutation } from '@/hooks/api/useApiMutation';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import axiosInstance from '@/shared/lib/axios';
 import type { ApiResponse } from '@/shared/lib/api/types';
+import { isApiSuccess, getApiResultMessage } from '@/shared/lib/api/result';
 import type {
   AccountSummaryUploadResult,
   LatestImportResponse,
@@ -35,8 +36,8 @@ export const useAccountSummaryUpload = (
 
       const body = res.data as ApiResponse<AccountSummaryUploadResult> | AccountSummaryUploadResult;
       if (isApiResponse(body)) {
-        if (body.result !== 'SUCCESS') {
-          const message = body.message || '업로드에 실패했습니다.';
+        if (!isApiSuccess(body)) {
+          const message = getApiResultMessage(body, '업로드에 실패했습니다.');
           throw new Error(message);
         }
         if (body.data) {

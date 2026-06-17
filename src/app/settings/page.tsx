@@ -329,7 +329,7 @@ export default function SettingsPage() {
     },
     onError: (error: Error) => {
       logger.error('길드 가입 신청 실패', error);
-      showToast.error(error.message || '길드 가입 신청에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '길드 가입 신청에 실패했습니다.');
     },
   });
 
@@ -1194,7 +1194,7 @@ export default function SettingsPage() {
                 >
                   {checkGuildByInviteCodeQuery.isFetching ? '확인 중...' : '길드 정보 확인'}
                 </Button>
-                {checkGuildByInviteCodeQuery.data && checkGuildByInviteCodeQuery.data.result === 'SUCCESS' && (
+                {checkGuildByInviteCodeQuery.data && isApiSuccess(checkGuildByInviteCodeQuery.data) && (
                   <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: 1 }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                       길드 정보
@@ -1228,7 +1228,7 @@ export default function SettingsPage() {
               disabled={
                 (guildJoinDialogTab === 'search' && !selectedGuild) ||
                 (guildJoinDialogTab === 'invite' && (!inviteCode || inviteCode.trim() === '')) ||
-                (guildJoinDialogTab === 'invite' && (!checkGuildByInviteCodeQuery.data || checkGuildByInviteCodeQuery.data.result !== 'SUCCESS')) ||
+                (guildJoinDialogTab === 'invite' && (!checkGuildByInviteCodeQuery.data || !isApiSuccess(checkGuildByInviteCodeQuery.data))) ||
                 applyJoinGuildMutation.isPending ||
                 joinGuildByInviteCodeMutation.isPending
               }
