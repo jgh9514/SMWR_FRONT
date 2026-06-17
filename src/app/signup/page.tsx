@@ -25,6 +25,7 @@ import { isEmpty } from '@/shared/utils/util';
 import { isValidEmail, isValidPassword } from '@/shared/utils/validation';
 import { showToast } from '@/shared/lib/notification';
 import { handleApiError } from '@/shared/lib/error-handler';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import { logger } from '@/shared/lib/logger';
 import type { SignupParams } from '@/types';
 
@@ -95,17 +96,16 @@ export default function SignupPage() {
   // 이메일 인증 코드 발송 Mutation
   const sendCodeMutation = useSendEmailVerification({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        const message = res.dev_code
-          ? `인증 코드가 발송되었습니다. (개발 모드: ${res.dev_code})`
-          : (res.message || '인증 코드가 발송되었습니다.');
+      if (isApiSuccess(res)) {
+        const message = (res as { dev_code?: string }).dev_code
+          ? `인증 코드가 발송되었습니다. (개발 모드: ${(res as { dev_code?: string }).dev_code})`
+          : getApiResultMessage(res, '인증 코드가 발송되었습니다.');
         showToast.success(message);
         setCodeSent(true);
-        setCountdown(300); // 5분 (300초)
-        setResendCooldown(10); // 과도한 재발송 방지(10초)
+        setCountdown(300);
+        setResendCooldown(10);
       } else {
-        const msg = (res as { message?: string } | undefined)?.message || '인증 코드 발송에 실패했습니다.';
-        showToast.error(msg);
+        showToast.error(getApiResultMessage(res, '인증 코드 발송에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
@@ -117,13 +117,13 @@ export default function SignupPage() {
   // 이메일 인증 코드 확인 Mutation
   const verifyCodeMutation = useVerifyEmailCode({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('이메일 인증이 완료되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '이메일 인증이 완료되었습니다.'));
         setEmailVerified(true);
         setCodeSent(false);
         setCountdown(0);
       } else {
-        throw new Error(res.message || '인증 코드가 일치하지 않습니다.');
+        showToast.error(getApiResultMessage(res, '인증 코드가 일치하지 않습니다.'));
       }
     },
     onError: (error: Error) => {
@@ -135,8 +135,8 @@ export default function SignupPage() {
   // 아이디 중복체크 Mutation
   const checkUserIdDuplicateMutation = useCheckUserIdDuplicate({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        const isDuplicate = res.isDuplicate ?? false;
+      if (isApiSuccess(res)) {
+        const isDuplicate = (res as { isDuplicate?: boolean }).isDuplicate ?? false;
         setUserIdAvailable(!isDuplicate);
         setUserIdChecked(true);
         if (isDuplicate) {
@@ -145,7 +145,7 @@ export default function SignupPage() {
           showToast.success('사용 가능한 아이디입니다.');
         }
       } else {
-        throw new Error(res.message || '아이디 중복체크에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '아이디 중복체크에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
@@ -159,11 +159,11 @@ export default function SignupPage() {
   // 회원가입 Mutation
   const signupMutation = useSignup({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('회원가입이 완료되었습니다. 로그인해 주세요.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '회원가입이 완료되었습니다. 로그인해 주세요.'));
         router.push('/login');
       } else {
-        throw new Error(res.message || '회원가입에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '회원가입에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {

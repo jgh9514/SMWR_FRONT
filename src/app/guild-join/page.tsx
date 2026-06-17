@@ -105,29 +105,29 @@ export default function GuildJoinPage() {
 
   const inviteMutation = useJoinGuildByInviteCode({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success('길드에 가입되었습니다!');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '길드에 가입되었습니다!'));
         router.push('/settings');
       } else {
-        showToast.error(res?.message || '초대 코드가 유효하지 않습니다.');
+        showToast.error(getApiResultMessage(res, '초대 코드가 유효하지 않습니다.'));
       }
     },
     onError: (e: Error) => {
-      showToast.error(e.message || '초대 코드가 유효하지 않습니다.');
+      showToast.error(handleApiError(e).message || '초대 코드가 유효하지 않습니다.');
     },
   });
 
   const cancelMutation = useCancelMyGuildJoinApplication({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success('가입 신청이 취소되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '가입 신청이 취소되었습니다.'));
         refetchStatus();
       } else {
-        showToast.error(res?.message || '취소에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '취소에 실패했습니다.'));
       }
     },
     onError: (e: Error) => {
-      showToast.error(e.message || '취소에 실패했습니다.');
+      showToast.error(handleApiError(e).message || '취소에 실패했습니다.');
     },
   });
 

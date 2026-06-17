@@ -40,6 +40,8 @@ import AddIcon from '@mui/icons-material/Add';
 import CloseIcon from '@mui/icons-material/Close';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import {
   useInquiryList,
   useInquiryDetail,
@@ -121,56 +123,56 @@ export default function InquiryPage() {
   // 1대1문의 작성 Mutation
   const saveInquiryMutation = useSaveInquiry({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('문의가 등록되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '문의가 등록되었습니다.'));
         setWriteDialogOpen(false);
         setFormData({ title: '', content: '' });
         inquiryListQuery.refetch();
       } else {
-        throw new Error(res.message || '문의 등록에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '문의 등록에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('문의 등록 실패', error);
-      showToast.error(error.message || '문의 등록에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '문의 등록에 실패했습니다.');
     },
   });
 
   // 1대1문의 답변 Mutation
   const answerInquiryMutation = useAnswerInquiry({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('답변이 등록되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '답변이 등록되었습니다.'));
         setAnswerDialogOpen(false);
         setAnswerData({ answer: '' });
         setSelectedInquiryId(null);
         inquiryListQuery.refetch();
         inquiryDetailQuery.refetch();
       } else {
-        throw new Error(res.message || '답변 등록에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '답변 등록에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('답변 등록 실패', error);
-      showToast.error(error.message || '답변 등록에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '답변 등록에 실패했습니다.');
     },
   });
 
   // 1대1문의 삭제 Mutation
   const deleteInquiryMutation = useDeleteInquiry({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('문의가 삭제되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '문의가 삭제되었습니다.'));
         setDeleteDialogOpen(false);
         setSelectedInquiryId(null);
         inquiryListQuery.refetch();
       } else {
-        throw new Error(res.message || '문의 삭제에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '문의 삭제에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('문의 삭제 실패', error);
-      showToast.error(error.message || '문의 삭제에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '문의 삭제에 실패했습니다.');
     },
   });
 

@@ -6,6 +6,7 @@ import { Box, Button, Card, CardContent, Container, Alert } from '@mui/material'
 import { PageHeader } from '@/shared/ui';
 import { isAuthenticated } from '@/shared/utils/auth';
 import { showToast } from '@/shared/lib/notification';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import {
   useNotificationList,
   useMarkNotificationRead,
@@ -38,9 +39,11 @@ export default function NotificationsPageClient() {
 
   const markAllReadMutation = useMarkAllNotificationsRead({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success('모든 알림을 읽음 처리했습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '모든 알림을 읽음 처리했습니다.'));
         notificationListQuery.refetch();
+      } else {
+        showToast.error(getApiResultMessage(res, '전체 읽음 처리에 실패했습니다.'));
       }
     },
     onError: () => {
@@ -50,10 +53,10 @@ export default function NotificationsPageClient() {
 
   const dismissMutation = useDismissNotification({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
+      if (isApiSuccess(res)) {
         notificationListQuery.refetch();
       } else {
-        showToast.error(res?.message || '알림을 숨기지 못했습니다.');
+        showToast.error(getApiResultMessage(res, '알림을 숨기지 못했습니다.'));
       }
     },
     onError: () => {

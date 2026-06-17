@@ -19,6 +19,8 @@ import { useGuildApplication } from '@/hooks/api';
 import { isEmpty } from '@/shared/utils/util';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import { validateFile } from '@/shared/utils/security';
 import GroupIcon from '@mui/icons-material/Group';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -69,18 +71,18 @@ export default function GuildApplicationPage() {
   // 길드 생성 신청 Mutation
   const guildCreateMutation = useGuildApplication({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('길드 생성 신청이 완료되었습니다. 관리자 승인 대기 중입니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '길드 생성 신청이 완료되었습니다. 관리자 승인 대기 중입니다.'));
         setTimeout(() => {
           router.push('/settings');
         }, 1500);
       } else {
-        throw new Error(res.message || '길드 생성 신청에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '길드 생성 신청에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('길드 생성 신청 실패', error);
-      showToast.error(error.message || '길드 생성 신청에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '길드 생성 신청에 실패했습니다.');
     },
   });
 

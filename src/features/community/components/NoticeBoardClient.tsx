@@ -27,6 +27,8 @@ import {
 } from '@mui/material';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import { useNoticeList, useDeleteNotice } from '@/hooks/api';
 import type { Notice, NoticeListResponse } from '@/features/community/types/community';
 import type { UserInfo } from '@/features/auth/types/auth';
@@ -80,18 +82,18 @@ export default function NoticeBoardClient({ initialData }: NoticeBoardClientProp
 
   const deleteNoticeMutation = useDeleteNotice({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('공지사항이 삭제되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '공지사항이 삭제되었습니다.'));
         setDeleteDialogOpen(false);
         setSelectedNoticeId(null);
         noticeListQuery.refetch();
       } else {
-        showToast.error(res?.message || '공지사항 삭제에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '공지사항 삭제에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('공지사항 삭제 실패', error);
-      showToast.error(error.message || '공지사항 삭제에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '공지사항 삭제에 실패했습니다.');
     },
   });
 

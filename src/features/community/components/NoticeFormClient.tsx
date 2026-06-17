@@ -21,6 +21,8 @@ import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import { useSaveNotice } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import PageHeader from '@/shared/ui/page-header/PageHeader';
 import type { UserInfo } from '@/features/auth/types/auth';
 import type { Notice } from '@/features/community/types/community';
@@ -72,17 +74,22 @@ export default function NoticeFormClient({ mode, noticeId, initialNotice }: Noti
 
   const saveNoticeMutation = useSaveNotice({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success(mode === 'edit' ? '공지사항이 수정되었습니다.' : '공지사항이 등록되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(
+          getApiResultMessage(
+            res,
+            mode === 'edit' ? '공지사항이 수정되었습니다.' : '공지사항이 등록되었습니다.',
+          ),
+        );
         router.push('/notice');
         router.refresh();
       } else {
-        showToast.error(res?.message || '공지사항 저장에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '공지사항 저장에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('공지사항 저장 실패', error);
-      showToast.error(error.message || '공지사항 저장에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '공지사항 저장에 실패했습니다.');
     },
   });
 

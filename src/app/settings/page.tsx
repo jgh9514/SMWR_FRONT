@@ -49,6 +49,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/shared/ui';
 import { showToast } from '@/shared/lib/notification';
 import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import {
   useUserGuild,
   useGuildSearch,
@@ -340,11 +341,10 @@ export default function SettingsPage() {
   // 초대 코드로 길드 가입 Mutation
   const joinGuildByInviteCodeMutation = useJoinGuildByInviteCode({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('길드에 가입되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '길드에 가입되었습니다.'));
         setGuildJoinDialog(false);
         setInviteCode('');
-        // 사용자 정보 갱신
         if (typeof window !== 'undefined') {
           userGuildQuery.refetch();
           setTimeout(() => {
@@ -352,12 +352,12 @@ export default function SettingsPage() {
           }, 1000);
         }
       } else {
-        throw new Error(res.message || '길드 가입에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '길드 가입에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('초대 코드로 길드 가입 실패', error);
-      showToast.error(error.message || '길드 가입에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '길드 가입에 실패했습니다.');
     },
   });
 
@@ -384,16 +384,16 @@ export default function SettingsPage() {
 
   const cancelMyJoinApplicationMutation = useCancelMyGuildJoinApplication({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('가입 신청을 취소했습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '가입 신청을 취소했습니다.'));
         myJoinStatusQuery.refetch();
       } else {
-        throw new Error(res?.message || '가입 신청 취소에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '가입 신청 취소에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('가입 신청 취소 실패', error);
-      showToast.error(error.message || '가입 신청 취소에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '가입 신청 취소에 실패했습니다.');
     },
   });
 
@@ -403,8 +403,8 @@ export default function SettingsPage() {
   // siege_view_scope 업데이트 Mutation
   const updateSiegeViewScopeMutation = useUpdateSiegeViewScope({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('설정이 저장되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '설정이 저장되었습니다.'));
         if (typeof window !== 'undefined' && userInfo) {
           const updatedUserInfo = {
             ...userInfo,
@@ -416,12 +416,12 @@ export default function SettingsPage() {
         notifySiegeViewScopeChanged();
         void invalidateSiegeQueries(queryClient);
       } else {
-        throw new Error(res?.message || '설정 저장에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '설정 저장에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('설정 저장 실패', error);
-      showToast.error(error.message || '설정 저장에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '설정 저장에 실패했습니다.');
     },
   });
 

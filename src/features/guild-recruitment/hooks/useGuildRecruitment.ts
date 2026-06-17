@@ -10,6 +10,7 @@ import type {
   GuildRecruitmentImageUploadResponse,
 } from '@/features/guild-recruitment/types';
 import { apiClient } from '@/shared/lib/api/client';
+import { isApiSuccess, getApiResultMessage } from '@/shared/lib/api/result';
 
 export function useGuildRecruitmentList(
   params: GuildRecruitmentListParams,
@@ -58,8 +59,8 @@ export async function uploadGuildRecruitmentImage(file: File): Promise<string> {
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } },
   );
-  if (res.result !== 'SUCCESS' || !res.url) {
-    throw new Error(res.message || '이미지 업로드에 실패했습니다.');
+  if (!isApiSuccess(res) || !res.url) {
+    throw new Error(getApiResultMessage(res, '이미지 업로드에 실패했습니다.'));
   }
   return res.url;
 }

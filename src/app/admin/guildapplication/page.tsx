@@ -36,6 +36,8 @@ import { useRouter } from 'next/navigation';
 import { useGuildApplicationList, useProcessGuildApplication } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import type { GuildApplicationItem } from '@/features/auth/types/auth';
 
 export default function GuildApplicationManagementPage() {
@@ -58,18 +60,18 @@ export default function GuildApplicationManagementPage() {
   // 길드 신청 승인/반려 Mutation
   const processApplicationMutation = useProcessGuildApplication({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('처리되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '처리되었습니다.'));
         guildApplicationListQuery.refetch();
         setDetailDialogOpen(false);
         setSelectedApplication(null);
       } else {
-        throw new Error(res.message || '처리에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '처리에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('길드 신청 처리 실패', error);
-      showToast.error(error.message || '처리에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '처리에 실패했습니다.');
     },
   });
 

@@ -55,6 +55,7 @@ import {
 } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
 import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { handleApiError } from '@/shared/lib/error-handler';
 import { logger } from '@/shared/lib/logger';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import type { GuildJoinApplication, GuildMember, GuildSettings, UserInfo } from '@/features/auth/types/auth';
@@ -220,25 +221,24 @@ export default function GuildManagementPage() {
   // 초대 코드 채번 Mutation
   const generateInviteCodeMutation = useGenerateInviteCode({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS' && (res.invite_code || res.invite_key)) {
-        showToast.success('초대 코드가 생성되었습니다.');
-        // 백엔드에서 최신 데이터를 가져오기 위해 refetch
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '초대 코드가 생성되었습니다.'));
         guildSettingsQuery.refetch();
       } else {
-        throw new Error(res.message || '초대 코드 생성에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '초대 코드 생성에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('초대 코드 생성 실패', error);
-      showToast.error(error.message || '초대 코드 생성에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '초대 코드 생성에 실패했습니다.');
     },
   });
 
   // 길드 정보 저장 Mutation (가입 허용 여부, 설명 저장용)
   const saveGuildInfoMutation = useSaveGuildSettings({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('길드 정보가 저장되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '길드 정보가 저장되었습니다.'));
         if (typeof window !== 'undefined') {
           const storedUserInfo = localStorage.getItem('userInfo');
           if (storedUserInfo) {
@@ -256,19 +256,18 @@ export default function GuildManagementPage() {
             }
           }
         }
-        // refetch 후 초대 코드 확인을 위해 약간의 지연 후 refetch
         setTimeout(() => {
           guildSettingsQuery.refetch().then((result) => {
             logger.info('길드 정보 refetch 완료', { data: result.data });
           });
         }, 500);
       } else {
-        throw new Error(res.message || '길드 정보 저장에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '길드 정보 저장에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('길드 정보 저장 실패', error);
-      showToast.error(error.message || '길드 정보 저장에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '길드 정보 저장에 실패했습니다.');
     },
   });
 
@@ -285,7 +284,7 @@ export default function GuildManagementPage() {
     },
     onError: (error: Error) => {
       logger.error('가입 신청 처리 실패', error);
-      showToast.error(error.message || '처리에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '처리에 실패했습니다.');
     },
     onSettled: () => {
       guildJoinApplicationListQuery.refetch();
@@ -303,19 +302,21 @@ export default function GuildManagementPage() {
 
   const kickMemberMutation = useKickGuildMember({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('추방 처리되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '추방 처리되었습니다.'));
         setKickDialogOpen(false);
         setSelectedMemberForKick(null);
         setKickReason('');
-        guildMembersQuery.refetch();
       } else {
-        throw new Error(res.message || '추방에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '추방에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('멤버 추방 실패', error);
-      showToast.error(error.message || '추방에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '추방에 실패했습니다.');
+    },
+    onSettled: () => {
+      guildMembersQuery.refetch();
     },
   });
 
@@ -330,12 +331,11 @@ export default function GuildManagementPage() {
   // 길드장 권한 위임 Mutation
   const transferLeadershipMutation = useTransferGuildLeadership({
     onSuccess: (res) => {
-      if (res && res.result === 'SUCCESS') {
-        showToast.success('길드장 권한이 위임되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '길드장 권한이 위임되었습니다.'));
         setTransferDialogOpen(false);
         setSelectedMemberForTransfer('');
         guildMembersQuery.refetch();
-        // 사용자 정보 갱신
         if (typeof window !== 'undefined') {
           const storedUserInfo = localStorage.getItem('userInfo');
           if (storedUserInfo) {
@@ -353,17 +353,16 @@ export default function GuildManagementPage() {
             }
           }
         }
-        // 페이지 새로고침
         setTimeout(() => {
           window.location.reload();
         }, 1000);
       } else {
-        throw new Error(res.message || '권한 위임에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '권한 위임에 실패했습니다.'));
       }
     },
     onError: (error: Error) => {
       logger.error('권한 위임 실패', error);
-      showToast.error(error.message || '권한 위임에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '권한 위임에 실패했습니다.');
     },
   });
 
@@ -454,22 +453,25 @@ export default function GuildManagementPage() {
           user_id: selectedMemberForEdit.user_id,
           user_nm: trimmedName,
         });
-        if (!nameRes || nameRes.result !== 'SUCCESS') {
-          throw new Error(nameRes.message || '이름 변경에 실패했습니다.');
+        if (!isApiSuccess(nameRes)) {
+          showToast.error(getApiResultMessage(nameRes, '이름 변경에 실패했습니다.'));
+          return;
         }
       }
 
       if (roleChanged) {
         const nextRole = toGuildRole(editMemberRole);
         if (!nextRole) {
-          throw new Error('변경할 권한 정보가 올바르지 않습니다.');
+          showToast.error('변경할 권한 정보가 올바르지 않습니다.');
+          return;
         }
         const roleRes = await updateMemberRoleMutation.mutateAsync({
           user_id: selectedMemberForEdit.user_id,
           guild_role: nextRole,
         });
-        if (!roleRes || roleRes.result !== 'SUCCESS') {
-          throw new Error(roleRes.message || '권한 변경에 실패했습니다.');
+        if (!isApiSuccess(roleRes)) {
+          showToast.error(getApiResultMessage(roleRes, '권한 변경에 실패했습니다.'));
+          return;
         }
         syncUserGuildRoleInStorage(selectedMemberForEdit.user_id, nextRole);
       }
@@ -479,7 +481,7 @@ export default function GuildManagementPage() {
       guildMembersQuery.refetch();
     } catch (error) {
       logger.error('멤버 수정 실패', error);
-      showToast.error(error instanceof Error ? error.message : '저장에 실패했습니다.');
+      showToast.error(handleApiError(error).message || '저장에 실패했습니다.');
     }
   };
 

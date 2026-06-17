@@ -17,6 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { PageBanner, PageHeader } from '@/shared/ui';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import { isAuthenticated } from '@/shared/utils/auth';
 import {
   useGuildRecruitmentDetail,
@@ -75,16 +76,17 @@ export default function GuildRecruitmentFormClient({ postId }: Props) {
 
   const saveMutation = useSaveGuildRecruitment({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success(isEdit ? '수정되었습니다.' : '등록되었습니다.');
-        const id = res.post_id ?? postId;
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, isEdit ? '수정되었습니다.' : '등록되었습니다.'));
+        const saveRes = res as { post_id?: string | number };
+        const id = saveRes.post_id ?? postId;
         if (id != null) {
           router.push(`/guild-recruitment/${id}`);
         } else {
           router.push('/guild-recruitment');
         }
       } else {
-        showToast.error(res?.message || '저장에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '저장에 실패했습니다.'));
       }
     },
     onError: (err: Error) => {

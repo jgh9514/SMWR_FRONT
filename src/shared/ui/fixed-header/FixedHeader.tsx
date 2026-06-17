@@ -63,6 +63,7 @@ import NotificationListPanel from '@/features/notification/components/Notificati
 import type { NotificationItem } from '@/features/notification/types/notification';
 import { isNotificationUnread } from '@/features/notification/lib/notificationUtils';
 import { showToast } from '@/shared/lib/notification';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import type { UserInfo } from '@/features/auth/types/auth';
 import { logger } from '@/shared/lib/logger';
 import { getPwaIconCacheQuery } from '@/shared/lib/pwa-icon-version';
@@ -342,8 +343,10 @@ export default function FixedHeader() {
 
   const markAllReadMutation = useMarkAllNotificationsRead({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success('모든 알림을 읽음 처리했습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '모든 알림을 읽음 처리했습니다.'));
+      } else {
+        showToast.error(getApiResultMessage(res, '전체 읽음 처리에 실패했습니다.'));
       }
       notificationListQuery.refetch();
     },
@@ -354,10 +357,10 @@ export default function FixedHeader() {
 
   const dismissNotificationMutation = useDismissNotification({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
+      if (isApiSuccess(res)) {
         notificationListQuery.refetch();
       } else {
-        showToast.error(res?.message || '알림을 숨기지 못했습니다.');
+        showToast.error(getApiResultMessage(res, '알림을 숨기지 못했습니다.'));
       }
     },
     onError: () => {

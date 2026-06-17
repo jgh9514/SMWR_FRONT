@@ -21,6 +21,7 @@ import { PageBanner, PageHeader } from '@/shared/ui';
 import { RichTextDisplay } from '@/shared/ui/editor/RichTextDisplay';
 import { showToast } from '@/shared/lib/notification';
 import { logger } from '@/shared/lib/logger';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import {
   useGuildRecruitmentDetail,
   useDeleteGuildRecruitment,
@@ -59,11 +60,11 @@ export default function GuildRecruitmentDetailClient({ postId }: Props) {
 
   const deleteMutation = useDeleteGuildRecruitment({
     onSuccess: (res) => {
-      if (res?.result === 'SUCCESS') {
-        showToast.success('삭제되었습니다.');
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '삭제되었습니다.'));
         router.push('/guild-recruitment');
       } else {
-        showToast.error(res?.message || '삭제에 실패했습니다.');
+        showToast.error(getApiResultMessage(res, '삭제에 실패했습니다.'));
       }
     },
     onError: (err: Error) => {
