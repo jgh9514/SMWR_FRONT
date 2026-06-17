@@ -7,7 +7,11 @@ import { useApiPostQuery, useApiPostSuspenseQuery } from '@/hooks/api/useApiQuer
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { GuildItem, MonsterItem, SiegeSearchParams } from '@/types';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
-import type { PopularAttackDeckCombosResponse } from '@/features/siege/types/siegeDetail';
+import type {
+  PopularAttackDeckCombosResponse,
+  RecordAttackDeckDefenseMatchupsResponse,
+  ImportableRecommendedDecksResponse,
+} from '@/features/siege/types/siegeDetail';
 
 export type MonsterOption = {
   monster_id: string;
@@ -304,6 +308,63 @@ export const usePopularAttackDeckCombos = (
       enabled,
       placeholderData: (previousData) => previousData,
       staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
+export type RecordAttackDeckDefenseMatchupsQueryParams = {
+  atk_monster_1: string;
+  atk_monster_2: string;
+  atk_monster_3: string;
+  paging?: number;
+  offset?: number;
+};
+
+/**
+ * 전적 공덱이 사용된 방덱 목록
+ * 백엔드: POST /api/v1/summonerswar/record-attack-deck-defenses
+ */
+export const useRecordAttackDeckDefenseMatchups = (
+  params: RecordAttackDeckDefenseMatchupsQueryParams | null,
+  enabled = true,
+) => {
+  return useApiPostQuery<RecordAttackDeckDefenseMatchupsResponse>(
+    '/summonerswar/record-attack-deck-defenses',
+    params ?? {},
+    {
+      enabled:
+        enabled
+        && !!params?.atk_monster_1
+        && !!params?.atk_monster_2
+        && !!params?.atk_monster_3,
+      staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  );
+};
+
+export type ImportableRecommendedDecksParams = {
+  exclude_def_monster_1?: string;
+  exclude_def_monster_2?: string;
+  exclude_def_monster_3?: string;
+  monster_id?: string;
+  paging?: number;
+  offset?: number;
+};
+
+export const useImportableRecommendedDecks = (
+  params: ImportableRecommendedDecksParams,
+  enabled = true,
+) => {
+  return useApiPostQuery<ImportableRecommendedDecksResponse>(
+    '/summonerswar/recommended-deck-import/list',
+    params,
+    {
+      enabled,
+      staleTime: 60 * 1000,
       gcTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
     },

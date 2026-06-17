@@ -27,6 +27,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import { useMonsterList, type MonsterOption, useApiPostMutation } from '@/hooks/api';
 import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
@@ -44,6 +45,8 @@ import {
   mergeMonsterOrderIds,
   parseMonsterOrderString,
 } from '@/features/siege/utils/deckOrder';
+import ImportRecommendedDeckDialog from '@/features/siege/components/ImportRecommendedDeckDialog';
+import type { DeckFormImportState } from '@/features/siege/utils/deckDetailForm';
 
 interface AddDeckPopupProps {
   open: boolean;
@@ -123,6 +126,7 @@ export default function AddDeckPopup({
   const defenseMonster = propDefenseMonster ?? null;
   const [targetingOrderIds, setTargetingOrderIds] = useState<string[]>([]);
   const [turnOrderIds, setTurnOrderIds] = useState<string[]>([]);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // 몬스터 목록 — 팝업 열릴 때만 조회(로컬 캐시 있으면 즉시 표시)
   const { data: monsterList = [], isLoading: monsterListLoading } = useMonsterList(undefined, { enabled: open });
@@ -264,6 +268,20 @@ export default function AddDeckPopup({
     setStep((prev) => Math.max(prev - 1, 0));
   };
 
+  const applyImportedDeck = (imported: DeckFormImportState) => {
+    setSelectedMonsterList(imported.selectedMonsterList);
+    setMonsterStats(imported.monsterStats);
+    setMonsterStatsOrList(imported.monsterStatsOrList);
+    setTurnOrderIds(imported.turnOrderIds);
+    setTurnOrder(imported.turnOrder);
+    setDeckComment(imported.deckComment);
+    setExpandedPanel([0, 1, 2]);
+    showToast.success('공덱을 불러왔습니다. 스탯·순서를 확인한 뒤 저장하세요.');
+    if (step === 0 && imported.selectedMonsterList.length === 3) {
+      setStep(1);
+    }
+  };
+
   const handleRuneChange = (index: number, selection: DeckMonsterRuneSelection) => {
     setMonsterStats((prev) => {
       const next = [...prev];
@@ -385,6 +403,7 @@ export default function AddDeckPopup({
     setTurnOrder('');
     setTurnOrderIds([]);
     setDeckComment('');
+    setImportDialogOpen(false);
     onClose();
   };
 
@@ -468,6 +487,18 @@ export default function AddDeckPopup({
 
         {step === 0 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {type === 2 && defenseMonster?.dm1 && (
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<FileDownloadOutlinedIcon />}
+                  onClick={() => setImportDialogOpen(true)}
+                >
+                  공덱 불러오기
+                </Button>
+              </Box>
+            )}
             <Box sx={SECTION_CARD_SX}>
               <Typography component="span" sx={SECTION_LABEL_SX}>
                 선택된 몬스터 ({selectedMonsterList.length}/3)
@@ -689,6 +720,18 @@ export default function AddDeckPopup({
           </Box>
         )}
 
+        {step === 1 && type === 2 && defenseMonster?.dm1 && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<FileDownloadOutlinedIcon />}
+              onClick={() => setImportDialogOpen(true)}
+            >
+              공덱 불러오기
+            </Button>
+          </Box>
+        )}
         {step === 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Box sx={SECTION_CARD_SX}>
@@ -941,6 +984,12 @@ export default function AddDeckPopup({
           </Button>
         )}
       </DialogActions>
+      <ImportRecommendedDeckDialog
+        open={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        defenseMonster={defenseMonster}
+        onImport={applyImportedDeck}
+      />
     </Dialog>
   );
 }

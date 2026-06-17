@@ -91,6 +91,62 @@ export interface PopularAttackDeckCombosResponse {
   totalCount: number;
 }
 
+/** 전적 공덱이 사용된 방덱(수비 조합) */
+export interface RecordAttackDeckDefenseMatchup {
+  def_monster_1?: string;
+  def_monster_2?: string;
+  def_monster_3?: string;
+  d1_kr_name?: string;
+  d2_kr_name?: string;
+  d3_kr_name?: string;
+  image_url1?: string;
+  image_url2?: string;
+  image_url3?: string;
+  usage_count?: number;
+  win_count?: number;
+  lose_count?: number;
+}
+
+export interface RecordAttackDeckDefenseMatchupsResponse {
+  matchupList: RecordAttackDeckDefenseMatchup[];
+  hasNext: boolean;
+  totalCount: number;
+}
+
+export interface RecordAttackDeckDefenseMatchupsParams {
+  atk_monster_1: string;
+  atk_monster_2: string;
+  atk_monster_3: string;
+  paging?: number;
+  offset?: number;
+}
+
+export interface ImportableRecommendedDeckItem {
+  deck_id: number | string;
+  def_monster_1?: string;
+  def_monster_2?: string;
+  def_monster_3?: string;
+  atk_monster_1?: string;
+  atk_monster_2?: string;
+  atk_monster_3?: string;
+  deck_comment_preview?: string;
+  def_m1_kr_name?: string;
+  def_m2_kr_name?: string;
+  def_m3_kr_name?: string;
+  atk_m1_kr_name?: string;
+  atk_m2_kr_name?: string;
+  atk_m3_kr_name?: string;
+  atk_image_url1?: string;
+  atk_image_url2?: string;
+  atk_image_url3?: string;
+}
+
+export interface ImportableRecommendedDecksResponse {
+  deckList: ImportableRecommendedDeckItem[];
+  hasNext: boolean;
+  totalCount: number;
+}
+
 export interface MonsterDetailResponse {
   enemyData: EnemyData;
   historyList: HistoryItem[];

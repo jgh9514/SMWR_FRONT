@@ -29,12 +29,13 @@ import { useResponsive, useServerPagination } from '@/shared/hooks';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import GuildRequiredGate from '@/features/guild/components/GuildRequiredGate';
 import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
+import RecordAttackDeckMatchupDialog from '@/features/siege/components/RecordAttackDeckMatchupDialog';
 import { EmptyState, ErrorBoundary } from '@/shared/ui';
 import type { MonsterOption } from '@/features/siege/hooks/useSiegeList';
 
 const TAB_DESCRIPTION: Record<AttackDeckComboSource, string> = {
   RECOMMENDED: '등록된 추천 공격 조합을 확인하고 상세 스펙·공략을 조회하세요.',
-  RECORD: '전투 전적에 실제로 사용된 공격 조합과 사용 횟수·승률을 확인하세요.',
+  RECORD: '전투 전적에 실제로 사용된 공격 조합과 사용 횟수·승률을 확인하세요. 클릭하면 어떤 방덱에 썼는지 볼 수 있습니다.',
 };
 
 const MIN_COUNT_LABEL: Record<AttackDeckComboSource, string> = {
@@ -68,6 +69,8 @@ function AttackDeckComboPageContent() {
   const [deckSource, setDeckSource] = useState<AttackDeckComboSource>('RECOMMENDED');
   const [selectedDeckItem, setSelectedDeckItem] = useState<RecommendedItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedRecordCombo, setSelectedRecordCombo] = useState<PopularAttackDeckComboItem | null>(null);
+  const [recordMatchupOpen, setRecordMatchupOpen] = useState(false);
   const [selectedMonster, setSelectedMonster] = useState<MonsterOption | null>(null);
   const [minUsageInput, setMinUsageInput] = useState('');
   const [sort, setSort] = useState<'USAGE_DESC' | 'LATEST_DESC'>('USAGE_DESC');
@@ -93,20 +96,33 @@ function AttackDeckComboPageContent() {
   const totalCount = combosQuery.data?.totalCount ?? 0;
 
   const openDetail = (item: PopularAttackDeckComboItem) => {
-    if (appliedSource !== 'RECOMMENDED' || item.deck_id == null) {
+    if (appliedSource === 'RECOMMENDED') {
+      if (item.deck_id == null) {
+        return;
+      }
+      setSelectedDeckItem({
+        deck_id: String(item.deck_id),
+        atk_monster_1: item.atk_monster_1,
+        atk_monster_2: item.atk_monster_2,
+        atk_monster_3: item.atk_monster_3,
+        image_url1: item.image_url1,
+        image_url2: item.image_url2,
+        image_url3: item.image_url3,
+      });
+      setDetailOpen(true);
       return;
     }
 
-    setSelectedDeckItem({
-      deck_id: String(item.deck_id),
-      atk_monster_1: item.atk_monster_1,
-      atk_monster_2: item.atk_monster_2,
-      atk_monster_3: item.atk_monster_3,
-      image_url1: item.image_url1,
-      image_url2: item.image_url2,
-      image_url3: item.image_url3,
-    });
-    setDetailOpen(true);
+    if (!item.atk_monster_1 || !item.atk_monster_2 || !item.atk_monster_3) {
+      return;
+    }
+    setSelectedRecordCombo(item);
+    setRecordMatchupOpen(true);
+  };
+
+  const closeRecordMatchup = () => {
+    setRecordMatchupOpen(false);
+    setSelectedRecordCombo(null);
   };
 
   const closeDetail = () => {
@@ -143,7 +159,11 @@ function AttackDeckComboPageContent() {
     pagination.setPage(1);
   };
 
-  const isDetailClickable = appliedSource === 'RECOMMENDED';
+  const isDetailClickable =
+    appliedSource === 'RECOMMENDED'
+      ? (item: PopularAttackDeckComboItem) => item.deck_id != null
+      : (item: PopularAttackDeckComboItem) =>
+          !!item.atk_monster_1 && !!item.atk_monster_2 && !!item.atk_monster_3;
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
@@ -257,16 +277,17 @@ function AttackDeckComboPageContent() {
           >
             {comboList.map((item) => {
               const comboKey = `${item.deck_id ?? 'record'}-${item.atk_monster_1}-${item.atk_monster_2}-${item.atk_monster_3}`;
+              const clickable = isDetailClickable(item);
 
               return (
                 <Card
                   key={comboKey}
                   sx={{
-                    cursor: isDetailClickable && item.deck_id != null ? 'pointer' : 'default',
+                    cursor: clickable ? 'pointer' : 'default',
                     transition: 'all 0.25s ease',
                     boxShadow: 1,
                     borderRadius: 2,
-                    ...(isDetailClickable && item.deck_id != null
+                    ...(clickable
                       ? {
                           '&:hover': {
                             boxShadow: 6,
@@ -345,6 +366,11 @@ function AttackDeckComboPageContent() {
         open={detailOpen}
         onClose={closeDetail}
         selectedItem={selectedDeckItem}
+      />
+      <RecordAttackDeckMatchupDialog
+        open={recordMatchupOpen}
+        onClose={closeRecordMatchup}
+        attackCombo={selectedRecordCombo}
       />
     </Container>
   );

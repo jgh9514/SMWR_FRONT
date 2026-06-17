@@ -37,6 +37,8 @@ import {
   FindUserIdResponse,
   FindPasswordParams,
   FindPasswordResponse,
+  GuildMemberActivityListParams,
+  GuildMemberActivityListResponse,
 } from '@/types';
 
 /**
@@ -294,6 +296,30 @@ export const useTransferGuildLeadership = (
  */
 export const useKickGuildMember = (options?: Parameters<typeof useApiPostMutation<ApiResult, KickGuildMemberParams>>[1]) => {
   return useApiPostMutation<ApiResult, KickGuildMemberParams>('/smw/guild/member/kick', options);
+};
+
+/**
+ * 길드원 활동 이력 조회 (길드장/매니저)
+ * 백엔드: /api/v1/smw/guild/member/activity/list
+ */
+export const useGuildMemberActivityList = (
+  guildId: string,
+  params?: Omit<GuildMemberActivityListParams, 'guild_id'>,
+  options?: Omit<Parameters<typeof useApiPostQuery<GuildMemberActivityListResponse>>[2], 'enabled'> & {
+    enabled?: boolean;
+  },
+) => {
+  const body: GuildMemberActivityListParams = {
+    guild_id: guildId,
+    limit: params?.limit ?? 30,
+    offset: params?.offset ?? 0,
+    ...(params?.user_id ? { user_id: params.user_id } : {}),
+    ...(params?.action_type ? { action_type: params.action_type } : {}),
+  };
+  return useApiPostQuery<GuildMemberActivityListResponse>('/smw/guild/member/activity/list', body, {
+    ...options,
+    enabled: !!guildId && (options?.enabled !== false),
+  });
 };
 
 /**

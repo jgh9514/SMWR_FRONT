@@ -288,3 +288,35 @@ export interface FindPasswordResponse {
   message?: string;
 }
 
+/** 길드원 활동 이력 항목 */
+export interface GuildMemberActivityLog {
+  log_id: number | string;
+  guild_id?: number | string;
+  user_id: string;
+  user_name?: string;
+  action_type: string;
+  reference_id?: string;
+  summary: string;
+  detail_json?: string | Record<string, unknown>;
+  crt_date: string;
+}
+
+export interface GuildMemberActivityPage {
+  list: GuildMemberActivityLog[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface GuildMemberActivityListParams {
+  guild_id?: string;
+  user_id?: string;
+  action_type?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface GuildMemberActivityListResponse extends ApiResult {
+  data?: GuildMemberActivityPage;
+}
+

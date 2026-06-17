@@ -40,6 +40,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import GroupIcon from '@mui/icons-material/Group';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import HowToRegIcon from '@mui/icons-material/HowToReg';
+import HistoryIcon from '@mui/icons-material/History';
 import { useRouter } from 'next/navigation';
 import {
   useGuildSettings,
@@ -52,13 +53,14 @@ import {
   useSaveGuildSettings,
   useGenerateInviteCode,
   useUpdateGuildMemberName,
+  useGuildMemberActivityList,
 } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
-import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { getApiResultMessage, isApiSuccess, unwrapApiData } from '@/shared/lib/api/result';
 import { handleApiError } from '@/shared/lib/error-handler';
 import { logger } from '@/shared/lib/logger';
 import RefreshIcon from '@mui/icons-material/Refresh';
-import type { GuildJoinApplication, GuildMember, GuildSettings, UserInfo } from '@/features/auth/types/auth';
+import type { GuildJoinApplication, GuildMember, GuildSettings, UserInfo, GuildMemberActivityLog, GuildMemberActivityPage } from '@/features/auth/types/auth';
 import { useResponsive } from '@/shared/hooks';
 
 type GuildMemberLike = GuildMember & {
@@ -80,6 +82,85 @@ function getRoleColor(role?: string): ChipProps['color'] {
   if (role === 'LEADER') return 'error';
   if (role === 'MANAGER') return 'warning';
   return 'default';
+}
+
+const ACTIVITY_PAGE_SIZE = 30;
+
+function getActivityActionLabel(actionType?: string): string {
+  switch (actionType) {
+    case 'DECK_REGISTER':
+      return '공덱 등록';
+    case 'DECK_UPDATE':
+      return '공덱 수정';
+    case 'DECK_DELETE':
+      return '공덱 삭제';
+    case 'DECK_VOTE_UP':
+      return '추천';
+    case 'DECK_VOTE_DOWN':
+      return '비추천';
+    case 'DECK_VOTE_CLEAR':
+      return '투표 취소';
+    case 'DEFENSE_DECK_REGISTER':
+      return '방덱 등록';
+    default:
+      return actionType || '-';
+  }
+}
+
+function getActivityActionColor(actionType?: string): ChipProps['color'] {
+  switch (actionType) {
+    case 'DECK_REGISTER':
+    case 'DEFENSE_DECK_REGISTER':
+      return 'success';
+    case 'DECK_UPDATE':
+      return 'info';
+    case 'DECK_DELETE':
+      return 'error';
+    case 'DECK_VOTE_UP':
+      return 'primary';
+    case 'DECK_VOTE_DOWN':
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
+
+function formatActivityDate(value?: string): string {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function GuildActivityLogRow({ item }: { item: GuildMemberActivityLog }) {
+  const displayName = item.user_name?.trim() || item.user_id;
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5 }}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 0.75 }}>
+        <Typography variant="body2" fontWeight={600} sx={{ minWidth: 0 }}>
+          {displayName}
+        </Typography>
+        <Chip
+          size="small"
+          label={getActivityActionLabel(item.action_type)}
+          color={getActivityActionColor(item.action_type)}
+          variant="outlined"
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+          {formatActivityDate(item.crt_date)}
+        </Typography>
+      </Box>
+      <Typography variant="body2" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
+        {item.summary}
+      </Typography>
+    </Paper>
+  );
 }
 
 function toGuildRole(role?: string): UserInfo['guild_role'] {
@@ -425,6 +506,10 @@ export default function GuildManagementPage() {
   const [selectedMemberForKick, setSelectedMemberForKick] = useState<GuildMemberLike | null>(null);
   const [kickReason, setKickReason] = useState<string>('');
   const [guildInfo, setGuildInfo] = useState<GuildSettings>({});
+  const [activityUserFilter, setActivityUserFilter] = useState('');
+  const [activityActionFilter, setActivityActionFilter] = useState('');
+  const [activityOffset, setActivityOffset] = useState(0);
+  const [activityItems, setActivityItems] = useState<GuildMemberActivityLog[]>([]);
 
   const isLeader = userInfo?.guild_role === 'LEADER';
   const isManager = userInfo?.guild_role === 'MANAGER';
@@ -480,6 +565,60 @@ export default function GuildManagementPage() {
     if (!list?.length) return [];
     return list.filter(isRenderablePendingJoinApplication);
   }, [guildJoinApplicationListQuery.data]);
+
+  const guildMemberActivityQuery = useGuildMemberActivityList(
+    userInfo?.guild_id || '',
+    {
+      limit: ACTIVITY_PAGE_SIZE,
+      offset: activityOffset,
+      user_id: activityUserFilter || undefined,
+      action_type: activityActionFilter || undefined,
+    },
+    { enabled: !!userInfo?.guild_id && (isLeader || isManager) },
+  );
+
+  useEffect(() => {
+    const res = guildMemberActivityQuery.data;
+    if (!res || !isApiSuccess(res)) {
+      if (activityOffset === 0) {
+        setActivityItems([]);
+      }
+      return;
+    }
+    const page = unwrapApiData<GuildMemberActivityPage>(res);
+    if (!page) {
+      return;
+    }
+    if (page.offset === 0) {
+      setActivityItems(page.list);
+      return;
+    }
+    setActivityItems((prev) => {
+      const ids = new Set(prev.map((row) => String(row.log_id)));
+      const merged = [...prev];
+      for (const row of page.list) {
+        const key = String(row.log_id);
+        if (!ids.has(key)) {
+          merged.push(row);
+        }
+      }
+      return merged;
+    });
+  }, [guildMemberActivityQuery.data, activityOffset]);
+
+  useEffect(() => {
+    setActivityOffset(0);
+    setActivityItems([]);
+  }, [activityUserFilter, activityActionFilter]);
+
+  const activityTotal = useMemo(() => {
+    const res = guildMemberActivityQuery.data;
+    if (!res || !isApiSuccess(res)) {
+      return 0;
+    }
+    return unwrapApiData<GuildMemberActivityPage>(res)?.total ?? 0;
+  }, [guildMemberActivityQuery.data]);
+  const canLoadMoreActivities = activityItems.length < activityTotal;
 
   // 초대 코드 채번 Mutation
   const generateInviteCodeMutation = useGenerateInviteCode({
@@ -1193,6 +1332,110 @@ export default function GuildManagementPage() {
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
                 대기 중인 가입 신청이 없습니다.
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 길드원 활동 이력 */}
+        <Card sx={{ minWidth: 0 }}>
+          <CardHeader
+            avatar={<HistoryIcon color="primary" />}
+            title="길드원 활동 이력"
+            subheader="추천 공덱 등록·수정·삭제·투표, 방덱 등록"
+            titleTypographyProps={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
+            action={
+              <IconButton
+                aria-label="활동 이력 새로고침"
+                onClick={() => {
+                  setActivityOffset(0);
+                  guildMemberActivityQuery.refetch();
+                }}
+                disabled={guildMemberActivityQuery.isFetching}
+              >
+                <RefreshIcon />
+              </IconButton>
+            }
+          />
+          <CardContent sx={{ pt: 0, overflow: 'hidden' }}>
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: { xs: 'column', sm: 'row' },
+                gap: 1.5,
+                mb: 2,
+              }}
+            >
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 180 } }}>
+                <InputLabel>길드원</InputLabel>
+                <Select
+                  value={activityUserFilter}
+                  label="길드원"
+                  onChange={(e) => setActivityUserFilter(e.target.value)}
+                >
+                  <MenuItem value="">전체</MenuItem>
+                  {(guildMembersQuery.data ?? []).map((member) => (
+                    <MenuItem key={member.user_id} value={member.user_id}>
+                      {member.user_nm || member.user_name || member.user_id}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 160 } }}>
+                <InputLabel>활동 유형</InputLabel>
+                <Select
+                  value={activityActionFilter}
+                  label="활동 유형"
+                  onChange={(e) => setActivityActionFilter(e.target.value)}
+                >
+                  <MenuItem value="">전체</MenuItem>
+                  <MenuItem value="DECK_REGISTER">공덱 등록</MenuItem>
+                  <MenuItem value="DECK_UPDATE">공덱 수정</MenuItem>
+                  <MenuItem value="DECK_DELETE">공덱 삭제</MenuItem>
+                  <MenuItem value="DECK_VOTE_UP">추천</MenuItem>
+                  <MenuItem value="DECK_VOTE_DOWN">비추천</MenuItem>
+                  <MenuItem value="DECK_VOTE_CLEAR">투표 취소</MenuItem>
+                  <MenuItem value="DEFENSE_DECK_REGISTER">방덱 등록</MenuItem>
+                </Select>
+              </FormControl>
+            </Box>
+
+            {guildMemberActivityQuery.isLoading && activityItems.length === 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : activityItems.length > 0 ? (
+              <>
+                <Box
+                  sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.25,
+                    maxHeight: 520,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
+                  }}
+                >
+                  {activityItems.map((item) => (
+                    <GuildActivityLogRow key={String(item.log_id)} item={item} />
+                  ))}
+                </Box>
+                {canLoadMoreActivities && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={guildMemberActivityQuery.isFetching}
+                      onClick={() => setActivityOffset((prev) => prev + ACTIVITY_PAGE_SIZE)}
+                    >
+                      {guildMemberActivityQuery.isFetching ? '불러오는 중...' : '더 보기'}
+                    </Button>
+                  </Box>
+                )}
+              </>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+                아직 기록된 활동이 없습니다. (기능 적용 이후 활동부터 표시됩니다)
               </Typography>
             )}
           </CardContent>
