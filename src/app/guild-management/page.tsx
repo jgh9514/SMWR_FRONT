@@ -66,6 +66,22 @@ type GuildMemberLike = GuildMember & {
   usr_id?: string;
 };
 
+function resolveMemberRole(member: GuildMemberLike): string {
+  return member.guild_role || member.role || 'MEMBER';
+}
+
+function getRoleLabel(role?: string) {
+  if (role === 'LEADER') return '길드장';
+  if (role === 'MANAGER') return '매니저';
+  return '멤버';
+}
+
+function getRoleColor(role?: string): ChipProps['color'] {
+  if (role === 'LEADER') return 'error';
+  if (role === 'MANAGER') return 'warning';
+  return 'default';
+}
+
 function toGuildRole(role?: string): UserInfo['guild_role'] {
   if (role === 'LEADER' || role === 'MANAGER' || role === 'MEMBER') {
     return role;
@@ -137,6 +153,7 @@ function GuildMemberActionButtons({
   onEdit,
   onTransfer,
   onKick,
+  compact = false,
 }: {
   member: GuildMemberLike;
   guildRole?: string;
@@ -147,9 +164,18 @@ function GuildMemberActionButtons({
   onEdit: (member: GuildMemberLike) => void;
   onTransfer: (member: GuildMemberLike) => void;
   onKick: (member: GuildMemberLike) => void;
+  compact?: boolean;
 }) {
   return (
-    <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
+    <Box
+      sx={{
+        display: 'flex',
+        gap: compact ? 0.25 : 0.5,
+        flexShrink: 0,
+        flexWrap: 'wrap',
+        justifyContent: 'flex-end',
+      }}
+    >
       {canEditMember(actorRole, guildRole, member.user_id, actorUserId, isLeader, isManager) && (
         <IconButton
           color="primary"
@@ -185,6 +211,179 @@ function GuildMemberActionButtons({
         </IconButton>
       )}
     </Box>
+  );
+}
+
+function GuildMemberMobileRow({
+  member,
+  showActions,
+  actorRole,
+  actorUserId,
+  isLeader,
+  isManager,
+  onEdit,
+  onTransfer,
+  onKick,
+}: {
+  member: GuildMemberLike;
+  showActions: boolean;
+  actorRole?: UserInfo['guild_role'];
+  actorUserId?: string;
+  isLeader: boolean;
+  isManager: boolean;
+  onEdit: (member: GuildMemberLike) => void;
+  onTransfer: (member: GuildMemberLike) => void;
+  onKick: (member: GuildMemberLike) => void;
+}) {
+  const guildRole = resolveMemberRole(member);
+  const userName = member.user_name || member.user_nm;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          mb: 0.75,
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          sx={{
+            fontWeight: 600,
+            minWidth: 0,
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {userName || member.user_id}
+        </Typography>
+        <Chip
+          label={getRoleLabel(guildRole)}
+          color={getRoleColor(guildRole)}
+          size="small"
+          sx={{ flexShrink: 0, fontSize: '0.7rem', height: 24 }}
+        />
+      </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+        }}
+      >
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            minWidth: 0,
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          ID: {member.user_id}
+        </Typography>
+        {showActions && (
+          <GuildMemberActionButtons
+            member={member}
+            guildRole={guildRole}
+            actorRole={actorRole}
+            actorUserId={actorUserId}
+            isLeader={isLeader}
+            isManager={isManager}
+            onEdit={onEdit}
+            onTransfer={onTransfer}
+            onKick={onKick}
+            compact
+          />
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+function GuildJoinApplicationMobileRow({
+  app,
+  onApprove,
+  onReject,
+  isPending,
+}: {
+  app: GuildJoinApplication & { application_id: string | number };
+  onApprove: () => void;
+  onReject: () => void;
+  isPending: boolean;
+}) {
+  const userName = app.user_name ?? app.user_nm;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 1.5 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 1,
+          mb: 0.75,
+        }}
+      >
+        <Typography
+          variant="subtitle2"
+          sx={{
+            fontWeight: 600,
+            minWidth: 0,
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {userName || app.user_id}
+        </Typography>
+        <Chip label="가입 대기" color="warning" size="small" sx={{ flexShrink: 0, fontSize: '0.7rem', height: 24 }} />
+      </Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            minWidth: 0,
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          ID: {app.user_id}
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 0.25, flexShrink: 0 }}>
+          <IconButton
+            color="success"
+            size="small"
+            onClick={onApprove}
+            disabled={isPending}
+            aria-label="가입 승인"
+          >
+            <CheckCircleIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            color="error"
+            size="small"
+            onClick={onReject}
+            disabled={isPending}
+            aria-label="가입 거절"
+          >
+            <CancelIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      </Box>
+    </Paper>
   );
 }
 
@@ -635,18 +834,6 @@ export default function GuildManagementPage() {
     saveGuildInfoMutation.mutate(params);
   };
 
-  const getRoleLabel = (role?: string) => {
-    if (role === 'LEADER') return '길드장';
-    if (role === 'MANAGER') return '매니저';
-    return '멤버';
-  };
-
-  const getRoleColor = (role?: string): ChipProps['color'] => {
-    if (role === 'LEADER') return 'error';
-    if (role === 'MANAGER') return 'warning';
-    return 'default';
-  };
-
   const selectedMemberTargetRole = selectedMemberForEdit?.guild_role || selectedMemberForEdit?.role;
   const canEditSelectedMemberName = canEditMemberName(
     userInfo?.guild_role,
@@ -666,9 +853,9 @@ export default function GuildManagementPage() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1.5, sm: 3 } }}>
+      <Box sx={{ mb: { xs: 2, md: 4 } }}>
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
           길드 관리
         </Typography>
         <Typography variant="body1" color="text.secondary">
@@ -682,14 +869,13 @@ export default function GuildManagementPage() {
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
-            md: 'repeat(2, 1fr)',
             lg: 'repeat(3, 1fr)',
           },
-          gap: 3,
+          gap: { xs: 2, md: 3 },
         }}
       >
         {/* 길드 기본 정보 */}
-        <Card>
+        <Card sx={{ minWidth: 0 }}>
           <CardHeader
             avatar={<GroupIcon color="primary" />}
             title="길드 기본 정보"
@@ -815,12 +1001,13 @@ export default function GuildManagementPage() {
         </Card>
 
         {/* 길드 인원 */}
-        <Card>
+        <Card sx={{ minWidth: 0 }}>
           <CardHeader
             avatar={<GroupIcon color="primary" />}
             title={`길드 인원 (${guildMembersQuery.data?.length || 0}명)`}
+            titleTypographyProps={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
           />
-          <CardContent>
+          <CardContent sx={{ pt: 0, overflow: 'hidden' }}>
             {guildMembersQuery.isLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
@@ -839,69 +1026,26 @@ export default function GuildManagementPage() {
                     sx={{
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 1.5,
+                      gap: 1.25,
                       maxHeight: 480,
-                      overflow: 'auto',
-                      pr: 0.5,
+                      overflowY: 'auto',
+                      overflowX: 'hidden',
                     }}
                   >
-                    {guildMembersQuery.data.map((member: GuildMemberLike, index: number) => {
-                      const guildRole = member.guild_role || member.role;
-                      const userName = member.user_name || member.user_nm;
-
-                      return (
-                        <Card key={member.user_id || `member-${index}`} variant="outlined">
-                          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography
-                                  variant="subtitle2"
-                                  sx={{
-                                    fontWeight: 600,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {userName || member.user_id}
-                                </Typography>
-                                <Typography
-                                  variant="caption"
-                                  color="text.secondary"
-                                  sx={{
-                                    display: 'block',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                >
-                                  {member.user_id}
-                                </Typography>
-                                <Chip
-                                  label={getRoleLabel(guildRole)}
-                                  color={getRoleColor(guildRole)}
-                                  size="small"
-                                  sx={{ mt: 1, fontSize: '0.7rem', height: 22 }}
-                                />
-                              </Box>
-                              {(isLeader || isManager) && (
-                                <GuildMemberActionButtons
-                                  member={member}
-                                  guildRole={guildRole}
-                                  actorRole={userInfo?.guild_role}
-                                  actorUserId={userInfo?.user_id}
-                                  isLeader={isLeader}
-                                  isManager={isManager}
-                                  onEdit={handleEditMember}
-                                  onTransfer={handleTransferLeadership}
-                                  onKick={handleKickMember}
-                                />
-                              )}
-                            </Box>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
+                    {guildMembersQuery.data.map((member: GuildMemberLike, index: number) => (
+                      <GuildMemberMobileRow
+                        key={member.user_id || `member-${index}`}
+                        member={member}
+                        showActions={isLeader || isManager}
+                        actorRole={userInfo?.guild_role}
+                        actorUserId={userInfo?.user_id}
+                        isLeader={isLeader}
+                        isManager={isManager}
+                        onEdit={handleEditMember}
+                        onTransfer={handleTransferLeadership}
+                        onKick={handleKickMember}
+                      />
+                    ))}
                   </Box>
                 ) : (
                 <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
@@ -916,7 +1060,7 @@ export default function GuildManagementPage() {
                     </TableHead>
                     <TableBody>
                       {guildMembersQuery.data.map((member: GuildMemberLike, index: number) => {
-                        const guildRole = member.guild_role || member.role;
+                        const guildRole = resolveMemberRole(member);
                         const userName = member.user_name || member.user_nm;
 
                         return (
@@ -966,12 +1110,13 @@ export default function GuildManagementPage() {
         </Card>
 
         {/* 신청 인원 */}
-        <Card>
+        <Card sx={{ minWidth: 0 }}>
           <CardHeader
             avatar={<PersonAddIcon color="primary" />}
             title={`가입 신청 (${pendingGuildJoinApplications.length}명)`}
+            titleTypographyProps={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}
           />
-          <CardContent>
+          <CardContent sx={{ pt: 0, overflow: 'hidden' }}>
             {guildJoinApplicationListQuery.isLoading ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
@@ -982,67 +1127,22 @@ export default function GuildManagementPage() {
                   sx={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 1.5,
+                    gap: 1.25,
                     maxHeight: 480,
-                    overflow: 'auto',
-                    pr: 0.5,
+                    overflowY: 'auto',
+                    overflowX: 'hidden',
                   }}
                 >
                   {pendingGuildJoinApplications.map((app) => {
                     const applicationId = String(app.application_id);
-                    const userName = app.user_name ?? app.user_nm;
                     return (
-                      <Card key={applicationId} variant="outlined">
-                        <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                              <Typography
-                                variant="subtitle2"
-                                sx={{
-                                  fontWeight: 600,
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {userName || app.user_id}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                sx={{
-                                  display: 'block',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                }}
-                              >
-                                {app.user_id}
-                              </Typography>
-                            </Box>
-                            <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-                              <IconButton
-                                color="success"
-                                size="small"
-                                onClick={() => handleProcessApplication(applicationId, 'APPROVED')}
-                                disabled={processJoinApplicationMutation.isPending}
-                                aria-label="가입 승인"
-                              >
-                                <CheckCircleIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton
-                                color="error"
-                                size="small"
-                                onClick={() => handleProcessApplication(applicationId, 'REJECTED')}
-                                disabled={processJoinApplicationMutation.isPending}
-                                aria-label="가입 거절"
-                              >
-                                <CancelIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Box>
-                        </CardContent>
-                      </Card>
+                      <GuildJoinApplicationMobileRow
+                        key={applicationId}
+                        app={app as GuildJoinApplication & { application_id: string | number }}
+                        onApprove={() => handleProcessApplication(applicationId, 'APPROVED')}
+                        onReject={() => handleProcessApplication(applicationId, 'REJECTED')}
+                        isPending={processJoinApplicationMutation.isPending}
+                      />
                     );
                   })}
                 </Box>

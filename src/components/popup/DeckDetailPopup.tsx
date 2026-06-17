@@ -40,7 +40,7 @@ import {
   useMonsterList,
 } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
-import { isPlainApiSuccess } from '@/shared/lib/api/result';
+import { isApiSuccess, isPlainApiSuccess, getApiResultMessage } from '@/shared/lib/api/result';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
@@ -180,9 +180,13 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
   const detailDataRecord = detailData as DeckDetailRecord | null | undefined;
 
   const deckVoteMutation = useDeckVoteMutation({
-    onSuccess: () => {
-      showToast.success('투표가 반영되었습니다.');
-      refetch();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '투표가 반영되었습니다.'));
+        refetch();
+      } else {
+        showToast.error(getApiResultMessage(res, '투표 처리에 실패했습니다.'));
+      }
     },
     onError: () => {
       showToast.error('투표 처리에 실패했습니다.');

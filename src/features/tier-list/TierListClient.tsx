@@ -7,6 +7,7 @@ import { useMonsterList } from '@/features/siege/hooks/useSiegeList';
 import { useApiQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
 import { apiClient } from '@/shared/lib/api/client';
+import { isApiSuccess, getApiResultMessage, unwrapApiData } from '@/shared/lib/api/result';
 import { parseMonsterElemental } from '@/shared/utils/monsterElemental';
 import { getMonsterImageUrl, inlineImagesForHtml2Canvas } from '@/shared/utils/image';
 import { monsterAwakenStepDigit } from '@/features/siege/lib/monsterIdEvolution';
@@ -283,7 +284,10 @@ function HistoryPanel({
 
   const { data: historyItems = [], isLoading } = useApiQuery<SavedTierList[]>({
     queryKey: HISTORY_QUERY_KEY,
-    queryFn: () => apiClient.post('/summonerswar/tier-list/list', {}),
+    queryFn: async () => {
+      const res = await apiClient.post<{ result?: string; data?: SavedTierList[] }>('/summonerswar/tier-list/list', {});
+      return unwrapApiData<SavedTierList[]>(res) ?? [];
+    },
     enabled: loggedIn,
     staleTime: 30_000,
   });
@@ -291,9 +295,13 @@ function HistoryPanel({
   const deleteMutation = useApiPostMutation<unknown, { id: number }>(
     '/summonerswar/tier-list/delete',
     {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
-        toast.success('삭제되었습니다.');
+      onSuccess: (res) => {
+        if (isApiSuccess(res)) {
+          qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+          toast.success(getApiResultMessage(res, '삭제되었습니다.'));
+        } else {
+          toast.error(getApiResultMessage(res, '삭제에 실패했습니다.'));
+        }
       },
       onError: () => toast.error('삭제에 실패했습니다.'),
     },
@@ -302,10 +310,14 @@ function HistoryPanel({
   const renameMutation = useApiPostMutation<unknown, { id: number; title: string; tier_data: string }>(
     '/summonerswar/tier-list/update',
     {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
-        setRenamingId(null);
-        toast.success('이름이 변경되었습니다.');
+      onSuccess: (res) => {
+        if (isApiSuccess(res)) {
+          qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+          setRenamingId(null);
+          toast.success(getApiResultMessage(res, '이름이 변경되었습니다.'));
+        } else {
+          toast.error(getApiResultMessage(res, '이름 변경에 실패했습니다.'));
+        }
       },
       onError: () => toast.error('이름 변경에 실패했습니다.'),
     },
@@ -745,12 +757,16 @@ export default function TierListClient() {
 
   // ── Save mutation ─────────────────────────────────────────────────────────
 
-  const saveMutation = useApiPostMutation<{ data: number }, { title: string; tier_data: string }>(
+  const saveMutation = useApiPostMutation<{ result?: string; data?: number }, { title: string; tier_data: string }>(
     '/summonerswar/tier-list/save',
     {
-      onSuccess: () => {
-        qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
-        toast.success('저장되었습니다!');
+      onSuccess: (res) => {
+        if (isApiSuccess(res)) {
+          qc.invalidateQueries({ queryKey: HISTORY_QUERY_KEY });
+          toast.success(getApiResultMessage(res, '저장되었습니다.'));
+        } else {
+          toast.error(getApiResultMessage(res, '저장에 실패했습니다.'));
+        }
       },
       onError: () => toast.error('저장에 실패했습니다.'),
     },

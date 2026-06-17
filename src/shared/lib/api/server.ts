@@ -66,28 +66,10 @@ function extractApiData<T>(response: ApiResponse<T> | T): T {
   }
 
   if (typeof response === 'object' && response !== null && 'result' in response) {
-    const apiResponse = response as ApiResponse<T>;
-    const keys = Object.keys(apiResponse);
-
-    if (keys.every((key) => key === 'result' || key === 'message')) {
-      return response as T;
-    }
-
-    if (
-      keys.every((key) => key === 'result' || key === 'data' || key === 'message') &&
-      hasPayloadData(apiResponse.data)
-    ) {
-      return apiResponse.data as T;
-    }
-
     return response as T;
   }
 
   return response as T;
-}
-
-function hasPayloadData(data: unknown): boolean {
-  return data !== undefined && data !== null && typeof data === 'object';
 }
 
 type ServerApiPostOptions = {

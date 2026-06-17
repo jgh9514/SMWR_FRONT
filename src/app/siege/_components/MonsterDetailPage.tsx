@@ -34,6 +34,7 @@ import {
   useDeckVoteMutation,
 } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import AddDeckPopup from '@/components/popup/AddDeckPopup';
 import DeckDetailPopup from '@/components/popup/DeckDetailPopup';
 import { DEFAULT_PAGE_SIZE } from '@/shared/constants';
@@ -322,10 +323,14 @@ export default function MonsterDetailPage() {
   };
 
   const deckVoteMutation = useDeckVoteMutation({
-    onSuccess: () => {
-      showToast.success('투표가 반영되었습니다.');
-      void history.refetch();
-      void recommended.refetch();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '투표가 반영되었습니다.'));
+        void history.refetch();
+        void recommended.refetch();
+      } else {
+        showToast.error(getApiResultMessage(res, '투표 처리에 실패했습니다.'));
+      }
     },
     onError: () => {
       showToast.error('투표 처리에 실패했습니다.');

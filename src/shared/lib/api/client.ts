@@ -51,31 +51,11 @@ class ApiClient {
     }
 
     if (typeof response === 'object' && response !== null && 'result' in response) {
-      const apiResponse = response as ApiResponse<T>;
-      const keys = Object.keys(apiResponse);
-
-      // ApiResult ({ result, message? }) — unwrap 금지 (data: null 오판 방지)
-      if (keys.every((key) => key === 'result' || key === 'message')) {
-        return response as unknown as T;
-      }
-
-      // { result, data, message? } — data가 객체·배열일 때만 unwrap
-      if (
-        keys.every((key) => key === 'result' || key === 'data' || key === 'message') &&
-        this.hasPayloadData(apiResponse.data)
-      ) {
-        return apiResponse.data as T;
-      }
-
-      // login-check, my-status 등 복합 응답
+      // result 필드가 있으면 ApiResult·복합 응답 — unwrap 하지 않음 (isApiSuccess 판별 유지)
       return response as unknown as T;
     }
 
     return response as T;
-  }
-
-  private hasPayloadData(data: unknown): boolean {
-    return data !== undefined && data !== null && typeof data === 'object';
   }
 }
 
