@@ -49,6 +49,10 @@ export function SiegeManualDefenseDeckDialog({ open, onClose }: SiegeManualDefen
       if (isPlainApiSuccess(res)) {
         showToast.success('방덱이 등록되었습니다.');
         void queryClient.invalidateQueries({ queryKey: ['/summonerswar/enemyTeam-list'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-basic'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-recommended'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-history'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-recent-battles'] });
         setSelectedMonsterList([]);
         onClose();
       } else {
