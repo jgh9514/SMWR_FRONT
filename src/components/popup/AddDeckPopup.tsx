@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
   DialogContent,
@@ -110,6 +111,7 @@ export default function AddDeckPopup({
 }: AddDeckPopupProps) {
   const theme = useTheme();
   const { isMobile } = useResponsive();
+  const queryClient = useQueryClient();
   const [selectedMonsterList, setSelectedMonsterList] = useState<MonsterOption[]>([]);
   const [step, setStep] = useState(0);
   const [expandedPanel, setExpandedPanel] = useState<number[]>([0, 1, 2]);
@@ -185,6 +187,11 @@ export default function AddDeckPopup({
     onSuccess: (res) => {
       if (isPlainApiSuccess(res)) {
         showToast.success('저장되었습니다.');
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/enemyTeam-list'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-basic'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-recommended'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-history'] });
+        void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-recent-battles'] });
         handleClose();
         onSave?.();
       } else {

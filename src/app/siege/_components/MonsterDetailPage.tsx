@@ -1296,7 +1296,9 @@ export default function MonsterDetailPage() {
           onSave={handleAddPopupClose}
           type="empty"
           defenseMonster={
-            schData.dm1 ? { dm1: schData.dm1, dm2: schData.dm2 ?? '', dm3: schData.dm3 ?? '' } : undefined
+            schData.dm1 && schData.dm2 && schData.dm3
+              ? { dm1: schData.dm1, dm2: schData.dm2, dm3: schData.dm3 }
+              : undefined
           }
         />
         <DeckDetailPopup
