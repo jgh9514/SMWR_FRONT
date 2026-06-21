@@ -37,6 +37,7 @@ import { useRouter } from 'next/navigation';
 import { useMonsterList, useMonsterUpdate, type MonsterItem } from '@/features/admin/hooks/useMonster';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
 import { logger } from '@/shared/lib/logger';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import { Avatar } from '@mui/material';
@@ -77,11 +78,15 @@ export default function MonsterManagementPage() {
   const totalPages = Math.ceil(totalCount / limit);
 
   const updateMutation = useMonsterUpdate({
-    onSuccess: () => {
-      showToast.success('수정되었습니다.');
-      setEditDialogOpen(false);
-      setEditData({});
-      refetchMonsterList();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success(getApiResultMessage(res, '수정되었습니다.'));
+        setEditDialogOpen(false);
+        setEditData({});
+        refetchMonsterList();
+      } else {
+        showToast.error(getApiResultMessage(res, '수정에 실패했습니다.'));
+      }
     },
     onError: (error: unknown) => {
       logger.error('몬스터 수정 실패', error, { context: 'MonsterManagementPage' });

@@ -42,8 +42,8 @@ class ApiClient {
 
   /**
    * 응답 데이터 추출
-   * - { result, message } 형태(ApiResult)는 unwrap 하지 않음
-   * - { result, data } 래퍼만 data 페이로드 unwrap (data가 null이면 전체 반환)
+   * - `result` 필드가 있으면 ApiResult·{ result, data } 래퍼 — unwrap 하지 않음 (isApiSuccess 유지)
+   * - plain string "SUCCESS" / 배열 / Map 은 그대로 반환
    */
   private extractData<T>(response: ApiResponse<T> | T): T {
     if (Array.isArray(response)) {

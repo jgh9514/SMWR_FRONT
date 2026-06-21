@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { useApiPostQuery, useApiPostSuspenseQuery } from '@/hooks/api/useApiQuery';
 import { useApiPostMutation } from '@/hooks/api/useApiMutation';
+import { isApiSuccess } from '@/shared/lib/api/result';
 import { GuildItem, MonsterItem, SiegeSearchParams } from '@/types';
 import { normalizeMonsterList } from '@/features/siege/lib/normalizeMonsterOption';
 import type {
@@ -239,13 +240,9 @@ export type DeleteDeckPayload =
       atk_monster_3: string;
     };
 
-/** 백엔드 deck-detail-delete는 plain string "SUCCESS" | "FAIL" 반환 */
+/** 백엔드 deck-detail-delete 등 plain string "SUCCESS" | "FAIL" 포함 */
 export function isDeckDeleteSuccess(res: unknown): boolean {
-  if (res === 'SUCCESS') return true;
-  if (typeof res === 'object' && res !== null && 'result' in res) {
-    return String((res as { result?: unknown }).result).toUpperCase() === 'SUCCESS';
-  }
-  return false;
+  return isApiSuccess(res);
 }
 
 /**

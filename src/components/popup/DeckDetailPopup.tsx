@@ -32,7 +32,6 @@ import ThumbDownIcon from '@mui/icons-material/ThumbDown';
 import {
   useDeckDetail,
   useDeleteDeck,
-  isDeckDeleteSuccess,
   type DeleteDeckPayload,
   useDeckVoteMutation,
   useApiPostMutation,
@@ -40,7 +39,7 @@ import {
   useMonsterList,
 } from '@/hooks/api';
 import { showToast, confirm } from '@/shared/lib/notification';
-import { isApiSuccess, isPlainApiSuccess, getApiResultMessage } from '@/shared/lib/api/result';
+import { isApiSuccess, getApiResultMessage } from '@/shared/lib/api/result';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
@@ -195,7 +194,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
 
   const deleteDeckMutation = useDeleteDeck({
     onSuccess: (res) => {
-      if (isDeckDeleteSuccess(res)) {
+      if (isApiSuccess(res)) {
         showToast.success('공덱이 삭제되었습니다.');
         const deletedId = resolveDeckId(lastSelectedItem as DeckDetailRecord)
           ?? resolveDeckId(detailDataRecord);
@@ -546,7 +545,7 @@ export default function DeckDetailPopup({ open, onClose, onDeleted, selectedItem
     deck_comment?: string;
   }>('/summonerswar/deck-detail-update', {
     onSuccess: (res) => {
-      if (isPlainApiSuccess(res)) {
+      if (isApiSuccess(res)) {
         showToast.success('스탯이 수정되었습니다.');
         setIsEditing(false);
         refetch();

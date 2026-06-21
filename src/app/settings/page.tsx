@@ -48,7 +48,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { PageHeader } from '@/shared/ui';
 import { showToast } from '@/shared/lib/notification';
-import { getApiResultMessage, isApiSuccess } from '@/shared/lib/api/result';
+import { getApiResultMessage, isApiSuccess, isApiFailure } from '@/shared/lib/api/result';
 import { handleApiError } from '@/shared/lib/error-handler';
 import {
   useUserGuild,
@@ -1209,7 +1209,7 @@ export default function SettingsPage() {
                     )}
                   </Box>
                 )}
-                {checkGuildByInviteCodeQuery.data && checkGuildByInviteCodeQuery.data.result === 'FAIL' && (
+                {checkGuildByInviteCodeQuery.data && isApiFailure(checkGuildByInviteCodeQuery.data) && (
                   <Box sx={{ p: 2, bgcolor: 'error.light', borderRadius: 1 }}>
                     <Typography variant="body2" color="error">
                       {checkGuildByInviteCodeQuery.data.message || '유효하지 않은 초대 코드입니다.'}

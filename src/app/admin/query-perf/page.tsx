@@ -37,6 +37,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/shared/ui';
 import { confirm, showToast } from '@/shared/lib/notification';
+import { isApiSuccess } from '@/shared/lib/api/result';
 import { logger } from '@/shared/lib/logger';
 import { handleApiError } from '@/shared/lib/error-handler';
 import {
@@ -126,9 +127,13 @@ export default function AdminQueryPerfPage() {
   const runningQuery = useAdminRunningQueries(runningParams, false);
 
   const resetMutation = useAdminResetQueryStats({
-    onSuccess: () => {
-      showToast.success('쿼리 통계를 리셋했습니다.');
-      if (tab === 'slow') slowQuery.refetch();
+    onSuccess: (res: unknown) => {
+      if (isApiSuccess(res)) {
+        showToast.success('쿼리 통계를 리셋했습니다.');
+        if (tab === 'slow') slowQuery.refetch();
+      } else {
+        showToast.error('리셋에 실패했습니다.');
+      }
     },
     onError: (error: unknown) => {
       logger.error('쿼리 통계 리셋 실패', error, { context: 'AdminQueryPerfPage' });

@@ -992,29 +992,30 @@ export default function GuildManagementPage() {
   }
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1.5, sm: 3 } }}>
-      <Box sx={{ mb: { xs: 2, md: 4 } }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
-          길드 관리
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          길드 정보 및 멤버를 관리할 수 있습니다
-        </Typography>
-      </Box>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pb: { xs: 4, md: 6 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 1.5, sm: 3 } }}>
+        <Box sx={{ mb: { xs: 2, md: 4 } }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>
+            길드 관리
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            길드 정보 및 멤버를 관리할 수 있습니다
+          </Typography>
+        </Box>
 
-      {/* 3열 레이아웃 */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: '1fr',
-            lg: 'repeat(3, 1fr)',
-          },
-          gap: { xs: 2, md: 3 },
-        }}
-      >
-        {/* 길드 기본 정보 */}
-        <Card sx={{ minWidth: 0 }}>
+        {/* PC: 2열 + 하단 전체 너비 / 모바일: 1열 */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              lg: 'repeat(2, minmax(0, 1fr))',
+            },
+            gap: { xs: 2, md: 3 },
+          }}
+        >
+          {/* 길드 기본 정보 */}
+          <Card sx={{ minWidth: 0 }}>
           <CardHeader
             avatar={<GroupIcon color="primary" />}
             title="길드 기본 정보"
@@ -1188,13 +1189,13 @@ export default function GuildManagementPage() {
                   </Box>
                 ) : (
                 <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
-                  <Table size="small" stickyHeader>
+                  <Table size="small" stickyHeader sx={{ tableLayout: 'fixed', width: '100%' }}>
                     <TableHead>
                       <TableRow>
-                        <TableCell align="center">사용자 ID</TableCell>
-                        <TableCell align="center">이름</TableCell>
-                        <TableCell align="center">권한</TableCell>
-                        {(isLeader || isManager) && <TableCell align="center">관리</TableCell>}
+                        <TableCell align="center" sx={{ width: '34%' }}>사용자 ID</TableCell>
+                        <TableCell align="center" sx={{ width: '26%' }}>이름</TableCell>
+                        <TableCell align="center" sx={{ width: '20%' }}>권한</TableCell>
+                        {(isLeader || isManager) && <TableCell align="center" sx={{ width: '20%' }}>관리</TableCell>}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1204,8 +1205,18 @@ export default function GuildManagementPage() {
 
                         return (
                           <TableRow key={member.user_id || `member-${index}`}>
-                            <TableCell align="center">{member.user_id}</TableCell>
-                            <TableCell align="center">{userName}</TableCell>
+                            <TableCell
+                              align="center"
+                              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'break-all' }}
+                            >
+                              {member.user_id}
+                            </TableCell>
+                            <TableCell
+                              align="center"
+                              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            >
+                              {userName}
+                            </TableCell>
                             <TableCell align="center">
                               <Chip
                                 label={getRoleLabel(guildRole)}
@@ -1248,8 +1259,8 @@ export default function GuildManagementPage() {
           </CardContent>
         </Card>
 
-        {/* 신청 인원 */}
-        <Card sx={{ minWidth: 0 }}>
+        {/* 신청 인원 — PC에서 전체 너비 */}
+        <Card sx={{ minWidth: 0, gridColumn: { lg: '1 / -1' }, maxWidth: { lg: 720 } }}>
           <CardHeader
             avatar={<PersonAddIcon color="primary" />}
             title={`가입 신청 (${pendingGuildJoinApplications.length}명)`}
@@ -1287,12 +1298,12 @@ export default function GuildManagementPage() {
                 </Box>
               ) : (
               <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, overflow: 'auto' }}>
-                <Table size="small" stickyHeader>
+                <Table size="small" stickyHeader sx={{ tableLayout: 'fixed', width: '100%' }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell align="center">사용자 ID</TableCell>
-                      <TableCell align="center">이름</TableCell>
-                      <TableCell align="center">처리</TableCell>
+                      <TableCell align="center" sx={{ width: '40%' }}>사용자 ID</TableCell>
+                      <TableCell align="center" sx={{ width: '35%' }}>이름</TableCell>
+                      <TableCell align="center" sx={{ width: '25%' }}>처리</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1300,8 +1311,18 @@ export default function GuildManagementPage() {
                       const applicationId = String(app.application_id);
                       return (
                         <TableRow key={applicationId}>
-                          <TableCell align="center">{app.user_id}</TableCell>
-                          <TableCell align="center">{app.user_name ?? app.user_nm}</TableCell>
+                          <TableCell
+                            align="center"
+                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', wordBreak: 'break-all' }}
+                          >
+                            {app.user_id}
+                          </TableCell>
+                          <TableCell
+                            align="center"
+                            sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          >
+                            {app.user_name ?? app.user_nm}
+                          </TableCell>
                           <TableCell align="center">
                             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                               <IconButton
@@ -1337,8 +1358,8 @@ export default function GuildManagementPage() {
           </CardContent>
         </Card>
 
-        {/* 길드원 활동 이력 */}
-        <Card sx={{ minWidth: 0 }}>
+        {/* 길드원 활동 이력 — PC에서 전체 너비 */}
+        <Card sx={{ minWidth: 0, gridColumn: { lg: '1 / -1' } }}>
           <CardHeader
             avatar={<HistoryIcon color="primary" />}
             title="길드원 활동 이력"
@@ -1548,7 +1569,8 @@ export default function GuildManagementPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Container>
+      </Container>
+    </Box>
   );
 }
 

@@ -50,6 +50,7 @@ import {
 import { apiClient } from '@/shared/lib/api/client';
 import { BATCH_MANUAL_RUN_TIMEOUT_MS } from '@/shared/constants';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { isApiSuccess } from '@/shared/lib/api/result';
 import { logger } from '@/shared/lib/logger';
 import { PageHeader } from '@/shared/ui';
 import { formatDate } from '@/shared/utils/format';
@@ -303,7 +304,7 @@ export default function BatchManagementPage() {
         );
         const logText = response.rslt_txt?.trim() || response.message || '결과가 없습니다.';
         setStreamLogText(logText);
-        const ok = response.result === 'SUCCESS' && response.rslt_cd === 'SUCCESS';
+        const ok = isApiSuccess(response) && response.rslt_cd === 'SUCCESS';
         setStreamLogStatus(ok ? 'success' : 'fail');
         if (ok) {
           showToast.success(response.message ?? '배치가 완료되었습니다.');

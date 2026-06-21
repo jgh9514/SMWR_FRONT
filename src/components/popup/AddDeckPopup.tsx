@@ -32,7 +32,7 @@ import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import { useMonsterList, type MonsterOption, useApiPostMutation } from '@/hooks/api';
 import { useResponsive } from '@/shared/hooks';
 import { showToast } from '@/shared/lib/notification';
-import { isPlainApiSuccess } from '@/shared/lib/api/result';
+import { isApiSuccess } from '@/shared/lib/api/result';
 import { getMonsterImageUrl } from '@/shared/utils/image';
 import DeckStatNumberField from '@/features/siege/components/DeckStatNumberField';
 import RuneSetPicker from '@/features/siege/components/RuneSetPicker';
@@ -185,7 +185,7 @@ export default function AddDeckPopup({
     deck_comment?: string;
   }>('/summonerswar/enemyTeam-save', {
     onSuccess: (res) => {
-      if (isPlainApiSuccess(res)) {
+      if (isApiSuccess(res)) {
         showToast.success('저장되었습니다.');
         void queryClient.invalidateQueries({ queryKey: ['/summonerswar/enemyTeam-list'] });
         void queryClient.invalidateQueries({ queryKey: ['/summonerswar/monster-detail-basic'] });

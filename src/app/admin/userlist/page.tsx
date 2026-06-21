@@ -38,6 +38,7 @@ import { useRouter } from 'next/navigation';
 import { useUserList, useUserSave } from '@/hooks/api';
 import { searchDataExtraction } from '@/shared/utils/util';
 import { showToast, confirm } from '@/shared/lib/notification';
+import { isApiSuccess } from '@/shared/lib/api/result';
 import { logger } from '@/shared/lib/logger';
 import type { UserItem } from '@/features/admin/types/admin';
 
@@ -58,11 +59,15 @@ export default function UserListPage() {
   const [editData, setEditData] = useState<Partial<UserItem>>({});
 
   const saveMutation = useUserSave({
-    onSuccess: () => {
-      showToast.success('수정되었습니다.');
-      setEditDialogOpen(false);
-      setEditData({});
-      refetchUserList();
+    onSuccess: (res) => {
+      if (isApiSuccess(res)) {
+        showToast.success('수정되었습니다.');
+        setEditDialogOpen(false);
+        setEditData({});
+        refetchUserList();
+      } else {
+        showToast.error('수정에 실패했습니다.');
+      }
     },
     onError: (error: unknown) => {
       logger.error('사용자 수정 실패', error, { context: 'UserListPage' });
