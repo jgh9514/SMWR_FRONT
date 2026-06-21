@@ -56,7 +56,7 @@ import {
   useGuildMemberActivityList,
 } from '@/hooks/api';
 import { showToast } from '@/shared/lib/notification';
-import { getApiResultMessage, isApiSuccess, unwrapApiData } from '@/shared/lib/api/result';
+import { getApiResultMessage, isApiSuccess, requireApiSuccess, unwrapApiData } from '@/shared/lib/api/result';
 import { handleApiError } from '@/shared/lib/error-handler';
 import { logger } from '@/shared/lib/logger';
 import RefreshIcon from '@mui/icons-material/Refresh';
@@ -664,6 +664,7 @@ export default function GuildManagementPage() {
           });
         }, 500);
       } else {
+        logger.warn('길드 저장 응답 성공 판별 실패', { response: res });
         showToast.error(getApiResultMessage(res, '길드 정보 저장에 실패했습니다.'));
       }
     },
@@ -695,12 +696,7 @@ export default function GuildManagementPage() {
   });
 
   // 길드 멤버 추방 Mutation
-  const updateMemberNameMutation = useUpdateGuildMemberName({
-    onError: (error: Error) => {
-      logger.error('멤버 이름 변경 실패', error);
-      showToast.error(error.message || '이름 변경에 실패했습니다.');
-    },
-  });
+  const updateMemberNameMutation = useUpdateGuildMemberName();
 
   const kickMemberMutation = useKickGuildMember({
     onSuccess: (res) => {
@@ -723,12 +719,7 @@ export default function GuildManagementPage() {
   });
 
   // 멤버 권한 변경 Mutation
-  const updateMemberRoleMutation = useUpdateGuildMemberRole({
-    onError: (error: Error) => {
-      logger.error('권한 변경 실패', error);
-      showToast.error(error.message || '권한 변경에 실패했습니다.');
-    },
-  });
+  const updateMemberRoleMutation = useUpdateGuildMemberRole();
 
   // 길드장 권한 위임 Mutation
   const transferLeadershipMutation = useTransferGuildLeadership({
@@ -855,10 +846,7 @@ export default function GuildManagementPage() {
           user_id: selectedMemberForEdit.user_id,
           user_nm: trimmedName,
         });
-        if (!isApiSuccess(nameRes)) {
-          showToast.error(getApiResultMessage(nameRes, '이름 변경에 실패했습니다.'));
-          return;
-        }
+        requireApiSuccess(nameRes, '이름 변경에 실패했습니다.');
       }
 
       if (roleChanged) {
@@ -871,19 +859,16 @@ export default function GuildManagementPage() {
           user_id: selectedMemberForEdit.user_id,
           guild_role: nextRole,
         });
-        if (!isApiSuccess(roleRes)) {
-          showToast.error(getApiResultMessage(roleRes, '권한 변경에 실패했습니다.'));
-          return;
-        }
+        requireApiSuccess(roleRes, '권한 변경에 실패했습니다.');
         syncUserGuildRoleInStorage(selectedMemberForEdit.user_id, nextRole);
       }
 
       showToast.success('저장되었습니다.');
       closeMemberEditDialog();
-      guildMembersQuery.refetch();
+      void guildMembersQuery.refetch();
     } catch (error) {
       logger.error('멤버 수정 실패', error);
-      showToast.error(handleApiError(error).message || '저장에 실패했습니다.');
+      showToast.error(error instanceof Error ? error.message : '저장에 실패했습니다.');
     }
   };
 
