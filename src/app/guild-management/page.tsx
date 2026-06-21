@@ -1003,14 +1003,11 @@ export default function GuildManagementPage() {
           </Typography>
         </Box>
 
-        {/* PC: 2열 + 하단 전체 너비 / 모바일: 1열 */}
+        {/* PC·모바일 공통: 테이블 섹션은 전체 너비 세로 스택 */}
         <Box
           sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              lg: 'repeat(2, minmax(0, 1fr))',
-            },
+            display: 'flex',
+            flexDirection: 'column',
             gap: { xs: 2, md: 3 },
           }}
         >
@@ -1026,7 +1023,13 @@ export default function GuildManagementPage() {
                 <CircularProgress />
               </Box>
             ) : guildSettingsQuery.data ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                  gap: 2,
+                }}
+              >
                 <Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     길드명
@@ -1070,7 +1073,7 @@ export default function GuildManagementPage() {
                   </FormControl>
                 </Box>
                 {(guildInfo.join_type === 'INVITE' || guildSettingsQuery.data?.join_type === 'INVITE') && (
-                  <Box>
+                  <Box sx={{ gridColumn: { md: '1 / -1' } }}>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                       초대코드
                     </Typography>
@@ -1097,7 +1100,7 @@ export default function GuildManagementPage() {
                     </Box>
                   </Box>
                 )}
-                <Box>
+                <Box sx={{ gridColumn: { md: '1 / -1' } }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     설명
                   </Typography>
@@ -1120,7 +1123,7 @@ export default function GuildManagementPage() {
                   </Typography>
                 </Box>
                 {(isLeader || isManager) && (
-                  <Box sx={{ mt: 2 }}>
+                  <Box sx={{ mt: { xs: 0, md: 0 }, gridColumn: { md: '1 / -1' } }}>
                     <Button
                       variant="contained"
                       fullWidth
@@ -1259,8 +1262,8 @@ export default function GuildManagementPage() {
           </CardContent>
         </Card>
 
-        {/* 신청 인원 — PC에서 전체 너비 */}
-        <Card sx={{ minWidth: 0, gridColumn: { lg: '1 / -1' }, maxWidth: { lg: 720 } }}>
+        {/* 신청 인원 */}
+        <Card sx={{ minWidth: 0 }}>
           <CardHeader
             avatar={<PersonAddIcon color="primary" />}
             title={`가입 신청 (${pendingGuildJoinApplications.length}명)`}
@@ -1358,8 +1361,8 @@ export default function GuildManagementPage() {
           </CardContent>
         </Card>
 
-        {/* 길드원 활동 이력 — PC에서 전체 너비 */}
-        <Card sx={{ minWidth: 0, gridColumn: { lg: '1 / -1' } }}>
+        {/* 길드원 활동 이력 */}
+        <Card sx={{ minWidth: 0 }}>
           <CardHeader
             avatar={<HistoryIcon color="primary" />}
             title="길드원 활동 이력"
